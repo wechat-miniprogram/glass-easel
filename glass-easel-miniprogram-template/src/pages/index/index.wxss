@@ -1,0 +1,9 @@
+.logo {
+  width: 256px;
+  margin: 0 auto;
+}
+
+.hello {
+  margin: 20px;
+  text-align: center;
+}

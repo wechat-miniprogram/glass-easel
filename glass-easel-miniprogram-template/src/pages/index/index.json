@@ -1,0 +1,6 @@
+{
+  "usingComponents": {
+    "view": "/components/view/view",
+    "image": "/components/image/image"
+  }
+}

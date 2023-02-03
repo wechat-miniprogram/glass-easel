@@ -1,0 +1,9 @@
+[workspace]
+members = [
+  "glass-easel-template-compiler",
+  "glass-easel-stylesheet-compiler",
+]
+
+[profile.release]
+opt-level = 3
+lto = true

@@ -1,0 +1,14 @@
+{
+    "compilerOptions": {
+        "strict": true,
+        "module": "es6",
+        "target": "es5",
+        "esModuleInterop": true,
+        "moduleResolution": "node",
+        "lib": ["ES6", "ES7", "DOM", "ESNext"]
+    },
+    "include": [
+        "src/**/*.ts",
+        "typings"
+    ]
+}

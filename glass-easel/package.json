@@ -1,0 +1,28 @@
+{
+  "name": "glass-easel",
+  "description": "The core module of the glass-easel project",
+  "version": "0.1.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wechat-miniprogram/glass-easel.git"
+  },
+  "keywords": ["glass-easel"],
+  "author": "wechat-miniprogram",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/wechat-miniprogram/glass-easel/issues"
+  },
+  "homepage": "https://github.com/wechat-miniprogram/glass-easel",
+  "main": "dist/index.js",
+  "scripts": {
+    "doc": "typedoc src/index.ts --excludePrivate --excludeProtected --excludeInternal",
+    "build": "webpack --config webpack.config.js",
+    "dev": "webpack --config webpack.config.js --watch",
+    "lint": "eslint src/**/*.ts",
+    "test": "jest -c jest.config.js",
+    "coverage": "jest -c jest.config.js --collect-coverage"
+  },
+  "devDependencies": {
+    "glass-easel-template-compiler": "*"
+  }
+}

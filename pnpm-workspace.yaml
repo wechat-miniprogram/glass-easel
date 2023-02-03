@@ -1,0 +1,7 @@
+packages:
+  - 'glass-easel'
+  - 'glass-easel-miniprogram-adapter'
+  - 'glass-easel-miniprogram-webpack-plugin'
+  - 'glass-easel-miniprogram-template'
+  - 'glass-easel-template-compiler'
+  - 'glass-easel-stylesheet-compiler'

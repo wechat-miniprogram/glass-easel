@@ -1,0 +1,29 @@
+{
+    "compilerOptions": {
+        "strictNullChecks": true,
+        "strictPropertyInitialization": true,
+        "noUncheckedIndexedAccess": true,
+        "useUnknownInCatchVariables": true,
+        "noImplicitAny": true,
+        "noImplicitOverride": true,
+        "noImplicitReturns": true,
+        "noImplicitThis": true,
+        "strictFunctionTypes": true,
+        "strictBindCallApply": true,
+        "module": "es6",
+        "target": "es5",
+        "esModuleInterop": true,
+        "moduleResolution": "node",
+        "lib": ["ES6", "ES7", "DOM", "ESNext"],
+        "types": ["jest", "node"],
+        "declaration": true,
+        "declarationMap": true,
+        "declarationDir": "dist/types",
+        "preserveConstEnums": true
+    },
+    "ts-node": {
+        "compilerOptions": {
+            "module": "CommonJS"
+        }
+    }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "glass-easel-stylesheet-compiler",
+  "description": "The stylesheet compiler of the glass-easel project.",
+  "version": "0.1.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wechat-miniprogram/glass-easel.git"
+  },
+  "keywords": ["glass-easel"],
+  "author": "wechat-miniprogram",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/wechat-miniprogram/glass-easel/issues"
+  },
+  "homepage": "https://github.com/wechat-miniprogram/glass-easel",
+  "files": [
+    "pkg-nodejs/glass_easel_stylesheet_compiler*",
+    "/README.md"
+  ],
+  "main": "pkg-nodejs/glass_easel_stylesheet_compiler.js",
+  "types": "pkg-nodejs/glass_easel_stylesheet_compiler.d.ts",
+  "scripts": {
+    "build": "wasm-pack build --target nodejs --out-dir pkg-nodejs"
+  }
+}
