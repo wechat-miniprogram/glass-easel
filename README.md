@@ -1,13 +1,12 @@
 <p align="center">
-  <img src="https://github.com/wechat-miniprogram/glass-easel/blob/master/logo_256.png" style="width: 128px" />
-  <h1>glass-easel</h1>
+  <img src="https://github.com/wechat-miniprogram/glass-easel/blob/master/logo_256.png" style="width: 128px; margin-bottom: -32px" />
+  <h1 style="text-align: center">glass-easel</h1>
 </p>
 <p align="center">
   the new component-based framework for WeChat MiniProgram
 </p>
-<p align="center">
-  ![npm](https://img.shields.io/npm/v/glass-easel?style=flat-square) ![crates.io](https://img.shields.io/crates/v/glass-easel-template-compiler?style=flat-square)
-</p>
+
+![npm](https://img.shields.io/npm/v/glass-easel?style=flat-square) ![crates.io](https://img.shields.io/crates/v/glass-easel-template-compiler?style=flat-square)
 
 [中文版 README](./README-zh_CN.md)
 
