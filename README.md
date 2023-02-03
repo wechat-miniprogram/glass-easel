@@ -113,7 +113,7 @@ If you are trying to implement a new feature for the MiniProgram SDK, please con
 
 The GitHub repository is the main repository of this project.
 
-If you are interested in new features that we are still implementing, refer to the [Road Map](TODO).
+If you are interested in new features that we are still implementing, refer to the [Road Map](https://github.com/wechat-miniprogram/glass-easel/milestones).
 
 ## LICENSE
 

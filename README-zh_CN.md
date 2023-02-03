@@ -96,7 +96,7 @@ glass-easel 还实现了一些新特性，未来将在小程序上可用。
 
 代码仓库管理方面：位于 GitHub 的仓库是主仓库。（出于集团信息安全方面的要求，项目开源前的 git 历史未在主仓库中保留，但开源后的会完整保留。）
 
-如果想要了解我们正在实现的新特性，请查看 [Road Map](TODO) 。
+如果想要了解我们正在实现的新特性，请查看 [Road Map](https://github.com/wechat-miniprogram/glass-easel/milestones) 。
 
 ## LICENSE
 
