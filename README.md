@@ -1,6 +1,13 @@
-![logo](./logo_256.png)
-
-# glass-easel : the new component-based framework for WeChat MiniProgram
+<p align="center">
+  <img src="https://github.com/wechat-miniprogram/glass-easel/blob/master/logo_256.png" style="width: 128px" />
+  <h1>glass-easel</h1>
+</p>
+<p align="center">
+  the new component-based framework for WeChat MiniProgram
+</p>
+<p align="center">
+  ![npm](https://img.shields.io/npm/v/glass-easel?style=flat-square) ![crates.io](https://img.shields.io/crates/v/glass-easel-template-compiler?style=flat-square)
+</p>
 
 [中文版 README](./README-zh_CN.md)
 
@@ -55,7 +62,7 @@ If you try to compile them, [rust](https://www.rust-lang.org/) 和 [wasm-pack](h
 | glass-easel-template-compiler          | rust       | The template compiler                      |
 | glass-easel-stylesheet-compiler        | rust       | The stylesheet compiler                    |
 
-## Guide for Users
+## Guides for Users
 
 Like common npm packages, each submodule can be installed as you need. For example:
 
