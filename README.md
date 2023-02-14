@@ -82,8 +82,8 @@ Furthermore, TypeScript modules contains TSDoc documents, which can be built wit
 For each submodule:
 
 - _glass-easel_ is a part of the MiniProgram runtime;
-- _glass-easel-template-compiler_ and _glass-easel-stylesheet-compiler_ is a part of the MiniProgram compiler;
-- _glass-easel-miniprogram-adapter_ and _glass-easel-miniprogram-webpack-plugin_ is not a part, because they are designed for simulation on web environments.
+- _glass-easel-template-compiler_ and _glass-easel-stylesheet-compiler_ are parts of the MiniProgram compiler;
+- _glass-easel-miniprogram-adapter_ and _glass-easel-miniprogram-webpack-plugin_ are not, because they are designed for simulation on web environments.
 
 However, no MiniProgram code can use any _glass-easel_ submodules currently, because we are still checking the interface stabilities and compatibilities. When stable enough, MiniProgram code will be able to use _glass-easel_ as the framework implementation.
 
@@ -99,7 +99,7 @@ We will consider do another implementation on web in future.
 
 Some features of _glass-easel_ are designed as new features, which will be available in MiniProgram environments.
 
-However, some advanced features - like custom backend, custom template engine, external components, etc - are impossible to use in MiniProgram code, because of the special environment limitation and some security strategies. If you are writing code that shares between web and MiniProgram, please refer to the _custom components_ interface of MiniProgram, avoiding the use of these unavailable features.
+However, some advanced features - like custom backend, custom template engine, external components, etc. - are impossible to use in MiniProgram code, because of the special environment limitation and some security strategies. If you are writing code that shares between web and MiniProgram, please refer to the _custom components_ interface of MiniProgram and avoid the use of these unavailable features.
 
 ### What are the differences between _glass-easel_ and the legacy framework?
 
