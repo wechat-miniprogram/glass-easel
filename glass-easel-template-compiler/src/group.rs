@@ -1,7 +1,7 @@
 //! The template group for cross references
 
 use crate::escape::gen_lit_str;
-use crate::proc_gen::{JsExprWriter, JsFunctionScopeWriter, JsWriter};
+use crate::proc_gen::{JsFunctionScopeWriter, JsWriter};
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Write;
@@ -210,37 +210,32 @@ impl TmplGroup {
         Ok(w.finish())
     }
 
-    fn gen_object_groups_body(&self, w: &mut JsExprWriter<String>) -> Result<(), TmplError> {
-        w.paren(|w| {
-            w.function(|w| {
-                runtime_fns(w)?;
-                w.expr_stmt(|w| {
-                    write!(w, "var G={{}}")?;
-                    Ok(())
-                })?;
-                for (path, tree) in self.trees.iter() {
-                    w.expr_stmt(|w| {
-                        write!(w, r#"G[{}]="#, gen_lit_str(path))?;
-                        tree.to_proc_gen(w, self)?;
-                        Ok(())
-                    })?;
-                }
-                w.expr_stmt(|w| {
-                    write!(w, "return G")?;
-                    Ok(())
-                })?;
-                Ok(())
-            })
-        })?;
-        w.paren(|_| Ok(()))?;
-        Ok(())
-    }
-
     /// Convert all to WXML GenObject js string
     pub fn get_tmpl_gen_object_groups(&self) -> Result<String, TmplError> {
         let mut w = JsWriter::new(String::new());
         w.expr_scope(|w| {
-            self.gen_object_groups_body(w)?;
+            w.paren(|w| {
+                w.function(|w| {
+                    runtime_fns(w)?;
+                    w.expr_stmt(|w| {
+                        write!(w, "var G={{}}")?;
+                        Ok(())
+                    })?;
+                    for (path, tree) in self.trees.iter() {
+                        w.expr_stmt(|w| {
+                            write!(w, r#"G[{}]="#, gen_lit_str(path))?;
+                            tree.to_proc_gen(w, self)?;
+                            Ok(())
+                        })?;
+                    }
+                    w.expr_stmt(|w| {
+                        write!(w, "return G")?;
+                        Ok(())
+                    })?;
+                    Ok(())
+                })
+            })?;
+            w.paren(|_| Ok(()))?;
             Ok(())
         })?;
         Ok(w.finish())
@@ -249,15 +244,28 @@ impl TmplGroup {
     /// Convert all to WXML GenObject js string, with wx environment support
     pub fn get_wx_gen_object_groups(&self) -> Result<String, TmplError> {
         let mut w = JsWriter::new(String::new());
-        write!(
-            w,
-            r#"if(typeof __wxAppCode__==='undefined')__wxAppCode__={{}};Object.assign(__wxAppCode__,"#
-        )?;
         w.expr_scope(|w| {
-            self.gen_object_groups_body(w)?;
+            w.paren(|w| {
+                w.function(|w| {
+                    runtime_fns(w)?;
+                    w.expr_stmt(|w| {
+                        write!(w, "var G={{}}")?;
+                        Ok(())
+                    })?;
+                    for (path, tree) in self.trees.iter() {
+                        w.expr_stmt(|w| {
+                            write!(w, r#"__wxCodeSpace__.addCompiledTemplate({path},{{groupList:G,content:G[{path}]="#, path = gen_lit_str(path))?;
+                            tree.to_proc_gen(w, self)?;
+                            write!(w, "}})")?;
+                            Ok(())
+                        })?;
+                    }
+                    Ok(())
+                })
+            })?;
+            w.paren(|_| Ok(()))?;
             Ok(())
         })?;
-        write!(w, r#");"#)?;
         Ok(w.finish())
     }
 
