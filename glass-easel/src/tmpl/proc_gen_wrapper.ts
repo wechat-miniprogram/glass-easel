@@ -25,7 +25,6 @@ export type UpdatePathTreeRoot = UpdatePathTreeNode | undefined
 type TmplArgs = {
   key?: number | string,
   keyList?: RangeListManager,
-  scopeData?: unknown, // for wx:scope-data
   dynEvListeners?: {
     [name: string]: (ev: ShadowedEvent<unknown>) => boolean | undefined,
   },
@@ -909,12 +908,6 @@ export class ProcGenWrapper {
       dynEvListeners[evName] = listener
     }
     if (handlerName) elem.addListener(evName, listener, evOptions)
-  }
-
-  // set scope-data
-  sd(elem: Element, scopeData: unknown) {
-    const tmplArgs = getTmplArgs(elem)
-    tmplArgs.scopeData = scopeData
   }
 
   // update a property or external class of a component, or an attribute of a native node

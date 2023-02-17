@@ -463,7 +463,6 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                         let mut attr_for_index = None;
                         let mut attr_key = None;
                         let mut attr_slot = None;
-                        let mut scope_data = None;
                         let mut slot_values: Vec<(String, String)> = Vec::with_capacity(0);
                         let mut generics: Option<HashMap<String, String>> = None;
 
@@ -484,7 +483,6 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                                             attr_for_index = Some(attr.value.static_value())
                                         }
                                         "key" => attr_key = Some(attr.value.static_value()),
-                                        "scope-data" => scope_data = Some(attr.value),
                                         _ => {}
                                     }
                                     continue;
@@ -643,7 +641,6 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                             _ => {}
                         }
                         elem.generics = generics;
-                        elem.scope_data = scope_data;
                         elem.slot = attr_slot;
 
                         // a helper for generating middle virtual node

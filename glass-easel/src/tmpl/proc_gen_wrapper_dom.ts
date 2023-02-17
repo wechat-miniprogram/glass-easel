@@ -25,7 +25,6 @@ import type {
 type TmplArgs = {
   key?: number | string,
   keyList?: RangeListManager,
-  scopeData?: unknown, // for wx:scope-data
   dynEvListeners?: {
     [name: string]: (ev: ShadowedEvent<unknown>) => boolean | undefined,
   },
@@ -211,11 +210,6 @@ export class ProcGenWrapperDom {
       if (final) return false
       return ret
     })
-  }
-
-  // set scope-data
-  sd() {
-    noop()
   }
 
   // update a property or external class of a component, or an attribute of a native node

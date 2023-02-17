@@ -59,7 +59,6 @@ pub(crate) struct TmplElement {
     pub(crate) children: Vec<TmplNode>,
     pub(crate) generics: Option<HashMap<String, String>>,
     pub(crate) extra_attr: Option<HashMap<String, String>>,
-    pub(crate) scope_data: Option<TmplAttrValue>,
     pub(crate) slot: Option<TmplAttrValue>,
     pub(crate) slot_values: Vec<(String, String)>,
 }
@@ -506,7 +505,6 @@ impl TmplElement {
             children: vec![],
             generics: None,
             extra_attr: None,
-            scope_data: None,
             slot: None,
             slot_values: Vec::with_capacity(0),
         }
@@ -601,44 +599,6 @@ impl TmplElement {
         group: &TmplGroup,
         cur_path: &str,
     ) -> Result<(), TmplError> {
-        if let Some(scope_data) = self.scope_data.as_ref() {
-            match &scope_data {
-                TmplAttrValue::Static(v) => {
-                    w.expr_stmt(|w| {
-                        write!(w, "if(C)R.sd(N,{})", gen_lit_str(v))?;
-                        Ok(())
-                    })?;
-                }
-                TmplAttrValue::Dynamic {
-                    expr,
-                    binding_map_keys,
-                } => {
-                    let p = expr.to_proc_gen_prepare(w, scopes)?;
-                    w.expr_stmt(|w| {
-                        write!(w, "if(C||K||")?;
-                        p.lvalue_state_expr(w, scopes)?;
-                        write!(w, ")R.sd(N,")?;
-                        p.value_expr(w)?;
-                        write!(w, ")")?;
-                        Ok(())
-                    })?;
-                    if let Some(binding_map_keys) = binding_map_keys {
-                        if !binding_map_keys.is_empty(bmc) {
-                            binding_map_keys.to_proc_gen_write_map(w, bmc, |w| {
-                                let p = expr.to_proc_gen_prepare(w, scopes)?;
-                                w.expr_stmt(|w| {
-                                    write!(w, "R.sd(N,")?;
-                                    p.value_expr(w)?;
-                                    write!(w, ")")?;
-                                    Ok(())
-                                })
-                            })?;
-                        }
-                    }
-                }
-            }
-        }
-
         match &self.virtual_type {
             TmplVirtualType::None => {
                 enum SlotKind<'a> {
@@ -1217,22 +1177,15 @@ impl fmt::Display for TmplElement {
                 })
                 .unwrap_or_default()
         };
-        let scope_data_seg = {
-            self.scope_data
-                .as_ref()
-                .map(|scope_data| format!(" wx-scope-data={}", scope_data))
-                .unwrap_or_default()
-        };
         write!(
             f,
-            "<{}{}{}{}{}{}{}>{}</{}>",
+            "<{}{}{}{}{}{}>{}</{}>",
             &self.tag_name,
             virtual_string,
             attr_strings.join(""),
             generics_seg,
             slot_props_seg,
             extra_attr_seg,
-            scope_data_seg,
             children_strings.join(""),
             &self.tag_name
         )
