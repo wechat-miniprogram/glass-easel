@@ -1214,6 +1214,7 @@ impl TmplExprProcGen {
                 None
             }
         } else {
+            write!(w, "null")?;
             None
         };
         Ok(ret)
