@@ -2,7 +2,7 @@
 
 const fs = require('fs').promises
 const path = require('path')
-const { NormalModule } = require('webpack')
+const webpack = require('webpack')
 const { RawSource } = require('webpack-sources')
 const VirtualModulesPlugin = require('webpack-virtual-modules')
 const chokidar = require('chokidar')
@@ -253,7 +253,7 @@ class GlassEaselMiniprogramWebpackPlugin {
 
     // add loaders
     compiler.hooks.compilation.tap(PLUGIN_NAME, (compilation) => {
-      NormalModule.getCompilationHooks(compilation).beforeLoaders
+      webpack.NormalModule.getCompilationHooks(compilation).beforeLoaders
         .tap(PLUGIN_NAME, (loaders, mod) => {
           const absPath = mod.resource
           const extName = path.extname(absPath)
