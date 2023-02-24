@@ -746,9 +746,8 @@ impl TmplExpr {
                 pas
             }
             TmplExpr::FuncCall(x, y) => {
-                write!(value, "W(")?; // TODO use the imported map
                 x.to_proc_gen_rec_and_end_path(w, scopes, TmplExprLevel::Cond, path_calc, value)?;
-                write!(value, ",[")?;
+                write!(value, "(")?;
                 for (i, y) in y.iter().enumerate() {
                     if i > 0 {
                         write!(value, ",")?;
@@ -761,7 +760,7 @@ impl TmplExpr {
                         value,
                     )?;
                 }
-                write!(value, "])")?;
+                write!(value, ")")?;
                 PathAnalysisState::NotInPath
             }
 

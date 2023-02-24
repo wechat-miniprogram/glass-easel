@@ -114,6 +114,19 @@ impl<'a, W: fmt::Write> JsFunctionScopeWriter<'a, W> {
         JsIdent { name: var_name }
     }
 
+    pub(crate) fn custom_stmt(
+        &mut self,
+        content: &str,
+    ) -> Result<(), TmplError> {
+        if self.block.need_stat_sep {
+            write!(&mut self.w, ";")?;
+        } else {
+            self.block.need_stat_sep = false;
+        }
+        write!(&mut self.w, "{}", content)?;
+        Ok(())
+    }
+
     fn stat<R>(
         &mut self,
         f: impl FnOnce(&mut Self) -> Result<R, TmplError>,

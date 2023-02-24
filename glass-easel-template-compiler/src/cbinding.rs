@@ -164,8 +164,8 @@ impl TmplGroup {
     }
 
     #[no_mangle]
-    pub extern "C" fn tmpl_group_get_runtime_string(&self) -> StrRef {
-        group::TmplGroup::get_runtime_string().into()
+    pub unsafe extern "C" fn tmpl_group_get_runtime_string(&self) -> StrRef {
+        self.inner().get_runtime_string().into()
     }
 
     #[no_mangle]

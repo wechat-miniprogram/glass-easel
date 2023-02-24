@@ -37,8 +37,8 @@ impl TmplGroup {
     }
 
     #[wasm_bindgen(js_name = "getRuntimeString")]
-    pub fn get_runtime_string() -> String {
-        crate::TmplGroup::get_runtime_string()
+    pub fn get_runtime_string(&self) -> String {
+        self.group.get_runtime_string()
     }
 
     #[wasm_bindgen(js_name = "getRuntimeVarList")]

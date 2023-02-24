@@ -34,6 +34,7 @@ pub struct TmplTree {
     pub(crate) includes: Vec<String>,
     pub(crate) sub_templates: HashMap<String, TmplElement>,
     pub(crate) binding_map_collector: BindingMapCollector,
+    pub(crate) scripts: Vec<TmplScript>,
 }
 
 #[derive(Debug)]
@@ -144,6 +145,18 @@ pub(crate) enum TmplAttrValue {
     },
 }
 
+#[derive(Debug)]
+pub(crate) enum TmplScript {
+    Inline {
+        module_name: String,
+        content: String,
+    },
+    GlobalRef {
+        module_name: String,
+        rel_path: String,
+    },
+}
+
 impl TmplTree {
     pub(crate) fn new() -> Self {
         Self {
@@ -153,6 +166,7 @@ impl TmplTree {
             includes: vec![],
             sub_templates: HashMap::new(),
             binding_map_collector: BindingMapCollector::new(),
+            scripts: vec![],
         }
     }
 
@@ -187,6 +201,27 @@ impl TmplTree {
                     write!(w, "var P={}", gen_lit_str(&self.path))?;
                     Ok(())
                 })?;
+                w.expr_stmt(|w| {
+                    write!(w, "var Q={{}}")?;
+                    Ok(())
+                })?;
+                for script in &self.scripts {
+                    match script {
+                        TmplScript::GlobalRef { module_name, rel_path } => {
+                            let abs_path = crate::group::path::resolve(&self.path, &rel_path);
+                            w.expr_stmt(|w| {
+                                write!(w, "var Q[{}]=R[{}]", gen_lit_str(module_name), gen_lit_str(&abs_path))?;
+                                Ok(())
+                            })?;
+                        }
+                        TmplScript::Inline { module_name, content } => {
+                            w.expr_stmt(|w| {
+                                write!(w, "var Q[{}]={}", gen_lit_str(module_name), content)?;
+                                Ok(())
+                            })?;
+                        }
+                    }
+                }
                 w.expr_stmt(|w| {
                     write!(w, "var H={{}}")?;
                     Ok(())
@@ -233,7 +268,6 @@ impl TmplTree {
                                     };
                                 }
                                 declare_shortcut!("L", "c");
-                                declare_shortcut!("Q", "y");
                                 declare_shortcut!("M", "m");
                                 declare_shortcut!("O", "r");
                                 w.expr_stmt(|w| {
@@ -1305,7 +1339,7 @@ impl TmplAttr {
                 write_value!("L");
             }
             TmplAttrKind::Style => {
-                write_value!("Q");
+                write_value!("R.y");
             }
             TmplAttrKind::ModelProperty { name }
             | TmplAttrKind::PropertyOrExternalClass { name } => {

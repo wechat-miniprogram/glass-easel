@@ -25,8 +25,8 @@ use super::*;
 // N: the `Node` to operate (may be undefined)
 // O: = R.r
 // P: the current path
-// Q: = R.y
-// R: the `ProcGenWrapper` object
+// Q: the script module of the current group
+// R: the global script module / the `ProcGenWrapper` object
 // S: the `DefineSlot` function
 // T: the `DefineTextNode` function / the `updateText` function
 // U: the update path tree
@@ -140,6 +140,8 @@ pub(crate) mod path {
 /// A template group in which the templates can ref each other.
 pub struct TmplGroup {
     trees: HashMap<String, TmplTree>,
+    scripts: HashMap<String, String>,
+    extra_runtime_string: String,
 }
 
 impl fmt::Debug for TmplGroup {
@@ -157,6 +159,8 @@ impl TmplGroup {
     pub fn new() -> Self {
         Self {
             trees: HashMap::new(),
+            scripts: HashMap::new(),
+            extra_runtime_string: String::new(),
         }
     }
 
@@ -178,15 +182,40 @@ impl TmplGroup {
         Ok(())
     }
 
+    /// Get a script segment in the group.
+    pub fn get_script(&mut self, path: &str) -> Result<&str, TmplError> {
+        match self.scripts.get(path) {
+            Some(x) => Ok(x.as_str()),
+            None => Err(TmplError {
+                message: format!(r#"no script "{}" found"#, path),
+            }),
+        }
+    }
+
+    /// Add a script segment into the group.
+    /// 
+    /// The `content` must be a valid JavaScript expression.
+    pub fn add_script(&mut self, path: String, content: &str) -> Result<(), TmplParseError> {
+        self.scripts.insert(path, content.to_string());
+        Ok(())
+    }
+
+    /// Set extra runtime string.
+    /// 
+    /// The `content` must be valid JavaScript statements (not a expression).
+    pub fn set_extra_runtime_string(&mut self, content: &str) {
+        self.extra_runtime_string = content.to_string();
+    }
+
     /// Output js runtime environment js code string.
-    pub fn get_runtime_string() -> String {
+    pub fn get_runtime_string(&self) -> String {
         let mut w = JsWriter::new(String::new());
         w.function_scope(|w| {
             runtime_fns(w)?;
             Ok(())
         })
         .unwrap();
-        w.finish()
+        w.finish() + self.extra_runtime_string.as_str()
     }
 
     /// Output js runtime environment js var name list.
@@ -210,13 +239,31 @@ impl TmplGroup {
         Ok(w.finish())
     }
 
+    fn write_group_global_content(&self, w: &mut JsFunctionScopeWriter<String>) -> Result<(), TmplError> {
+        runtime_fns(w)?;
+        w.custom_stmt(&self.extra_runtime_string)?;
+        if self.scripts.len() > 0 {
+            w.expr_stmt(|w| {
+                write!(w, "var R={{}}")?;
+                Ok(())
+            })?;
+            for (p, script) in self.scripts.iter() {
+                w.expr_stmt(|w| {
+                    write!(w, r#"R[{}]={}"#, p, script)?;
+                    Ok(())
+                })?;
+            }
+        }
+        Ok(())
+    }
+
     /// Convert all to WXML GenObject js string
     pub fn get_tmpl_gen_object_groups(&self) -> Result<String, TmplError> {
         let mut w = JsWriter::new(String::new());
         w.expr_scope(|w| {
             w.paren(|w| {
                 w.function(|w| {
-                    runtime_fns(w)?;
+                    self.write_group_global_content(w)?;
                     w.expr_stmt(|w| {
                         write!(w, "var G={{}}")?;
                         Ok(())
@@ -247,7 +294,7 @@ impl TmplGroup {
         w.expr_scope(|w| {
             w.paren(|w| {
                 w.function(|w| {
-                    runtime_fns(w)?;
+                    self.write_group_global_content(w)?;
                     w.expr_stmt(|w| {
                         write!(w, "var G={{}}")?;
                         Ok(())
