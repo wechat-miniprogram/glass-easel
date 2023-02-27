@@ -662,8 +662,8 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                                         // FIXME warn unused attr
                                     }
                                 }
-                                scripts.push(TmplScript::GlobalRef { module_name, rel_path: src })
-                                
+                                scripts.push(TmplScript::GlobalRef { module_name, rel_path: src });
+                                continue;
                             }
                             _ => {}
                         }
@@ -898,10 +898,16 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                 }
             }
         }
+        let scope_names = tree.scripts.iter().map(|script| {
+            match script {
+                TmplScript::Inline { module_name, .. } => module_name.to_string(),
+                TmplScript::GlobalRef { module_name, .. } => module_name.to_string(),
+            }
+        }).collect();
         rec(
             &mut tree.root,
             &mut tree.binding_map_collector,
-            &vec![],
+            &scope_names,
             false,
         );
         for tmpl in tree.sub_templates.values_mut() {

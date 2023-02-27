@@ -190,6 +190,20 @@ impl TmplTree {
         ret
     }
 
+    pub(crate) fn get_script_dependencies(&self) -> Vec<String> {
+        let mut ret = vec![];
+        for script in self.scripts.iter() {
+            match script {
+                TmplScript::GlobalRef { rel_path, .. } => {
+                    let abs_path = crate::group::path::resolve(&self.path, &rel_path);
+                    ret.push(abs_path);
+                }
+                TmplScript::Inline { .. } => {}
+            }
+        }
+        ret
+    }
+
     pub(crate) fn to_proc_gen<W: std::fmt::Write>(
         &self,
         w: &mut JsExprWriter<W>,
@@ -201,27 +215,6 @@ impl TmplTree {
                     write!(w, "var P={}", gen_lit_str(&self.path))?;
                     Ok(())
                 })?;
-                w.expr_stmt(|w| {
-                    write!(w, "var Q={{}}")?;
-                    Ok(())
-                })?;
-                for script in &self.scripts {
-                    match script {
-                        TmplScript::GlobalRef { module_name, rel_path } => {
-                            let abs_path = crate::group::path::resolve(&self.path, &rel_path);
-                            w.expr_stmt(|w| {
-                                write!(w, "var Q[{}]=R[{}]", gen_lit_str(module_name), gen_lit_str(&abs_path))?;
-                                Ok(())
-                            })?;
-                        }
-                        TmplScript::Inline { module_name, content } => {
-                            w.expr_stmt(|w| {
-                                write!(w, "var Q[{}]={}", gen_lit_str(module_name), content)?;
-                                Ok(())
-                            })?;
-                        }
-                    }
-                }
                 w.expr_stmt(|w| {
                     write!(w, "var H={{}}")?;
                     Ok(())
@@ -300,6 +293,25 @@ impl TmplTree {
                         })
                     };
                 let scopes = &mut vec![];
+                for script in &self.scripts {
+                    let ident = w.gen_ident();
+                    match script {
+                        TmplScript::GlobalRef { module_name: _, rel_path } => {
+                            let abs_path = crate::group::path::resolve(&self.path, &rel_path);
+                            w.expr_stmt(|w| {
+                                write!(w, r#"var {}=R[{}]"#, ident, gen_lit_str(&abs_path))?;
+                                Ok(())
+                            })?;
+                        }
+                        TmplScript::Inline { module_name: _, content } => {
+                            w.expr_stmt(|w| {
+                                write!(w, "var {}={}", ident, content)?;
+                                Ok(())
+                            })?;
+                        }
+                    }
+                    scopes.push(ScopeVar { var: ident, update_path_tree: None, lvalue_path: None })
+                }
                 for (k, v) in self.sub_templates.iter() {
                     let bmc = BindingMapCollector::new();
                     write_template_item(k, w, scopes, &bmc, &v.children)?;
@@ -440,7 +452,7 @@ impl TmplNode {
                             slot_value_count += 1;
                             scopes.push(ScopeVar {
                                 var: var_scope.clone(),
-                                update_path_tree: var_update_path_tree.clone(),
+                                update_path_tree: Some(var_update_path_tree.clone()),
                                 lvalue_path: None,
                             });
                         }
@@ -934,12 +946,12 @@ impl TmplElement {
                     w.function_args(&children_args, |w| {
                         scopes.push(ScopeVar {
                             var: var_scope_item,
-                            update_path_tree: var_scope_item_update_path_tree,
+                            update_path_tree: Some(var_scope_item_update_path_tree),
                             lvalue_path: Some(var_scope_item_lvalue_path),
                         });
                         scopes.push(ScopeVar {
                             var: var_scope_index,
-                            update_path_tree: var_scope_index_update_path_tree,
+                            update_path_tree: Some(var_scope_index_update_path_tree),
                             lvalue_path: None,
                         });
                         TmplNode::to_proc_gen_define_children_content(

@@ -25,7 +25,7 @@ use super::*;
 // N: the `Node` to operate (may be undefined)
 // O: = R.r
 // P: the current path
-// Q: the script module of the current group
+// Q
 // R: the global script module / the `ProcGenWrapper` object
 // S: the `DefineSlot` function
 // T: the `DefineTextNode` function / the `updateText` function
@@ -223,9 +223,14 @@ impl TmplGroup {
         runtime_var_list()
     }
 
-    /// Convert to WXML GenObject js string.
+    /// Get direct dependency template files.
     pub fn get_direct_dependencies(&self, path: &str) -> Result<Vec<String>, TmplError> {
         Ok(self.get_tree(path)?.get_direct_dependencies())
+    }
+
+    /// Get dependency script files.
+    pub fn get_script_dependencies(&self, path: &str) -> Result<Vec<String>, TmplError> {
+        Ok(self.get_tree(path)?.get_script_dependencies())
     }
 
     /// Convert to WXML GenObject js string.
@@ -241,7 +246,9 @@ impl TmplGroup {
 
     fn write_group_global_content(&self, w: &mut JsFunctionScopeWriter<String>) -> Result<(), TmplError> {
         runtime_fns(w)?;
-        w.custom_stmt(&self.extra_runtime_string)?;
+        if self.extra_runtime_string.len() > 0 {
+            w.custom_stmt(&self.extra_runtime_string)?;
+        }
         if self.scripts.len() > 0 {
             w.expr_stmt(|w| {
                 write!(w, "var R={{}}")?;
@@ -249,7 +256,7 @@ impl TmplGroup {
             })?;
             for (p, script) in self.scripts.iter() {
                 w.expr_stmt(|w| {
-                    write!(w, r#"R[{}]={}"#, p, script)?;
+                    write!(w, r#"R[{}]={}"#, gen_lit_str(p), script)?;
                     Ok(())
                 })?;
             }

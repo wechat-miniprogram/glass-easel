@@ -222,6 +222,6 @@ impl<'a, W: fmt::Write> fmt::Write for JsExprWriter<'a, W> {
 
 pub(crate) struct ScopeVar {
     pub(crate) var: JsIdent,
-    pub(crate) update_path_tree: JsIdent,
+    pub(crate) update_path_tree: Option<JsIdent>,
     pub(crate) lvalue_path: Option<JsIdent>,
 }
