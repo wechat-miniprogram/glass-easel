@@ -175,9 +175,9 @@ impl TmplGroup {
     }
 
     /// Add a template into the group.
-    pub fn add_tmpl(&mut self, path: String, tmpl_str: &str) -> Result<(), TmplParseError> {
+    pub fn add_tmpl(&mut self, path: &str, tmpl_str: &str) -> Result<(), TmplParseError> {
         let mut tmpl = parse_tmpl(tmpl_str)?;
-        tmpl.path = path;
+        tmpl.path = path.to_string();
         self.trees.insert(tmpl.path.clone(), tmpl);
         Ok(())
     }
@@ -194,16 +194,18 @@ impl TmplGroup {
 
     /// Add a script segment into the group.
     /// 
-    /// The `content` must be a valid JavaScript expression.
-    pub fn add_script(&mut self, path: String, content: &str) -> Result<(), TmplParseError> {
-        self.scripts.insert(path, content.to_string());
+    /// The `content` must be a valid JavaScript function expression.
+    /// Whenever the script is used in the template through a `<wxs>` element,
+    /// This function is called and the return value is used as the value of the `<wxs>` module.
+    pub fn add_script(&mut self, path: &str, content: &str) -> Result<(), TmplParseError> {
+        self.scripts.insert(path.to_string(), content.to_string());
         Ok(())
     }
 
     /// Set extra runtime string.
     /// 
-    /// The `content` must be valid JavaScript statements (not a expression).
-    pub fn set_extra_runtime_string(&mut self, content: &str) {
+    /// The `content` must be valid JavaScript statements (not an expression).
+    pub fn set_extra_runtime_script(&mut self, content: &str) {
         self.extra_runtime_string = content.to_string();
     }
 

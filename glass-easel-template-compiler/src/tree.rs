@@ -299,7 +299,7 @@ impl TmplTree {
                         TmplScript::GlobalRef { module_name: _, rel_path } => {
                             let abs_path = crate::group::path::resolve(&self.path, &rel_path);
                             w.expr_stmt(|w| {
-                                write!(w, r#"var {}=R[{}]"#, ident, gen_lit_str(&abs_path))?;
+                                write!(w, r#"var {}=R[{}]()"#, ident, gen_lit_str(&abs_path))?;
                                 Ok(())
                             })?;
                         }

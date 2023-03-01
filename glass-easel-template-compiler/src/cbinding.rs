@@ -139,9 +139,25 @@ impl TmplGroup {
         content_buf: &u8,
         content_len: usize,
     ) -> TmplParseResult {
-        let path = String::from_utf8_lossy(slice::from_raw_parts(path_buf, path_len)).to_string();
+        let path = String::from_utf8_lossy(slice::from_raw_parts(path_buf, path_len));
         let content = String::from_utf8_lossy(slice::from_raw_parts(content_buf, content_len));
-        match self.inner_mut().add_tmpl(path, &content) {
+        match self.inner_mut().add_tmpl(&path, &content) {
+            Ok(_) => TmplParseResult::ok(),
+            Err(e) => TmplParseResult::from(e),
+        }
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn tmpl_group_add_script(
+        &mut self,
+        path_buf: &u8,
+        path_len: usize,
+        content_buf: &u8,
+        content_len: usize,
+    ) -> TmplParseResult {
+        let path = String::from_utf8_lossy(slice::from_raw_parts(path_buf, path_len));
+        let content = String::from_utf8_lossy(slice::from_raw_parts(content_buf, content_len));
+        match self.inner_mut().add_script(&path, &content) {
             Ok(_) => TmplParseResult::ok(),
             Err(e) => TmplParseResult::from(e),
         }
@@ -166,6 +182,16 @@ impl TmplGroup {
     #[no_mangle]
     pub unsafe extern "C" fn tmpl_group_get_runtime_string(&self) -> StrRef {
         self.inner().get_runtime_string().into()
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn tmpl_group_set_extra_runtime_script(
+        &mut self,
+        content_buf: &u8,
+        content_len: usize,
+    ) {
+        let content = String::from_utf8_lossy(slice::from_raw_parts(content_buf, content_len));
+        self.inner_mut().set_extra_runtime_script(&content);
     }
 
     #[no_mangle]

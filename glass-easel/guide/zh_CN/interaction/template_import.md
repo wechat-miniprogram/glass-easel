@@ -1,4 +1,4 @@
-# 多文件模板
+# 模板引用
 
 ## 模板片段
 
@@ -92,3 +92,60 @@ group.addTmpl('path/to/a/component', `
   </div>
 `)
 ```
+
+## 嵌入 JavaScript 代码
+
+在编译多个模板的同时，可以嵌入若干段 JavaScript 代码，与模板一同生成编译结果。
+
+嵌入的 JavaScript 代码必须是一个合法的 JavaScript 函数表达式，这个函数需要返回一个对象值。
+
+如果需要嵌入 JavaScript 文件内容，可以把它用函数包裹起来，例如：
+
+```js
+function () {
+  const exports = {}
+
+  // JavaScript 文件内容
+  // ...
+
+  return exports
+}
+```
+
+类似于模板文件，每段 JavaScript 代码也都有一个路径。嵌入的方式形如：
+
+```js
+group.addScript('path/to/script', `
+  function () {
+    const exports = {}
+    // ...
+    return exports
+  }
+`)
+```
+
+在模板文件中，可以通过 `<wxs>` 来引用指定路径对应的 JavaScript 代码，并将这个 JavaScript 函数的返回值作为 wxs module 值。例如：
+
+```xml
+<wxs module="myScriptModule" src="/path/to/script" />
+```
+
+这样，模板中的数据绑定表达式中就可以访问 `myScriptModule` 变量（它的值就是对应 JavaScript 函数的返回值）。
+
+```xml
+<wxs module="myScriptModule" src="/path/to/script" />
+<div> {{ myScriptModule.myField }} </div>
+```
+
+## 模板全局 JavaScript 代码
+
+除了按路径嵌入的 JavaScript 代码，还可以添加一段全局 JavaScript 代码。
+
+```js
+group.addExtraRuntimeScript(`
+  // JavaScript 代码
+  // ...
+`)
+```
+
+这段代码无论如何都会执行，它可以定义一些全局量供所有其他 JavaScript 代码使用，但这些全局量无法被模板中的数据绑定表达式直接访问到。

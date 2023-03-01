@@ -87,6 +87,47 @@ class GlassEaselMiniprogramWebpackPlugin {
       styleSheetManager: new StyleSheetManager(),
     }
 
+    // add global template env script
+    params.tmplGroup.setExtraRuntimeScript(`
+      var D = (function () {
+        var modules = Object.create(null);
+        var load = function (filename) {
+          var module = modules[filename];
+          if (!module) throw new Error('no such WXS module: ' + filename);
+          if (!module.loaded) {
+            module.loaded = true;
+            var require = function (rel) {
+              var slices
+              if (rel[0] === '/') {
+                slices = rel.split('/')
+              } else {
+                slices = filename.split('/').slice(0, -1).concat(rel.split('/'))
+              }
+              var normalized = []
+              slices.forEach(function (slice) {
+                if (slice === '' || slice === '.') return
+                if (slice === '..') {
+                  normalized.pop()
+                } else {
+                  normalized.push(slice)
+                }
+              })
+              return load(normalized.join('/'));
+            };
+            module.loader.call(null, require, module.exports, module);
+          }
+          return module.exports;
+        };
+        return function (filename, func) {
+          if (func === undefined) {
+            return load(filename);
+          }
+          var module = { exports: {}, loader: func, loaded: false };
+          modules[filename] = module;
+        };
+      })();
+    `)
+
     // determine a path is a component path or not, returning the json content if true
     const isCompPath = async (relPath) => {
       if (!relPath) return null
@@ -181,6 +222,21 @@ class GlassEaselMiniprogramWebpackPlugin {
           const srcPath = path.join(codeRoot, relPath)
           params.styleSheetManager.add(relPath.slice(0, -extName.length), srcPath)
           // TODO support wxss file remove
+        }
+
+        // add wxs
+        if (extName === '.wxs') {
+          const src = await fs.readFile(path.join(codeRoot, relPath), { encoding: 'utf8' })
+          const scriptPath = relPath.slice(0, -extName.length)
+          params.tmplGroup.addScript(scriptPath, `
+            (function () {
+              D('${scriptPath}', (require, exports, module) => {
+                ${src}
+              })
+              return function () { return D('${scriptPath}') }
+            })()
+          `)
+          // TODO support wxs file remove
         }
 
         // find resource files
