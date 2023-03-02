@@ -97,19 +97,19 @@ class GlassEaselMiniprogramWebpackPlugin {
           if (!module.loaded) {
             module.loaded = true;
             var require = function (rel) {
-              var slices
+              var slices;
               if (rel[0] === '/') {
-                slices = rel.split('/')
+                slices = rel.split('/');
               } else {
-                slices = filename.split('/').slice(0, -1).concat(rel.split('/'))
+                slices = filename.split('/').slice(0, -1).concat(rel.split('/'));
               }
               var normalized = []
               slices.forEach(function (slice) {
-                if (slice === '' || slice === '.') return
+                if (slice === '' || slice === '.') return;
                 if (slice === '..') {
-                  normalized.pop()
+                  normalized.pop();
                 } else {
-                  normalized.push(slice)
+                  normalized.push(slice);
                 }
               })
               return load(normalized.join('/'));
