@@ -544,7 +544,8 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                                         if path.is_some() {
                                             // FIXME warn duplicated attr
                                         } else {
-                                            path = Some(attr.value.static_value());
+                                            let p = attr.value.static_value();
+                                            path = Some(p.strip_suffix(".wxml").unwrap_or(&p).to_string());
                                         }
                                     } else {
                                         // FIXME warn unused attr
