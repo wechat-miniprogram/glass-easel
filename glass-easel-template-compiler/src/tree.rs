@@ -204,6 +204,33 @@ impl TmplTree {
         ret
     }
 
+    pub(crate) fn get_inline_script_module_names(&self) -> Vec<String> {
+        let mut ret = vec![];
+        for script in self.scripts.iter() {
+            match script {
+                TmplScript::GlobalRef { .. } => {}
+                TmplScript::Inline { module_name, .. } => {
+                    ret.push(module_name.to_string());
+                }
+            }
+        }
+        ret
+    }
+
+    pub(crate) fn get_inline_script(&self, module_name: &str) -> Option<&str> {
+        for script in self.scripts.iter() {
+            match script {
+                TmplScript::GlobalRef { .. } => {}
+                TmplScript::Inline { module_name: m, content } => {
+                    if module_name == m {
+                        return Some(&content);
+                    }
+                }
+            }
+        }
+        None
+    }
+
     pub(crate) fn to_proc_gen<W: std::fmt::Write>(
         &self,
         w: &mut JsExprWriter<W>,
@@ -303,9 +330,9 @@ impl TmplTree {
                                 Ok(())
                             })?;
                         }
-                        TmplScript::Inline { module_name: _, content } => {
+                        TmplScript::Inline { module_name, content } => {
                             w.expr_stmt(|w| {
-                                write!(w, "var {}={}", ident, content)?;
+                                write!(w, "var {}=D('{}#{}',(require,exports,module)=>{{{}}})()", ident, &self.path, module_name, content)?;
                                 Ok(())
                             })?;
                         }

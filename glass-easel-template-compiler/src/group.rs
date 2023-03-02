@@ -12,7 +12,7 @@ use super::*;
 // A: the binding map object
 // B: the `DefineIfGroup` function
 // C: true if in create process
-// D: the data value
+// D: the global script runtime `define` / the data value
 // E: the `DefineElement` function / the `elementUpdated` function
 // F: the `DefineForLoop` function
 // G: the whole group list
@@ -275,6 +275,16 @@ impl TmplGroup {
     /// Get dependency script files.
     pub fn get_script_dependencies(&self, path: &str) -> Result<Vec<String>, TmplError> {
         Ok(self.get_tree(path)?.get_script_dependencies())
+    }
+
+    /// Get inline script module names.
+    pub fn get_inline_script_module_names(&self, path: &str) -> Result<Vec<String>, TmplError> {
+        Ok(self.get_tree(path)?.get_inline_script_module_names())
+    }
+
+    /// Get inline script content.
+    pub fn get_inline_script(&self, path: &str, module_name: &str) -> Result<Option<&str>, TmplError> {
+        Ok(self.get_tree(path)?.get_inline_script(module_name))
     }
 
     /// Convert to WXML GenObject js string.

@@ -270,6 +270,7 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
         Static(U),
         Dynamic(Box<TmplExpr>),
     }
+
     fn parse_text_entity(pair: pest::iterators::Pair<'_, Rule>) -> TextEntity<String> {
         let mut is_dynamic = false;
         let segs: Vec<TextEntity<&str>> = pair
@@ -346,7 +347,68 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                 Rule::tag => {
                     let mut tag_pairs = pair.into_inner();
                     if let Some(pair) = tag_pairs.next() {
+                        let read_attr = |mut pairs: pest::iterators::Pairs<Rule>| {
+                            let name = pairs.next().unwrap();
+                            let value = match pairs.next() {
+                                None => TmplAttrValue::Dynamic {
+                                    // TODO use a better representation for default static values
+                                    expr: Box::new(TmplExpr::LitBool(true)),
+                                    binding_map_keys: None,
+                                },
+                                Some(x) => {
+                                    let value = x.into_inner().next().unwrap();
+                                    match parse_text_entity(value) {
+                                        TextEntity::Static(s) => {
+                                            TmplAttrValue::Static(s)
+                                        }
+                                        TextEntity::Dynamic(expr) => {
+                                            TmplAttrValue::Dynamic {
+                                                expr,
+                                                binding_map_keys: None,
+                                            }
+                                        }
+                                    }
+                                }
+                            };
+                            (name.as_str().to_string(), value)
+                        };
                         match pair.as_rule() {
+                            Rule::wxs_script_tag_begin => {
+                                let mut elem = TmplElement::new("wxs", TmplVirtualType::Pure);
+                                let pair = tag_pairs.next().unwrap();
+                                match pair.as_rule() {
+                                    Rule::wxs_script_tag => {
+                                        let mut wxs_pairs = pair.into_inner();
+                                        while let Some(pair) = wxs_pairs.next() {
+                                            match pair.as_rule() {
+                                                Rule::attr => {
+                                                    let pairs = pair.into_inner();
+                                                    let (name, value) = read_attr(pairs);
+                                                    elem.add_attr(name.as_str(), value);
+                                                }
+                                                Rule::wxs_script_body => {
+                                                    let text: String = pair
+                                                        .into_inner()
+                                                        .map(|pair| {
+                                                            match pair.as_rule() {
+                                                                Rule::entity => entities::decode(pair.as_str()),
+                                                                Rule::pure_text => pair.as_str(),
+                                                                _ => unreachable!(),
+                                                            }
+                                                        })
+                                                        .collect();
+                                                    elem.append_text_node(TmplTextNode::Static(text));
+                                                    break;
+                                                }
+                                                _ => unreachable!()
+                                            }
+                                        }
+                                    }
+                                    _ => unreachable!(),
+                                }
+                                pairs.next();
+                                target.append_element(elem);
+                            }
                             Rule::tag_begin => {
                                 let mut elem = {
                                     let mut pairs = pair.into_inner();
@@ -358,31 +420,9 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                                     };
                                     let mut elem = TmplElement::new(tag_name, virtual_type);
                                     while let Some(pair) = pairs.next() {
-                                        let mut pairs = pair.into_inner();
-                                        let name = pairs.next().unwrap();
-                                        let value = match pairs.next() {
-                                            None => TmplAttrValue::Dynamic {
-                                                // TODO use a better repr for default static values
-                                                expr: Box::new(TmplExpr::LitBool(true)),
-                                                binding_map_keys: None,
-                                            },
-                                            Some(x) => {
-                                                let value = x.into_inner().next().unwrap();
-                                                match parse_text_entity(value) {
-                                                    TextEntity::Static(s) => {
-                                                        TmplAttrValue::Static(s)
-                                                    }
-                                                    TextEntity::Dynamic(expr) => {
-                                                        TmplAttrValue::Dynamic {
-                                                            expr,
-                                                            binding_map_keys: None,
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        };
-                                        let name = name.as_str();
-                                        elem.add_attr(name, value);
+                                        let pairs = pair.into_inner();
+                                        let (name, value) = read_attr(pairs);
+                                        elem.add_attr(name.as_str(), value);
                                     }
                                     elem
                                 };
@@ -638,7 +678,7 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                             "wxs" => {
                                 let old_attrs = std::mem::replace(&mut elem.attrs, vec![]);
                                 let mut module_name = String::new();
-                                let mut src = String::new(); // TODO inline script
+                                let mut src = String::new();
                                 for attr in old_attrs.into_iter() {
                                     if attr.is_property("module") {
                                         match attr.value {
@@ -662,7 +702,17 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                                         // FIXME warn unused attr
                                     }
                                 }
-                                scripts.push(TmplScript::GlobalRef { module_name, rel_path: src });
+                                if src.len() == 0 {
+                                    let content = match elem.children.get(0) {
+                                        Some(TmplNode::TextNode(TmplTextNode::Static(x))) => x.as_str(),
+                                        None => "",
+                                        _ => unreachable!(),
+                                    };
+                                    scripts.push(TmplScript::Inline { module_name, content: content.to_string() });
+                                } else {
+                                    // FIXME warn unused script content
+                                    scripts.push(TmplScript::GlobalRef { module_name, rel_path: src });
+                                }
                                 continue;
                             }
                             _ => {}

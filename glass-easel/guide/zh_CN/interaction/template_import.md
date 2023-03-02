@@ -126,6 +126,8 @@ exports.hello = function () {
 <div> {{ helloModule.hello() }} </div>
 ```
 
+此外， `<wxs>` 也可以不使用 `src` 引入，而是直接将 JavaScript 代码内联在 `<wxs>` 内部。
+
 ## 模板全局 JavaScript 代码
 
 除了按路径嵌入的 JavaScript 代码，还可以添加一段全局 JavaScript 代码。

@@ -6,12 +6,29 @@ tag = ${
     "<"
     ~ (
         comment
+        | wxs_script_tag_begin ~ WHITE_SPACE* ~ wxs_script_tag
         | tag_end ~ WHITE_SPACE*
         | tag_begin ~ WHITE_SPACE* ~ self_close?
     )
     ~ ">"
 }
 comment = _{ "!--" ~ (!"-->" ~ ANY)* ~ "--" }
+
+wxs_script_tag_begin = ${
+    &"wxs " ~ "wxs"
+    | &"wxs\r" ~ "wxs"
+    | &"wxs\n" ~ "wxs"
+    | &"wxs\t" ~ "wxs"
+    | &"wxs>" ~ "wxs"
+}
+wxs_script_tag = ${
+    (attr ~ WHITE_SPACE*)* ~ (
+        ">" ~ wxs_script_body ~ "</wxs"
+        | "/"
+    )
+}
+wxs_script_body = ${ (!"</wxs>" ~ (entity | pure_text))* }
+
 tag_begin = ${ name ~ (WHITE_SPACE* ~ attr)* }
 tag_end = ${ "/" ~ name }
 self_close = ${ "/" }
