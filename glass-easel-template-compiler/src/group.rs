@@ -45,10 +45,53 @@ const RUNTIME_ITEMS: [(&'static str, &'static str); 3] = [
     ),
 ];
 
-fn runtime_fns<W: std::fmt::Write>(w: &mut JsFunctionScopeWriter<W>) -> Result<(), TmplError> {
+const WXS_RUNTIME: &'static str = r#"
+var D = (() => {
+    var modules = Object.create(null);
+    var load = (filename) => {
+        var module = modules[filename];
+        if (!module) throw new Error('no such WXS module: ' + filename);
+        if (!module.loaded) {
+            module.loaded = true;
+            var require = (rel) => {
+                var slices;
+                if (rel[0] === '/') {
+                    slices = rel.split('/');
+                } else {
+                    slices = filename.split('/').slice(0, -1).concat(rel.split('/'));
+                }
+                var normalized = [];
+                slices.forEach((slice) => {
+                    if (slice === '' || slice === '.') return;
+                    if (slice === '..') {
+                        normalized.pop();
+                    } else {
+                        normalized.push(slice);
+                    }
+                })
+                return load(normalized.join('/'));
+            };
+            module.loader.call(null, require, module.exports, module);
+        }
+        return module.exports;
+    };
+    return (filename, func) => {
+        modules[filename] = { exports: {}, loader: func, loaded: false };
+        return () => load(filename);
+    };
+})()
+"#;
+
+fn runtime_fns<W: std::fmt::Write>(w: &mut JsFunctionScopeWriter<W>, need_wxs_runtime: bool) -> Result<(), TmplError> {
     for (k, v) in RUNTIME_ITEMS.iter() {
         w.expr_stmt(|w| {
             write!(w, "var {}={}", k, v)?;
+            Ok(())
+        })?;
+    }
+    if need_wxs_runtime {
+        w.expr_stmt(|w| {
+            write!(w, "{}", WXS_RUNTIME)?;
             Ok(())
         })?;
     }
@@ -194,17 +237,16 @@ impl TmplGroup {
 
     /// Add a script segment into the group.
     /// 
-    /// The `content` must be a valid JavaScript function expression.
-    /// Whenever the script is used in the template through a `<wxs>` element,
-    /// This function is called and the return value is used as the value of the `<wxs>` module.
+    /// The `content` must be valid JavaScript file content.
+    /// `require` and `exports` can be visited in this JavaScript segment, similar to Node.js.
     pub fn add_script(&mut self, path: &str, content: &str) -> Result<(), TmplParseError> {
         self.scripts.insert(path.to_string(), content.to_string());
         Ok(())
     }
 
-    /// Set extra runtime string.
+    /// Set extra runtime JavaScript code as a string.
     /// 
-    /// The `content` must be valid JavaScript statements (not an expression).
+    /// The `content` must be valid JavaScript statements, ended by semicolon.
     pub fn set_extra_runtime_script(&mut self, content: &str) {
         self.extra_runtime_string = content.to_string();
     }
@@ -213,7 +255,7 @@ impl TmplGroup {
     pub fn get_runtime_string(&self) -> String {
         let mut w = JsWriter::new(String::new());
         w.function_scope(|w| {
-            runtime_fns(w)?;
+            runtime_fns(w, self.scripts.len() > 0)?;
             Ok(())
         })
         .unwrap();
@@ -247,9 +289,9 @@ impl TmplGroup {
     }
 
     fn write_group_global_content(&self, w: &mut JsFunctionScopeWriter<String>) -> Result<(), TmplError> {
-        runtime_fns(w)?;
+        runtime_fns(w, self.scripts.len() > 0)?;
         if self.extra_runtime_string.len() > 0 {
-            w.custom_stmt(&self.extra_runtime_string)?;
+            w.custom_stmt_str(&self.extra_runtime_string)?;
         }
         if self.scripts.len() > 0 {
             w.expr_stmt(|w| {
@@ -258,7 +300,7 @@ impl TmplGroup {
             })?;
             for (p, script) in self.scripts.iter() {
                 w.expr_stmt(|w| {
-                    write!(w, r#"R[{}]={}"#, gen_lit_str(p), script)?;
+                    write!(w, r#"R[{path}]=D({path},(require,exports,module)=>{{{}}})"#, script, path = gen_lit_str(p))?;
                     Ok(())
                 })?;
             }

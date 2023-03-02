@@ -655,7 +655,7 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                                                 // FIXME warn must be static
                                             }
                                             TmplAttrValue::Static(s) => {
-                                                src = s;
+                                                src = s.strip_suffix(".wxs").unwrap_or(&s).to_string();
                                             }
                                         }
                                     } else {

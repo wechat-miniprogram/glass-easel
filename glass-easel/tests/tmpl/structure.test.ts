@@ -697,6 +697,28 @@ describe('node tree structure', () => {
     expect(domHtml(elem)).toBe('<div>key: B</div><div>value: b</div>')
   })
 
+  test('custom scripts', () => {
+    const def = glassEasel.registerElement({
+      template: multiTmpl({
+        '': `
+          <wxs module="a" src="./scripts/abc" />
+          <div>{{ a.test(1, 3) + 2 }}</div>
+        `,
+        'scripts/abc.wxs': `
+          module.exports = require('def')
+        `,
+        'scripts/def.wxs': `
+          exports.test = function (a, b) {
+            return a + b
+          }
+        `,
+      }),
+      data: {},
+    }).general()
+    const elem = glassEasel.Component.createWithContext('root', def, domBackend).asInstanceOf(def)!
+    expect(domHtml(elem)).toBe('<div>6</div>')
+  })
+
   test('block slot', () => {
     const childComp = glassEasel.registerElement({
       options: {
