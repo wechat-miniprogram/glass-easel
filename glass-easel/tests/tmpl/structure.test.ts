@@ -495,7 +495,7 @@ describe('node tree structure', () => {
     const def = glassEasel.registerElement({
       template: multiTmpl({
         '': '<include src="./a.wxml" />',
-        'a.wxml': '<div>{{a}}</div>',
+        'a': '<div>{{a}}</div>',
       }),
       data: {
         a: 123,
@@ -673,7 +673,7 @@ describe('node tree structure', () => {
           <template is="S" data="{{ {c} }}" />
         `,
         'template/s': `
-          <import src="./i" />
+          <import src="./i.wxml" />
           <template name="S">
             <div>key: {{ c.i }}</div>
             <template is="{{ c.i }}" />
