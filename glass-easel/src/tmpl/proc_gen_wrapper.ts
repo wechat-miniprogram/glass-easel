@@ -12,6 +12,7 @@ import {
   Node,
   ShadowedEvent,
   StyleSegmentIndex,
+  NativeNode,
 } from '..'
 import {
   DataPath,
@@ -750,11 +751,11 @@ export class ProcGenWrapper {
     let elem: Element
     let dynSlot = false
     if (this.disallowNativeNode || placeholding !== undefined) {
-      const initPropValues = (elem: GeneralComponent) => {
-        const sr = this.dynamicSlotUpdate(elem, dynamicSlotValueNames, children)
+      const initPropValues = (elem: GeneralComponent | NativeNode) => {
+        const sr = elem instanceof NativeNode ? null : this.dynamicSlotUpdate(elem, dynamicSlotValueNames, children)
         if (sr) dynSlot = true
         propertyInit(elem, true)
-        if (elem.hasPendingChanges()) {
+        if (!(elem instanceof NativeNode) && elem.hasPendingChanges()) {
           const nodeDataProxy = Component.getDataProxy(elem)
           nodeDataProxy.applyDataUpdates(true)
         }
@@ -771,7 +772,7 @@ export class ProcGenWrapper {
             initPropValues,
           )
           replacer.destroyBackendElementOnDetach()
-          const replacerShadowRoot = replacer.getShadowRoot()
+          const replacerShadowRoot = replacer instanceof NativeNode ? null : replacer.getShadowRoot()
           const elemShadowRoot = (elem as GeneralComponent).getShadowRoot()
           if (replacerShadowRoot?.isDynamicSlots()) {
             if (!elemShadowRoot?.isDynamicSlots()) {
@@ -941,7 +942,9 @@ export class ProcGenWrapper {
         }
       }
     } else {
-      elem.updateAttribute(name, v)
+      (elem as NativeNode).callAttributeFilter(name, v, (newPropValue) => {
+        elem.updateAttribute(name, newPropValue)
+      })
     }
   }
 }

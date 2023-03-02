@@ -21,8 +21,30 @@ import {
   BackendMode,
 } from './backend/mode'
 
+export type NativeNodeAttributeFilter = (
+  // eslint-disable-next-line no-use-before-define
+  elem: NativeNode, propName: string, propValue: any, callback: (res: any) => void
+) => void
+
+export interface ExtendedNativeNodeDefinition {
+  lifetimes?: {
+    // eslint-disable-next-line no-use-before-define
+    created: (elem: NativeNode) => void,
+  },
+  attributeFilters?: Record<string, NativeNodeAttributeFilter>,
+  eventListeners?: Record<
+    string,
+    {
+      capture?: boolean,
+      // eslint-disable-next-line no-use-before-define
+      handler?: (elem: NativeNode, event: any) => boolean | void
+    }
+  >
+}
+
 export class NativeNode extends Element {
   is: string
+  private _$attributeFilters: Record<string, NativeNodeAttributeFilter>
 
   constructor() {
     throw new Error('Element cannot be constructed directly')
@@ -33,9 +55,11 @@ export class NativeNode extends Element {
   static create(
     tagName: string,
     owner: ShadowRoot,
+    extendedDefinition?: ExtendedNativeNodeDefinition,
   ): NativeNode {
     const node = Object.create(NativeNode.prototype) as NativeNode
     node.is = tagName
+    node._$attributeFilters = {}
     let backendElement: GeneralBackendElement | null
     if (BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike)) {
       backendElement = (owner._$nodeTreeContext as domlikeBackend.Context)
@@ -69,6 +93,35 @@ export class NativeNode extends Element {
         (backendElement as backend.Element | composedBackend.Element).associateValue(node)
       }
     }
+
+    if (extendedDefinition !== undefined) {
+      if (extendedDefinition.attributeFilters !== undefined) {
+        node._$attributeFilters = extendedDefinition.attributeFilters
+      }
+      if (extendedDefinition.eventListeners !== undefined) {
+        Object.keys(extendedDefinition.eventListeners).forEach((event) => {
+          if (typeof extendedDefinition.eventListeners![event]!.handler === 'function') {
+            const func = extendedDefinition.eventListeners![event]!.handler!
+            node.addListener(
+              event,
+              (event) => func(node, event),
+              { capture: extendedDefinition.eventListeners![event]!.capture },
+            )
+          }
+        })
+      }
+    }
+    if (typeof extendedDefinition?.lifetimes === 'object' && typeof extendedDefinition?.lifetimes.created === 'function') {
+      extendedDefinition?.lifetimes.created.call(node, node)
+    }
     return node
+  }
+
+  callAttributeFilter(propName: string, propValue: any, callback: (newPropValue: any) => void) {
+    if (typeof this._$attributeFilters[propName] !== 'function') {
+      callback(propValue)
+      return
+    }
+    this._$attributeFilters[propName]!(this, propName, propValue, callback)
   }
 }

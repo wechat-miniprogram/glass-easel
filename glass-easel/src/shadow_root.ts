@@ -13,6 +13,7 @@ import {
   TextNode,
 } from './text_node'
 import {
+  ExtendedNativeNodeDefinition,
   NativeNode,
 } from './native_node'
 import {
@@ -141,8 +142,8 @@ export class ShadowRoot extends VirtualNode {
     return new TextNode(text, this)
   }
 
-  createNativeNode(tagName: string): NativeNode {
-    return NativeNode.create(tagName, this)
+  createNativeNode(tagName: string, extendedDefinition?: ExtendedNativeNodeDefinition): NativeNode {
+    return NativeNode.create(tagName, this, extendedDefinition)
   }
 
   createVirtualNode(virtualName = 'virtual'): VirtualNode {
@@ -155,8 +156,8 @@ export class ShadowRoot extends VirtualNode {
     genericTargets?: { [key: string]: string },
     placeholderCallback?:
       (c: GeneralComponentDefinition) => void,
-    initPropValues?: (comp: GeneralComponent) => void,
-  ): GeneralComponent {
+    initPropValues?: (comp: GeneralComponent | NativeNode) => void,
+  ): GeneralComponent | NativeNode {
     const host = this._$host
     const beh = host._$behavior
     const hostGenericImpls = host._$genericImpls
@@ -212,6 +213,13 @@ export class ShadowRoot extends VirtualNode {
       }
     }
 
+    const extendedNativeDef = space.getExtendedNativeNode(tagName)
+    if (extendedNativeDef) {
+      const node = this.createNativeNode(tagName, extendedNativeDef)
+      initPropValues?.(node)
+      return node
+    }
+
     // find in the space otherwise
     const comp = space.getComponentByUrl(compName, '')
     if (!comp) {
@@ -258,7 +266,8 @@ export class ShadowRoot extends VirtualNode {
     }
 
     // use native node otherwise
-    const node = NativeNode.create(tagName, this)
+    const extendedNativeDef = space.getExtendedNativeNode(tagName)
+    const node = this.createNativeNode(tagName, extendedNativeDef)
     initPropValues?.(node)
     return node
   }

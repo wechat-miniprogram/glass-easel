@@ -17,6 +17,9 @@ import {
   Component,
   GeneralComponent,
 } from './component'
+import type {
+  ExtendedNativeNodeDefinition,
+} from './native_node'
 import {
   ComponentOptions,
   normalizeComponentOptions,
@@ -114,6 +117,14 @@ export class ComponentSpace {
   /** @internal */
   private _$pubList = Object.create(null) as { [path: string]: GeneralComponentDefinition }
   /** @internal */
+  private _$extendedNativeList = Object.create(null) as {
+    [path: string]: ExtendedNativeNodeDefinition
+  }
+  /** @internal */
+  private _$pubExtendedNativeList = Object.create(null) as {
+    [path: string]: ExtendedNativeNodeDefinition
+  }
+  /** @internal */
   private _$importedSpaces = Object.create(null) as {
     [path: string]: {
       space: ComponentSpace,
@@ -152,6 +163,7 @@ export class ComponentSpace {
     if (baseSpace) {
       Object.assign(this._$list, baseSpace._$pubList)
       Object.assign(this._$behaviorList, baseSpace._$pubBehaviorList)
+      Object.assign(this._$extendedNativeList, baseSpace._$pubExtendedNativeList)
     }
     this._$defaultComponent = defaultComponent ?? ''
     this._$componentOptions = normalizeComponentOptions({}, baseSpace?._$componentOptions)
@@ -186,6 +198,11 @@ export class ComponentSpace {
       Object.create(null) as { [path: string]: GeneralBehavior },
       baseSpace._$pubBehaviorList,
       this._$behaviorList,
+    )
+    this._$extendedNativeList = Object.assign(
+      Object.create(null) as { [path: string]: GeneralBehavior },
+      baseSpace._$pubExtendedNativeList,
+      this._$extendedNativeList,
     )
   }
 
@@ -384,6 +401,14 @@ export class ComponentSpace {
     this._$behaviorList[is] = beh
   }
 
+  registerExtendedNativeNode(tagName: string, def: ExtendedNativeNodeDefinition) {
+    this._$extendedNativeList[tagName] = def
+  }
+
+  getExtendedNativeNode(tagName: string) {
+    return this._$extendedNativeList[tagName]
+  }
+
   /**
    * Assign a public alias to a component
    *
@@ -415,6 +440,14 @@ export class ComponentSpace {
       throw new Error(`There is no behavior "${is}" for aliasing`)
     }
     this._$pubBehaviorList[alias] = beh
+  }
+
+  exportExtendedNativeNode(tagName: string) {
+    const extendedNativeNode = this._$extendedNativeList[tagName]
+    if (!extendedNativeNode) {
+      throw new Error(`There is no extended native node "${tagName}" for aliasing`)
+    }
+    this._$pubExtendedNativeList[tagName] = extendedNativeNode
   }
 
   /** @internal */
