@@ -25,7 +25,7 @@ use super::*;
 // N: the `Node` to operate (may be undefined)
 // O: = R.r
 // P: the current path
-// Q
+// Q (extra runtime helpers)
 // R: the global script module / the `ProcGenWrapper` object
 // S: the `DefineSlot` function
 // T: the `DefineTextNode` function / the `updateText` function
@@ -35,6 +35,10 @@ use super::*;
 // X (preserved for runtime)
 // Y (preserved for runtime)
 // Z (preserved for runtime)
+
+// Q extra runtime helper list
+// A: filter binding function in change properties bindings
+// B: filter binding function in event bindings
 
 const RUNTIME_ITEMS: [(&'static str, &'static str); 3] = [
     ("X", "function(a){return a==null?Object.create(null):a}"),
@@ -92,6 +96,10 @@ fn runtime_fns<W: std::fmt::Write>(w: &mut JsFunctionScopeWriter<W>, need_wxs_ru
     if need_wxs_runtime {
         w.expr_stmt(|w| {
             write!(w, "{}", WXS_RUNTIME)?;
+            Ok(())
+        })?;
+        w.expr_stmt(|w| {
+            write!(w, "var Q={{A:(x)=>x,B:(x)=>x}}")?;
             Ok(())
         })?;
     }
@@ -184,6 +192,7 @@ pub(crate) mod path {
 pub struct TmplGroup {
     trees: HashMap<String, TmplTree>,
     scripts: HashMap<String, String>,
+    has_scripts: bool,
     extra_runtime_string: String,
 }
 
@@ -203,6 +212,7 @@ impl TmplGroup {
         Self {
             trees: HashMap::new(),
             scripts: HashMap::new(),
+            has_scripts: false,
             extra_runtime_string: String::new(),
         }
     }
@@ -221,6 +231,9 @@ impl TmplGroup {
     pub fn add_tmpl(&mut self, path: &str, tmpl_str: &str) -> Result<(), TmplParseError> {
         let mut tmpl = parse_tmpl(tmpl_str)?;
         tmpl.path = path.to_string();
+        if tmpl.get_inline_script_module_names().len() > 0 {
+            self.has_scripts = true;
+        }
         self.trees.insert(tmpl.path.clone(), tmpl);
         Ok(())
     }
@@ -241,6 +254,7 @@ impl TmplGroup {
     /// `require` and `exports` can be visited in this JavaScript segment, similar to Node.js.
     pub fn add_script(&mut self, path: &str, content: &str) -> Result<(), TmplParseError> {
         self.scripts.insert(path.to_string(), content.to_string());
+        self.has_scripts = true;
         Ok(())
     }
 
@@ -255,7 +269,7 @@ impl TmplGroup {
     pub fn get_runtime_string(&self) -> String {
         let mut w = JsWriter::new(String::new());
         w.function_scope(|w| {
-            runtime_fns(w, self.scripts.len() > 0)?;
+            runtime_fns(w, self.has_scripts)?;
             Ok(())
         })
         .unwrap();
@@ -299,7 +313,7 @@ impl TmplGroup {
     }
 
     fn write_group_global_content(&self, w: &mut JsFunctionScopeWriter<String>) -> Result<(), TmplError> {
-        runtime_fns(w, self.scripts.len() > 0)?;
+        runtime_fns(w, self.has_scripts)?;
         if self.extra_runtime_string.len() > 0 {
             w.custom_stmt_str(&self.extra_runtime_string)?;
         }

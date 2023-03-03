@@ -122,6 +122,9 @@ pub(crate) enum TmplAttrKind {
     ModelProperty {
         name: String,
     },
+    ChangeProperty {
+        name: String,
+    },
     Data {
         name: String,
     },
@@ -270,78 +273,91 @@ impl TmplTree {
                         // FIXME warn no target file
                     }
                 }
-                let write_template_item =
-                    |key,
-                     w: &mut JsFunctionScopeWriter<W>,
-                     scopes: &mut Vec<ScopeVar>,
-                     bmc: &BindingMapCollector,
-                     children: &Vec<TmplNode>| {
-                        w.expr_stmt(|w| {
-                            write!(w, "H[{key}]=I[{key}]=", key = gen_lit_str(key))?;
-                            w.function_args("R,C,D,U", |w| {
-                                macro_rules! declare_shortcut {
-                                    ($d:expr, $v:expr) => {
-                                        w.expr_stmt(|w| {
-                                            write!(w, "var {}=R.{}", $d, $v)?;
-                                            Ok(())
-                                        })?;
-                                    };
-                                }
-                                declare_shortcut!("L", "c");
-                                declare_shortcut!("M", "m");
-                                declare_shortcut!("O", "r");
+                let write_template_item = |
+                    key,
+                    w: &mut JsFunctionScopeWriter<W>,
+                    scopes: &mut Vec<ScopeVar>,
+                    bmc: &BindingMapCollector,
+                    children: &Vec<TmplNode>,
+                    has_scripts: bool,
+                | {
+                    w.expr_stmt(|w| {
+                        write!(w, "H[{key}]=I[{key}]=", key = gen_lit_str(key))?;
+                        w.function_args("R,C,D,U", |w| {
+                            if has_scripts {
                                 w.expr_stmt(|w| {
-                                    write!(w, "var A={{")?;
-                                    for (index, (key, size)) in bmc.list_fields().enumerate() {
-                                        if index > 0 {
-                                            write!(w, ",")?;
-                                        }
-                                        write!(w, "{}:new Array({})", gen_lit_str(key), size)?;
+                                    write!(w, "R.setFnFilter(Q.A,Q.B)")?;
+                                    Ok(())
+                                })?;
+                            }
+                            macro_rules! declare_shortcut {
+                                ($d:expr, $v:expr) => {
+                                    w.expr_stmt(|w| {
+                                        write!(w, "var {}=R.{}", $d, $v)?;
+                                        Ok(())
+                                    })?;
+                                };
+                            }
+                            declare_shortcut!("L", "c");
+                            declare_shortcut!("M", "m");
+                            declare_shortcut!("O", "r");
+                            w.expr_stmt(|w| {
+                                write!(w, "var A={{")?;
+                                for (index, (key, size)) in bmc.list_fields().enumerate() {
+                                    if index > 0 {
+                                        write!(w, ",")?;
                                     }
-                                    write!(w, "}}")?;
-                                    Ok(())
-                                })?;
-                                w.expr_stmt(|w| {
-                                    write!(w, "var K=U===true")?;
-                                    Ok(())
-                                })?;
-                                w.expr_stmt(|w| {
-                                    write!(w, "return {{C:")?;
-                                    TmplNode::to_proc_gen_define_children(
-                                        children, w, scopes, bmc, group, &self.path,
-                                    )?;
-                                    write!(w, ",B:A")?;
-                                    write!(w, "}}")?;
-                                    Ok(())
-                                })?;
+                                    write!(w, "{}:new Array({})", gen_lit_str(key), size)?;
+                                }
+                                write!(w, "}}")?;
+                                Ok(())
+                            })?;
+                            w.expr_stmt(|w| {
+                                write!(w, "var K=U===true")?;
+                                Ok(())
+                            })?;
+                            w.expr_stmt(|w| {
+                                write!(w, "return {{C:")?;
+                                TmplNode::to_proc_gen_define_children(
+                                    children, w, scopes, bmc, group, &self.path,
+                                )?;
+                                write!(w, ",B:A")?;
+                                write!(w, "}}")?;
                                 Ok(())
                             })?;
                             Ok(())
-                        })
-                    };
+                        })?;
+                        Ok(())
+                    })
+                };
                 let scopes = &mut vec![];
-                for script in &self.scripts {
-                    let ident = w.gen_ident();
-                    match script {
-                        TmplScript::GlobalRef { module_name: _, rel_path } => {
-                            let abs_path = crate::group::path::resolve(&self.path, &rel_path);
-                            w.expr_stmt(|w| {
-                                write!(w, r#"var {}=R[{}]()"#, ident, gen_lit_str(&abs_path))?;
-                                Ok(())
-                            })?;
+                let has_scripts = if self.scripts.len() > 0 {
+                    for script in &self.scripts {
+                        let ident = w.gen_ident();
+                        match script {
+                            TmplScript::GlobalRef { module_name: _, rel_path } => {
+                                let abs_path = crate::group::path::resolve(&self.path, &rel_path);
+                                w.expr_stmt(|w| {
+                                    write!(w, r#"var {}=R[{}]()"#, ident, gen_lit_str(&abs_path))?;
+                                    Ok(())
+                                })?;
+                            }
+                            TmplScript::Inline { module_name, content } => {
+                                w.expr_stmt(|w| {
+                                    write!(w, "var {}=D('{}#{}',(require,exports,module)=>{{{}}})()", ident, &self.path, module_name, content)?;
+                                    Ok(())
+                                })?;
+                            }
                         }
-                        TmplScript::Inline { module_name, content } => {
-                            w.expr_stmt(|w| {
-                                write!(w, "var {}=D('{}#{}',(require,exports,module)=>{{{}}})()", ident, &self.path, module_name, content)?;
-                                Ok(())
-                            })?;
-                        }
+                        scopes.push(ScopeVar { var: ident, update_path_tree: None, lvalue_path: None })
                     }
-                    scopes.push(ScopeVar { var: ident, update_path_tree: None, lvalue_path: None })
-                }
+                    true
+                } else {
+                    false
+                };
                 for (k, v) in self.sub_templates.iter() {
                     let bmc = BindingMapCollector::new();
-                    write_template_item(k, w, scopes, &bmc, &v.children)?;
+                    write_template_item(k, w, scopes, &bmc, &v.children, has_scripts)?;
                 }
                 write_template_item(
                     "",
@@ -349,6 +365,7 @@ impl TmplTree {
                     scopes,
                     &self.binding_map_collector,
                     &self.root.children,
+                    has_scripts,
                 )?;
                 w.expr_stmt(|w| {
                     write!(w, "return function(P){{return H[P]}}")?;
@@ -593,6 +610,9 @@ impl TmplElement {
                     name: dash_to_camel(&name),
                 },
                 "model" => TmplAttrKind::ModelProperty {
+                    name: dash_to_camel(&name),
+                },
+                "change" => TmplAttrKind::ChangeProperty {
                     name: dash_to_camel(&name),
                 },
                 "data" => TmplAttrKind::Data { name },
@@ -1431,6 +1451,39 @@ impl TmplAttr {
                     }
                 }
             }
+            TmplAttrKind::ChangeProperty { name } => {
+                let attr_name = gen_lit_str(&name);
+                match &self.value {
+                    TmplAttrValue::Static(_) => {}
+                    TmplAttrValue::Dynamic {
+                        expr,
+                        binding_map_keys,
+                    } => {
+                        let p = expr.to_proc_gen_prepare(w, scopes)?;
+                        w.expr_stmt(|w| {
+                            write!(w, "if(C||K||")?;
+                            p.lvalue_state_expr(w, scopes)?;
+                            write!(w, ")R.p(N,{},", attr_name)?;
+                            p.value_expr(w)?;
+                            write!(w, ")")?;
+                            Ok(())
+                        })?;
+                        if let Some(binding_map_keys) = binding_map_keys {
+                            if !binding_map_keys.is_empty(bmc) {
+                                binding_map_keys.to_proc_gen_write_map(w, bmc, |w| {
+                                    let p = expr.to_proc_gen_prepare(w, scopes)?;
+                                    w.expr_stmt(|w| {
+                                        write!(w, "R.p(N,{},", attr_name)?;
+                                        p.value_expr(w)?;
+                                        write!(w, ")")?;
+                                        Ok(())
+                                    })
+                                })?;
+                            }
+                        }
+                    }
+                }
+            }
             TmplAttrKind::Data { name } => {
                 write_value!("R.d", gen_lit_str(name));
             }
@@ -1514,6 +1567,7 @@ impl fmt::Display for TmplAttr {
             TmplAttrKind::Style => format!("style"),
             TmplAttrKind::PropertyOrExternalClass { name } => format!("{}", name),
             TmplAttrKind::ModelProperty { name } => format!("model:{}", name),
+            TmplAttrKind::ChangeProperty { name } => format!("change:{}", name),
             TmplAttrKind::Data { name } => format!("data:{}", name),
             TmplAttrKind::Event {
                 capture,
