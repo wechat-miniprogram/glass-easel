@@ -10,6 +10,7 @@ import {
   Behavior,
   BehaviorBuilder,
   GeneralBehavior,
+  NativeNodeDefinition,
 } from './behavior'
 import {
   ComponentDefinition,
@@ -114,6 +115,10 @@ export class ComponentSpace {
   /** @internal */
   private _$pubList = Object.create(null) as { [path: string]: GeneralComponentDefinition }
   /** @internal */
+  private _$using = Object.create(null) as {
+    [path: string]: GeneralComponentDefinition | NativeNodeDefinition
+  }
+  /** @internal */
   private _$importedSpaces = Object.create(null) as {
     [path: string]: {
       space: ComponentSpace,
@@ -172,21 +177,14 @@ export class ComponentSpace {
   }
 
   /**
-   * Update the base component space
+   * Set (or update) a global using component item
    *
-   * This will add the components in `baseSpace` if there is no components with the same names.
+   * This will allow all the components in this component space using this component automatically,
+   * without declaring it with `using` or `usingComponents` again.
+   * The target can also be a tag name of a native node.
    */
-  updateBaseSpace(baseSpace: ComponentSpace) {
-    this._$list = Object.assign(
-      Object.create(null) as { [path: string]: GeneralComponentDefinition },
-      baseSpace._$pubList,
-      this._$list,
-    )
-    this._$behaviorList = Object.assign(
-      Object.create(null) as { [path: string]: GeneralBehavior },
-      baseSpace._$pubBehaviorList,
-      this._$behaviorList,
-    )
+  setGlobalUsingComponent(key: string, target: GeneralComponentDefinition | string) {
+    this._$using[key] = target
   }
 
   /**
@@ -281,6 +279,10 @@ export class ComponentSpace {
 
   isDefaultComponent(def: GeneralComponentDefinition) {
     return this._$list[this._$defaultComponent] === def
+  }
+
+  getGlobalUsingComponent(key: string): GeneralComponentDefinition | NativeNodeDefinition | null {
+    return this._$using[key] || null
   }
 
   /**

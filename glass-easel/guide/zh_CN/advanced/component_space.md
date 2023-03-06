@@ -49,6 +49,34 @@ export const helloWorld = componentSpace.defineComponent({
 })
 ```
 
+## 全局引用
+
+在实践中，可能有一些很常用的组件，在其他每个组件中都 using 引用会很繁琐。此时可以使用组件空间全局引用。例如：
+
+```js
+const hotComponent = componentSpace.defineComponent({})
+
+componentSpace.setGlobalUsingComponent('hot', hotComponent)
+```
+
+这样相当于在所有组件中都引用了这个这个组件。
+
+此外，可以将非组件节点也作为全局引用的目标，此时相当于给非组件节点赋予另一个名字。例如：
+
+```js
+componentSpace.setGlobalUsingComponent('hot', 'div')
+```
+
+在组件的 `usingComponents` 中也可以重新 using 全局引用、赋予另一个名字。例如：
+
+```js
+const myComponent = componentSpace.defineComponent({
+  using: {
+    'another-hot': 'hot',
+  },
+})
+```
+
 ## 基组件空间
 
 组件空间在创建时，可以导入另一个组件空间中的 **公开组件** 。例如：
@@ -66,7 +94,7 @@ baseComponentSpace.defineComponent({
 baseComponentSpace.exportComponent('base-component', 'base-component')
 
 // 创建另一个组件空间，指定基组件空间
-const baseComponentSpace = new glassEasel.ComponentSpace('', baseComponentSpace)
+const componentSpace = new glassEasel.ComponentSpace('', baseComponentSpace)
 
 // 可以使用基组件空间中导出的组件
 componentSpace.defineComponent({

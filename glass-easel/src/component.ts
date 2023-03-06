@@ -45,6 +45,7 @@ import {
   RelationHandler,
   normalizeRelation,
   BuilderContext,
+  NativeNodeDefinition,
 } from './behavior'
 import {
   ComponentSpace,
@@ -117,8 +118,10 @@ export const convertGenerics = (
           } else if (hostGenericImpls && hostGenericImpls[target]) {
             genericImpls[key] = hostGenericImpls[target]!
           } else {
-            const comp = space.getComponentByUrlWithoutDefault(target, '')
-            if (comp) {
+            const comp = space.getGlobalUsingComponent(target)
+            if (typeof comp === 'string') {
+              genericImpls[key] = comp
+            } else if (comp) {
               genericImpls[key] = {
                 final: comp,
                 placeholder: null,
@@ -145,11 +148,13 @@ export const convertGenerics = (
         if (!defaultComp) {
           throw new Error(`Cannot find default component for generic "${key}" (on component "${compDef.is}")`)
         }
-        genericImpls[key] = {
-          final: defaultComp,
-          placeholder: null,
-          waiting: null,
-        }
+        genericImpls[key] = typeof defaultComp === 'string'
+          ? defaultComp
+          : {
+            final: defaultComp,
+            placeholder: null,
+            waiting: null,
+          }
       }
     }
   } else {
@@ -163,12 +168,14 @@ export const resolvePlaceholder = (
   space: ComponentSpace,
   behavior: GeneralBehavior,
   genericImpls: { [key: string]: ComponentDefinitionWithPlaceholder } | null,
-): GeneralComponentDefinition => {
+): GeneralComponentDefinition | NativeNodeDefinition => {
   const using = behavior._$using
   const usingTarget = using[placeholder] || (genericImpls && genericImpls[placeholder])
-  let ret: GeneralComponentDefinition | null = null
+  let ret: GeneralComponentDefinition | NativeNodeDefinition | null = null
   if (usingTarget) {
-    if (usingTarget.placeholder === null) {
+    if (typeof usingTarget === 'string') {
+      ret = usingTarget
+    } else if (usingTarget.placeholder === null) {
       ret = usingTarget.final
     } else {
       triggerWarning(`Placeholder on generic implementation is not valid (on component "${behavior.is}")`)

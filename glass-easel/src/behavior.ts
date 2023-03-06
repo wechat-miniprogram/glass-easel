@@ -88,7 +88,9 @@ export type ComponentDefinitionWithPlaceholder = {
   final: GeneralComponentDefinition | null,
   placeholder: string | null,
   waiting: ComponentWaitingList | null,
-}
+} | NativeNodeDefinition
+
+export type NativeNodeDefinition = string
 
 type ResolveBehaviorBuilder<B, TChainingFilter extends ChainingFilterType> =
   IsNever<TChainingFilter> extends false
@@ -1058,7 +1060,7 @@ export class Behavior<
   /** @internal */
   _$generics?: string[]
   /** @internal */
-  _$genericDefaults?: { [alias: string]: null | GeneralComponentDefinition }
+  _$genericDefaults?: { [alias: string]: null | GeneralComponentDefinition | NativeNodeDefinition }
   /** @internal */
   _$externalClasses?: string[]
   /** @internal */
@@ -1153,7 +1155,7 @@ export class Behavior<
    * This method will prepare the underlying behavior.
    */
   getComponentDependencies(
-    genericTargets?: { [name: string]: GeneralComponentDefinition },
+    genericTargets?: { [name: string]: GeneralComponentDefinition | NativeNodeDefinition },
   ): Set<GeneralComponentDefinition> {
     const ret: Set<GeneralComponentDefinition> = new Set()
     const rec = function (this: void, beh: GeneralBehavior) {
@@ -1162,6 +1164,7 @@ export class Behavior<
       for (let i = 0; i < keys.length; i += 1) {
         const k = keys[i]!
         const v = beh._$using[k]!
+        if (typeof v === 'string') continue
         const dep = v.final
         if (dep && !ret.has(dep)) {
           ret.add(dep)
@@ -1174,6 +1177,7 @@ export class Behavior<
       const list = Object.values(genericTargets)
       for (let i = 0; i < list.length; i += 1) {
         const dep = list[i]!
+        if (typeof dep === 'string') continue
         if (!ret.has(dep)) {
           ret.add(dep)
           rec(dep.behavior as GeneralBehavior)
@@ -1326,7 +1330,7 @@ export class Behavior<
       const keys = Object.keys(builder._$using)
       for (let i = 0; i < keys.length; i += 1) {
         const k = keys[i]!
-        const v = builder._$using[k]
+        const v = builder._$using[k]!
         let placeholder = null
         if (hasPlaceholders) {
           placeholder = (
@@ -1365,10 +1369,15 @@ export class Behavior<
             }
             this._$using[k] = p
           } else {
-            this._$using[k] = {
-              final: space.getDefaultComponent(),
-              placeholder: null,
-              waiting: null,
+            const final = space.getGlobalUsingComponent(path)
+            if (typeof final === 'string') {
+              this._$using[k] = final
+            } else {
+              this._$using[k] = {
+                final,
+                placeholder: null,
+                waiting: null,
+              }
             }
           }
         } else {
@@ -1381,20 +1390,23 @@ export class Behavior<
     if (typeof builder._$generics === 'object' && builder._$generics !== null) {
       const generics = this._$generics = [] as string[]
       const genericDefaults = Object.create(null) as {
-        [alias: string]: null | GeneralComponentDefinition
+        [alias: string]: null | GeneralComponentDefinition | NativeNodeDefinition
       }
       this._$genericDefaults = genericDefaults
       const genericKeys = Object.keys(builder._$generics)
       for (let i = 0; i < genericKeys.length; i += 1) {
         const k = genericKeys[i]!
         const genericDef = builder._$generics[k]
-        let defaultComp: GeneralComponentDefinition | null = null
+        let defaultComp: GeneralComponentDefinition | NativeNodeDefinition | null = null
         const d = genericDef === true ? undefined : genericDef?.default
         if (d !== undefined) {
           if (d instanceof ComponentDefinition) {
             defaultComp = d
           } else if (space) {
-            defaultComp = space.getComponentByUrl(String(d), is)
+            const tagName = String(d)
+            defaultComp =
+              space.getComponentByUrlWithoutDefault(tagName, is) ||
+              space.getGlobalUsingComponent(tagName)
           } else {
             triggerWarning(`cannot define generic "${k}" without a default implementor (when preparing behavior "${is}").`)
           }
