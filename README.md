@@ -51,7 +51,7 @@ If you decide to write the adapter or the build tools by yourself, the core modu
 If your code requires some style-related features, this module is needed.
 
 Note that the two compilers are implemented in rust.
-If you try to compile them, [rust](https://www.rust-lang.org/) 和 [wasm-pack](https://rustwasm.github.io/wasm-pack/) should be installed in your machine.
+If you try to compile them, [rust](https://www.rust-lang.org/) and [wasm-pack](https://rustwasm.github.io/wasm-pack/) should be installed in your machine.
 
 | Submodule Name                         | Language   | Description                                |
 | -------------------------------------- | ---------- | ------------------------------------------ |
