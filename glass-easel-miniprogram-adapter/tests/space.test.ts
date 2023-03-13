@@ -189,7 +189,7 @@ describe('define', () => {
 
     codeSpace.addComponentStaticConfig('comp/a', {
       component: true,
-      generics: {
+      componentGenerics: {
         c: true,
       },
     })
@@ -245,9 +245,10 @@ describe('define', () => {
     codeSpace.addComponentStaticConfig('path/to/comp', {
       usingComponents: {
         a: '/comp/b',
+        ph: '/comp/a',
       },
-      placeholder: {
-        a: '/comp/a',
+      componentPlaceholder: {
+        a: 'ph',
       },
     })
     codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
