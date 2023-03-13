@@ -15,10 +15,10 @@ export const enum StyleIsolation {
 export type ComponentStaticConfig = {
   component?: boolean
   usingComponents?: { [name: string]: string }
-  generics?: {
+  componentGenerics?: {
     [name: string]: true | { default?: string }
   }
-  placeholder?: { [name: string]: string }
+  componentPlaceholder?: { [name: string]: string }
   styleIsolation?: StyleIsolation,
   /** @obsolete */
   addGlobalClass?: boolean,

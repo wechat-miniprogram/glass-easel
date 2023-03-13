@@ -1495,8 +1495,8 @@ export class ComponentBuilder<
     this._$.options(options)
     const staticConfig = codeSpace.getComponentStaticConfig(is)
     const using = staticConfig?.usingComponents
-    const generics = staticConfig?.generics
-    const placeholder = staticConfig?.placeholder
+    const generics = staticConfig?.componentGenerics
+    const placeholder = staticConfig?.componentPlaceholder
     if (using) this._$.usingComponents(using)
     if (generics) this._$.generics(generics)
     if (placeholder) this._$.placeholders(placeholder)
