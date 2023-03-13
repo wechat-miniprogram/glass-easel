@@ -13,7 +13,7 @@ describe('env', () => {
   test('add global components', () => {
     const env = new MiniProgramEnv()
     const globalCodeSpace = env.getGlobalCodeSpace()
-    globalCodeSpace.getComponentSpace().define('external')
+    const def = globalCodeSpace.getComponentSpace().define('external')
       .options({
         virtualHost: true,
       })
@@ -21,8 +21,8 @@ describe('env', () => {
         <span class="inner" />
       `))
       .registerComponent()
-    globalCodeSpace.getComponentSpace().exportComponent('external', 'external')
     const codeSpace = env.createCodeSpace('', true)
+    codeSpace.getComponentSpace().setGlobalUsingComponent('external', def)
 
     codeSpace.addComponentStaticConfig('path/to/comp', {
       usingComponents: {
@@ -49,7 +49,7 @@ describe('env', () => {
   test('add global components', () => {
     const env = new MiniProgramEnv()
     const globalCodeSpace = env.getGlobalCodeSpace()
-    globalCodeSpace.getComponentSpace().define('external')
+    const def = globalCodeSpace.getComponentSpace().define('external')
       .options({
         virtualHost: true,
       })
@@ -57,8 +57,8 @@ describe('env', () => {
         <span class="inner" />
       `))
       .registerComponent()
-    globalCodeSpace.getComponentSpace().exportComponent('external', 'external')
     const codeSpace = env.createCodeSpace('', true)
+    codeSpace.getComponentSpace().setGlobalUsingComponent('external', def)
 
     codeSpace.addComponentStaticConfig('path/to/comp', {
       usingComponents: {
