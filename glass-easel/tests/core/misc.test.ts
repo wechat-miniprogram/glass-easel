@@ -29,7 +29,7 @@ describe('dump element', () => {
   })
 
   test('dump node structure (composed)', () => {
-    componentSpace.defineComponent({
+    const compDefA = componentSpace.defineComponent({
       is: 'comp-a',
       options: { multipleSlots: true },
       properties: {
@@ -37,6 +37,7 @@ describe('dump element', () => {
       },
       template: tmpl('<block wx:if="1"> <slot name="a" /> </block>'),
     })
+    componentSpace.setGlobalUsingComponent('comp-a', compDefA.general())
     const compDef = componentSpace.defineComponent({
       is: 'comp-b',
       template: tmpl('<comp-a prop="p"><div attr="c" slot="a">A</div></comp-a>'),

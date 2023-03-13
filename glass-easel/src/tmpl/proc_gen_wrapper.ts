@@ -12,6 +12,7 @@ import {
   Node,
   ShadowedEvent,
   StyleSegmentIndex,
+  NativeNode,
 } from '..'
 import {
   DataPath,
@@ -749,17 +750,21 @@ export class ProcGenWrapper {
     const placeholding = this.shadowRoot.checkComponentPlaceholder(tagName)
     let elem: Element
     let dynSlot = false
-    if (this.disallowNativeNode || placeholding !== undefined) {
-      const initPropValues = (elem: GeneralComponent) => {
-        const sr = this.dynamicSlotUpdate(elem, dynamicSlotValueNames, children)
-        if (sr) dynSlot = true
-        propertyInit(elem, true)
+    const initPropValues = (elem: GeneralComponent | NativeNode) => {
+      const sr = elem instanceof Component
+        ? this.dynamicSlotUpdate(elem, dynamicSlotValueNames, children)
+        : null
+      if (sr) dynSlot = true
+      propertyInit(elem, true)
+      if (elem instanceof Component) {
         if (elem.hasPendingChanges()) {
           const nodeDataProxy = Component.getDataProxy(elem)
           nodeDataProxy.applyDataUpdates(true)
         }
         sr?.applySlotUpdates()
       }
+    }
+    if (this.disallowNativeNode || typeof placeholding === 'boolean') {
       let placeholderCb: (() => void) | undefined
       if (placeholding) {
         placeholderCb = () => {
@@ -771,8 +776,8 @@ export class ProcGenWrapper {
             initPropValues,
           )
           replacer.destroyBackendElementOnDetach()
-          const replacerShadowRoot = replacer.getShadowRoot()
-          const elemShadowRoot = (elem as GeneralComponent).getShadowRoot()
+          const replacerShadowRoot = (elem as GeneralComponent).getShadowRoot()
+          const elemShadowRoot = elem instanceof Component ? elem.getShadowRoot() : null
           if (replacerShadowRoot?.isDynamicSlots()) {
             if (!elemShadowRoot?.isDynamicSlots()) {
               throw new Error('The "dynamicSlots" option of the component and its placeholder should be the same.')
@@ -797,22 +802,9 @@ export class ProcGenWrapper {
       elem.destroyBackendElementOnDetach()
     } else {
       elem = this.shadowRoot.createComponentOrNativeNode(
-        tagName,
+        placeholding ?? tagName,
         genericImpls,
-        (elem) => {
-          const sr = elem instanceof Component
-            ? this.dynamicSlotUpdate(elem, dynamicSlotValueNames, children)
-            : null
-          if (sr) dynSlot = true
-          propertyInit(elem, true)
-          if (elem instanceof Component) {
-            if (elem.hasPendingChanges()) {
-              const nodeDataProxy = Component.getDataProxy(elem)
-              nodeDataProxy.applyDataUpdates(true)
-            }
-            sr?.applySlotUpdates()
-          }
-        },
+        initPropValues,
       )
       elem.destroyBackendElementOnDetach()
     }

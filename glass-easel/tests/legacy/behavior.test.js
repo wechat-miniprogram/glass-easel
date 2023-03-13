@@ -18,7 +18,9 @@ const regBeh = (config) => {
 const regElem = (config) => {
   const { template, ...c } = config
   if (template) c.template = tmpl(template)
-  return componentSpace.defineComponent(c)
+  const ret = componentSpace.defineComponent(c)
+  componentSpace.setGlobalUsingComponent(config.is, ret)
+  return ret
 }
 
 const createElem = (is, backend) => {
