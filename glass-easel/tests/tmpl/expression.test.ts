@@ -306,12 +306,14 @@ describe('binding expression', () => {
     })
     const comp = glassEasel.registerElement({
       using: { sub: subComp.general() },
-      template: tmpl([
-        '<template name="test">',
-        '  <sub t="{{ t || \'\' }}" u="{{ u || \'\' }}"/>',
-        '</template>',
-        '<template is="test" data={{ t: a[b], u: a[c] }} />',
-      ].join('')),
+      template: tmpl(
+        [
+          '<template name="test">',
+          '  <sub t="{{ t || \'\' }}" u="{{ u || \'\' }}"/>',
+          '</template>',
+          '<template is="test" data={{ t: a[b], u: a[c] }} />',
+        ].join(''),
+      ),
     })
     const elem = glassEasel.createElement('comp', comp.general())
     expect(onTChanged).toBeCalledTimes(1)
@@ -334,7 +336,7 @@ describe('binding expression', () => {
       data: {
         a: {
           b: 123,
-        } as { b: number | { c: number }} | number,
+        } as { b: number | { c: number } } | number,
       },
     })
     const elem = glassEasel.createElement('root', def)

@@ -14,35 +14,39 @@ import {
   StyleSegmentIndex,
   NativeNode,
 } from '..'
-import {
-  DataPath,
-} from '../data_path'
+import { DataPath } from '../data_path'
 import { RangeListManager } from './range_list_diff'
 
 export type UpdatePathTreeNode = true | { [key: string]: UpdatePathTreeNode } | UpdatePathTreeNode[]
 
 export type UpdatePathTreeRoot = UpdatePathTreeNode | undefined
 
-type ChangePropListener = (this: unknown, newValue: unknown, oldValue: unknown, host: unknown, elem: unknown) => void
+type ChangePropListener = (
+  this: unknown,
+  newValue: unknown,
+  oldValue: unknown,
+  host: unknown,
+  elem: unknown,
+) => void
 
 const emptyFilter = <T>(x: T) => x
 
 type TmplArgs = {
-  key?: number | string,
-  keyList?: RangeListManager,
+  key?: number | string
+  keyList?: RangeListManager
   dynEvListeners?: {
-    [name: string]: (ev: ShadowedEvent<unknown>) => boolean | undefined,
-  },
-  index?: number,
-  dynamicSlotNameMatched?: boolean,
-  slotProps?: Record<string, [DataValue, DataPath | null, boolean]>,
-  slotPropsUpdatePathTree?: Record<string, UpdatePathTreeRoot>,
+    [name: string]: (ev: ShadowedEvent<unknown>) => boolean | undefined
+  }
+  index?: number
+  dynamicSlotNameMatched?: boolean
+  slotProps?: Record<string, [DataValue, DataPath | null, boolean]>
+  slotPropsUpdatePathTree?: Record<string, UpdatePathTreeRoot>
   changeProp?: {
     [name: string]: {
-      listener: ChangePropListener,
-      oldValue: unknown,
-    },
-  },
+      listener: ChangePropListener
+      oldValue: unknown
+    }
+  }
 }
 export type TmplNode = Node & { _$wxTmplArgs?: TmplArgs }
 
@@ -60,9 +64,7 @@ export const dataValueToString = (v: DataValue): string => {
 }
 
 const dashToCamelCase = (dash: string): string => {
-  const ret = dash.indexOf('-') <= 0
-    ? dash
-    : dash.replace(/-[a-z]/g, (s) => s[1]!.toUpperCase())
+  const ret = dash.indexOf('-') <= 0 ? dash : dash.replace(/-[a-z]/g, (s) => s[1]!.toUpperCase())
   return ret
 }
 
@@ -72,13 +74,13 @@ export type ProcGen = (
   data: DataValue,
   dataUpdatePathTree: UpdatePathTreeRoot,
 ) => {
-  C: DefineChildren,
-  B?: { [field: string]: BindingMapGen[] },
+  C: DefineChildren
+  B?: { [field: string]: BindingMapGen[] }
 }
 
 export type ProcGenEnv = {
-  group: (name: string) => ProcGen,
-  list: ProcGenGroupList,
+  group: (name: string) => ProcGen
+  list: ProcGenGroupList
 }
 
 export type BindingMapGen = (
@@ -99,10 +101,7 @@ export type DefineChildren = (
   slotValueUpdatePathTrees: UpdatePathTreeNode | undefined,
 ) => void
 
-type DefineTextNode = (
-  text: string | undefined,
-  textInit?: (elem: TextNode) => boolean,
-) => void
+type DefineTextNode = (text: string | undefined, textInit?: (elem: TextNode) => boolean) => void
 
 type DefineElement = (
   tag: string,
@@ -113,10 +112,7 @@ type DefineElement = (
   dynamicSlotValueNames?: string[],
 ) => void
 
-type DefineIfGroup = (
-  branchKey: number | string,
-  branchFunc: DefineChildren,
-) => void
+type DefineIfGroup = (branchKey: number | string, branchFunc: DefineChildren) => void
 
 type DefineForLoop = (
   list: DataValue[],
@@ -139,15 +135,9 @@ type DefineForLoop = (
   ) => void,
 ) => void
 
-type DefineSlot = (
-  name: string | undefined,
-  slotValueInit?: (elem: Element) => void,
-) => void
+type DefineSlot = (name: string | undefined, slotValueInit?: (elem: Element) => void) => void
 
-type DefinePureVirtualNode = (
-  children: DefineChildren,
-  slot: string | undefined,
-) => void
+type DefinePureVirtualNode = (children: DefineChildren, slot: string | undefined) => void
 
 export class ProcGenWrapper {
   shadowRoot: ShadowRoot
@@ -157,11 +147,7 @@ export class ProcGenWrapper {
   changePropFilter = emptyFilter
   eventListenerFilter = emptyFilter
 
-  constructor(
-    shadowRoot: ShadowRoot,
-    procGen: ProcGen,
-    disallowNativeNode: boolean,
-  ) {
+  constructor(shadowRoot: ShadowRoot, procGen: ProcGen, disallowNativeNode: boolean) {
     this.shadowRoot = shadowRoot
     this.procGen = procGen
     this.disallowNativeNode = disallowNativeNode
@@ -277,10 +263,7 @@ export class ProcGenWrapper {
       },
 
       // wx:if node or template-is node
-      (
-        branchKey: number | string,
-        branchFunc: DefineChildren,
-      ) => {
+      (branchKey: number | string, branchFunc: DefineChildren) => {
         const elem = this.shadowRoot.createVirtualNode('wx:if')
         elem.destroyBackendElementOnDetach()
         Element.setInheritSlots(elem)
@@ -327,30 +310,35 @@ export class ProcGenWrapper {
             childNode.destroyBackendElementOnDetach()
             Element.setInheritSlots(childNode)
             if (slotElement) Element.setSlotElement(elem, slotElement)
-            this.handleChildrenCreation((
-              isCreation,
-              defineTextNode,
-              defineElement,
-              defineIfGroup,
-              defineForLoop,
-              defineSlot,
-              definePureVirtualNode,
-            ) => {
-              itemCallback(
-                true,
-                item,
-                index,
-                undefined,
-                undefined,
-                lvaluePath ? [...lvaluePath, index] : null,
+            this.handleChildrenCreation(
+              (
+                isCreation,
                 defineTextNode,
                 defineElement,
                 defineIfGroup,
                 defineForLoop,
                 defineSlot,
                 definePureVirtualNode,
-              )
-            }, childNode, slotElement, dynamicSlotName)
+              ) => {
+                itemCallback(
+                  true,
+                  item,
+                  index,
+                  undefined,
+                  undefined,
+                  lvaluePath ? [...lvaluePath, index] : null,
+                  defineTextNode,
+                  defineElement,
+                  defineIfGroup,
+                  defineForLoop,
+                  defineSlot,
+                  definePureVirtualNode,
+                )
+              },
+              childNode,
+              slotElement,
+              dynamicSlotName,
+            )
             return childNode
           },
         )
@@ -358,10 +346,7 @@ export class ProcGenWrapper {
       },
 
       // slot node
-      (
-        slotName: string | undefined,
-        slotValueInit?: (elem: Element) => void,
-      ) => {
+      (slotName: string | undefined, slotValueInit?: (elem: Element) => void) => {
         const elem = this.shadowRoot.createVirtualNode('slot')
         elem.destroyBackendElementOnDetach()
         Element.setSlotName(elem, dataValueToString(slotName))
@@ -371,10 +356,7 @@ export class ProcGenWrapper {
       },
 
       // other virtual node
-      (
-        children: DefineChildren,
-        slot: string | undefined,
-      ) => {
+      (children: DefineChildren, slot: string | undefined) => {
         if (slot !== undefined) {
           if (slotElement) {
             if (dynamicSlotName! === slot) {
@@ -494,10 +476,7 @@ export class ProcGenWrapper {
       },
 
       // wx:if node or template-is node
-      (
-        branchKey: number | string,
-        branchFunc: DefineChildren,
-      ) => {
+      (branchKey: number | string, branchFunc: DefineChildren) => {
         const elem = childNodes[index] as Element
         index += 1
         const tmplArgs = getTmplArgs(elem)
@@ -550,30 +529,35 @@ export class ProcGenWrapper {
             childNode.destroyBackendElementOnDetach()
             Element.setInheritSlots(childNode)
             if (slotElement) Element.setSlotElement(elem, slotElement)
-            this.handleChildrenCreation((
-              isCreation,
-              defineTextNode,
-              defineElement,
-              defineIfGroup,
-              defineForLoop,
-              defineSlot,
-              definePureVirtualNode,
-            ) => {
-              itemCallback(
-                true,
-                item,
-                index,
-                undefined,
-                undefined,
-                lvaluePath ? [...lvaluePath, index] : null,
+            this.handleChildrenCreation(
+              (
+                isCreation,
                 defineTextNode,
                 defineElement,
                 defineIfGroup,
                 defineForLoop,
                 defineSlot,
                 definePureVirtualNode,
-              )
-            }, childNode, slotElement, dynamicSlotName)
+              ) => {
+                itemCallback(
+                  true,
+                  item,
+                  index,
+                  undefined,
+                  undefined,
+                  lvaluePath ? [...lvaluePath, index] : null,
+                  defineTextNode,
+                  defineElement,
+                  defineIfGroup,
+                  defineForLoop,
+                  defineSlot,
+                  definePureVirtualNode,
+                )
+              },
+              childNode,
+              slotElement,
+              dynamicSlotName,
+            )
             return childNode
           },
           (
@@ -583,39 +567,41 @@ export class ProcGenWrapper {
             indexChanged: boolean,
             childNode: Element,
           ) => {
-            this.handleChildrenUpdate((
-              isCreation,
-              defineTextNode,
-              defineElement,
-              defineIfGroup,
-              defineForLoop,
-              defineSlot,
-              definePureVirtualNode,
-            ) => {
-              itemCallback(
-                false,
-                item,
-                index,
-                updatePathTree,
-                indexChanged ? true : undefined,
-                lvaluePath ? [...lvaluePath, index] : null,
+            this.handleChildrenUpdate(
+              (
+                isCreation,
                 defineTextNode,
                 defineElement,
                 defineIfGroup,
                 defineForLoop,
                 defineSlot,
                 definePureVirtualNode,
-              )
-            }, childNode, slotElement, dynamicSlotName)
+              ) => {
+                itemCallback(
+                  false,
+                  item,
+                  index,
+                  updatePathTree,
+                  indexChanged ? true : undefined,
+                  lvaluePath ? [...lvaluePath, index] : null,
+                  defineTextNode,
+                  defineElement,
+                  defineIfGroup,
+                  defineForLoop,
+                  defineSlot,
+                  definePureVirtualNode,
+                )
+              },
+              childNode,
+              slotElement,
+              dynamicSlotName,
+            )
           },
         )
       },
 
       // slot node
-      (
-        slotName: string | undefined,
-        slotValueInit?: (elem: Element) => void,
-      ) => {
+      (slotName: string | undefined, slotValueInit?: (elem: Element) => void) => {
         const elem = childNodes[index] as Element
         index += 1
         if (slotName !== undefined) {
@@ -626,10 +612,7 @@ export class ProcGenWrapper {
       },
 
       // other virtual node
-      (
-        children: DefineChildren,
-        slot: string | undefined,
-      ) => {
+      (children: DefineChildren, slot: string | undefined) => {
         const elem = childNodes[index] as Element
         index += 1
         if (slot !== undefined) {
@@ -676,27 +659,32 @@ export class ProcGenWrapper {
       sr.setDynamicSlotHandler(
         dynamicSlotValueNames || [],
         (slot, slotName, slotValues) => {
-          this.handleChildrenCreation((
-            isCreation,
-            defineTextNode,
-            defineElement,
-            defineIfGroup,
-            defineForLoop,
-            defineSlot,
-            definePureVirtualNode,
-          ) => {
-            children(
-              true,
+          this.handleChildrenCreation(
+            (
+              isCreation,
               defineTextNode,
               defineElement,
               defineIfGroup,
               defineForLoop,
               defineSlot,
               definePureVirtualNode,
-              slotValues,
-              undefined,
-            )
-          }, elem, slot, slotName)
+            ) => {
+              children(
+                true,
+                defineTextNode,
+                defineElement,
+                defineIfGroup,
+                defineForLoop,
+                defineSlot,
+                definePureVirtualNode,
+                slotValues,
+                undefined,
+              )
+            },
+            elem,
+            slot,
+            slotName,
+          )
         },
         (slot) => {
           const childIndexes = []
@@ -713,27 +701,32 @@ export class ProcGenWrapper {
         },
         (slot, slotValues, slotValueUpdatePathTrees) => {
           const slotName = slot._$slotName || ''
-          this.handleChildrenUpdate((
-            isCreation,
-            defineTextNode,
-            defineElement,
-            defineIfGroup,
-            defineForLoop,
-            defineSlot,
-            definePureVirtualNode,
-          ) => {
-            children(
-              false,
+          this.handleChildrenUpdate(
+            (
+              isCreation,
               defineTextNode,
               defineElement,
               defineIfGroup,
               defineForLoop,
               defineSlot,
               definePureVirtualNode,
-              slotValues,
-              slotValueUpdatePathTrees,
-            )
-          }, elem, slot, slotName)
+            ) => {
+              children(
+                false,
+                defineTextNode,
+                defineElement,
+                defineIfGroup,
+                defineForLoop,
+                defineSlot,
+                definePureVirtualNode,
+                slotValues,
+                slotValueUpdatePathTrees,
+              )
+            },
+            elem,
+            slot,
+            slotName,
+          )
         },
       )
       return sr
@@ -741,9 +734,7 @@ export class ProcGenWrapper {
     return null
   }
 
-  createDynamicPlaceholder(
-    slotElement: Element,
-  ): Element {
+  createDynamicPlaceholder(slotElement: Element): Element {
     const elem = this.shadowRoot.createVirtualNode('virtual')
     elem.destroyBackendElementOnDetach()
     Element.setSlotElement(elem, slotElement)
@@ -763,9 +754,10 @@ export class ProcGenWrapper {
     let elem: Element
     let dynSlot = false
     const initPropValues = (elem: GeneralComponent | NativeNode) => {
-      const sr = elem instanceof Component
-        ? this.dynamicSlotUpdate(elem, dynamicSlotValueNames, children)
-        : null
+      const sr =
+        elem instanceof Component
+          ? this.dynamicSlotUpdate(elem, dynamicSlotValueNames, children)
+          : null
       if (sr) dynSlot = true
       propertyInit(elem, true)
       if (elem instanceof Component) {
@@ -792,13 +784,17 @@ export class ProcGenWrapper {
           const elemShadowRoot = elem instanceof Component ? elem.getShadowRoot() : null
           if (replacerShadowRoot?.isDynamicSlots()) {
             if (!elemShadowRoot?.isDynamicSlots()) {
-              throw new Error('The "dynamicSlots" option of the component and its placeholder should be the same.')
+              throw new Error(
+                'The "dynamicSlots" option of the component and its placeholder should be the same.',
+              )
             }
             elemShadowRoot.useDynamicSlotHandlerFrom(replacerShadowRoot)
             elem.parentNode?.replaceChild(replacer, elem)
           } else {
             if (elemShadowRoot?.isDynamicSlots()) {
-              throw new Error('The "dynamicSlots" option of the component and its placeholder should be the same.')
+              throw new Error(
+                'The "dynamicSlots" option of the component and its placeholder should be the same.',
+              )
             }
             elem.selfReplaceWith(replacer)
           }
@@ -850,7 +846,7 @@ export class ProcGenWrapper {
       // "class" itself can also be an external class
       const hasExternalClass = (elem as GeneralComponent).hasExternalClass('class')
       if (hasExternalClass) {
-        (elem as GeneralComponent).setExternalClass('class', dataValueToString(v))
+        ;(elem as GeneralComponent).setExternalClass('class', dataValueToString(v))
       }
       elem.class = dataValueToString(v)
     } else {
@@ -943,15 +939,55 @@ export class ProcGenWrapper {
       } else {
         // compatibilities for legacy event binding syntax
         if (camelName.startsWith('bind')) {
-          ProcGenWrapper.prototype.v(elem, camelName.slice('bind'.length), dataValueToString(v), false, false, false, true)
+          ProcGenWrapper.prototype.v(
+            elem,
+            camelName.slice('bind'.length),
+            dataValueToString(v),
+            false,
+            false,
+            false,
+            true,
+          )
         } else if (camelName.startsWith('captureBind')) {
-          ProcGenWrapper.prototype.v(elem, camelName.slice('captureBind'.length), dataValueToString(v), false, false, true, true)
+          ProcGenWrapper.prototype.v(
+            elem,
+            camelName.slice('captureBind'.length),
+            dataValueToString(v),
+            false,
+            false,
+            true,
+            true,
+          )
         } else if (camelName.startsWith('catch')) {
-          ProcGenWrapper.prototype.v(elem, camelName.slice('catch'.length), dataValueToString(v), true, false, false, true)
+          ProcGenWrapper.prototype.v(
+            elem,
+            camelName.slice('catch'.length),
+            dataValueToString(v),
+            true,
+            false,
+            false,
+            true,
+          )
         } else if (camelName.startsWith('captureCatch')) {
-          ProcGenWrapper.prototype.v(elem, camelName.slice('captureCatch'.length), dataValueToString(v), true, false, true, true)
+          ProcGenWrapper.prototype.v(
+            elem,
+            camelName.slice('captureCatch'.length),
+            dataValueToString(v),
+            true,
+            false,
+            true,
+            true,
+          )
         } else if (camelName.startsWith('on')) {
-          ProcGenWrapper.prototype.v(elem, camelName.slice('on'.length), dataValueToString(v), false, false, false, true)
+          ProcGenWrapper.prototype.v(
+            elem,
+            camelName.slice('on'.length),
+            dataValueToString(v),
+            false,
+            false,
+            false,
+            true,
+          )
         }
       }
     } else {
@@ -976,10 +1012,7 @@ export class ProcGenWrapper {
   }
 
   // set filter functions for change properties and event listeners
-  setFnFilter(
-    changePropFilter: <T>(v: T) => T,
-    eventListenerFilter: <T>(v: T) => T,
-  ) {
+  setFnFilter(changePropFilter: <T>(v: T) => T, eventListenerFilter: <T>(v: T) => T) {
     this.changePropFilter = changePropFilter
     this.eventListenerFilter = eventListenerFilter
   }

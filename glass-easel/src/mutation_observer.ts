@@ -1,11 +1,5 @@
-import {
-  Element,
-  Node,
-  TextNode,
-} from '.'
-import {
-  FuncArr,
-} from './func_arr'
+import { Element, Node, TextNode } from '.'
+import { FuncArr } from './func_arr'
 
 /**
  * What the observer will listen
@@ -24,32 +18,32 @@ export type MutationObserverOptions = {
 }
 
 export type MutationObserverAttrEvent = {
-  type: 'properties',
-  target: Element,
-  propertyName?: string,
-  attributeName?: string,
+  type: 'properties'
+  target: Element
+  propertyName?: string
+  attributeName?: string
 }
 
 export type MutationObserverTextEvent = {
-  type: 'characterData',
-  target: TextNode,
+  type: 'characterData'
+  target: TextNode
 }
 
 export type MutationObserverChildEvent = {
-  type: 'childList',
-  target: Node,
-  addedNodes?: Node[],
-  removedNodes?: Node[],
+  type: 'childList'
+  target: Node
+  addedNodes?: Node[]
+  removedNodes?: Node[]
 }
 
 export type MutationObserverAttachEvent = {
-  type: 'attachStatus',
-  target: Element,
-  status: 'attached' | 'detached',
+  type: 'attachStatus'
+  target: Element
+  status: 'attached' | 'detached'
 }
 
 export type MutationObserverEvent =
-  MutationObserverAttrEvent
+  | MutationObserverAttrEvent
   | MutationObserverTextEvent
   | MutationObserverChildEvent
   | MutationObserverAttachEvent
@@ -155,16 +149,12 @@ export class MutationObserver {
   private _$bindedFuncArrs: FuncArr<MutationObserverListener<MutationObserverEvent>>[] = []
   private _$bindedTarget: MutationObserverTarget | null = null
 
-  constructor(
-    listener: (ev: MutationObserverEvent) => void,
-  ) {
+  constructor(listener: (ev: MutationObserverEvent) => void) {
     this._$listener = listener
     this._$normalizedListener = null
   }
 
-  static create(
-    listener: (ev: MutationObserverEvent) => void,
-  ): MutationObserver {
+  static create(listener: (ev: MutationObserverEvent) => void): MutationObserver {
     return new MutationObserver(listener)
   }
 
@@ -191,14 +181,12 @@ export class MutationObserver {
       targetElement._$mutationObserverTarget = target
     }
     this._$listener = null
-    const cb = (
-      options.subtree
-        ? listener
-        : function noSubtreeListener(this: Node, ev: MutationObserverEvent) {
+    const cb = options.subtree
+      ? listener
+      : function noSubtreeListener(this: Node, ev: MutationObserverEvent) {
           // this might be TextNode, but do the same as Element
           if (ev.target === this) listener.call(this as Element, ev)
         }
-    )
     this._$normalizedListener = cb
     this._$bindedTarget = target
     if (options.properties) {

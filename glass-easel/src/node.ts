@@ -2,28 +2,12 @@ import * as backend from './backend/backend_protocol'
 import * as composedBackend from './backend/composed_backend_protocol'
 import * as domlikeBackend from './backend/domlike_backend_protocol'
 import * as suggestedBackend from './backend/suggested_backend_protocol'
-import {
-  TextNode,
-} from './text_node'
-import {
-  Element,
-} from './element'
-import {
-  VirtualNode,
-} from './virtual_node'
-import {
-  Component,
-  ComponentDefinition,
-} from './component'
-import {
-  NativeNode,
-} from './native_node'
-import {
-  DataList,
-  PropertyList,
-  MethodList,
-  ComponentInstance,
-} from './component_params'
+import { TextNode } from './text_node'
+import { Element } from './element'
+import { VirtualNode } from './virtual_node'
+import { Component, ComponentDefinition } from './component'
+import { NativeNode } from './native_node'
+import { DataList, PropertyList, MethodList, ComponentInstance } from './component_params'
 
 export type GeneralBackendContext = (
   | backend.Context
@@ -74,11 +58,7 @@ export interface NodeCast {
    *
    * Returns `null` if the element is not the instance of the specified component.
    */
-  asInstanceOf<
-    UData extends DataList,
-    UProperty extends PropertyList,
-    UMethod extends MethodList,
-  >(
+  asInstanceOf<UData extends DataList, UProperty extends PropertyList, UMethod extends MethodList>(
     componentDefinition: ComponentDefinition<UData, UProperty, UMethod>,
   ): ComponentInstance<UData, UProperty, UMethod> | null
 }

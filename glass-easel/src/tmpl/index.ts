@@ -32,11 +32,11 @@ export type ProcGenGroup = (name: string) => ProcGen
 export type ProcGenGroupList = { [path: string]: ProcGenGroup }
 
 export type ComponentTemplate = {
-  groupList?: ProcGenGroupList,
-  content: (name: string) => ProcGen,
-  updateMode?: string,
-  disallowNativeNode?: boolean,
-  procGenWrapperType?: typeof ProcGenWrapper,
+  groupList?: ProcGenGroupList
+  content: (name: string) => ProcGen
+  updateMode?: string
+  disallowNativeNode?: boolean
+  procGenWrapperType?: typeof ProcGenWrapper
 }
 
 const enum BindingMapUpdateEnabled {
@@ -62,11 +62,11 @@ class GlassEaselTemplate implements templateEngine.Template {
   updateMode: string
   disallowNativeNode: boolean
 
-  constructor(
-    behavior: GeneralBehavior,
-  ) {
+  constructor(behavior: GeneralBehavior) {
     if (typeof behavior._$template !== 'object' && behavior._$template !== undefined) {
-      throw new Error(`Component template of ${behavior.is} must be a valid compiled template (or "null" for default template).`)
+      throw new Error(
+        `Component template of ${behavior.is} must be a valid compiled template (or "null" for default template).`,
+      )
     }
     const c = (behavior._$template as ComponentTemplate | null | undefined) || {
       content: DEFAULT_PROC_GEN_GROUP,
@@ -79,9 +79,7 @@ class GlassEaselTemplate implements templateEngine.Template {
     this.disallowNativeNode = c.disallowNativeNode || false
   }
 
-  createInstance(
-    comp: GeneralComponent,
-  ): templateEngine.TemplateInstance {
+  createInstance(comp: GeneralComponent): templateEngine.TemplateInstance {
     return new GlassEaselTemplateInstance(this, comp)
   }
 }
@@ -110,17 +108,12 @@ class GlassEaselTemplateInstance implements templateEngine.TemplateInstance {
     this.procGenWrapper = new ProcGenWrapper(this.shadowRoot, procGen, template.disallowNativeNode)
   }
 
-  initValues(
-    data: DataValue,
-  ): ShadowRoot | ExternalShadowRoot {
+  initValues(data: DataValue): ShadowRoot | ExternalShadowRoot {
     this.bindingMapGen = this.procGenWrapper.create(data)
     return this.shadowRoot
   }
 
-  updateValues(
-    data: DataValue,
-    changes: DataChange[],
-  ) {
+  updateValues(data: DataValue, changes: DataChange[]) {
     if (this.forceBindingMapUpdate === BindingMapUpdateEnabled.Forced) {
       for (let i = 0; i < changes.length; i += 1) {
         this.tryBindingMapUpdate(data, changes[i])
@@ -183,10 +176,7 @@ class GlassEaselTemplateInstance implements templateEngine.TemplateInstance {
     this.procGenWrapper.update(data, dataUpdatePathTree)
   }
 
-  tryBindingMapUpdate(
-    data: DataValue,
-    change?: DataChange,
-  ): boolean {
+  tryBindingMapUpdate(data: DataValue, change?: DataChange): boolean {
     if (!change) return true
     const bindingMapGen = this.bindingMapGen
     if (!bindingMapGen) {

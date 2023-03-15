@@ -1,10 +1,4 @@
-import {
-  Element,
-  Component,
-  VirtualNode,
-  ShadowRoot,
-  ComponentSpace,
-} from '.'
+import { Element, Component, VirtualNode, ShadowRoot, ComponentSpace } from '.'
 
 const enum SegmentRelation {
   Child,
@@ -154,10 +148,7 @@ export class ParsedSelector {
    * If `root` is specified, than the selector is match inside this subtree;
    * otherwise it match in the whole tree.
    */
-  testSelector(
-    root: Element | null,
-    node: Element,
-  ): boolean {
+  testSelector(root: Element | null, node: Element): boolean {
     if (node instanceof VirtualNode) return false
     const union = this.unions
     let ownerSpace: ComponentSpace | undefined

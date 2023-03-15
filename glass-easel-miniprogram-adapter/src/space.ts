@@ -11,9 +11,7 @@ import {
   PageDefinition,
   utils as typeUtils,
 } from './types'
-import {
-  guid,
-} from './utils'
+import { guid } from './utils'
 import {
   Behavior,
   ComponentType,
@@ -21,23 +19,13 @@ import {
   GeneralBehavior,
   TraitBehavior,
 } from './behavior'
-import {
-  AllData,
-  Component,
-  ComponentProto,
-  GeneralComponent,
-} from './component'
+import { AllData, Component, ComponentProto, GeneralComponent } from './component'
 
 // The page constructor
 export interface PageConstructor {
-  <
-    TData extends DataList,
-    TNewExtraFields extends { [k: PropertyKey]: any },
-  >(
-    definition: PageDefinition<
-      TData,
-      TNewExtraFields
-    > & ThisType<Component<TData, Empty, TNewExtraFields, undefined>>,
+  <TData extends DataList, TNewExtraFields extends { [k: PropertyKey]: any }>(
+    definition: PageDefinition<TData, TNewExtraFields> &
+      ThisType<Component<TData, Empty, TNewExtraFields, undefined>>,
   ): void
 }
 
@@ -50,12 +38,8 @@ export interface ComponentConstructor {
     TMethod extends MethodList,
     TComponentExport,
   >(
-    definition: ComponentDefinition<
-      TData,
-      TProperty,
-      TMethod,
-      TComponentExport
-    > & ThisType<Component<TData, TProperty, TMethod, TComponentExport>>,
+    definition: ComponentDefinition<TData, TProperty, TMethod, TComponentExport> &
+      ThisType<Component<TData, TProperty, TMethod, TComponentExport>>,
   ): void
 }
 
@@ -69,24 +53,19 @@ export interface BehaviorConstructor {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     TComponentExport,
   >(
-    definition: BehaviorDefinition<
-      TData,
-      TProperty,
-      TMethod
-    >,
+    definition: BehaviorDefinition<TData, TProperty, TMethod>,
   ): Behavior<TData, TProperty, TMethod, never>
   trait<TIn extends { [key: string]: any }>(): TraitBehavior<TIn, TIn>
-  trait<
-    TIn extends { [key: string]: any },
-    TOut extends { [key: string]: any }
-  >(trans: (impl: TIn) => TOut): TraitBehavior<TIn, TOut>
+  trait<TIn extends { [key: string]: any }, TOut extends { [key: string]: any }>(
+    trans: (impl: TIn) => TOut,
+  ): TraitBehavior<TIn, TOut>
 }
 
 /* The component registration environment */
 export interface ComponentEnv {
-  Page: PageConstructor,
-  Component: ComponentConstructor,
-  Behavior: BehaviorConstructor,
+  Page: PageConstructor
+  Component: ComponentConstructor
+  Behavior: BehaviorConstructor
 }
 
 type Empty = typeUtils.Empty
@@ -100,76 +79,67 @@ type ComponentMethod = typeUtils.ComponentMethod
 type TaggedMethod<Fn extends ComponentMethod> = typeUtils.TaggedMethod<Fn>
 type ChainingFilterFunc<
   TAddedFields extends { [key: string]: any },
-  TRemovedFields extends string = never
+  TRemovedFields extends string = never,
 > = typeUtils.ChainingFilterFunc<TAddedFields, TRemovedFields>
 
 export interface RelationHandler<TTarget, TOut> {
   list(): TTarget[]
-  listAsTrait: TOut extends never
-    ? undefined
-    : () => TOut[]
+  listAsTrait: TOut extends never ? undefined : () => TOut[]
 }
 
 export type TraitRelationParams<TOut extends { [key: string]: any }> = {
-  target: TraitBehavior<any, TOut>;
-  type:
-    | 'ancestor'
-    | 'descendant'
-    | 'parent'
-    | 'child'
-    | 'parent-common-node'
-    | 'child-common-node';
-  linked?: (target: GeneralComponent) => void;
-  linkChanged?: (target: GeneralComponent) => void;
-  unlinked?: (target: GeneralComponent) => void;
-  linkFailed?: (target: GeneralComponent) => void;
+  target: TraitBehavior<any, TOut>
+  type: 'ancestor' | 'descendant' | 'parent' | 'child' | 'parent-common-node' | 'child-common-node'
+  linked?: (target: GeneralComponent) => void
+  linkChanged?: (target: GeneralComponent) => void
+  unlinked?: (target: GeneralComponent) => void
+  linkFailed?: (target: GeneralComponent) => void
 }
 
 export type RelationParams = {
-  target?: string | ComponentType<any, any, any, any> | GeneralBehavior | TraitBehavior<any>;
-  type: 'ancestor' | 'descendant' | 'parent' | 'child' | 'parent-common-node' | 'child-common-node';
-  linked?: (target: GeneralComponent) => void;
-  linkChanged?: (target: GeneralComponent) => void;
-  unlinked?: (target: GeneralComponent) => void;
-  linkFailed?: (target: GeneralComponent) => void;
+  target?: string | ComponentType<any, any, any, any> | GeneralBehavior | TraitBehavior<any>
+  type: 'ancestor' | 'descendant' | 'parent' | 'child' | 'parent-common-node' | 'child-common-node'
+  linked?: (target: GeneralComponent) => void
+  linkChanged?: (target: GeneralComponent) => void
+  unlinked?: (target: GeneralComponent) => void
+  linkFailed?: (target: GeneralComponent) => void
 }
 
 export type Lifetimes = {
-  created: () => void,
-  attached: () => void,
-  moved: () => void,
-  detached: () => void,
-  ready: () => void,
+  created: () => void
+  attached: () => void
+  moved: () => void
+  detached: () => void
+  ready: () => void
 }
 
 export interface BuilderContext<
   TPrevData extends DataList,
   TProperty extends PropertyList,
-  TMethodCaller
+  TMethodCaller,
 > extends ThisType<TMethodCaller> {
-  self: TMethodCaller;
-  data: typeUtils.DeepReadonly<typeUtils.DataWithPropertyValues<TPrevData, TProperty>>;
-  setData: (
-    newData: Partial<typeUtils.SetDataSetter<TPrevData>>, callback?: () => void,
-  ) => void;
+  self: TMethodCaller
+  data: typeUtils.DeepReadonly<typeUtils.DataWithPropertyValues<TPrevData, TProperty>>
+  setData: (newData: Partial<typeUtils.SetDataSetter<TPrevData>>, callback?: () => void) => void
   implement: <TIn extends { [x: string]: any }>(
     traitBehavior: TraitBehavior<TIn, any>,
-    impl: TIn
-  ) => void;
-  relation<TOut extends { [key: string]: any }>
-  (def: TraitRelationParams<TOut> & ThisType<TMethodCaller>): RelationHandler<any, TOut>
+    impl: TIn,
+  ) => void
+  relation<TOut extends { [key: string]: any }>(
+    def: TraitRelationParams<TOut> & ThisType<TMethodCaller>,
+  ): RelationHandler<any, TOut>
   relation(def: RelationParams & ThisType<TMethodCaller>): RelationHandler<any, never>
   observer<
     P extends typeUtils.ObserverDataPathStrings<
       typeUtils.DataWithPropertyValues<TPrevData, TProperty>
     >,
     V = typeUtils.DeepReadonly<
-     typeUtils. GetFromObserverPathString<typeUtils.DataWithPropertyValues<TPrevData, TProperty>, P>
-    >
+      typeUtils.GetFromObserverPathString<typeUtils.DataWithPropertyValues<TPrevData, TProperty>, P>
+    >,
   >(
     paths: P,
     func: (newValue: V) => void,
-  ): void;
+  ): void
   observer<
     P extends typeUtils.ObserverDataPathStrings<
       typeUtils.DataWithPropertyValues<TPrevData, TProperty>
@@ -181,14 +151,14 @@ export interface BuilderContext<
           P[K]
         >
       >
-    }
+    },
   >(
     paths: readonly [...P],
     func: (...newValues: V extends any[] ? V : never) => void,
-  ): void;
-  lifetime: <L extends keyof Lifetimes>(name: L, func: Lifetimes[L]) => void;
-  pageLifetime: (name: string, func: (...args: any[]) => void) => void;
-  method: <Fn extends ComponentMethod>(func: Fn) => TaggedMethod<Fn>;
+  ): void
+  lifetime: <L extends keyof Lifetimes>(name: L, func: Lifetimes[L]) => void
+  pageLifetime: (name: string, func: (...args: any[]) => void) => void
+  method: <Fn extends ComponentMethod>(func: Fn) => TaggedMethod<Fn>
 }
 
 /**
@@ -201,7 +171,7 @@ export class CodeSpace {
   private space: glassEasel.ComponentSpace
   private styleScopeManager: glassEasel.StyleScopeManager
   private staticConfigMap: { [path: string]: ComponentStaticConfig }
-  private styleSheetMap: { [path: string]: { url: string, styleScopeName: string | undefined } }
+  private styleSheetMap: { [path: string]: { url: string; styleScopeName: string | undefined } }
   private compiledTemplateMap: { [path: string]: glassEasel.template.ComponentTemplate }
   private waitingAliasMap: { [is: string]: string[] }
   /** @internal */
@@ -227,10 +197,12 @@ export class CodeSpace {
     )
     this.styleScopeManager = this.space.styleScopeManager
     this.staticConfigMap = Object.create(null) as { [path: string]: ComponentStaticConfig }
-    this.styleSheetMap = Object.create(null) as
-      { [path: string]: { url: string, styleScopeName: string } }
-    this.compiledTemplateMap = Object.create(null) as
-      { [path: string]: glassEasel.template.ComponentTemplate }
+    this.styleSheetMap = Object.create(null) as {
+      [path: string]: { url: string; styleScopeName: string }
+    }
+    this.compiledTemplateMap = Object.create(null) as {
+      [path: string]: glassEasel.template.ComponentTemplate
+    }
     this.waitingAliasMap = Object.create(null) as { [path: string]: string[] }
     Object.keys(publicComponents).forEach((alias) => {
       const is = publicComponents[alias]!
@@ -365,14 +337,14 @@ export class CodeSpace {
     let styleScope: glassEasel.StyleScopeId | undefined
     let extraStyleScope: glassEasel.StyleScopeId | undefined
     if (
-      styleIsolation === StyleIsolation.ApplyShared
-      || styleIsolation === StyleIsolation.PageApplyShared
+      styleIsolation === StyleIsolation.ApplyShared ||
+      styleIsolation === StyleIsolation.PageApplyShared
     ) {
       styleScope = this.styleScopeManager.register(this.getStyleScopeName(is) || `__${guid()}`)
       extraStyleScope = this._$sharedStyleScope
     } else if (
-      (styleIsolation === StyleIsolation.Shared || styleIsolation === StyleIsolation.PageShared)
-      && this._$isMainSpace
+      (styleIsolation === StyleIsolation.Shared || styleIsolation === StyleIsolation.PageShared) &&
+      this._$isMainSpace
     ) {
       styleScope = this._$sharedStyleScope
     } else {
@@ -437,10 +409,8 @@ export class CodeSpace {
       TData extends DataList,
       TNewExtraFields extends { [k: PropertyKey]: any },
     >(
-      definition: PageDefinition<
-        TData,
-        TNewExtraFields
-      > & ThisType<Component<TData, Empty, TNewExtraFields, undefined>>,
+      definition: PageDefinition<TData, TNewExtraFields> &
+        ThisType<Component<TData, Empty, TNewExtraFields, undefined>>,
     ) {
       return self.component(path).pageDefinition(definition).register()
     }
@@ -452,27 +422,13 @@ export class CodeSpace {
       TProperty extends PropertyList,
       TMethod extends MethodList,
       TComponentExport,
-    >(
-      definition: ComponentDefinition<
-        TData,
-        TProperty,
-        TMethod,
-        TComponentExport
-      >,
-    ): void
+    >(definition: ComponentDefinition<TData, TProperty, TMethod, TComponentExport>): void
     function componentConstructor<
       TData extends DataList,
       TProperty extends PropertyList,
       TMethod extends MethodList,
       TComponentExport,
-    >(
-      definition?: ComponentDefinition<
-        TData,
-        TProperty,
-        TMethod,
-        TComponentExport
-      >,
-    ) {
+    >(definition?: ComponentDefinition<TData, TProperty, TMethod, TComponentExport>) {
       if (definition !== undefined) {
         return self.component(path).definition(definition).register()
       }
@@ -488,11 +444,7 @@ export class CodeSpace {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       TComponentExport,
     >(
-      definition: BehaviorDefinition<
-        TData,
-        TProperty,
-        TMethod
-      >,
+      definition: BehaviorDefinition<TData, TProperty, TMethod>,
     ): Behavior<TData, TProperty, TMethod, never>
     function behaviorConstructor<
       TData extends DataList,
@@ -500,13 +452,7 @@ export class CodeSpace {
       TMethod extends MethodList,
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       TComponentExport,
-    >(
-      definition?: BehaviorDefinition<
-        TData,
-        TProperty,
-        TMethod
-      >,
-    ) {
+    >(definition?: BehaviorDefinition<TData, TProperty, TMethod>) {
       if (definition !== undefined) {
         return self.behavior().definition(definition).register()
       }
@@ -546,14 +492,12 @@ export class CodeSpace {
    * Define a trait behavior
    */
   traitBehavior<TIn extends { [key: string]: any }>(): TraitBehavior<TIn, TIn>
-  traitBehavior<
-    TIn extends { [key: string]: any },
-    TOut extends { [key: string]: any }
-  >(trans: (impl: TIn) => TOut): TraitBehavior<TIn, TOut>
-  traitBehavior<
-    TIn extends { [key: string]: any },
-    TOut extends { [key: string]: any }
-  >(trans?: (impl: TIn) => TOut): TraitBehavior<TIn, TOut> {
+  traitBehavior<TIn extends { [key: string]: any }, TOut extends { [key: string]: any }>(
+    trans: (impl: TIn) => TOut,
+  ): TraitBehavior<TIn, TOut>
+  traitBehavior<TIn extends { [key: string]: any }, TOut extends { [key: string]: any }>(
+    trans?: (impl: TIn) => TOut,
+  ): TraitBehavior<TIn, TOut> {
     if (trans === undefined) {
       return new TraitBehavior(this.space.defineTraitBehavior<TIn>())
     }
@@ -561,8 +505,10 @@ export class CodeSpace {
   }
 }
 
-type ResolveBehaviorBuilder<B, TChainingFilter extends ChainingFilterType> =
-  typeUtils.IsNever<TChainingFilter> extends false
+type ResolveBehaviorBuilder<
+  B,
+  TChainingFilter extends ChainingFilterType,
+> = typeUtils.IsNever<TChainingFilter> extends false
   ? TChainingFilter extends ChainingFilterType
     ? Omit<B, TChainingFilter['remove']> & TChainingFilter['add']
     : B
@@ -604,7 +550,7 @@ export class BaseBehaviorBuilder<
   }
 
   data<T extends DataList>(
-    gen: (() => typeUtils.NewFieldList<AllData<TData, TProperty>, T>),
+    gen: () => typeUtils.NewFieldList<AllData<TData, TProperty>, T>,
   ): ResolveBehaviorBuilder<
     BaseBehaviorBuilder<
       T,
@@ -621,11 +567,7 @@ export class BaseBehaviorBuilder<
     return this as any
   }
 
-  property<
-    N extends string,
-    T extends PropertyType,
-    V extends PropertyTypeToValueType<T>,
-  >(
+  property<N extends string, T extends PropertyType, V extends PropertyTypeToValueType<T>>(
     name: N,
     def: N extends keyof (TData & TProperty) ? never : typeUtils.PropertyListItem<T, V>,
   ): ResolveBehaviorBuilder<
@@ -649,9 +591,7 @@ export class BaseBehaviorBuilder<
    *
    * The public method can be used as an event handler, and can be visited in component instance.
    */
-  methods<
-    T extends MethodList,
-  >(
+  methods<T extends MethodList>(
     funcs: T & ThisType<Component<TData, TProperty, TMethod & T, any>>,
   ): ResolveBehaviorBuilder<
     BaseBehaviorBuilder<
@@ -678,12 +618,12 @@ export class BaseBehaviorBuilder<
     >,
     V = typeUtils.DeepReadonly<
       typeUtils.GetFromObserverPathString<typeUtils.DataWithPropertyValues<TPrevData, TProperty>, P>
-    >
+    >,
   >(
     paths: P,
     func: (this: Component<TData, TProperty, TMethod, any>, newValue: V) => void,
     once?: boolean,
-  ): ResolveBehaviorBuilder<this, TChainingFilter>;
+  ): ResolveBehaviorBuilder<this, TChainingFilter>
   observer<
     P extends typeUtils.ObserverDataPathStrings<
       typeUtils.DataWithPropertyValues<TPrevData, TProperty>
@@ -695,7 +635,7 @@ export class BaseBehaviorBuilder<
           P[K]
         >
       >
-    }
+    },
   >(
     paths: readonly [...P],
     func: (
@@ -703,7 +643,7 @@ export class BaseBehaviorBuilder<
       ...newValues: V extends any[] ? V : never
     ) => void,
     once?: boolean,
-  ): ResolveBehaviorBuilder<this, TChainingFilter>;
+  ): ResolveBehaviorBuilder<this, TChainingFilter>
   observer(
     paths: string | readonly string[],
     func: (this: Component<TData, TProperty, TMethod, any>, ...args: any[]) => any,
@@ -747,9 +687,10 @@ export class BaseBehaviorBuilder<
     name: string,
     rel: RelationParams & ThisType<Component<TData, TProperty, TMethod, TComponentExport>>,
   ): ResolveBehaviorBuilder<this, TChainingFilter> {
-    const target = (rel.target instanceof Behavior || rel.target instanceof ComponentType)
-      ? rel.target._$
-      : rel.target
+    const target =
+      rel.target instanceof Behavior || rel.target instanceof ComponentType
+        ? rel.target._$
+        : rel.target
     this._$.relation(name, {
       target,
       type: rel.type,
@@ -770,7 +711,7 @@ export class BaseBehaviorBuilder<
         Component<TData, TProperty, TMethod, TComponentExport>
       >,
     ) => TExport,
-  // eslint-disable-next-line function-paren-newline
+    // eslint-disable-next-line function-paren-newline
   ): ResolveBehaviorBuilder<
     BaseBehaviorBuilder<
       TPrevData,
@@ -804,9 +745,10 @@ export class BaseBehaviorBuilder<
             linkFailed: rel.linkFailed,
           } as any)
         }
-        const target = (rel.target instanceof Behavior || rel.target instanceof ComponentType)
-          ? rel.target._$
-          : rel.target
+        const target =
+          rel.target instanceof Behavior || rel.target instanceof ComponentType
+            ? rel.target._$
+            : rel.target
         return relation({
           target,
           type: rel.type,
@@ -850,18 +792,15 @@ export class BaseBehaviorBuilder<
     TNewProperty extends PropertyList = Empty,
     TNewMethod extends MethodList = Empty,
   >(
-    def: BehaviorDefinition<
-      TNewData,
-      TNewProperty,
-      TNewMethod
-    > & ThisType<
-      Component<
-        TData & TNewData,
-        TProperty & TNewProperty,
-        TMethod & TNewMethod,
-        TComponentExport
-      >
-    >,
+    def: BehaviorDefinition<TNewData, TNewProperty, TNewMethod> &
+      ThisType<
+        Component<
+          TData & TNewData,
+          TProperty & TNewProperty,
+          TMethod & TNewMethod,
+          TComponentExport
+        >
+      >,
   ): ResolveBehaviorBuilder<
     BaseBehaviorBuilder<
       TPrevData,
@@ -914,7 +853,7 @@ export class BaseBehaviorBuilder<
       if (Array.isArray(rawObservers)) {
         for (let i = 0; i < rawObservers.length; i += 1) {
           const { fields, observer } = rawObservers[i]!
-          inner.observer(fields || '**' as any, observer)
+          inner.observer(fields || ('**' as any), observer)
         }
       } else {
         const keys = Object.keys(rawObservers)
@@ -983,8 +922,7 @@ export class BehaviorBuilder<
   static create(codeSpace: CodeSpace): BehaviorBuilder {
     const ret = new BehaviorBuilder()
     ret._$codeSpace = codeSpace
-    ret._$ = codeSpace.getComponentSpace()
-      .defineWithMethodCaller()
+    ret._$ = codeSpace.getComponentSpace().defineWithMethodCaller()
     return ret
   }
 
@@ -995,10 +933,18 @@ export class BehaviorBuilder<
   >(
     func: ChainingFilterFunc<TAddedFields, TRemovedFields>,
   ): ResolveBehaviorBuilder<
-    BehaviorBuilder<TPrevData, TData, TProperty, TMethod, TChainingFilter, {
-      add: TAddedFields,
-      remove: TRemovedFields,
-    }, TComponentExport>,
+    BehaviorBuilder<
+      TPrevData,
+      TData,
+      TProperty,
+      TMethod,
+      TChainingFilter,
+      {
+        add: TAddedFields
+        remove: TRemovedFields
+      },
+      TComponentExport
+    >,
     TChainingFilter
   > {
     this._$.chainingFilter(func as any)
@@ -1038,7 +984,7 @@ export class BehaviorBuilder<
    * The `gen` function executes once during component creation.
    */
   override data<T extends DataList>(
-    gen: (() => typeUtils.NewFieldList<AllData<TData, TProperty>, T>),
+    gen: () => typeUtils.NewFieldList<AllData<TData, TProperty>, T>,
   ): ResolveBehaviorBuilder<
     BehaviorBuilder<
       T,
@@ -1059,11 +1005,7 @@ export class BehaviorBuilder<
    *
    * The property name should be different from other properties.
    */
-  override property<
-    N extends string,
-    T extends PropertyType,
-    V extends PropertyTypeToValueType<T>,
-  >(
+  override property<N extends string, T extends PropertyType, V extends PropertyTypeToValueType<T>>(
     name: N,
     def: N extends keyof (TData & TProperty) ? never : typeUtils.PropertyListItem<T, V>,
   ): ResolveBehaviorBuilder<
@@ -1086,9 +1028,7 @@ export class BehaviorBuilder<
    *
    * The public method can be used as an event handler, and can be visited in component instance.
    */
-  override methods<
-    T extends MethodList,
-  >(
+  override methods<T extends MethodList>(
     funcs: T & ThisType<Component<TData, TProperty, TMethod & T, any>>,
   ): ResolveBehaviorBuilder<
     BehaviorBuilder<
@@ -1121,7 +1061,7 @@ export class BehaviorBuilder<
         Component<TData, TProperty, TMethod, TComponentExport>
       >,
     ) => TExport,
-  // eslint-disable-next-line function-paren-newline
+    // eslint-disable-next-line function-paren-newline
   ): ResolveBehaviorBuilder<
     BehaviorBuilder<
       TPrevData,
@@ -1143,18 +1083,15 @@ export class BehaviorBuilder<
     TNewProperty extends PropertyList = Empty,
     TNewMethod extends MethodList = Empty,
   >(
-    def: BehaviorDefinition<
-      TNewData,
-      TNewProperty,
-      TNewMethod
-    > & ThisType<
-      Component<
-        TData & TNewData,
-        TProperty & TNewProperty,
-        TMethod & TNewMethod,
-        TComponentExport
-      >
-    >,
+    def: BehaviorDefinition<TNewData, TNewProperty, TNewMethod> &
+      ThisType<
+        Component<
+          TData & TNewData,
+          TProperty & TNewProperty,
+          TMethod & TNewMethod,
+          TComponentExport
+        >
+      >,
   ): ResolveBehaviorBuilder<
     BehaviorBuilder<
       TPrevData,
@@ -1176,11 +1113,7 @@ export class BehaviorBuilder<
    * Finish the behavior definition process
    */
   register(): Behavior<TData, TProperty, TMethod, TPendingChainingFilter> {
-    return new Behavior(
-      this._$.registerBehavior(),
-      this._$parents,
-      this._$definitionFilter,
-    )
+    return new Behavior(this._$.registerBehavior(), this._$parents, this._$definitionFilter)
   }
 }
 
@@ -1215,8 +1148,7 @@ export class ComponentBuilder<
     const ret = new ComponentBuilder()
     const overallBehavior = codeSpace._$overallBehavior
     ret._$codeSpace = codeSpace
-    ret._$ = codeSpace.getComponentSpace()
-      .defineWithMethodCaller(is || '')
+    ret._$ = codeSpace.getComponentSpace().defineWithMethodCaller(is || '')
     ret._$is = is || ''
     ret._$alias = alias
     ret._$.methodCallerInit(function () {
@@ -1242,9 +1174,7 @@ export class ComponentBuilder<
    *
    * If called multiple times, only the latest call is valid.
    */
-  options(
-    options: ComponentDefinitionOptions,
-  ): ResolveBehaviorBuilder<this, TChainingFilter> {
+  options(options: ComponentDefinitionOptions): ResolveBehaviorBuilder<this, TChainingFilter> {
     this._$options = options
     return this as any
   }
@@ -1305,7 +1235,7 @@ export class ComponentBuilder<
    * The `gen` function executes once during component creation.
    */
   override data<T extends DataList>(
-    gen: (() => typeUtils.NewFieldList<AllData<TData, TProperty>, T>),
+    gen: () => typeUtils.NewFieldList<AllData<TData, TProperty>, T>,
   ): ResolveBehaviorBuilder<
     ComponentBuilder<
       T,
@@ -1326,11 +1256,7 @@ export class ComponentBuilder<
    *
    * The property name should be different from other properties.
    */
-  override property<
-    N extends string,
-    T extends PropertyType,
-    V extends PropertyTypeToValueType<T>,
-  >(
+  override property<N extends string, T extends PropertyType, V extends PropertyTypeToValueType<T>>(
     name: N,
     def: N extends keyof (TData & TProperty) ? never : typeUtils.PropertyListItem<T, V>,
   ): ResolveBehaviorBuilder<
@@ -1353,9 +1279,7 @@ export class ComponentBuilder<
    *
    * The public method can be used as an event handler, and can be visited in component instance.
    */
-  override methods<
-    T extends MethodList,
-  >(
+  override methods<T extends MethodList>(
     funcs: T & ThisType<Component<TData, TProperty, TMethod & T, any>>,
   ): ResolveBehaviorBuilder<
     ComponentBuilder<
@@ -1388,7 +1312,7 @@ export class ComponentBuilder<
         Component<TData, TProperty, TMethod, TComponentExport>
       >,
     ) => TExport,
-  // eslint-disable-next-line function-paren-newline
+    // eslint-disable-next-line function-paren-newline
   ): ResolveBehaviorBuilder<
     ComponentBuilder<
       TPrevData,
@@ -1411,19 +1335,15 @@ export class ComponentBuilder<
     TNewMethod extends MethodList = Empty,
     TNewComponentExport = undefined,
   >(
-    def: ComponentDefinition<
-      TNewData,
-      TNewProperty,
-      TNewMethod,
-      TNewComponentExport
-    > & ThisType<
-      Component<
-        TData & TNewData,
-        TProperty & TNewProperty,
-        TMethod & TNewMethod,
-        TNewComponentExport
-      >
-    >,
+    def: ComponentDefinition<TNewData, TNewProperty, TNewMethod, TNewComponentExport> &
+      ThisType<
+        Component<
+          TData & TNewData,
+          TProperty & TNewProperty,
+          TMethod & TNewMethod,
+          TNewComponentExport
+        >
+      >,
   ): ResolveBehaviorBuilder<
     ComponentBuilder<
       TPrevData,
@@ -1441,14 +1361,9 @@ export class ComponentBuilder<
     return this as any
   }
 
-  pageDefinition<
-    TNewData extends DataList,
-    TNewExtraFields extends { [k: PropertyKey]: any },
-  >(
-    def: PageDefinition<
-      TNewData,
-      TNewExtraFields
-    > & ThisType<Component<TData & TNewData, TProperty, TMethod & TNewExtraFields, undefined>>,
+  pageDefinition<TNewData extends DataList, TNewExtraFields extends { [k: PropertyKey]: any }>(
+    def: PageDefinition<TNewData, TNewExtraFields> &
+      ThisType<Component<TData & TNewData, TProperty, TMethod & TNewExtraFields, undefined>>,
   ): ResolveBehaviorBuilder<
     ComponentBuilder<
       TPrevData,
@@ -1471,9 +1386,9 @@ export class ComponentBuilder<
       if (k === 'data' || k === 'options' || k === 'behaviors') {
         compDef[k] = def[k]
       } else if (typeof def[k] === 'function') {
-        (compDef.methods as { [k: string]: unknown })[k] = def[k] as unknown
+        ;(compDef.methods as { [k: string]: unknown })[k] = def[k] as unknown
       } else {
-        (freeData as { [k: string]: unknown })[k] = def[k]
+        ;(freeData as { [k: string]: unknown })[k] = def[k]
       }
     }
     this.definition(compDef)

@@ -28,19 +28,18 @@ const createElem = (is, backend) => {
   return glassEasel.Component.createWithContext(is || 'test', def, backend || domBackend)
 }
 
-describe('DataProxy', function(){
-
-  it('should allow independent usage', function(){
+describe('DataProxy', function () {
+  it('should allow independent usage', function () {
     var callOrder = []
     var da = {
       a: 1,
     }
-    var g = glassEasel.DataGroup.create(da, function(data, combinedChanges){
+    var g = glassEasel.DataGroup.create(da, function (data, combinedChanges) {
       callOrder.push([data, combinedChanges])
     })
     g.replaceDataOnPath(['a'], 2)
     g.applyDataUpdates()
-    expect(g.data).toStrictEqual({a: 2})
+    expect(g.data).toStrictEqual({ a: 2 })
     var db = {
       b: 1,
     }
@@ -48,10 +47,10 @@ describe('DataProxy', function(){
     expect(g.data).toBe(db)
     g.replaceDataOnPath(['b'], 2)
     g.applyDataUpdates()
-    expect(g.data).toStrictEqual({b: 2})
+    expect(g.data).toStrictEqual({ b: 2 })
   })
 
-  it('should separate template data', function(){
+  it('should separate template data', function () {
     regElem({
       is: 'data-proxy-separate-a',
       template: '<div id="c" prop-abc="{{a}} {{b}} {{c}}" />',
@@ -59,22 +58,22 @@ describe('DataProxy', function(){
         a: 1,
         b: 2,
         c: 3,
-      }
+      },
     })
     var elem = createElem('data-proxy-separate-a')
     expect(elem.$.c.$$.getAttribute('prop-abc')).toBe('1 2 3')
     elem.data.a = 4
     elem.setData({
-      b: 5
+      b: 5,
     })
     expect(elem.$.c.$$.getAttribute('prop-abc')).toBe('1 5 3')
   })
 
-  it('should support inner data filter', function(){
+  it('should support inner data filter', function () {
     regElem({
       is: 'data-proxy-inner-data-exclude-a',
       options: {
-        pureDataPattern: /^_/
+        pureDataPattern: /^_/,
       },
       template: '<div id="c" prop-abc="{{a}} {{_b}} {{_c}} {{d}} {{_e}}" />',
       data: {
@@ -82,13 +81,13 @@ describe('DataProxy', function(){
         _b: 2,
       },
       observers: {
-        '_b': function() {
+        _b: function () {
           this.setData({
             d: this.data._b * 10,
             _e: this.data._b * 100,
           })
         },
-      }
+      },
     })
     var elem = createElem('data-proxy-inner-data-exclude-a')
     expect(elem.data.a).toBe(1)
@@ -107,38 +106,38 @@ describe('DataProxy', function(){
     expect(elem.$.c.getAttribute('prop-abc')).toBe('10   200 ')
   })
 
-  it('should support inner data filter on properties', function(){
+  it('should support inner data filter on properties', function () {
     var observerTriggered = []
     regElem({
       is: 'data-proxy-inner-data-exclude-b',
       options: {
-        pureDataPattern: /^_/
+        pureDataPattern: /^_/,
       },
       template: '<div id="c" prop-abc="{{a}} {{_b}}" />',
       properties: {
         a: {
           type: Number,
           value: 1,
-          observer: function() {
+          observer: function () {
             observerTriggered.push('a1')
-          }
+          },
         },
         _b: {
           type: Number,
           value: 2,
-          observer: function() {
+          observer: function () {
             observerTriggered.push('b1')
-          }
+          },
         },
       },
       observers: {
-        a: function() {
+        a: function () {
           observerTriggered.push('a2')
         },
-        _b: function() {
+        _b: function () {
           observerTriggered.push('b2')
         },
-      }
+      },
     })
     var elem = createElem('data-proxy-inner-data-exclude-b')
     expect(elem.data.a).toBe(1)
@@ -154,12 +153,12 @@ describe('DataProxy', function(){
     expect(observerTriggered).toStrictEqual(['a2', 'b2', 'a1'])
   })
 
-  it('should support inner data filter (when separating template data disabled)', function(){
+  it('should support inner data filter (when separating template data disabled)', function () {
     regElem({
       is: 'data-proxy-inner-data-exclude-c',
       options: {
         dataDeepCopy: glassEasel.DeepCopyKind.None,
-        pureDataPattern: /^_/
+        pureDataPattern: /^_/,
       },
       template: '<div id="c" prop-abc="{{a}} {{_b}} {{_c}} {{d}} {{_e}}" />',
       data: {
@@ -167,13 +166,13 @@ describe('DataProxy', function(){
         _b: 2,
       },
       observers: {
-        '_b': function() {
+        _b: function () {
           this.setData({
             d: (this.data._b || 40) * 10,
             _e: (this.data._b || 40) * 100,
           })
         },
-      }
+      },
     })
     var elem = createElem('data-proxy-inner-data-exclude-c')
     expect(elem.data.a).toBe(1)
@@ -192,39 +191,39 @@ describe('DataProxy', function(){
     expect(elem.$.c.getAttribute('prop-abc')).toBe('10   200 ')
   })
 
-  it('should support inner data filter on properties (when separating template data disabled)', function(){
+  it('should support inner data filter on properties (when separating template data disabled)', function () {
     var observerTriggered = []
     regElem({
       is: 'data-proxy-inner-data-exclude-d',
       options: {
         dataDeepCopy: glassEasel.DeepCopyKind.None,
-        pureDataPattern: /^_/
+        pureDataPattern: /^_/,
       },
       template: '<div id="c" prop-abc="{{a}} {{_b}}" />',
       properties: {
         a: {
           type: Number,
           value: 1,
-          observer: function() {
+          observer: function () {
             observerTriggered.push('a1')
-          }
+          },
         },
         _b: {
           type: Number,
           value: 2,
-          observer: function() {
+          observer: function () {
             observerTriggered.push('b1')
-          }
+          },
         },
       },
       observers: {
-        a: function() {
+        a: function () {
           observerTriggered.push('a2')
         },
-        _b: function() {
+        _b: function () {
           observerTriggered.push('b2')
         },
-      }
+      },
     })
     var elem = createElem('data-proxy-inner-data-exclude-d')
     expect(elem.data.a).toBe(1)
@@ -240,7 +239,7 @@ describe('DataProxy', function(){
     expect(observerTriggered).toStrictEqual(['a2', 'b2', 'a1'])
   })
 
-  it('should not separate template data if options specified', function(){
+  it('should not separate template data if options specified', function () {
     regElem({
       is: 'data-proxy-separate-b',
       options: {
@@ -251,18 +250,18 @@ describe('DataProxy', function(){
         a: 1,
         b: 2,
         c: 3,
-      }
+      },
     })
     var elem = createElem('data-proxy-separate-b')
     expect(elem.$.c.getAttribute('prop-abc')).toBe('1 2 3')
     elem.data.a = 4
     elem.setData({
-      b: 5
+      b: 5,
     })
     expect(elem.$.c.getAttribute('prop-abc')).toBe('4 5 3')
   })
 
-  it('should not copy when property passing if options specified', function(){
+  it('should not copy when property passing if options specified', function () {
     regElem({
       is: 'data-proxy-prop-passing-deep-copy',
       options: {
@@ -275,7 +274,7 @@ describe('DataProxy', function(){
             b: 1,
           },
         },
-      }
+      },
     })
     var elem = createElem('data-proxy-prop-passing-deep-copy')
     expect(elem.$.c.getAttribute('prop-abc')).toBe('1')
@@ -285,16 +284,15 @@ describe('DataProxy', function(){
     c = 5
     dataGroup.applyDataUpdates()
     expect(elem.$.c.getAttribute('prop-abc')).toBe('4')
-    d = {b: c}
+    d = { b: c }
     dataGroup.replaceProperty('a', d)
     d.b = 6
     dataGroup.applyDataUpdates()
     expect(elem.$.c.getAttribute('prop-abc')).toBe('6')
   })
 
-  describe('#scheduleReplace #setChanges #getChanges', function(){
-
-    it('should support global observer', function(){
+  describe('#scheduleReplace #setChanges #getChanges', function () {
+    it('should support global observer', function () {
       regElem({
         is: 'data-proxy-a',
         properties: {
@@ -302,50 +300,52 @@ describe('DataProxy', function(){
         },
         data: {
           data1: {
-            arr: [10, 100]
-          }
+            arr: [10, 100],
+          },
         },
-        observers: [{
-          observer: function(newVal) {
-            if(observesLeft === 2) {
-              expect(newVal).toBe(this.data)
-            } else {
-              expect(newVal).toBe(this.data)
-            }
-            observesLeft--
-          }
-        }]
+        observers: [
+          {
+            observer: function (newVal) {
+              if (observesLeft === 2) {
+                expect(newVal).toBe(this.data)
+              } else {
+                expect(newVal).toBe(this.data)
+              }
+              observesLeft--
+            },
+          },
+        ],
       })
       var elem = createElem('data-proxy-a')
       var observesLeft = 2
       elem.prop1 = 123
       elem.setData({
-        'data1.arr[1]': '200'
+        'data1.arr[1]': '200',
       })
       expect(observesLeft).toBe(0)
     })
 
-    it('should do replace in correct order', function(){
+    it('should do replace in correct order', function () {
       regElem({
         is: 'data-proxy-replace',
         data: {
-          data1: []
-        }
+          data1: [],
+        },
       })
       var elem = createElem('data-proxy-replace')
-      elem.groupUpdates(function() {
+      elem.groupUpdates(function () {
         elem.replaceDataOnPath(['data2'], {
-          f1: {}
+          f1: {},
         })
         elem.replaceDataOnPath(['data2'], {
           f2: {
             sf1: {
-              obj: {}
+              obj: {},
             },
             sf2: {
-              arr: ['a']
-            }
-          }
+              arr: ['a'],
+            },
+          },
         })
         elem.replaceDataOnPath(['data2', 'f3'], {})
         elem.replaceDataOnPath(['data2', 'f2', 'sf1'], true)
@@ -358,30 +358,33 @@ describe('DataProxy', function(){
           f2: {
             sf1: true,
             sf2: {
-              arr: ['a', 'b', 'c']
-            }
+              arr: ['a', 'b', 'c'],
+            },
           },
-          f3: {}
-        }
+          f3: {},
+        },
       })
     })
 
-    it('should be able to set all data changes', function(){
+    it('should be able to set all data changes', function () {
       regElem({
         is: 'data-proxy-replace-set',
       })
       var elem = createElem('data-proxy-replace-set')
       elem.replaceDataOnPath(['data3'], true)
       glassEasel.Component.getDataProxy(elem).setChanges([
-        [['data2'], {f1: {}}],
-        [['data2'], {
-          f2: {
-            sf1: {
-              obj: {}
-            }
-          }
-        }],
-        [['data2'], {f3: {}}],
+        [['data2'], { f1: {} }],
+        [
+          ['data2'],
+          {
+            f2: {
+              sf1: {
+                obj: {},
+              },
+            },
+          },
+        ],
+        [['data2'], { f3: {} }],
         [['data2', 'f2', 'sf1'], true],
       ])
       elem.replaceDataOnPath(['data4'], 123)
@@ -390,12 +393,12 @@ describe('DataProxy', function(){
         data4: 123,
         data2: {
           f2: { sf1: true },
-          f3: {}
-        }
+          f3: {},
+        },
       })
     })
 
-    it('should be able to get and set all data changes', function(){
+    it('should be able to get and set all data changes', function () {
       regElem({
         is: 'data-proxy-replace-set',
       })
@@ -408,19 +411,17 @@ describe('DataProxy', function(){
       expect(elem.data.a).toBe(undefined)
       expect(elem.data.b).toBe(2)
     })
-
   })
 
-  describe('#addObserver', function(){
-
-    it('should trigger data observers', function(){
+  describe('#addObserver', function () {
+    it('should trigger data observers', function () {
       var beh = regBeh({
         observers: {
-          'data2.arr.**': function(newVal){
+          'data2.arr.**': function (newVal) {
             actualOrder.push(7)
             expect(newVal).toBe(this.data.data2 && this.data.data2.arr)
-          }
-        }
+          },
+        },
       })
       regElem({
         is: 'data-proxy-observer',
@@ -428,40 +429,42 @@ describe('DataProxy', function(){
         properties: {
           prop1: {
             type: Number,
-            observer: function(newVal){
+            observer: function (newVal) {
               actualOrder.push(0)
-            }
-          }
+            },
+          },
         },
         observers: {
-          'data2': function f1(newVal){
+          data2: function f1(newVal) {
             actualOrder.push(1)
             expect(newVal).toBe(this.data.data2)
           },
-          'data2.**': function f2(newVal){
+          'data2.**': function f2(newVal) {
             actualOrder.push(2)
             expect(newVal).toBe(this.data.data2)
           },
-          'data2.arr.**': function f3(newVal){
+          'data2.arr.**': function f3(newVal) {
             actualOrder.push(3)
             expect(newVal).toBe(this.data.data2 && this.data.data2.arr)
           },
-          'data2.arr[0].sf1, data2.arr[1].**': function f4(newVal1, newVal2){
+          'data2.arr[0].sf1, data2.arr[1].**': function f4(newVal1, newVal2) {
             actualOrder.push(4)
-            expect(newVal1).toBe(this.data.data2 && this.data.data2.arr[0] && this.data.data2.arr[0].sf1)
+            expect(newVal1).toBe(
+              this.data.data2 && this.data.data2.arr[0] && this.data.data2.arr[0].sf1,
+            )
             expect(newVal2).toBe(this.data.data2 && this.data.data2.arr[1])
           },
-          'data2.arr[0]': function f5(newVal){
+          'data2.arr[0]': function f5(newVal) {
             actualOrder.push(5)
             expect(newVal).toBe(this.data.data2 && this.data.data2.arr[0])
           },
-          'data2.**, not.exists, prop1': function f6(newVal1, newVal2, newVal3){
+          'data2.**, not.exists, prop1': function f6(newVal1, newVal2, newVal3) {
             actualOrder.push(6)
             expect(newVal1).toBe(this.data.data2)
             expect(newVal2).toBe(undefined)
             expect(newVal3).toBe(this.data.prop1)
           },
-        }
+        },
       })
       var elem = createElem('data-proxy-observer')
       var actualOrder = null
@@ -469,7 +472,7 @@ describe('DataProxy', function(){
       actualOrder = []
       elem.setData({
         prop1: '123',
-        data1: null
+        data1: null,
       })
       expect(elem.data.prop1).toBe(123)
       expect(actualOrder).toStrictEqual([6, 0])
@@ -477,46 +480,46 @@ describe('DataProxy', function(){
       actualOrder = []
       elem.setData({
         data2: {
-          arr: [{ sf2: 'b' }]
-        }
+          arr: [{ sf2: 'b' }],
+        },
       })
       expect(actualOrder).toStrictEqual([7, 1, 2, 3, 4, 5, 6])
 
       actualOrder = []
       elem.setData({
         'data2.arr[0]': {
-          sf1: 'a'
-        }
+          sf1: 'a',
+        },
       })
       expect(actualOrder).toStrictEqual([7, 2, 3, 4, 5, 6])
 
       actualOrder = []
       elem.setData({
-        'data2.arr[0].sf1': 'a'
+        'data2.arr[0].sf1': 'a',
       })
       expect(actualOrder).toStrictEqual([7, 2, 3, 4, 6])
 
       actualOrder = []
       elem.setData({
-        'data2.arr[1].sf2': 'b'
+        'data2.arr[1].sf2': 'b',
       })
       expect(actualOrder).toStrictEqual([7, 2, 3, 4, 6])
 
       actualOrder = []
       elem.setData({
         prop1: 456,
-        'data2.arr[1]': null
+        'data2.arr[1]': null,
       })
       expect(actualOrder).toStrictEqual([7, 2, 3, 4, 6, 0])
 
       actualOrder = []
       elem.setData({
-        'data2.arr[2].sf2': 'b'
+        'data2.arr[2].sf2': 'b',
       })
       expect(actualOrder).toStrictEqual([7, 2, 3, 6])
     })
 
-    it('should trigger data observers before applied to templates', function(){
+    it('should trigger data observers before applied to templates', function () {
       regElem({
         is: 'data-proxy-observer-b',
         template: '<div id="a" prop-a="{{prop1}}">',
@@ -524,30 +527,30 @@ describe('DataProxy', function(){
           prop1: {
             type: Number,
             value: 123,
-            observer: function(){
+            observer: function () {
               actualOrder.push(0)
               expect(elem.data.prop1).toBe(456)
               expect(elem.$.a.getAttribute('prop-a')).toBe('456')
-            }
-          }
+            },
+          },
         },
         observers: {
-          '**': function(){
+          '**': function () {
             actualOrder.push(1)
             expect(elem.data.prop1).toBe(456)
             expect(elem.$.a.getAttribute('prop-a')).toBe('123')
-          }
-        }
+          },
+        },
       })
       var actualOrder = []
       var elem = createElem('data-proxy-observer-b')
       elem.setData({
-        prop1: 456
+        prop1: 456,
       })
       expect(actualOrder).toStrictEqual([1, 0])
     })
 
-    it('should support setData in observers', function(){
+    it('should support setData in observers', function () {
       regElem({
         is: 'data-proxy-observer-c',
         template: '<div id="a" prop-a="{{propA}}" prop-b="{{dataB}}">',
@@ -556,26 +559,26 @@ describe('DataProxy', function(){
             type: Number,
             value: 0,
             public: true,
-            observer: function() {
+            observer: function () {
               actualOrder.push(1)
               expect(this.data.propA).toBe(123)
               expect(this.data.dataB).toBe(456)
               expect(this.$.a.getAttribute('prop-a')).toBe('123')
               expect(this.$.a.getAttribute('prop-b')).toBe('456')
               expect(elem.data.dataE).toBe(true)
-            }
-          }
+            },
+          },
         },
         observers: {
-          propA: function(propA) {
+          propA: function (propA) {
             if (this.propA === 0) return
             actualOrder.push(6)
             expect(propA).toBe(123)
             this.setData({
-              dataB: 456
+              dataB: 456,
             })
-          }
-        }
+          },
+        },
       })
       regElem({
         is: 'data-proxy-observer-d',
@@ -584,22 +587,22 @@ describe('DataProxy', function(){
           propC: {
             type: String,
             value: '0',
-            observer: function(){
+            observer: function () {
               actualOrder.push(2)
               expect(this.data.propC).toBe('123')
               expect(this.data.dataD).toBe('DDD')
               expect(elem.data.dataE).toBe(true)
-            }
-          }
+            },
+          },
         },
         data: {
           dataF: null,
         },
         observers: {
-          dataF: function(){
+          dataF: function () {
             actualOrder.push(5)
           },
-          dataD: function(){
+          dataD: function () {
             expect(elem.data.dataE).toBe(false)
             this.setData({
               propC: '123',
@@ -609,13 +612,13 @@ describe('DataProxy', function(){
             actualOrder.push(3)
             expect(elem.data.dataE).toBe(true)
           },
-          dataE: function(){
+          dataE: function () {
             this.setData({
               dataF: null,
             })
             actualOrder.push(4)
-          }
-        }
+          },
+        },
       })
       var actualOrder = []
       var elem = createElem('data-proxy-observer-d')
@@ -627,61 +630,65 @@ describe('DataProxy', function(){
       expect(actualOrder).toStrictEqual([5, 3, 4, 5, 6, 1, 2])
     })
 
-    it('should treat arrays and objects as the same', function(){
+    it('should treat arrays and objects as the same', function () {
       regElem({
         is: 'data-proxy-observer-obj-arr',
-        observers: [{
-          fields: 'arr[0]',
-          observer: function() {
-            actualOrder.push(1)
-          }
-        }]
+        observers: [
+          {
+            fields: 'arr[0]',
+            observer: function () {
+              actualOrder.push(1)
+            },
+          },
+        ],
       })
       var elem = createElem('data-proxy-observer-obj-arr')
       var actualOrder = null
       actualOrder = []
       elem.setData({
-        'arr.0': 1
+        'arr.0': 1,
       })
       expect(actualOrder).toStrictEqual([1])
       actualOrder = []
       elem.setData({
-        'arr[0]': 1
+        'arr[0]': 1,
       })
       expect(actualOrder).toStrictEqual([1])
     })
 
-    it('should allow multiple listeners on one path', function(){
+    it('should allow multiple listeners on one path', function () {
       var callOrder = []
       var beh = regBeh({
-        observers: [{
-          fields: 'a',
-          observer: 'b1',
-        }],
+        observers: [
+          {
+            fields: 'a',
+            observer: 'b1',
+          },
+        ],
         methods: {
-          b1: function(){
+          b1: function () {
             callOrder.push(1)
-          }
+          },
         },
       })
       regElem({
         is: 'data-proxy-multi-observer-on-field',
         behaviors: [beh],
         observers: {
-          a: function(){
+          a: function () {
             callOrder.push(2)
-          }
+          },
         },
       })
       var elem = createElem('data-proxy-multi-observer-on-field')
       elem.setData({
-        a: 1
+        a: 1,
       })
       expect(callOrder).toStrictEqual([1, 2])
     })
   })
 
-  it('should support recursive data fields', function(){
+  it('should support recursive data fields', function () {
     regElem({
       is: 'data-proxy-rec-data-fields',
       options: {
@@ -702,7 +709,7 @@ describe('DataProxy', function(){
     expect(elem.data.a.b.b.c).toBe(1)
   })
 
-  it('should support recursive property fields', function(){
+  it('should support recursive property fields', function () {
     regElem({
       is: 'data-proxy-rec-data-fields',
       options: {
@@ -727,7 +734,7 @@ describe('DataProxy', function(){
     expect(elem.data.a.b.b.c).toBe(1)
   })
 
-  it('should support attributes reflection and ID prefixes', function(){
+  it('should support attributes reflection and ID prefixes', function () {
     regElem({
       is: 'data-proxy-data-reflect-child',
       options: {
@@ -744,11 +751,11 @@ describe('DataProxy', function(){
     regElem({
       is: 'data-proxy-data-reflect-parent',
       options: {
-        idPrefixGenerator: function(){
+        idPrefixGenerator: function () {
           return 'rid'
         },
       },
-      template: '<data-proxy-data-reflect-child id="a" p-a="123" p-b="456" />'
+      template: '<data-proxy-data-reflect-child id="a" p-a="123" p-b="456" />',
     })
     var elem = createElem('data-proxy-data-reflect-parent')
     var child = elem.$.a
@@ -757,5 +764,4 @@ describe('DataProxy', function(){
     expect(child.data.pB).toBe(456)
     expect(child.$$.getAttribute('p-b')).toBe('456')
   })
-  
 })

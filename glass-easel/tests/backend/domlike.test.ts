@@ -30,8 +30,10 @@ describe('domlike backend', () => {
       const ops: number[] = []
       let touch: Touch
 
-      const Comp = componentSpace.define()
-        .template(tmpl(`
+      const Comp = componentSpace
+        .define()
+        .template(
+          tmpl(`
           <div
             bind:tap="onTapWrapper"
             bind:touchstart="onTouchStartWrapper"
@@ -42,15 +44,16 @@ describe('domlike backend', () => {
               bind:touchstart="onTouchStartButton"
             ></span>
           </div>
-        `))
+        `),
+        )
         .init(({ listener }) => {
-          const onTapWrapper = listener<{ x: number, y: number }>((e) => {
+          const onTapWrapper = listener<{ x: number; y: number }>((e) => {
             ops.push(1)
             expect(e.bubbles).toBe(true)
             expect(e.detail).toEqual({ x: -1, y: -1 })
           })
 
-          const onTapButton = listener<{ x: number, y: number }>((e) => {
+          const onTapButton = listener<{ x: number; y: number }>((e) => {
             ops.push(2)
             expect(e.bubbles).toBe(true)
             expect(e.detail).toEqual({ x: -1, y: -1 })
@@ -140,8 +143,10 @@ describe('domlike backend', () => {
     it('non-delegate event', () => {
       const ops: number[] = []
 
-      const Comp = componentSpace.define()
-        .template(tmpl(`
+      const Comp = componentSpace
+        .define()
+        .template(
+          tmpl(`
           <div
             bind:keydown="onKeydownWrapper"
           >
@@ -150,7 +155,8 @@ describe('domlike backend', () => {
               bind:keydown="onKeydownButton"
             ></span>
           </div>
-        `))
+        `),
+        )
         .init(({ listener }) => {
           const onKeydownWrapper = listener((e) => {
             ops.push(5)
@@ -190,8 +196,10 @@ describe('domlike backend', () => {
     it('non-bubble event', () => {
       const ops: number[] = []
 
-      const Comp = componentSpace.define()
-        .template(tmpl(`
+      const Comp = componentSpace
+        .define()
+        .template(
+          tmpl(`
           <div
             bind:focus="onFocusWrapper"
           >
@@ -200,7 +208,8 @@ describe('domlike backend', () => {
               bind:focus="onFocusButton"
             ></span>
           </div>
-        `))
+        `),
+        )
         .init(({ listener }) => {
           const onFocusWrapper = listener((e) => {
             ops.push(5)

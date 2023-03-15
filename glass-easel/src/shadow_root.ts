@@ -1,7 +1,5 @@
 import * as backend from './backend/backend_protocol'
-import {
-  VirtualNode,
-} from './virtual_node'
+import { VirtualNode } from './virtual_node'
 import {
   Component,
   GeneralComponentDefinition,
@@ -9,33 +7,14 @@ import {
   convertGenerics,
   resolvePlaceholder,
 } from './component'
-import {
-  TextNode,
-} from './text_node'
-import {
-  NativeNode,
-} from './native_node'
-import {
-  Element,
-} from './element'
-import {
-  Node,
-} from './node'
-import {
-  ComponentDefinitionWithPlaceholder, NativeNodeDefinition,
-} from './behavior'
-import {
-  BM,
-  BackendMode,
-} from './backend/mode'
-import {
-  DeepCopyStrategy,
-  getDeepCopyStrategy,
-} from './data_proxy'
-import {
-  deepCopy,
-  simpleDeepCopy,
-} from './data_utils'
+import { TextNode } from './text_node'
+import { NativeNode } from './native_node'
+import { Element } from './element'
+import { Node } from './node'
+import { ComponentDefinitionWithPlaceholder, NativeNodeDefinition } from './behavior'
+import { BM, BackendMode } from './backend/mode'
+import { DeepCopyStrategy, getDeepCopyStrategy } from './data_proxy'
+import { deepCopy, simpleDeepCopy } from './data_utils'
 
 const enum SlotMode {
   Single,
@@ -44,8 +23,8 @@ const enum SlotMode {
 }
 
 type AppliedSlotMeta = {
-  slotName: string,
-  updatePathTree: { [key: string]: true } | undefined,
+  slotName: string
+  updatePathTree: { [key: string]: true } | undefined
 }
 
 const wrapPlaceholderCallback = (
@@ -95,9 +74,7 @@ export class ShadowRoot extends VirtualNode {
     super()
   }
 
-  static createShadowRoot(
-    host: GeneralComponent,
-  ): ShadowRoot {
+  static createShadowRoot(host: GeneralComponent): ShadowRoot {
     const node = Object.create(ShadowRoot.prototype) as ShadowRoot
     node._$initializeVirtual('shadow', null, host._$nodeTreeContext)
     node._$idMap = null
@@ -122,9 +99,10 @@ export class ShadowRoot extends VirtualNode {
       node._$removeDynamicSlotHandler = undefined
       node._$updateDynamicSlotHandler = undefined
     }
-    const sr = BM.SHADOW || (BM.DYNAMIC && host.getBackendMode() === BackendMode.Shadow)
-      ? (host.getBackendElement() as backend.Element | null)?.getShadowRoot() || null
-      : null
+    const sr =
+      BM.SHADOW || (BM.DYNAMIC && host.getBackendMode() === BackendMode.Shadow)
+        ? (host.getBackendElement() as backend.Element | null)?.getShadowRoot() || null
+        : null
     node._$backendShadowRoot = sr
     const backendElement = node._$backendShadowRoot?.getRootNode() || null
     node._$initialize(true, backendElement, node, host._$nodeTreeContext)
@@ -168,8 +146,7 @@ export class ShadowRoot extends VirtualNode {
     tagName: string,
     usingKey?: string,
     genericTargets?: { [key: string]: string },
-    placeholderCallback?:
-      (c: GeneralComponentDefinition) => void,
+    placeholderCallback?: (c: GeneralComponentDefinition) => void,
     initPropValues?: (comp: GeneralComponent | NativeNode) => void,
   ): GeneralComponent | NativeNode {
     const host = this._$host

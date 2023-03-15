@@ -1,6 +1,4 @@
-import {
-  triggerWarning,
-} from './func_arr'
+import { triggerWarning } from './func_arr'
 
 export type DataPath = Array<string | number>
 
@@ -60,7 +58,9 @@ const parseFieldName = (state: ParseState): string => {
       ret += next
     } else if (next >= '0' && next <= '9') {
       if (ret === '') {
-        throw new Error(`data path descriptor "${str}" is illegal at char ${state.cur} (field name cannot start with digits)`)
+        throw new Error(
+          `data path descriptor "${str}" is illegal at char ${state.cur} (field name cannot start with digits)`,
+        )
       }
       ret += next
     } else {
@@ -110,7 +110,9 @@ const parsePath = (state: ParseState): DataPath => {
   }
   const seg = parseFieldName(state)
   if (!seg) {
-    throw new Error(`data path descriptor "${str}" is illegal at char ${state.cur} (first field name illegal)`)
+    throw new Error(
+      `data path descriptor "${str}" is illegal at char ${state.cur} (first field name illegal)`,
+    )
   }
   const ret: DataPath = [seg]
   while (state.cur < str.length) {
@@ -126,7 +128,9 @@ const parsePath = (state: ParseState): DataPath => {
       }
       const seg = parseFieldName(state)
       if (!seg) {
-        throw new Error(`data path descriptor "${str}" is illegal at char ${state.cur} (field name illegal)`)
+        throw new Error(
+          `data path descriptor "${str}" is illegal at char ${state.cur} (field name illegal)`,
+        )
       }
       ret.push(seg)
     } else if (next === '[') {
@@ -136,7 +140,9 @@ const parsePath = (state: ParseState): DataPath => {
       skipWhiteSpace(state)
       const next2 = str[state.cur]
       if (next2 !== ']') {
-        throw new Error(`data path descriptor "${str}" is illegal at char ${state.cur} (illegal index)`)
+        throw new Error(
+          `data path descriptor "${str}" is illegal at char ${state.cur} (illegal index)`,
+        )
       }
       state.cur += 1
       ret.push(index)
@@ -161,7 +167,9 @@ const parsePathWithSpecialChars = (state: ParseState): DataPath => {
       const index = parseInteger(state)
       const next2 = str[state.cur]
       if (next2 !== ']' && state.cur < str.length) {
-        throw new Error(`data path descriptor "${str}" is illegal at char ${state.cur} (illegal index)`)
+        throw new Error(
+          `data path descriptor "${str}" is illegal at char ${state.cur} (illegal index)`,
+        )
       }
       state.cur += 1
       ret.push(index)

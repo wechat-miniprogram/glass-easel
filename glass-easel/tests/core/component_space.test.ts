@@ -1,7 +1,5 @@
 import * as glassEasel from '../../src'
-import {
-  composedBackend, tmpl,
-} from '../base/env'
+import { composedBackend, tmpl } from '../base/env'
 
 describe('Component Space', () => {
   test('update and get component options', () => {
@@ -154,12 +152,14 @@ describe('Component Space', () => {
         dataD: 456,
       },
     })
-    const comp = cs.createComponentByUrl(
-      'root',
-      '/comp/path?propC=1&propA&propB=3.4&dataD=789',
-      null,
-      composedBackend,
-    ).asInstanceOf(compDef)!
+    const comp = cs
+      .createComponentByUrl(
+        'root',
+        '/comp/path?propC=1&propA&propB=3.4&dataD=789',
+        null,
+        composedBackend,
+      )
+      .asInstanceOf(compDef)!
     expect(comp.data.propA).toBe('init')
     expect(comp.data.propB).toBe(3.4)
     expect(comp.data.propC).toBe(true)
@@ -190,14 +190,16 @@ describe('Component Space', () => {
         <gb id="b" pc="{{pp}}" />
       `),
     })
-    const comp = cs.createComponentByUrl(
-      'root',
-      '/comp/parent?pp=123',
-      {
-        ga: 'comp/child',
-      },
-      composedBackend,
-    ).asInstanceOf(compDef)!
+    const comp = cs
+      .createComponentByUrl(
+        'root',
+        '/comp/parent?pp=123',
+        {
+          ga: 'comp/child',
+        },
+        composedBackend,
+      )
+      .asInstanceOf(compDef)!
     expect(comp.data.pp).toBe(123)
     const a = (comp.$.a as glassEasel.GeneralComponent).asInstanceOf(childCompDef)!
     const b = (comp.$.b as glassEasel.GeneralComponent).asInstanceOf(childCompDef)!
@@ -222,12 +224,9 @@ describe('Component Space', () => {
     })
     cs.setGlobalUsingComponent('child', childCompDef.general())
     cs.setGlobalUsingComponent('native-node', 'span')
-    const comp = cs.createComponentByUrl(
-      'root',
-      '/comp/parent',
-      null,
-      composedBackend,
-    ).asInstanceOf(compDef)!
+    const comp = cs
+      .createComponentByUrl('root', '/comp/parent', null, composedBackend)
+      .asInstanceOf(compDef)!
     const a = (comp.$.a as glassEasel.GeneralComponent).asInstanceOf(childCompDef)!
     const b = (comp.$.b as glassEasel.GeneralComponent).asNativeNode()!
     expect(a.is).toBe('comp/child')
@@ -255,12 +254,9 @@ describe('Component Space', () => {
     })
     cs.setGlobalUsingComponent('child', childCompDef.general())
     cs.setGlobalUsingComponent('native-node', 'span')
-    const comp = cs.createComponentByUrl(
-      'root',
-      '/comp/parent',
-      null,
-      composedBackend,
-    ).asInstanceOf(compDef)!
+    const comp = cs
+      .createComponentByUrl('root', '/comp/parent', null, composedBackend)
+      .asInstanceOf(compDef)!
     const a = (comp.$.a as glassEasel.GeneralComponent).asInstanceOf(childCompDef)!
     const b = (comp.$.b as glassEasel.GeneralComponent).asNativeNode()!
     expect(a.is).toBe('comp/child')

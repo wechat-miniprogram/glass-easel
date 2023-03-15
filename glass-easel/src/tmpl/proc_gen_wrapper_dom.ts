@@ -1,15 +1,8 @@
 /* eslint-disable class-methods-use-this */
 /* global document */
 
-import {
-  DataValue,
-  Node,
-  ShadowedEvent,
-  GeneralBackendElement,
-} from '..'
-import {
-  DataPath,
-} from '../data_path'
+import { DataValue, Node, ShadowedEvent, GeneralBackendElement } from '..'
+import { DataPath } from '../data_path'
 import { RangeListManager } from './range_list_diff'
 import {
   ProcGen,
@@ -18,23 +11,23 @@ import {
   dataValueToString,
   ProcGenWrapper,
 } from './proc_gen_wrapper'
-import type {
-  GlassEaselTemplateDOMInstance,
-} from './native_rendering'
+import type { GlassEaselTemplateDOMInstance } from './native_rendering'
 
 type TmplArgs = {
-  key?: number | string,
-  keyList?: RangeListManager,
+  key?: number | string
+  keyList?: RangeListManager
   dynEvListeners?: {
-    [name: string]: (ev: ShadowedEvent<unknown>) => boolean | undefined,
-  },
-  index?: number,
-  slotProps?: Record<string, [DataValue, DataPath | null, boolean]>,
-  slotPropsUpdatePathTree?: Record<string, UpdatePathTreeRoot>,
+    [name: string]: (ev: ShadowedEvent<unknown>) => boolean | undefined
+  }
+  index?: number
+  slotProps?: Record<string, [DataValue, DataPath | null, boolean]>
+  slotPropsUpdatePathTree?: Record<string, UpdatePathTreeRoot>
 }
 export type TmplNode = Node & { _$wxTmplArgs?: TmplArgs }
 
-const noop = () => { /* empty */ }
+const noop = () => {
+  /* empty */
+}
 
 export type DefineChildren = (
   isCreation: boolean,
@@ -46,10 +39,7 @@ export type DefineChildren = (
   definePureVirtualNode: DefinePureVirtualNode,
 ) => void
 
-type DefineTextNode = (
-  text: string | undefined,
-  textInit?: (elem: Text) => void,
-) => void
+type DefineTextNode = (text: string | undefined, textInit?: (elem: Text) => void) => void
 
 type DefineElement = (
   tag: string,
@@ -61,19 +51,13 @@ type DefineElement = (
 
 type DefineSlot = () => void
 
-type DefinePureVirtualNode = (
-  children: DefineChildren,
-  slot: string | undefined,
-) => void
+type DefinePureVirtualNode = (children: DefineChildren, slot: string | undefined) => void
 
 export class ProcGenWrapperDom {
   shadowRoot: GlassEaselTemplateDOMInstance
   procGen: ProcGen
 
-  constructor(
-    shadowRoot: GlassEaselTemplateDOMInstance,
-    procGen: ProcGen,
-  ) {
+  constructor(shadowRoot: GlassEaselTemplateDOMInstance, procGen: ProcGen) {
     this.shadowRoot = shadowRoot
     this.procGen = procGen
   }
@@ -99,9 +83,11 @@ export class ProcGenWrapperDom {
       const bindingMapGen = updaters[i]!
       bindingMapGen(
         data,
-        () => { /* empty */ },
+        () => {
+          /* empty */
+        },
         (elem: unknown, v: string) => {
-          (elem as Text).textContent = v
+          ;(elem as Text).textContent = v
         },
       )
     }
@@ -155,9 +141,7 @@ export class ProcGenWrapperDom {
         }
       },
       // other virtual node
-      (
-        children: DefineChildren,
-      ) => {
+      (children: DefineChildren) => {
         if (slotMerged) appendSlot()
         else slotMergeable = false
         const elem = document.createElement('virtual')
@@ -198,12 +182,7 @@ export class ProcGenWrapperDom {
   }
 
   // set event handler
-  v(
-    elem: HTMLElement,
-    evName: string,
-    v: string,
-    final: boolean,
-  ) {
+  v(elem: HTMLElement, evName: string, v: string, final: boolean) {
     this.shadowRoot.setListener(elem as unknown as GeneralBackendElement, evName, (ev) => {
       const handler = this.shadowRoot.template.methods[v]
       const ret = handler?.(ev) as unknown

@@ -26,10 +26,10 @@ const createElem = (is, backend) => {
 
 var matchElementWithDom = require('../base/match').native
 
-describe('Element', function(){
+describe('Element', function () {
   var root = null
 
-  beforeAll(function(){
+  beforeAll(function () {
     root = createElem('root')
     root.$$.id = 'root'
     var placeholder = document.createElement('div')
@@ -46,33 +46,33 @@ describe('Element', function(){
       properties: {
         s: {
           type: String,
-          value: 'DEFAULT'
-        }
+          value: 'DEFAULT',
+        },
       },
-      created: function(){
+      created: function () {
         this._attached = false
         this._attachedTimes = 0
         this._movedTimes = 0
         this._detachedTimes = 0
       },
-      attached: function(){
+      attached: function () {
         expect(this._attached).toBe(false)
         this._attached = true
-        this._attachedTimes ++
+        this._attachedTimes++
       },
-      moved: function(){
+      moved: function () {
         expect(this._attached).toBe(true)
-        this._movedTimes ++
+        this._movedTimes++
       },
-      detached: function(){
+      detached: function () {
         expect(this._attached).toBe(true)
         this._attached = false
-        this._detachedTimes ++
-      }
+        this._detachedTimes++
+      },
     })
   })
 
-  it('should be able to register and create element', function(){
+  it('should be able to register and create element', function () {
     var elem = createElem('element-a')
     root.appendChild(elem)
 
@@ -85,7 +85,7 @@ describe('Element', function(){
     expect(elem.$$.childNodes[0].childNodes[0].textContent).toBe('DEFAULT')
   })
 
-  it('should call attached, moved, and detached', function(){
+  it('should call attached, moved, and detached', function () {
     var e1 = createElem('element-a')
     var e2 = createElem('element-a')
     var e3 = createElem('element-a')
@@ -155,9 +155,8 @@ describe('Element', function(){
     expect(e3._detachedTimes).toBe(1)
   })
 
-  describe('#appendChild', function(){
-
-    it('should work for detached child', function(){
+  describe('#appendChild', function () {
+    it('should work for detached child', function () {
       var parent = createElem('element-a')
       parent.id = 'p'
       root.appendChild(parent)
@@ -167,13 +166,15 @@ describe('Element', function(){
       expect(child1._attached).toBe(true)
       matchElementWithDom({
         element: parent,
-        childNodes: [{
-          element: child1
-        }]
+        childNodes: [
+          {
+            element: child1,
+          },
+        ],
       })
     })
 
-    it('should work for appended child', function(){
+    it('should work for appended child', function () {
       var parent = createElem('element-a')
       root.appendChild(parent)
       var child1 = createElem('element-a')
@@ -181,69 +182,77 @@ describe('Element', function(){
       var child2 = createElem('element-a')
       child2.id = 'c2'
       var waitingEvents = 4
-      var observer = glassEasel.Observer.create(function(e){
-        if(waitingEvents > 2) {
+      var observer = glassEasel.Observer.create(function (e) {
+        if (waitingEvents > 2) {
           expect(e.addedNodes[0]._attached).toBe(true)
           expect(e.removedNodes).toBe(undefined)
-        } else if(waitingEvents === 2) {
+        } else if (waitingEvents === 2) {
           expect(e.addedNodes[0]).toBe(e.removedNodes[0])
           expect(e.removedNodes[0]._attached).toBe(true)
         } else {
           expect(e.addedNodes).toBe(undefined)
           expect(e.removedNodes[0]._attached).toBe(true)
         }
-        waitingEvents --
+        waitingEvents--
       })
-      observer.observe(parent, {childList: true})
+      observer.observe(parent, { childList: true })
 
       parent.appendChild(child1)
       parent.appendChild(child2)
       matchElementWithDom({
         element: parent,
-        childNodes: [{
-          element: child1
-        }, {
-          element: child2
-        }]
+        childNodes: [
+          {
+            element: child1,
+          },
+          {
+            element: child2,
+          },
+        ],
       })
 
       parent.insertBefore(child2, child1)
       matchElementWithDom({
         element: parent,
-        childNodes: [{
-          element: child2
-        }, {
-          element: child1
-        }]
+        childNodes: [
+          {
+            element: child2,
+          },
+          {
+            element: child1,
+          },
+        ],
       })
 
       child2.appendChild(child1)
       matchElementWithDom({
         element: parent,
-        childNodes: [{
-          element: child2,
-          childNodes: [{
-            element: child1
-          }]
-        }]
+        childNodes: [
+          {
+            element: child2,
+            childNodes: [
+              {
+                element: child1,
+              },
+            ],
+          },
+        ],
       })
 
       expect(waitingEvents).toBe(0)
     })
-
   })
 
-  describe('#insertBefore', function(){
-
-    it('should work for detached child', function(){
+  describe('#insertBefore', function () {
+    it('should work for detached child', function () {
       var parent = createElem('element-a')
       root.appendChild(parent)
       var waitingEvents = 3
-      var observer = glassEasel.Observer.create(function(e){
+      var observer = glassEasel.Observer.create(function (e) {
         waitingEvents--
         expect(e.addedNodes[0]._attached).toBe(true)
       })
-      observer.observe(parent, {childList: true})
+      observer.observe(parent, { childList: true })
 
       var child1 = createElem('element-a')
       var child2 = createElem('element-a')
@@ -252,42 +261,48 @@ describe('Element', function(){
       parent.insertBefore(child2, child1)
       matchElementWithDom({
         element: parent,
-        childNodes: [{
-          element: child2
-        }, {
-          element: child1
-        }]
+        childNodes: [
+          {
+            element: child2,
+          },
+          {
+            element: child1,
+          },
+        ],
       })
       expect(waitingEvents).toBe(0)
     })
 
-    it('should work for appended child', function(){
+    it('should work for appended child', function () {
       var parent = createElem('element-a')
       root.appendChild(parent)
       var child1 = createElem('element-a')
       var child2 = createElem('element-a')
       var waitingEvents = 2
-      var observer = glassEasel.Observer.create(function(e){
+      var observer = glassEasel.Observer.create(function (e) {
         waitingEvents--
         expect(e.addedNodes[0]._attached).toBe(true)
       })
-      observer.observe(parent, {childList: true})
+      observer.observe(parent, { childList: true })
 
       parent.appendChild(child1)
       child1.appendChild(child2)
       parent.insertBefore(child2, child1)
       matchElementWithDom({
         element: parent,
-        childNodes: [{
-          element: child2
-        }, {
-          element: child1
-        }]
+        childNodes: [
+          {
+            element: child2,
+          },
+          {
+            element: child1,
+          },
+        ],
       })
       expect(waitingEvents).toBe(0)
     })
 
-    it('should work for appended child (on the same parent element)', function(){
+    it('should work for appended child (on the same parent element)', function () {
       var parent = createElem('element-a')
       root.appendChild(parent)
       var child1 = createElem('element-a')
@@ -295,15 +310,15 @@ describe('Element', function(){
       var child3 = createElem('element-a')
       var child4 = createElem('element-a')
       var waitingEvents = 5
-      var observer = glassEasel.Observer.create(function(e){
-        if(waitingEvents-- !== 1) {
+      var observer = glassEasel.Observer.create(function (e) {
+        if (waitingEvents-- !== 1) {
           expect(e.addedNodes[0]._attached).toBe(true)
         } else {
           expect(e.addedNodes[0]).toBe(e.removedNodes[0])
           expect(e.removedNodes[0]._attached).toBe(true)
         }
       })
-      observer.observe(parent, {childList: true})
+      observer.observe(parent, { childList: true })
 
       parent.insertBefore(child1)
       parent.insertBefore(child2)
@@ -312,73 +327,74 @@ describe('Element', function(){
       parent.insertBefore(child2, child4)
       matchElementWithDom({
         element: parent,
-        childNodes: [{
-          element: child1
-        }, {
-          element: child3
-        }, {
-          element: child2
-        }, {
-          element: child4
-        }]
+        childNodes: [
+          {
+            element: child1,
+          },
+          {
+            element: child3,
+          },
+          {
+            element: child2,
+          },
+          {
+            element: child4,
+          },
+        ],
       })
       expect(waitingEvents).toBe(0)
     })
-
   })
 
-  describe('#removeChild', function(){
-
-    it('should work for appended child', function(){
+  describe('#removeChild', function () {
+    it('should work for appended child', function () {
       var parent = createElem('element-a')
       root.appendChild(parent)
       var waitingEvents = 2
-      var observer = glassEasel.Observer.create(function(e){
-        if(waitingEvents-- === 2) {
+      var observer = glassEasel.Observer.create(function (e) {
+        if (waitingEvents-- === 2) {
           expect(e.addedNodes[0]._attached).toBe(true)
         } else {
           expect(e.removedNodes[0]._attached).toBe(false)
         }
       })
-      observer.observe(parent, {childList: true})
+      observer.observe(parent, { childList: true })
 
       var child1 = createElem('element-a')
       parent.appendChild(child1)
       parent.removeChild(child1)
       matchElementWithDom({
         element: parent,
-        childNodes: []
+        childNodes: [],
       })
       expect(waitingEvents).toBe(0)
     })
 
-    it('should work for detached child', function(){
+    it('should work for detached child', function () {
       var parent = createElem('element-a')
       root.appendChild(parent)
       var child1 = createElem('element-a')
       parent.removeChild(child1)
       matchElementWithDom({
         element: parent,
-        childNodes: []
+        childNodes: [],
       })
     })
-
   })
 
-  describe('#replaceChild', function(){
-
-    it('should work for detached child', function(){
+  describe('#replaceChild', function () {
+    it('should work for detached child', function () {
       var parent = createElem('element-a')
       root.appendChild(parent)
       var waitingEvents = 4
-      var observer = glassEasel.Observer.create(function(e){
-        if(waitingEvents-- !== 2) {
+      var observer = glassEasel.Observer.create(function (e) {
+        if (waitingEvents-- !== 2) {
           expect(e.addedNodes[0]._attached).toBe(true)
         } else {
           expect(e.removedNodes[0]._attached).toBe(false)
         }
       })
-      observer.observe(parent, {childList: true})
+      observer.observe(parent, { childList: true })
 
       var child1 = createElem('element-a')
       var child2 = createElem('element-a')
@@ -388,30 +404,33 @@ describe('Element', function(){
       parent.replaceChild(child3, child1)
       matchElementWithDom({
         element: parent,
-        childNodes: [{
-          element: child3
-        }, {
-          element: child2
-        }]
+        childNodes: [
+          {
+            element: child3,
+          },
+          {
+            element: child2,
+          },
+        ],
       })
       expect(waitingEvents).toBe(0)
     })
 
-    it('should work for appended child', function(){
+    it('should work for appended child', function () {
       var parent = createElem('element-a')
       root.appendChild(parent)
       var child1 = createElem('element-a')
       var child2 = createElem('element-a')
       var child3 = createElem('element-a')
       var waitingEvents = 4
-      var observer = glassEasel.Observer.create(function(e){
-        if(waitingEvents-- !== 2) {
+      var observer = glassEasel.Observer.create(function (e) {
+        if (waitingEvents-- !== 2) {
           expect(e.addedNodes[0]._attached).toBe(true)
         } else {
           expect(e.removedNodes[0]._attached).toBe(false)
         }
       })
-      observer.observe(parent, {childList: true})
+      observer.observe(parent, { childList: true })
 
       parent.appendChild(child1)
       parent.appendChild(child2)
@@ -419,45 +438,51 @@ describe('Element', function(){
       parent.replaceChild(child3, child2)
       matchElementWithDom({
         element: parent,
-        childNodes: [{
-          element: child1
-        }, {
-          element: child3
-        }]
+        childNodes: [
+          {
+            element: child1,
+          },
+          {
+            element: child3,
+          },
+        ],
       })
       expect(waitingEvents).toBe(0)
     })
 
-    it('should work for appended child (child === oldChild)', function(){
+    it('should work for appended child (child === oldChild)', function () {
       var parent = createElem('element-a')
       root.appendChild(parent)
       var child1 = createElem('element-a')
       var child2 = createElem('element-a')
       var waitingEvents = 3
-      var observer = glassEasel.Observer.create(function(e){
-        if(waitingEvents-- !== 1) {
+      var observer = glassEasel.Observer.create(function (e) {
+        if (waitingEvents-- !== 1) {
           expect(e.addedNodes[0]._attached).toBe(true)
         } else {
           expect(e.removedNodes[0]._attached).toBe(true)
         }
       })
-      observer.observe(parent, {childList: true})
+      observer.observe(parent, { childList: true })
 
       parent.appendChild(child1)
       parent.appendChild(child2)
       parent.replaceChild(child1, child1)
       matchElementWithDom({
         element: parent,
-        childNodes: [{
-          element: child1
-        }, {
-          element: child2
-        }]
+        childNodes: [
+          {
+            element: child1,
+          },
+          {
+            element: child2,
+          },
+        ],
       })
       expect(waitingEvents).toBe(0)
     })
 
-    it('should work for appended child (on the same parent element)', function(){
+    it('should work for appended child (on the same parent element)', function () {
       var parent = createElem('element-a')
       root.appendChild(parent)
       var child1 = createElem('element-a')
@@ -465,10 +490,10 @@ describe('Element', function(){
       var child3 = createElem('element-a')
       var child4 = createElem('element-a')
       var waitingEvents = 6
-      var observer = glassEasel.Observer.create(function(e){
-        if(waitingEvents > 2) {
+      var observer = glassEasel.Observer.create(function (e) {
+        if (waitingEvents > 2) {
           expect(e.addedNodes[0]._attached).toBe(true)
-        } else if(waitingEvents === 2) {
+        } else if (waitingEvents === 2) {
           expect(e.removedNodes[0]._attached).toBe(false)
         } else {
           expect(e.addedNodes[0]).toBe(e.removedNodes[0])
@@ -476,7 +501,7 @@ describe('Element', function(){
         }
         waitingEvents--
       })
-      observer.observe(parent, {childList: true})
+      observer.observe(parent, { childList: true })
 
       parent.appendChild(child1)
       parent.appendChild(child2)
@@ -485,20 +510,23 @@ describe('Element', function(){
       parent.replaceChild(child2, child4)
       matchElementWithDom({
         element: parent,
-        childNodes: [{
-          element: child1
-        }, {
-          element: child3
-        }, {
-          element: child2
-        }]
+        childNodes: [
+          {
+            element: child1,
+          },
+          {
+            element: child3,
+          },
+          {
+            element: child2,
+          },
+        ],
       })
       expect(waitingEvents).toBe(0)
     })
-
   })
 
-  it('should support style segments', function(){
+  it('should support style segments', function () {
     var e = createElem('element-a')
     e.setNodeStyle('color: red')
     expect(e.$$.style.color).toBe('red')
@@ -508,5 +536,4 @@ describe('Element', function(){
     e.setNodeStyle('text-align: center', 3)
     expect(e.$$.getAttribute('style')).toBe('color: red;font-size: 16px;;text-align: center')
   })
-
 })

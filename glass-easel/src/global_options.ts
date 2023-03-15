@@ -1,29 +1,13 @@
 import * as backend from './backend/backend_protocol'
 import * as composedBackend from './backend/composed_backend_protocol'
 import * as domlikeBackend from './backend/domlike_backend_protocol'
-import {
-  StyleScopeId,
-  StyleScopeManager,
-} from './class_list'
-import {
-  Context as BackendContext,
-} from './backend/backend_protocol'
-import {
-  TemplateEngine,
-} from './template_engine'
-import {
-  ComponentSpace,
-} from './component_space'
-import {
-  GlassEaselTemplateEngine,
-} from './tmpl'
-import {
-  GeneralComponent,
-  GeneralBackendContext,
-} from '.'
-import {
-  BM,
-} from './backend/mode'
+import { StyleScopeId, StyleScopeManager } from './class_list'
+import { Context as BackendContext } from './backend/backend_protocol'
+import { TemplateEngine } from './template_engine'
+import { ComponentSpace } from './component_space'
+import { GlassEaselTemplateEngine } from './tmpl'
+import { GeneralComponent, GeneralBackendContext } from '.'
+import { BM } from './backend/mode'
 
 /**
  * The deep copy strategy
@@ -190,53 +174,32 @@ export const normalizeComponentOptions = (
   }
   const p = componentOptions ?? {}
   return {
-    externalComponent: p.externalComponent !== undefined
-      ? p.externalComponent
-      : b.externalComponent,
-    templateEngine: p.templateEngine !== undefined
-      ? p.templateEngine
-      : b.templateEngine,
-    styleScope: p.styleScope !== undefined
-      ? p.styleScope
-      : b.styleScope,
-    extraStyleScope: p.extraStyleScope !== undefined
-      ? p.extraStyleScope
-      : b.extraStyleScope,
-    multipleSlots: p.multipleSlots !== undefined
-      ? p.multipleSlots
-      : b.multipleSlots,
-    dynamicSlots: p.dynamicSlots !== undefined
-      ? p.dynamicSlots
-      : b.dynamicSlots,
-    reflectToAttributes: p.reflectToAttributes !== undefined
-      ? p.reflectToAttributes
-      : b.reflectToAttributes,
-    writeFieldsToNode: p.writeFieldsToNode !== undefined
-      ? p.writeFieldsToNode
-      : b.writeFieldsToNode,
-    writeIdToDOM: p.writeIdToDOM !== undefined
-      ? p.writeIdToDOM
-      : b.writeIdToDOM,
-    idPrefixGenerator: p.idPrefixGenerator !== undefined
-      ? p.idPrefixGenerator
-      : b.idPrefixGenerator,
-    pureDataPattern: p.pureDataPattern !== undefined
-      ? p.pureDataPattern
-      : b.pureDataPattern,
-    dataDeepCopy: p.dataDeepCopy !== undefined
-      ? p.dataDeepCopy
-      : b.dataDeepCopy,
-    propertyPassingDeepCopy: p.propertyPassingDeepCopy !== undefined
-      ? p.propertyPassingDeepCopy
-      : b.propertyPassingDeepCopy,
-    listenerChangeLifetimes: p.listenerChangeLifetimes !== undefined
-      ? p.listenerChangeLifetimes
-      : b.listenerChangeLifetimes,
-    virtualHost: p.virtualHost !== undefined
-      ? p.virtualHost
-      : b.virtualHost,
-    propertyEarlyInit: p.propertyEarlyInit !== undefined
-      ? p.propertyEarlyInit
-      : b.propertyEarlyInit,
+    externalComponent:
+      p.externalComponent !== undefined ? p.externalComponent : b.externalComponent,
+    templateEngine: p.templateEngine !== undefined ? p.templateEngine : b.templateEngine,
+    styleScope: p.styleScope !== undefined ? p.styleScope : b.styleScope,
+    extraStyleScope: p.extraStyleScope !== undefined ? p.extraStyleScope : b.extraStyleScope,
+    multipleSlots: p.multipleSlots !== undefined ? p.multipleSlots : b.multipleSlots,
+    dynamicSlots: p.dynamicSlots !== undefined ? p.dynamicSlots : b.dynamicSlots,
+    reflectToAttributes:
+      p.reflectToAttributes !== undefined ? p.reflectToAttributes : b.reflectToAttributes,
+    writeFieldsToNode:
+      p.writeFieldsToNode !== undefined ? p.writeFieldsToNode : b.writeFieldsToNode,
+    writeIdToDOM: p.writeIdToDOM !== undefined ? p.writeIdToDOM : b.writeIdToDOM,
+    idPrefixGenerator:
+      p.idPrefixGenerator !== undefined ? p.idPrefixGenerator : b.idPrefixGenerator,
+    pureDataPattern: p.pureDataPattern !== undefined ? p.pureDataPattern : b.pureDataPattern,
+    dataDeepCopy: p.dataDeepCopy !== undefined ? p.dataDeepCopy : b.dataDeepCopy,
+    propertyPassingDeepCopy:
+      p.propertyPassingDeepCopy !== undefined
+        ? p.propertyPassingDeepCopy
+        : b.propertyPassingDeepCopy,
+    listenerChangeLifetimes:
+      p.listenerChangeLifetimes !== undefined
+        ? p.listenerChangeLifetimes
+        : b.listenerChangeLifetimes,
+    virtualHost: p.virtualHost !== undefined ? p.virtualHost : b.virtualHost,
+    propertyEarlyInit:
+      p.propertyEarlyInit !== undefined ? p.propertyEarlyInit : b.propertyEarlyInit,
   }
 }

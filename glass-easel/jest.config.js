@@ -1,6 +1,3 @@
 module.exports = {
-  projects: [
-    './jest.unit.config.js',
-    './jest.dts.config.js',
-  ]
+  projects: ['./jest.unit.config.js', './jest.dts.config.js'],
 }

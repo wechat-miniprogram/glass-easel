@@ -1,8 +1,4 @@
-import {
-  domBackend,
-  execWithWarn,
-  tmpl,
-} from '../base/env'
+import { domBackend, execWithWarn, tmpl } from '../base/env'
 import * as glassEasel from '../../src'
 
 const componentSpace = new glassEasel.ComponentSpace()
@@ -16,7 +12,8 @@ componentSpace.defineComponent({
 
 describe('partial update', () => {
   test('should be able to merge updates', () => {
-    const compDef = componentSpace.define()
+    const compDef = componentSpace
+      .define()
       .data(() => ({
         a: 123,
         b: 'abc',
@@ -37,19 +34,23 @@ describe('partial update', () => {
 
   test('should be able to replace subfields', () => {
     const execArr = [] as string[]
-    const childCompDef = componentSpace.define()
+    const childCompDef = componentSpace
+      .define()
       .property('p', String)
       .lifetime('attached', function () {
         execArr.push(this.data.p)
       })
       .registerComponent()
-    const compDef = componentSpace.define()
+    const compDef = componentSpace
+      .define()
       .usingComponents({
         child: childCompDef.general(),
       })
-      .template(tmpl(`
+      .template(
+        tmpl(`
         <child id="c" p="{{obj.a}}" />
-      `))
+      `),
+      )
       .data(() => ({
         obj: { a: 123 },
       }))
@@ -80,19 +81,23 @@ describe('partial update', () => {
 
   test('should be able to update list fields (without key)', () => {
     let execArr = [] as string[]
-    const childCompDef = componentSpace.define()
+    const childCompDef = componentSpace
+      .define()
       .property('p', String)
       .observer('p', function () {
         execArr.push(this.data.p)
       })
       .registerComponent()
-    const compDef = componentSpace.define()
+    const compDef = componentSpace
+      .define()
       .usingComponents({
         child: childCompDef.general(),
       })
-      .template(tmpl(`
+      .template(
+        tmpl(`
         <child wx:for="{{list}}" p="{{item}}" />
-      `))
+      `),
+      )
       .data(() => ({
         list: ['A', 'B', 'C'],
       }))
@@ -101,9 +106,12 @@ describe('partial update', () => {
     glassEasel.Element.pretendAttached(comp)
     const getP = () => {
       const ret = [] as string[]
-      comp.getShadowRoot()!.childNodes[0]!.asElement()!.childNodes.forEach((child) => {
-        ret.push(child.asElement()!.childNodes[0]!.asInstanceOf(childCompDef)!.data.p)
-      })
+      comp
+        .getShadowRoot()!
+        .childNodes[0]!.asElement()!
+        .childNodes.forEach((child) => {
+          ret.push(child.asElement()!.childNodes[0]!.asInstanceOf(childCompDef)!.data.p)
+        })
       return ret
     }
     expect(getP()).toStrictEqual(['A', 'B', 'C'])
@@ -118,19 +126,23 @@ describe('partial update', () => {
 
   test('should be able to update list fields (with key)', () => {
     let execArr = [] as string[]
-    const childCompDef = componentSpace.define()
+    const childCompDef = componentSpace
+      .define()
       .property('p', String)
       .observer('p', function () {
         execArr.push(this.data.p)
       })
       .registerComponent()
-    const compDef = componentSpace.define()
+    const compDef = componentSpace
+      .define()
       .usingComponents({
         child: childCompDef.general(),
       })
-      .template(tmpl(`
+      .template(
+        tmpl(`
         <child wx:for="{{list}}" wx:key="k" p="{{item.v}}" />
-      `))
+      `),
+      )
       .data(() => ({
         list: [
           { k: 1, v: 'A' },
@@ -139,13 +151,18 @@ describe('partial update', () => {
         ],
       }))
       .registerComponent()
-    const comp = execWithWarn(1, () => glassEasel.Component.createWithContext('root', compDef, domBackend))
+    const comp = execWithWarn(1, () =>
+      glassEasel.Component.createWithContext('root', compDef, domBackend),
+    )
     glassEasel.Element.pretendAttached(comp)
     const getP = () => {
       const ret = [] as string[]
-      comp.getShadowRoot()!.childNodes[0]!.asElement()!.childNodes.forEach((child) => {
-        ret.push(child.asElement()!.childNodes[0]!.asInstanceOf(childCompDef)!.data.p)
-      })
+      comp
+        .getShadowRoot()!
+        .childNodes[0]!.asElement()!
+        .childNodes.forEach((child) => {
+          ret.push(child.asElement()!.childNodes[0]!.asInstanceOf(childCompDef)!.data.p)
+        })
       return ret
     }
     expect(getP()).toStrictEqual(['A', 'B', 'C'])
@@ -170,19 +187,23 @@ describe('partial update', () => {
 
   test('should be able to update list keys', () => {
     let execArr = [] as string[]
-    const childCompDef = componentSpace.define()
+    const childCompDef = componentSpace
+      .define()
       .property('p', String)
       .observer('p', function () {
         execArr.push(this.data.p)
       })
       .registerComponent()
-    const compDef = componentSpace.define()
+    const compDef = componentSpace
+      .define()
       .usingComponents({
         child: childCompDef.general(),
       })
-      .template(tmpl(`
+      .template(
+        tmpl(`
         <child wx:for="{{list}}" wx:key="k" p="{{item.v}}" />
-      `))
+      `),
+      )
       .data(() => ({
         list: [
           { k: 1, v: 'A' },
@@ -191,13 +212,18 @@ describe('partial update', () => {
         ],
       }))
       .registerComponent()
-    const comp = execWithWarn(1, () => glassEasel.Component.createWithContext('root', compDef, domBackend))
+    const comp = execWithWarn(1, () =>
+      glassEasel.Component.createWithContext('root', compDef, domBackend),
+    )
     glassEasel.Element.pretendAttached(comp)
     const getP = () => {
       const ret = [] as string[]
-      comp.getShadowRoot()!.childNodes[0]!.asElement()!.childNodes.forEach((child) => {
-        ret.push(child.asElement()!.childNodes[0]!.asInstanceOf(childCompDef)!.data.p)
-      })
+      comp
+        .getShadowRoot()!
+        .childNodes[0]!.asElement()!
+        .childNodes.forEach((child) => {
+          ret.push(child.asElement()!.childNodes[0]!.asInstanceOf(childCompDef)!.data.p)
+        })
       return ret
     }
     expect(getP()).toStrictEqual(['A', 'B', 'C'])
@@ -234,19 +260,23 @@ describe('partial update', () => {
 
   test('should be able to do list-splice update (without key)', () => {
     let execArr = [] as string[]
-    const childCompDef = componentSpace.define()
+    const childCompDef = componentSpace
+      .define()
       .property('p', String)
       .observer('p', function () {
         execArr.push(this.data.p)
       })
       .registerComponent()
-    const compDef = componentSpace.define()
+    const compDef = componentSpace
+      .define()
       .usingComponents({
         child: childCompDef.general(),
       })
-      .template(tmpl(`
+      .template(
+        tmpl(`
         <child wx:for="{{list}}" p="{{item}}" />
-      `))
+      `),
+      )
       .data(() => ({
         list: ['A', 'B', 'C'],
       }))
@@ -255,9 +285,12 @@ describe('partial update', () => {
     glassEasel.Element.pretendAttached(comp)
     const getP = () => {
       const ret = [] as string[]
-      comp.getShadowRoot()!.childNodes[0]!.asElement()!.childNodes.forEach((child) => {
-        ret.push(child.asElement()!.childNodes[0]!.asInstanceOf(childCompDef)!.data.p)
-      })
+      comp
+        .getShadowRoot()!
+        .childNodes[0]!.asElement()!
+        .childNodes.forEach((child) => {
+          ret.push(child.asElement()!.childNodes[0]!.asInstanceOf(childCompDef)!.data.p)
+        })
       return ret
     }
     expect(getP()).toStrictEqual(['A', 'B', 'C'])
@@ -291,19 +324,23 @@ describe('partial update', () => {
 
   test('should be able to do list-splice update (with key)', () => {
     let execArr = [] as string[]
-    const childCompDef = componentSpace.define()
+    const childCompDef = componentSpace
+      .define()
       .property('p', String)
       .observer('p', function () {
         execArr.push(this.data.p)
       })
       .registerComponent()
-    const compDef = componentSpace.define()
+    const compDef = componentSpace
+      .define()
       .usingComponents({
         child: childCompDef.general(),
       })
-      .template(tmpl(`
+      .template(
+        tmpl(`
         <child wx:for="{{list}}" wx:key="k" p="{{item.v}}" />
-      `))
+      `),
+      )
       .data(() => ({
         list: [
           { k: 1, v: 'A' },
@@ -316,16 +353,22 @@ describe('partial update', () => {
     glassEasel.Element.pretendAttached(comp)
     const getP = () => {
       const ret = [] as string[]
-      comp.getShadowRoot()!.childNodes[0]!.asElement()!.childNodes.forEach((child) => {
-        ret.push(child.asElement()!.childNodes[0]!.asInstanceOf(childCompDef)!.data.p)
-      })
+      comp
+        .getShadowRoot()!
+        .childNodes[0]!.asElement()!
+        .childNodes.forEach((child) => {
+          ret.push(child.asElement()!.childNodes[0]!.asInstanceOf(childCompDef)!.data.p)
+        })
       return ret
     }
     expect(getP()).toStrictEqual(['A', 'B', 'C'])
     expect(execArr).toStrictEqual(['A', 'B', 'C'])
     execArr = []
     comp.groupUpdates(() => {
-      comp.spliceArrayDataOnPath(['list'], 1, 1, [{ k: 4, v: 'D' }, { k: 5, v: 'Z' }])
+      comp.spliceArrayDataOnPath(['list'], 1, 1, [
+        { k: 4, v: 'D' },
+        { k: 5, v: 'Z' },
+      ])
       comp.spliceArrayDataOnPath(['list'], 2, 1, [{ k: 5, v: 'E' }])
     })
     expect(getP()).toStrictEqual(['A', 'D', 'E', 'C'])
@@ -377,19 +420,23 @@ describe('partial update', () => {
 
   test('should be able to do list-splice update (with key and using index)', () => {
     let execArr = [] as string[]
-    const childCompDef = componentSpace.define()
+    const childCompDef = componentSpace
+      .define()
       .property('p', String)
       .observer('p', function () {
         execArr.push(this.data.p)
       })
       .registerComponent()
-    const compDef = componentSpace.define()
+    const compDef = componentSpace
+      .define()
       .usingComponents({
         child: childCompDef.general(),
       })
-      .template(tmpl(`
+      .template(
+        tmpl(`
         <child wx:for="{{list}}" wx:key="k" p="{{index}}:{{item.v}}" />
-      `))
+      `),
+      )
       .data(() => ({
         list: [
           { k: 1, v: 'A' },
@@ -402,9 +449,12 @@ describe('partial update', () => {
     glassEasel.Element.pretendAttached(comp)
     const getP = () => {
       const ret = [] as string[]
-      comp.getShadowRoot()!.childNodes[0]!.asElement()!.childNodes.forEach((child) => {
-        ret.push(child.asElement()!.childNodes[0]!.asInstanceOf(childCompDef)!.data.p)
-      })
+      comp
+        .getShadowRoot()!
+        .childNodes[0]!.asElement()!
+        .childNodes.forEach((child) => {
+          ret.push(child.asElement()!.childNodes[0]!.asInstanceOf(childCompDef)!.data.p)
+        })
       return ret
     }
     expect(getP()).toStrictEqual(['0:A', '1:B', '2:C'])
@@ -430,7 +480,8 @@ describe('partial update', () => {
   })
 
   test('should not allow updates before init done', () => {
-    const compDef = componentSpace.define()
+    const compDef = componentSpace
+      .define()
       .data(() => ({
         a: 123,
         b: ['a'],
@@ -439,19 +490,29 @@ describe('partial update', () => {
         let throwCount = 0
         try {
           self.setData({ a: 456 })
-        } catch { throwCount += 1 }
+        } catch {
+          throwCount += 1
+        }
         try {
           self.updateData({ b: ['c'] })
-        } catch { throwCount += 1 }
+        } catch {
+          throwCount += 1
+        }
         try {
           self.replaceDataOnPath(['a'], 789)
-        } catch { throwCount += 1 }
+        } catch {
+          throwCount += 1
+        }
         try {
           self.spliceArrayDataOnPath(['b'], 0, 0, ['b'])
-        } catch { throwCount += 1 }
+        } catch {
+          throwCount += 1
+        }
         try {
           self.groupUpdates(() => undefined)
-        } catch { throwCount += 1 }
+        } catch {
+          throwCount += 1
+        }
         expect(throwCount).toBe(5)
       })
       .registerComponent()

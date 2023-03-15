@@ -1,25 +1,12 @@
 import * as backend from './backend/backend_protocol'
 import * as composedBackend from './backend/composed_backend_protocol'
 import * as domlikeBackend from './backend/domlike_backend_protocol'
-import {
-  ShadowRoot,
-} from './shadow_root'
-import {
-  Element,
-} from './element'
-import {
-  MutationObserverTarget,
-} from './mutation_observer'
-import {
-  GeneralBackendElement, NodeCast,
-} from './node'
-import {
-  BM,
-  BackendMode,
-} from './backend/mode'
-import {
-  Component,
-} from './component'
+import { ShadowRoot } from './shadow_root'
+import { Element } from './element'
+import { MutationObserverTarget } from './mutation_observer'
+import { GeneralBackendElement, NodeCast } from './node'
+import { BM, BackendMode } from './backend/mode'
+import { Component } from './component'
 
 export class TextNode implements NodeCast {
   private _$backendElement: GeneralBackendElement | null
@@ -31,15 +18,13 @@ export class TextNode implements NodeCast {
   /** @internal */
   _$nodeSlotElement: Element | null
 
-  constructor(
-    text: string,
-    owner: ShadowRoot,
-  ) {
+  constructor(text: string, owner: ShadowRoot) {
     this._$text = String(text)
     let backendElement: GeneralBackendElement | null
     if (BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike)) {
-      backendElement = (owner._$nodeTreeContext as domlikeBackend.Context)
-        .document.createTextNode(text)
+      backendElement = (owner._$nodeTreeContext as domlikeBackend.Context).document.createTextNode(
+        text,
+      )
     } else if (BM.SHADOW || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Shadow)) {
       const backend = owner._$backendShadowRoot
       backendElement = backend?.createTextNode(text) || null
@@ -56,10 +41,7 @@ export class TextNode implements NodeCast {
     this._$nodeSlotElement = null
   }
 
-  static create(
-    text: string,
-    ownerShadowRoot: ShadowRoot,
-  ): TextNode {
+  static create(text: string, ownerShadowRoot: ShadowRoot): TextNode {
     return new TextNode(text, ownerShadowRoot)
   }
 
@@ -90,10 +72,13 @@ export class TextNode implements NodeCast {
   /** Destroy the backend element */
   destroyBackendElement() {
     if (this._$backendElement) {
-      if (!(
-        BM.DOMLIKE || (BM.DYNAMIC && this.ownerShadowRoot.getBackendMode() === BackendMode.Domlike)
-      )) {
-        (this._$backendElement as backend.Element | composedBackend.Element).release()
+      if (
+        !(
+          BM.DOMLIKE ||
+          (BM.DYNAMIC && this.ownerShadowRoot.getBackendMode() === BackendMode.Domlike)
+        )
+      ) {
+        ;(this._$backendElement as backend.Element | composedBackend.Element).release()
       }
       this._$backendElement = null
     }
@@ -134,11 +119,12 @@ export class TextNode implements NodeCast {
     this._$text = String(text)
     if (this._$backendElement) {
       if (
-        BM.DOMLIKE || (BM.DYNAMIC && this.ownerShadowRoot.getBackendMode() === BackendMode.Domlike)
+        BM.DOMLIKE ||
+        (BM.DYNAMIC && this.ownerShadowRoot.getBackendMode() === BackendMode.Domlike)
       ) {
-        (this._$backendElement as domlikeBackend.Element).textContent = this._$text
+        ;(this._$backendElement as domlikeBackend.Element).textContent = this._$text
       } else {
-        (this._$backendElement as backend.Element | composedBackend.Element).setText(this._$text)
+        ;(this._$backendElement as backend.Element | composedBackend.Element).setText(this._$text)
       }
     }
     MutationObserverTarget.callTextObservers(this, {

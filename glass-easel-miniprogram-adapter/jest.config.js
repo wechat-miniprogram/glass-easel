@@ -7,7 +7,5 @@ module.exports = {
   },
   roots: ['tests'],
   testEnvironment: 'jsdom',
-  "collectCoverageFrom": [
-    "src/**/*.ts"
-  ],
+  collectCoverageFrom: ['src/**/*.ts'],
 }

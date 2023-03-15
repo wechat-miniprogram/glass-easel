@@ -1,10 +1,5 @@
-import {
-  Event,
-  ShadowedEvent,
-} from './event'
-import {
-  GeneralBackendElement,
-} from './node'
+import { Event, ShadowedEvent } from './event'
+import { GeneralBackendElement } from './node'
 
 /**
  * An external shadow root

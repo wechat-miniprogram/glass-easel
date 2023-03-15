@@ -21,12 +21,10 @@ const getSingleSlotElement = (comp: GeneralComponent) => {
 }
 
 // check internal structure of an external component (with its child nodes given)
-export const native = (
-  structure: {
-    element: GeneralComponent,
-    childNodes?: { element: GeneralComponent }[],
-  },
-) => {
+export const native = (structure: {
+  element: GeneralComponent
+  childNodes?: { element: GeneralComponent }[]
+}) => {
   const elem = structure.element
   const expectChildNodes = structure.childNodes || []
   expectChildNodes.forEach((expectItem, i) => {
@@ -37,9 +35,9 @@ export const native = (
     native(expectItem)
   })
   expect(elem.childNodes[expectChildNodes.length]).toBe(undefined)
-  expect(
-    (getSingleSlotElement(elem) as Element).childNodes[expectChildNodes.length],
-  ).toBe(undefined)
+  expect((getSingleSlotElement(elem) as Element).childNodes[expectChildNodes.length]).toBe(
+    undefined,
+  )
 }
 
 // check the structure of a backend element
@@ -47,12 +45,10 @@ const testBackend = (elem: Element): void => {
   const testDom = (elem: HTMLElement) => {
     expect(elem).toBeInstanceOf(HTMLElement)
     let sr = elem
-    let host = (sr as unknown as domlikeBackend.Element).__wxElement as
-      GeneralComponent | undefined
+    let host = (sr as unknown as domlikeBackend.Element).__wxElement as GeneralComponent | undefined
     while (!host) {
       sr = sr.parentElement!
-      host = (sr as unknown as domlikeBackend.Element).__wxElement as
-        GeneralComponent | undefined
+      host = (sr as unknown as domlikeBackend.Element).__wxElement as GeneralComponent | undefined
     }
     const slot = (host.shadowRoot as ExternalShadowRoot).slot as unknown as HTMLElement
     if (elem === slot) {
@@ -78,11 +74,7 @@ const testBackend = (elem: Element): void => {
 }
 
 // check the structure of an element
-export const virtual = (
-  elem: Element,
-  defDomElem?: HTMLElement,
-  defIndex?: number,
-): number => {
+export const virtual = (elem: Element, defDomElem?: HTMLElement, defIndex?: number): number => {
   // for a component, check its shadow children and its shadow root
   if (elem instanceof Component) {
     const slotIndex = new Map<Element | HTMLElement, number>()
@@ -137,8 +129,8 @@ export const virtual = (
   } else if (elem instanceof Component && elem._$external) {
     domElem = (elem.shadowRoot as ExternalShadowRoot).slot as unknown as HTMLElement
   } else {
-    domElem = defDomElem || (elem.getBackendElement() || undefined) as
-      unknown as HTMLElement | undefined
+    domElem =
+      defDomElem || ((elem.getBackendElement() || undefined) as unknown as HTMLElement | undefined)
   }
 
   // check the composed children recursively
@@ -149,9 +141,8 @@ export const virtual = (
     }
     return false
   }
-  const expectParentNode = Element.getSlotName(elem) === undefined
-    ? elem
-    : elem.ownerShadowRoot!.getHostNode()
+  const expectParentNode =
+    Element.getSlotName(elem) === undefined ? elem : elem.ownerShadowRoot!.getHostNode()
   elem.forEachComposedChild((child) => {
     expect(child.getComposedParent()).toBe(elem)
     if (!(child instanceof ShadowRoot)) {

@@ -1,25 +1,9 @@
-import {
-  safeCallback,
-  triggerWarning,
-} from './func_arr'
-import {
-  convertValueToType,
-  PropertyDefinition,
-} from './behavior'
-import {
-  deepCopy,
-  simpleDeepCopy,
-} from './data_utils'
-import {
-  DataPath,
-  MultiPaths,
-} from './data_path'
-import {
-  DeepCopyKind,
-} from './global_options'
-import {
-  MutationObserverTarget,
-} from './mutation_observer'
+import { safeCallback, triggerWarning } from './func_arr'
+import { convertValueToType, PropertyDefinition } from './behavior'
+import { deepCopy, simpleDeepCopy } from './data_utils'
+import { DataPath, MultiPaths } from './data_path'
+import { DeepCopyKind } from './global_options'
+import { MutationObserverTarget } from './mutation_observer'
 import {
   GeneralComponentInstance,
   DataList,
@@ -49,11 +33,11 @@ export type DataReplace = [DataPath, DataValue, undefined, undefined]
 export type DataSplice = [DataPath, DataValue[], number, number]
 
 export type PropertyChange = {
-  propName: string,
-  prop: PropertyDefinition,
-  oldValue: unknown,
-  newValue: unknown,
-  skipModelListener: boolean,
+  propName: string
+  prop: PropertyDefinition
+  oldValue: unknown
+  newValue: unknown
+  skipModelListener: boolean
 }
 
 export type DataUpdateCallback = (
@@ -64,9 +48,9 @@ export type DataUpdateCallback = (
 export type ModelBindingListener = (value: DataValue) => void
 
 type ObserverNode = {
-  listener?: number[],
-  wildcard?: number[],
-  sub: { [name: string]: ObserverNode },
+  listener?: number[]
+  wildcard?: number[]
+  sub: { [name: string]: ObserverNode }
 }
 
 export class DataGroupObserverTree {
@@ -122,11 +106,11 @@ const callObserver = <
   TProperty extends PropertyList,
   TMethod extends MethodList,
 >(
-    comp: ComponentInstance<TData, TProperty, TMethod>,
-    data: { [key: string]: DataValue },
-    path: MultiPaths,
-    f: DataObserver,
-  ) => {
+  comp: ComponentInstance<TData, TProperty, TMethod>,
+  data: { [key: string]: DataValue },
+  path: MultiPaths,
+  f: DataObserver,
+) => {
   const args: unknown[] = new Array(path.length)
   for (let i = 0; i < path.length; i += 1) {
     const singlePath = path[i]!
@@ -148,14 +132,11 @@ const callObserver = <
     f,
     comp.getMethodCaller() as any,
     args,
-    comp as unknown as GeneralComponentInstance || undefined,
+    (comp as unknown as GeneralComponentInstance) || undefined,
   )
 }
 
-const dfsMarkTriggerBitOnPath = (
-  node: ObserverNode,
-  observerStatus: boolean[],
-) => {
+const dfsMarkTriggerBitOnPath = (node: ObserverNode, observerStatus: boolean[]) => {
   if (node.listener) {
     for (let i = 0; i < node.listener.length; i += 1) {
       const observerId = node.listener[i]!
@@ -200,18 +181,18 @@ const markTriggerBitOnPath = (
   if (found) dfsMarkTriggerBitOnPath(cur, observerStatus)
 }
 
-type DataObserverWithPath = { path: MultiPaths, f: DataObserver }
+type DataObserverWithPath = { path: MultiPaths; f: DataObserver }
 
 const triggerAndCleanTriggerBit = <
   TData extends DataList,
   TProperty extends PropertyList,
   TMethod extends MethodList,
 >(
-    observers: DataObserverWithPath[],
-    observerStatus: boolean[],
-    comp: ComponentInstance<TData, TProperty, TMethod> | null,
-    data: { [key: string]: DataValue },
-  ) => {
+  observers: DataObserverWithPath[],
+  observerStatus: boolean[],
+  comp: ComponentInstance<TData, TProperty, TMethod> | null,
+  data: { [key: string]: DataValue },
+) => {
   for (let i = 0; i < observers.length; i += 1) {
     const { path, f } = observers[i]!
     const status = observerStatus[i]
@@ -249,9 +230,9 @@ export class DataGroup<
   private _$updateListener?: DataUpdateCallback
   private _$pendingChanges: DataChange[] = []
   private _$doingUpdates: {
-    prop: PropertyChange[],
-    combined: DataChange[],
-    count: number,
+    prop: PropertyChange[]
+    combined: DataChange[]
+    count: number
   } | null = null
 
   private _$generateInnerData(data: { [key: string]: DataValue }) {
@@ -278,8 +259,7 @@ export class DataGroup<
   }
 
   constructor(
-    associatedComponent: ComponentInstance<TData, TProperty, TMethod>
-      | null,
+    associatedComponent: ComponentInstance<TData, TProperty, TMethod> | null,
     data: DataWithPropertyValues<TData, TProperty>,
     pureDataPattern: RegExp | null,
     dataDeepCopy: DeepCopyStrategy,
@@ -337,7 +317,11 @@ export class DataGroup<
     inserts: DataValue[],
   ) {
     if (!Array.isArray(inserts)) {
-      triggerWarning(`The splice insertion must be a string (on path "${path.join('.')}"). The change is ignored.`)
+      triggerWarning(
+        `The splice insertion must be a string (on path "${path.join(
+          '.',
+        )}"). The change is ignored.`,
+      )
       return
     }
     this._$pendingChanges.push([path, inserts, index ?? -1, del || 0])
@@ -384,8 +368,9 @@ export class DataGroup<
     if (this._$modelBindingListener) {
       this._$modelBindingListener[propName] = listener
     } else {
-      const map = this._$modelBindingListener = Object.create(null) as
-        { [name: string]: ModelBindingListener }
+      const map = (this._$modelBindingListener = Object.create(null) as {
+        [name: string]: ModelBindingListener
+      })
       map[propName] = listener
     }
   }
@@ -439,13 +424,16 @@ export class DataGroup<
         if (isSplice) {
           if (Array.isArray(oldData)) {
             const c = change as DataSplice
-            normalizedSpliceIndex = spliceIndex! >= 0 && spliceIndex! < oldData.length
-              ? spliceIndex!
-              : oldData.length
+            normalizedSpliceIndex =
+              spliceIndex! >= 0 && spliceIndex! < oldData.length ? spliceIndex! : oldData.length
             c[2] = normalizedSpliceIndex
             oldData.splice(normalizedSpliceIndex, spliceDel, ...(newData as typeof oldData))
           } else {
-            triggerWarning(`An array splice change cannot be applied to a non-array value (on path "${path.join('.')}"). The change is ignored.`)
+            triggerWarning(
+              `An array splice change cannot be applied to a non-array value (on path "${path.join(
+                '.',
+              )}"). The change is ignored.`,
+            )
           }
           filteredData = oldData
         } else {
@@ -464,7 +452,7 @@ export class DataGroup<
               } else {
                 change[1] = inserts = simpleDeepCopy(newData as unknown[])
               }
-              (innerNewData as DataValue[]).splice(normalizedSpliceIndex, spliceDel!, ...inserts)
+              ;(innerNewData as DataValue[]).splice(normalizedSpliceIndex, spliceDel!, ...inserts)
             } else if (dataDeepCopy === DeepCopyStrategy.SimpleWithRecursion) {
               change[1] = innerNewData = deepCopy(filteredData, true)
             } else {
@@ -473,7 +461,7 @@ export class DataGroup<
             this.innerData[propName] = innerNewData
           }
         }
-        (this.data as DataList)[propName] = filteredData
+        ;(this.data as DataList)[propName] = filteredData
         if (this._$reflectToAttributes) {
           const be = comp!.getBackendElement()
           if (be) {
@@ -516,23 +504,24 @@ export class DataGroup<
           const nextSlice = path[i]!
           if (Number.isFinite(nextSlice)) {
             if (
-              !hasOwnProperty.call(curData, curSlice)
-              || !Array.isArray((curData as { [key: string]: unknown })[curSlice as string])
+              !hasOwnProperty.call(curData, curSlice) ||
+              !Array.isArray((curData as { [key: string]: unknown })[curSlice as string])
             ) {
-              (curData as { [key: string]: unknown })[curSlice as string] = []
+              ;(curData as { [key: string]: unknown })[curSlice as string] = []
             }
           } else {
             if (
-              !hasOwnProperty.call(curData, curSlice)
-              || (curData as { [key: string]: unknown })[curSlice as string] === null
-              || typeof (curData as { [key: string]: unknown })[curSlice as string] !== 'object'
-              || Array.isArray((curData as { [key: string]: unknown })[curSlice as string])
+              !hasOwnProperty.call(curData, curSlice) ||
+              (curData as { [key: string]: unknown })[curSlice as string] === null ||
+              typeof (curData as { [key: string]: unknown })[curSlice as string] !== 'object' ||
+              Array.isArray((curData as { [key: string]: unknown })[curSlice as string])
             ) {
-              (curData as { [key: string]: unknown })[curSlice as string] = {}
+              ;(curData as { [key: string]: unknown })[curSlice as string] = {}
             }
           }
           curData = (curData as { [key: string]: unknown })[curSlice as string] as
-            { [key: string]: unknown } | unknown[]
+            | { [key: string]: unknown }
+            | unknown[]
           curSlice = nextSlice
         }
         let normalizedSpliceIndex: number | undefined
@@ -540,16 +529,19 @@ export class DataGroup<
           const oldData = (curData as DataList)[curSlice as string]
           if (Array.isArray(oldData)) {
             const c = change as DataSplice
-            normalizedSpliceIndex = spliceIndex! >= 0 && spliceIndex! < oldData.length
-              ? spliceIndex!
-              : oldData.length
+            normalizedSpliceIndex =
+              spliceIndex! >= 0 && spliceIndex! < oldData.length ? spliceIndex! : oldData.length
             c[2] = normalizedSpliceIndex
             oldData.splice(normalizedSpliceIndex, spliceDel, ...(newData as typeof oldData))
           } else {
-            triggerWarning(`An array splice change cannot be applied to a non-array value (on path "${path.join('.')}"). The change is ignored.`)
+            triggerWarning(
+              `An array splice change cannot be applied to a non-array value (on path "${path.join(
+                '.',
+              )}"). The change is ignored.`,
+            )
           }
         } else {
-          (curData as DataList)[curSlice as string] = newData
+          ;(curData as DataList)[curSlice as string] = newData
         }
         if (!excluded && this.innerData) {
           curData = this.innerData
@@ -558,44 +550,46 @@ export class DataGroup<
             const nextSlice = path[i]!
             if (Number.isFinite(nextSlice)) {
               if (
-                !hasOwnProperty.call(curData, curSlice)
-                || !Array.isArray((curData as { [key: string]: unknown })[curSlice as string])
+                !hasOwnProperty.call(curData, curSlice) ||
+                !Array.isArray((curData as { [key: string]: unknown })[curSlice as string])
               ) {
-                (curData as { [key: string]: unknown })[curSlice as string] = []
+                ;(curData as { [key: string]: unknown })[curSlice as string] = []
               }
             } else {
               if (
-                !hasOwnProperty.call(curData, curSlice)
-                || (curData as { [key: string]: unknown })[curSlice as string] === null
-                || typeof (curData as { [key: string]: unknown })[curSlice as string] !== 'object'
-                || Array.isArray((curData as { [key: string]: unknown })[curSlice as string])
+                !hasOwnProperty.call(curData, curSlice) ||
+                (curData as { [key: string]: unknown })[curSlice as string] === null ||
+                typeof (curData as { [key: string]: unknown })[curSlice as string] !== 'object' ||
+                Array.isArray((curData as { [key: string]: unknown })[curSlice as string])
               ) {
-                (curData as { [key: string]: unknown })[curSlice as string] = {}
+                ;(curData as { [key: string]: unknown })[curSlice as string] = {}
               }
             }
             curData = (curData as { [key: string]: unknown })[curSlice as string] as
-              { [key: string]: unknown } | unknown[]
+              | { [key: string]: unknown }
+              | unknown[]
             curSlice = nextSlice
           }
           let innerNewData: unknown
           if (dataDeepCopy === DeepCopyStrategy.None) {
             change[1] = innerNewData = newData
           } else if (normalizedSpliceIndex !== undefined) {
-            innerNewData = (curData as { [key: string]: unknown })[curSlice as string] as
-              DataValue[]
+            innerNewData = (curData as { [key: string]: unknown })[
+              curSlice as string
+            ] as DataValue[]
             let inserts: DataValue[]
             if (dataDeepCopy === DeepCopyStrategy.SimpleWithRecursion) {
               change[1] = inserts = deepCopy(newData as unknown[], true)
             } else {
               change[1] = inserts = simpleDeepCopy(newData as unknown[])
             }
-            (innerNewData as DataValue[]).splice(normalizedSpliceIndex, spliceDel!, ...inserts)
+            ;(innerNewData as DataValue[]).splice(normalizedSpliceIndex, spliceDel!, ...inserts)
           } else if (dataDeepCopy === DeepCopyStrategy.SimpleWithRecursion) {
             change[1] = innerNewData = deepCopy(newData, true)
           } else {
             change[1] = innerNewData = simpleDeepCopy(newData)
           }
-          (curData as { [key: string]: unknown })[curSlice as string] = innerNewData
+          ;(curData as { [key: string]: unknown })[curSlice as string] = innerNewData
         }
         if (!excluded && prop) {
           // NOTE for prop observers, oldVal will be undefined when doing a sub-path update
@@ -629,27 +623,24 @@ export class DataGroup<
     }
 
     // tell template engine what changed
-    this._$updateListener?.(
-      this.innerData || this.data,
-      combinedChanges,
-    )
+    this._$updateListener?.(this.innerData || this.data, combinedChanges)
 
     // trigger prop observers (to simulating legacy behaviors)
     if (comp) {
       for (let i = 0; i < propChanges.length; i += 1) {
-        const {
-          propName,
-          prop,
-          oldValue,
-          newValue,
-          skipModelListener,
-        } = propChanges[i]!
+        const { propName, prop, oldValue, newValue, skipModelListener } = propChanges[i]!
         if (!skipModelListener && this._$modelBindingListener) {
           const listener = this._$modelBindingListener[propName]
           if (listener) listener(newValue)
         }
         if (prop.observer) {
-          safeCallback('Property Observer', prop.observer, comp.getMethodCaller() as any, [newValue, oldValue], comp as unknown as GeneralComponentInstance)
+          safeCallback(
+            'Property Observer',
+            prop.observer,
+            comp.getMethodCaller() as any,
+            [newValue, oldValue],
+            comp as unknown as GeneralComponentInstance,
+          )
         }
         if (comp._$mutationObserverTarget) {
           MutationObserverTarget.callAttrObservers(comp, {
@@ -663,8 +654,4 @@ export class DataGroup<
   }
 }
 
-export type GeneralDataGroup = DataGroup<
-  DataList,
-  PropertyList,
-  MethodList
->
+export type GeneralDataGroup = DataGroup<DataList, PropertyList, MethodList>

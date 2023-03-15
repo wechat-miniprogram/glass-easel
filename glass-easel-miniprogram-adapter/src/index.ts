@@ -1,8 +1,6 @@
 import * as glassEasel from 'glass-easel'
 import { AssociatedBackend } from './backend'
-import {
-  CodeSpace,
-} from './space'
+import { CodeSpace } from './space'
 
 export * as glassEasel from 'glass-easel'
 export * as types from './types'

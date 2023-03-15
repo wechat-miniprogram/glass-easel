@@ -1,25 +1,12 @@
 import * as backend from './backend/backend_protocol'
 import * as composedBackend from './backend/composed_backend_protocol'
 import * as domlikeBackend from './backend/domlike_backend_protocol'
-import {
-  globalOptions,
-} from './global_options'
-import {
-  ClassList,
-} from './class_list'
-import {
-  Element,
-} from './element'
-import {
-  ShadowRoot,
-} from './shadow_root'
-import {
-  GeneralBackendElement,
-} from '.'
-import {
-  BM,
-  BackendMode,
-} from './backend/mode'
+import { globalOptions } from './global_options'
+import { ClassList } from './class_list'
+import { Element } from './element'
+import { ShadowRoot } from './shadow_root'
+import { GeneralBackendElement } from '.'
+import { BM, BackendMode } from './backend/mode'
 
 export class NativeNode extends Element {
   is: string
@@ -30,16 +17,14 @@ export class NativeNode extends Element {
     super()
   }
 
-  static create(
-    tagName: string,
-    owner: ShadowRoot,
-  ): NativeNode {
+  static create(tagName: string, owner: ShadowRoot): NativeNode {
     const node = Object.create(NativeNode.prototype) as NativeNode
     node.is = tagName
     let backendElement: GeneralBackendElement | null
     if (BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike)) {
-      backendElement = (owner._$nodeTreeContext as domlikeBackend.Context)
-        .document.createElement(tagName)
+      backendElement = (owner._$nodeTreeContext as domlikeBackend.Context).document.createElement(
+        tagName,
+      )
     } else if (BM.SHADOW || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Shadow)) {
       const backend = owner._$backendShadowRoot
       backendElement = backend?.createElement(tagName) || null
@@ -53,11 +38,12 @@ export class NativeNode extends Element {
       const styleScope = owner.getHostNode()._$definition._$options.styleScope
       if (styleScope) {
         if (!(BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike))) {
-          (backendElement as backend.Element | composedBackend.Element).setStyleScope(styleScope)
+          ;(backendElement as backend.Element | composedBackend.Element).setStyleScope(styleScope)
         }
       }
       if (globalOptions.writeExtraInfoToAttr) {
-        const prefix = owner.getHostNode()
+        const prefix = owner
+          .getHostNode()
           ._$behavior.ownerSpace?.styleScopeManager.queryName(styleScope)
         if (prefix) {
           backendElement.setAttribute('exparser:info-class-prefix', `${prefix}--`)
@@ -66,7 +52,7 @@ export class NativeNode extends Element {
     }
     if (!(BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike))) {
       if (backendElement) {
-        (backendElement as backend.Element | composedBackend.Element).associateValue(node)
+        ;(backendElement as backend.Element | composedBackend.Element).associateValue(node)
       }
     }
     return node

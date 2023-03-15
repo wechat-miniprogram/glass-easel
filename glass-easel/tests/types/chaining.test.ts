@@ -340,10 +340,10 @@ componentSpace
 
     observer('**', (newValue) => {
       expectType<{
-        readonly str: string;
+        readonly str: string
         readonly objFoo: {
-          readonly foo: string;
-        };
+          readonly foo: string
+        }
       }>(newValue)
     })
 
@@ -396,10 +396,10 @@ componentSpace
 
   .observer('**', (newValue) => {
     expectType<{
-      readonly str: string;
+      readonly str: string
       readonly objFoo: {
-        readonly foo: string;
-      };
+        readonly foo: string
+      }
     }>(newValue)
   })
 
@@ -436,8 +436,8 @@ componentSpace
  * Trait
  */
 interface SimpleFormControlInterface {
-  getName(): string;
-  getValue(): { foo: string };
+  getName(): string
+  getValue(): { foo: string }
 }
 const FormControl = componentSpace.defineTraitBehavior<SimpleFormControlInterface>()
 
@@ -509,13 +509,12 @@ const propCheck = componentSpace
       myInit<T>(
         this: T,
         name: string,
-        fn: T extends { init: (fn: infer Fn) => any } ? Fn : never
-      ): T;
-        },
+        fn: T extends { init: (fn: infer Fn) => any } ? Fn : never,
+      ): T
+    },
     never
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-        >((chain) => chain as any,
-        )
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+  >((chain) => chain as any)
   .registerBehavior()
 
 componentSpace
@@ -525,8 +524,8 @@ componentSpace
   .property('prop2', String)
   .myInit('foo', ({ data }) => {
     expectType<{
-      readonly prop1: string;
-      readonly prop2: string;
+      readonly prop1: string
+      readonly prop2: string
     }>(data)
   })
   .registerComponent()
@@ -575,12 +574,8 @@ componentSpace
 /**
  * Share Code
  */
-declare function onThemeChanged(
-  callback: (res: { theme: string }) => void
-): void;
-declare function offThemeChanged(
-  callback: (res: { theme: string }) => void
-): void;
+declare function onThemeChanged(callback: (res: { theme: string }) => void): void
+declare function offThemeChanged(callback: (res: { theme: string }) => void): void
 
 const useTheme = (
   { lifetime }: glassEasel.BuilderContext<any, any, any>,

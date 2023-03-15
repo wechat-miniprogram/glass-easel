@@ -39,7 +39,7 @@ const optimization = {
 const devtool = 'source-map'
 
 const resolve = {
-  extensions: [ '.ts', '.js' ],
+  extensions: ['.ts', '.js'],
 }
 
 const performance = {
@@ -49,20 +49,25 @@ const performance = {
 
 class BundleDeclarationEntrancePlugin {
   apply(compiler) {
-    compiler.hooks.compilation.tap('BundleDeclarationEntrancePlugin', (compilation, compilationParams) => {
-      compilation.hooks.additionalAssets.tapPromise('ExtraAssetPlugin', async () => {
-        Object.keys(compilation.assets).forEach((file) => {
-          if (file.endsWith('.js')) {
-            const dtsFile = file.replace(/\.js$/, '.d.ts')
-            compilation.assets[dtsFile] = new RawSource('export * from "./types/src/index"')
+    compiler.hooks.compilation.tap(
+      'BundleDeclarationEntrancePlugin',
+      (compilation, compilationParams) => {
+        compilation.hooks.additionalAssets.tapPromise('ExtraAssetPlugin', async () => {
+          Object.keys(compilation.assets).forEach((file) => {
+            if (file.endsWith('.js')) {
+              const dtsFile = file.replace(/\.js$/, '.d.ts')
+              compilation.assets[dtsFile] = new RawSource('export * from "./types/src/index"')
+            }
+          })
+          if (mainJobOutput) {
+            compilation.assets['index.js'] = new RawSource(
+              `module.exports = require('./${mainJobOutput}')`,
+            )
+            compilation.assets['index.d.ts'] = new RawSource(`export * from "./${mainJobOutput}"`)
           }
         })
-        if (mainJobOutput) {
-          compilation.assets['index.js'] = new RawSource(`module.exports = require('./${mainJobOutput}')`)
-          compilation.assets['index.d.ts'] = new RawSource(`export * from "./${mainJobOutput}"`)
-        }
-      })
-    })
+      },
+    )
   }
 }
 
@@ -89,7 +94,7 @@ const allCompilation = {
       'BM.COMPOSED': false,
       'BM.DOMLIKE': false,
     }),
-    ...globalPlugins
+    ...globalPlugins,
   ],
 }
 
@@ -114,7 +119,7 @@ const shadowCompilation = {
       'BM.COMPOSED': false,
       'BM.DOMLIKE': false,
     }),
-    ...globalPlugins
+    ...globalPlugins,
   ],
 }
 
@@ -140,7 +145,7 @@ const shadowGlobalCompilation = {
       'BM.COMPOSED': false,
       'BM.DOMLIKE': false,
     }),
-    ...globalPlugins
+    ...globalPlugins,
   ],
 }
 
@@ -165,7 +170,7 @@ const composedCompilation = {
       'BM.COMPOSED': true,
       'BM.DOMLIKE': false,
     }),
-    ...globalPlugins
+    ...globalPlugins,
   ],
 }
 
@@ -191,7 +196,7 @@ const composedGlobalCompilation = {
       'BM.COMPOSED': true,
       'BM.DOMLIKE': false,
     }),
-    ...globalPlugins
+    ...globalPlugins,
   ],
 }
 
@@ -211,13 +216,13 @@ const domlikeCompilation = {
   resolve,
   performance,
   plugins: [
-    new webpack.DefinePlugin({ 
+    new webpack.DefinePlugin({
       'BM.DYNAMIC': false,
       'BM.SHADOW': false,
       'BM.COMPOSED': false,
       'BM.DOMLIKE': true,
     }),
-    ...globalPlugins
+    ...globalPlugins,
   ],
 }
 
@@ -244,7 +249,7 @@ const domlikeGlobalCompilation = {
       'BM.COMPOSED': false,
       'BM.DOMLIKE': true,
     }),
-    ...globalPlugins
+    ...globalPlugins,
   ],
 }
 
@@ -253,12 +258,12 @@ const defaultJobs = [allCompilation, domlikeGlobalCompilation]
 if (jobs.length) {
   module.exports = jobs.map((name) => {
     const map = {
-      'all': allCompilation,
-      'shadow': shadowCompilation,
+      all: allCompilation,
+      shadow: shadowCompilation,
       'shadow-global': shadowGlobalCompilation,
-      'composed': composedCompilation,
+      composed: composedCompilation,
       'composed-global': composedGlobalCompilation,
-      'domlike': domlikeCompilation,
+      domlike: domlikeCompilation,
       'domlike-global': domlikeGlobalCompilation,
     }
     if (map[name]) return map[name]

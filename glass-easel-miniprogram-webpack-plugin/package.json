@@ -6,7 +6,9 @@
     "type": "git",
     "url": "https://github.com/wechat-miniprogram/glass-easel.git"
   },
-  "keywords": ["glass-easel"],
+  "keywords": [
+    "glass-easel"
+  ],
   "author": "wechat-miniprogram",
   "license": "MIT",
   "bugs": {

@@ -64,9 +64,7 @@ describe('slot', () => {
           parent.general(),
           domBackend,
         )
-        const childElem = parentElem
-          .getShadowRoot()!
-          .childNodes[0]!.asInstanceOf(child)!
+        const childElem = parentElem.getShadowRoot()!.childNodes[0]!.asInstanceOf(child)!
 
         const slot1 = childElem.getShadowRoot()!.createVirtualNode('slot')
         glassEasel.Element.setSlotName(slot1, '')
@@ -88,9 +86,7 @@ describe('slot', () => {
 
         childElem.$.a?.appendChild(slotA1 as any)
         expect(childElem.childNodes.length).toBe(4)
-        expect(domHtml(parentElem)).toBe(
-          '<child><span id="a"><comp>A</comp></span></child>',
-        )
+        expect(domHtml(parentElem)).toBe('<child><span id="a"><comp>A</comp></span></child>')
         expect(ops).toEqual([[-1, 'A']])
         matchElementWithDom(parentElem)
 
@@ -165,9 +161,7 @@ describe('slot', () => {
           .define()
           .options({ dynamicSlots: true })
           .definition({
-            template: tmpl(
-              '<slot name="a" /> <span><slot name="b" /></span> <slot name="a" />',
-            ),
+            template: tmpl('<slot name="a" /> <span><slot name="b" /></span> <slot name="a" />'),
           })
           .registerComponent()
 
@@ -184,26 +178,17 @@ describe('slot', () => {
           parent.general(),
           domBackend,
         )
-        const childElem = parentElem
-          .getShadowRoot()!
-          .childNodes[0]!.asInstanceOf(child)!
+        const childElem = parentElem.getShadowRoot()!.childNodes[0]!.asInstanceOf(child)!
 
-        const slotA = childElem.getShadowRoot()!
+        const slotA = childElem.getShadowRoot()!.childNodes[0]! as glassEasel.Element
+        const slotB = (childElem.getShadowRoot()!.childNodes[1]! as glassEasel.Element)
           .childNodes[0]! as glassEasel.Element
-        const slotB = (
-          childElem.getShadowRoot()!.childNodes[1]! as glassEasel.Element
-        ).childNodes[0]! as glassEasel.Element
-        const slotC = childElem.getShadowRoot()!
-          .childNodes[2]! as glassEasel.Element
+        const slotC = childElem.getShadowRoot()!.childNodes[2]! as glassEasel.Element
 
-        const contentA = parentElem
-          .getShadowRoot()!
-          .createVirtualNode('virtual')
+        const contentA = parentElem.getShadowRoot()!.createVirtualNode('virtual')
         contentA.appendChild(parentElem.getShadowRoot()!.createTextNode('A'))
 
-        const contentB = parentElem
-          .getShadowRoot()!
-          .createVirtualNode('virtual')
+        const contentB = parentElem.getShadowRoot()!.createVirtualNode('virtual')
         glassEasel.Element.setInheritSlots(contentB)
         contentB.appendChild(parentElem.getShadowRoot()!.createTextNode('B'))
 
@@ -306,9 +291,7 @@ describe('slot', () => {
           parent.general(),
           domBackend,
         )
-        const childElem = parentElem
-          .getShadowRoot()!
-          .childNodes[0]!.asInstanceOf(child)!
+        const childElem = parentElem.getShadowRoot()!.childNodes[0]!.asInstanceOf(child)!
 
         expect(childElem.childNodes.length).toBe(6)
         expect(domHtml(parentElem)).toBe('<child>AB<span>AB</span>AB</child>')
@@ -316,9 +299,7 @@ describe('slot', () => {
 
         parentElem.setData({ slotContent1: 'AA' })
         expect(childElem.childNodes.length).toBe(6)
-        expect(domHtml(parentElem)).toBe(
-          '<child>AAB<span>AAB</span>AAB</child>',
-        )
+        expect(domHtml(parentElem)).toBe('<child>AAB<span>AAB</span>AAB</child>')
         matchElementWithDom(parentElem)
 
         parentElem.setData({ slotName1: 'b' })
@@ -379,9 +360,7 @@ describe('slot', () => {
           parent.general(),
           domBackend,
         )
-        const childElem = parentElem
-          .getShadowRoot()!
-          .childNodes[0]!.asInstanceOf(child)!
+        const childElem = parentElem.getShadowRoot()!.childNodes[0]!.asInstanceOf(child)!
 
         expect(domHtml(parentElem)).toBe('<child><div>123</div></child>')
         matchElementWithDom(parentElem)
@@ -546,9 +525,7 @@ describe('slot', () => {
         expect(domHtml(parentElem)).toBe(
           '<child><c1><x>A</x><x>B</x><a></a></c1><c2><x>A</x><a></a></c2><c3><x>A</x><a></a></c3></child>',
         )
-        expect(ops).toEqual([
-          [-2, '3:B'],
-        ])
+        expect(ops).toEqual([[-2, '3:B']])
         matchElementWithDom(parentElem)
 
         ops = []
@@ -567,9 +544,7 @@ describe('slot', () => {
         expect(domHtml(parentElem)).toBe(
           '<child><c1><a><x>A</x><x>B</x></a></c1><c2><a><x>B</x></a></c2><c3><a><x>B</x><x>B</x></a></c3></child>',
         )
-        expect(ops).toEqual([
-          [-2, '3:A'],
-        ])
+        expect(ops).toEqual([[-2, '3:A']])
         matchElementWithDom(parentElem)
 
         ops = []
@@ -783,9 +758,7 @@ describe('slot', () => {
         ).asInstanceOf(parent)!
 
         glassEasel.Element.pretendAttached(parentElem)
-        expect(domHtml(parentElem)).toBe(
-          '<c1><a></a></c1><c2><a></a></c2><c3><a></a></c3>',
-        )
+        expect(domHtml(parentElem)).toBe('<c1><a></a></c1><c2><a></a></c2><c3><a></a></c3>')
         expect(ops).toEqual([
           [-1, '1:A'],
           [-1, '1:B'],
@@ -901,9 +874,7 @@ describe('slot', () => {
 
         ops = []
         parentElem.setData({ enableA1: false })
-        expect(domHtml(parentElem)).toBe(
-          '<c1><a></a></c1><c2><a></a></c2><c3><a></a></c3>',
-        )
+        expect(domHtml(parentElem)).toBe('<c1><a></a></c1><c2><a></a></c2><c3><a></a></c3>')
         expect(ops).toEqual([
           [-2, '3:C'],
           [-2, '3:B'],
@@ -936,9 +907,7 @@ describe('slot', () => {
             c: 0,
           }))
           .definition({
-            template: tmpl(
-              '<slot a="{{a1}}" c="{{c}}" /><slot a="{{a2}}" c="{{c}}" />',
-            ),
+            template: tmpl('<slot a="{{a1}}" c="{{c}}" /><slot a="{{a2}}" c="{{c}}" />'),
           })
           .registerComponent()
 
@@ -962,9 +931,7 @@ describe('slot', () => {
           parent.general(),
           domBackend,
         ).asInstanceOf(parent)!
-        const childElem = parentElem
-          .getShadowRoot()!
-          .childNodes[0]!.asInstanceOf(child)!
+        const childElem = parentElem.getShadowRoot()!.childNodes[0]!.asInstanceOf(child)!
 
         expect(domHtml(parentElem)).toBe(
           '<child><x-c>10</x-c><span>0</span><x-c>20</x-c><span>0</span></child>',
@@ -1057,21 +1024,13 @@ describe('slot', () => {
           })
           .registerComponent()
 
-        const parentElem = glassEasel.Component.createWithContext(
-          'root',
-          parent,
-          domBackend,
-        )
+        const parentElem = glassEasel.Component.createWithContext('root', parent, domBackend)
         glassEasel.Element.pretendAttached(parentElem)
-        const childElem = parentElem
-          .getShadowRoot()!
-          .childNodes[1]!.asInstanceOf(child)!
+        const childElem = parentElem.getShadowRoot()!.childNodes[1]!.asInstanceOf(child)!
 
         parentElem.replaceDataOnPath(['a', 'foo'], 'oops')
 
-        expect(domHtml(parentElem)).toBe(
-          '<x-c></x-c><child></child>',
-        )
+        expect(domHtml(parentElem)).toBe('<x-c></x-c><child></child>')
         expect(ops).toEqual([
           [0, 'foo'],
           [-1, 'foo'],
@@ -1202,9 +1161,7 @@ describe('slot', () => {
 
         ops = []
         parentElem.setData({ bar: '1' })
-        expect(ops).toEqual([
-          [0, 'oops'],
-        ])
+        expect(ops).toEqual([[0, 'oops']])
       })
 
       test('should support different deep copy strategies', () => {
@@ -1264,12 +1221,8 @@ describe('slot', () => {
           parent.general(),
           domBackend,
         )
-        const noneElem = parentElem
-          .getShadowRoot()!
-          .childNodes[0]!.asInstanceOf(none)!
-        const recElem = parentElem
-          .getShadowRoot()!
-          .childNodes[1]!.asInstanceOf(rec)!
+        const noneElem = parentElem.getShadowRoot()!.childNodes[0]!.asInstanceOf(none)!
+        const recElem = parentElem.getShadowRoot()!.childNodes[1]!.asInstanceOf(rec)!
 
         expect(domHtml(parentElem)).toBe('<none><div>123</div></none><rec><div>abc</div></rec>')
         matchElementWithDom(parentElem)
@@ -1392,11 +1345,7 @@ describe('slot', () => {
         })
         .registerComponent()
 
-      const parentElem = glassEasel.Component.createWithContext(
-        'root',
-        parent,
-        domBackend,
-      )
+      const parentElem = glassEasel.Component.createWithContext('root', parent, domBackend)
       const singleElem = (parentElem.$.s as glassEasel.Element).asInstanceOf(single)!
       const multiElem = (parentElem.$.m as glassEasel.Element).asInstanceOf(multi)!
       const dynamicElem = (parentElem.$.d as glassEasel.Element).asInstanceOf(dynamic)!
@@ -1465,31 +1414,19 @@ describe('slot', () => {
         })
         expect(cur).toBe(expectedContent?.length)
       }
-      checkSlotContentMethods(
-        singleElem.getShadowRoot()!,
-        singleSlot,
-        [
-          singleElem.childNodes[0]!,
-          (singleElem.childNodes[0] as glassEasel.Element).childNodes[0]!,
-          singleElem.childNodes[1]!,
-        ],
-      )
-      checkSlotContentMethods(
-        multiElem.getShadowRoot()!,
-        multiSlot,
-        [
-          (multiElem.childNodes[0] as glassEasel.Element).childNodes[0]!,
-        ],
-      )
-      checkSlotContentMethods(
-        dynamicElem.getShadowRoot()!,
-        dynamicSlot,
-        [
-          dynamicElem.childNodes[0]!,
-          (dynamicElem.childNodes[0] as glassEasel.Element).childNodes[0]!,
-          dynamicElem.childNodes[1]!,
-        ],
-      )
+      checkSlotContentMethods(singleElem.getShadowRoot()!, singleSlot, [
+        singleElem.childNodes[0]!,
+        (singleElem.childNodes[0] as glassEasel.Element).childNodes[0]!,
+        singleElem.childNodes[1]!,
+      ])
+      checkSlotContentMethods(multiElem.getShadowRoot()!, multiSlot, [
+        (multiElem.childNodes[0] as glassEasel.Element).childNodes[0]!,
+      ])
+      checkSlotContentMethods(dynamicElem.getShadowRoot()!, dynamicSlot, [
+        dynamicElem.childNodes[0]!,
+        (dynamicElem.childNodes[0] as glassEasel.Element).childNodes[0]!,
+        dynamicElem.childNodes[1]!,
+      ])
     })
   })
 })

@@ -1,16 +1,7 @@
-import {
-  Element,
-} from './element'
-import {
-  ShadowRoot,
-} from './shadow_root'
-import {
-  BM,
-  BackendMode,
-} from './backend/mode'
-import {
-  GeneralBackendContext, GeneralBackendElement,
-} from '.'
+import { Element } from './element'
+import { ShadowRoot } from './shadow_root'
+import { BM, BackendMode } from './backend/mode'
+import { GeneralBackendContext, GeneralBackendElement } from '.'
 
 export class VirtualNode extends Element {
   is: string
@@ -40,10 +31,7 @@ export class VirtualNode extends Element {
     }
   }
 
-  static create(
-    virtualName: string,
-    owner: ShadowRoot,
-  ): VirtualNode {
+  static create(virtualName: string, owner: ShadowRoot): VirtualNode {
     const node = Object.create(VirtualNode.prototype) as VirtualNode
     node._$initializeVirtual(virtualName, owner, owner._$nodeTreeContext)
     return node

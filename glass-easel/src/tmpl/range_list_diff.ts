@@ -1,10 +1,5 @@
-import {
-  Element,
-  VirtualNode,
-} from '..'
-import {
-  DataValue,
-} from '../data_proxy'
+import { Element, VirtualNode } from '..'
+import { DataValue } from '../data_proxy'
 import { UpdatePathTreeNode, UpdatePathTreeRoot } from './proc_gen_wrapper'
 import { triggerWarning } from '../func_arr'
 
@@ -20,10 +15,7 @@ export class RangeListManager {
     keyName: string | null,
     dataList: DataValue,
     elem: Element,
-    newListItem: (
-      item: DataValue,
-      index: number | string,
-    ) => VirtualNode,
+    newListItem: (item: DataValue, index: number | string) => VirtualNode,
   ) {
     this.keyName = keyName
     this.updateKeys(dataList)
@@ -56,14 +48,18 @@ export class RangeListManager {
         indexes[i] = key
       }
     } else if (typeof dataList === 'string') {
-      triggerWarning('Use string as for-list is generally for testing. Each character is treated as an item.')
+      triggerWarning(
+        'Use string as for-list is generally for testing. Each character is treated as an item.',
+      )
       items = new Array<string>(dataList.length)
       indexes = null
       for (let i = 0; i < dataList.length; i += 1) {
         items[i] = dataList[i]!
       }
     } else if (typeof dataList === 'number') {
-      triggerWarning('Use number as for-list is generally for testing. The number is used as the repeated times of the item.')
+      triggerWarning(
+        'Use number as for-list is generally for testing. The number is used as the repeated times of the item.',
+      )
       items = new Array<string>(dataList)
       indexes = null
       for (let i = 0; i < dataList; i += 1) {
@@ -126,10 +122,7 @@ export class RangeListManager {
     dataList: DataValue[],
     oriUpdatePathTree: UpdatePathTreeRoot,
     elem: Element,
-    newListItem: (
-      item: DataValue,
-      index: string | number,
-    ) => VirtualNode,
+    newListItem: (item: DataValue, index: string | number) => VirtualNode,
     updateListItem: (
       item: DataValue,
       index: string | number,
@@ -174,7 +167,9 @@ export class RangeListManager {
         for (let i = 0; i < keys.length; i += 1) {
           const k = keys[i]!
           const subTree = (oriUpdatePathTree as { [s: string]: UpdatePathTreeNode })[k]! as
-            { [s: string]: UpdatePathTreeNode } | undefined | true
+            | { [s: string]: UpdatePathTreeNode }
+            | undefined
+            | true
           if (subTree === true || (keyName === '*this' ? subTree : subTree?.[keyName])) {
             needUpdate = true
             break
@@ -189,7 +184,9 @@ export class RangeListManager {
             updatePathTree[i] = true
           } else {
             const subTree = (oriUpdatePathTree as { [s: string]: UpdatePathTreeNode })[i] as
-              { [s: string]: UpdatePathTreeNode } | undefined | true
+              | { [s: string]: UpdatePathTreeNode }
+              | undefined
+              | true
             if (subTree === undefined) {
               // empty
             } else if (subTree === true || (keyName === '*this' ? subTree : subTree?.[keyName])) {
@@ -220,9 +217,10 @@ export class RangeListManager {
         const item = items[i]!
         const index = indexes === null ? i : indexes[i]!
         const oldIndex = oldIndexes === null ? i : oldIndexes[i]!
-        const u = updatePathTree === true || updatePathTree === undefined
-          ? updatePathTree
-          : updatePathTree[i]
+        const u =
+          updatePathTree === true || updatePathTree === undefined
+            ? updatePathTree
+            : updatePathTree[i]
         updateListItem(item, index, u, index !== oldIndex, elem.childNodes[i]! as VirtualNode)
         i += 1
       }
@@ -265,9 +263,8 @@ export class RangeListManager {
         prevMinIndexByLenIndex += 1
         minIndexByLen[prevMinIndexByLenIndex] = prevOldIndex
         minIndexByLenIndexes[prevMinIndexByLenIndex] = i
-        minIndexPrev[i] = prevMinIndexByLenIndex > 0
-          ? minIndexByLenIndexes[prevMinIndexByLenIndex - 1]!
-          : -1
+        minIndexPrev[i] =
+          prevMinIndexByLenIndex > 0 ? minIndexByLenIndexes[prevMinIndexByLenIndex - 1]! : -1
         oldPosList[i] = prevOldIndex
         continue
       }
@@ -304,9 +301,10 @@ export class RangeListManager {
         const item = items[i]!
         const index = indexes === null ? i : indexes[i]!
         const oldIndex = oldIndexes === null ? i : oldIndexes[i]!
-        const u: UpdatePathTreeRoot = updatePathTree === true || updatePathTree === undefined
-          ? updatePathTree
-          : (updatePathTree as UpdatePathTreeNode[])[i]
+        const u: UpdatePathTreeRoot =
+          updatePathTree === true || updatePathTree === undefined
+            ? updatePathTree
+            : (updatePathTree as UpdatePathTreeNode[])[i]
         updateListItem(item, index, u, index !== oldIndex, elem.childNodes[i]! as VirtualNode)
         i += 1
       }
@@ -361,12 +359,10 @@ export class RangeListManager {
     let opIndex = 0
     curLcsArrIndex = 0
     do {
-      const nextStable = curLcsArrIndex < lcsArr.length
-        ? lcsArr[curLcsArrIndex]!
-        : changedItems.length
-      const nextStableOldPos = curLcsArrIndex < lcsArr.length
-        ? oldPosList[nextStable]!
-        : oldListOp.length
+      const nextStable =
+        curLcsArrIndex < lcsArr.length ? lcsArr[curLcsArrIndex]! : changedItems.length
+      const nextStableOldPos =
+        curLcsArrIndex < lcsArr.length ? oldPosList[nextStable]! : oldListOp.length
 
       // remove items between two LCS items
       while (opOldPos < nextStableOldPos) {
@@ -410,9 +406,10 @@ export class RangeListManager {
           const item = items[opIndex]!
           const index = indexes === null ? opIndex : indexes[opIndex]!
           const oldIndex = oldIndexes === null ? oldPos : oldIndexes[oldPos]!
-          const u: UpdatePathTreeRoot = updatePathTree === true || updatePathTree === undefined
-            ? updatePathTree
-            : (updatePathTree as UpdatePathTreeNode[])[opIndex]
+          const u: UpdatePathTreeRoot =
+            updatePathTree === true || updatePathTree === undefined
+              ? updatePathTree
+              : (updatePathTree as UpdatePathTreeNode[])[opIndex]
           updateListItem(item, index, u, index !== oldIndex, newItem)
           if (oldListOp[oldPos] === OpKind.BackwardMove) {
             realListDiff += 1
@@ -428,9 +425,10 @@ export class RangeListManager {
         const item = items[nextStable]!
         const index = indexes === null ? nextStable : indexes[nextStable]!
         const oldIndex = oldIndexes === null ? nextStableOldPos : oldIndexes[nextStableOldPos]!
-        const u: UpdatePathTreeRoot = updatePathTree === true || updatePathTree === undefined
-          ? updatePathTree
-          : (updatePathTree as UpdatePathTreeNode[])[nextStable]
+        const u: UpdatePathTreeRoot =
+          updatePathTree === true || updatePathTree === undefined
+            ? updatePathTree
+            : (updatePathTree as UpdatePathTreeNode[])[nextStable]
         const node = elem.childNodes[nextStableOldPos + realListDiff]! as VirtualNode
         updateListItem(item, index, u, index !== oldIndex, node)
       }

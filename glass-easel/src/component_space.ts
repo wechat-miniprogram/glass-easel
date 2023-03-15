@@ -6,12 +6,7 @@ import {
   ComponentInstance,
   Empty,
 } from './component_params'
-import {
-  Behavior,
-  BehaviorBuilder,
-  GeneralBehavior,
-  NativeNodeDefinition,
-} from './behavior'
+import { Behavior, BehaviorBuilder, GeneralBehavior, NativeNodeDefinition } from './behavior'
 import {
   ComponentDefinition,
   GeneralComponentDefinition,
@@ -23,12 +18,8 @@ import {
   normalizeComponentOptions,
   NormalizedComponentOptions,
 } from './global_options'
-import {
-  StyleScopeManager,
-} from './class_list'
-import {
-  GeneralBackendContext,
-} from '.'
+import { StyleScopeManager } from './class_list'
+import { GeneralBackendContext } from '.'
 import { TraitBehavior } from './trait_behaviors'
 
 const normalizePath = (path: string, basePath: string): string => {
@@ -54,7 +45,7 @@ const normalizePath = (path: string, basePath: string): string => {
 export const normalizeUrl = (
   path: string,
   relPath: string,
-): { domain: string | null, absPath: string } => {
+): { domain: string | null; absPath: string } => {
   const protoSep = path.indexOf('://')
   if (protoSep > 0) {
     const domainSep = path.indexOf('/', protoSep + 3)
@@ -121,8 +112,8 @@ export class ComponentSpace {
   /** @internal */
   private _$importedSpaces = Object.create(null) as {
     [path: string]: {
-      space: ComponentSpace,
-      privateUse: boolean,
+      space: ComponentSpace
+      privateUse: boolean
     }
   }
   /** @internal */
@@ -198,11 +189,7 @@ export class ComponentSpace {
    * If `privateUse` set to false, only component alias in the imported space can be used;
    * the original name of components is imported otherwise.
    */
-  importSpace(
-    protoDomain: string,
-    space: ComponentSpace,
-    privateUse: boolean,
-  ) {
+  importSpace(protoDomain: string, space: ComponentSpace, privateUse: boolean) {
     this._$importedSpaces[protoDomain] = {
       space,
       privateUse,
@@ -224,7 +211,9 @@ export class ComponentSpace {
     const { domain, absPath } = normalizeUrl(path, basePath)
     const comp = this.getComponent(absPath, true, domain)
     if (!comp) {
-      throw new Error(`There is no component "${absPath}" in the space and no default component can be used`)
+      throw new Error(
+        `There is no component "${absPath}" in the space and no default component can be used`,
+      )
     }
     return comp
   }
@@ -296,10 +285,7 @@ export class ComponentSpace {
   }
 
   /** @internal */
-  _$getBehavior(
-    absPath: string,
-    domain: string | null = null,
-  ): GeneralBehavior | undefined {
+  _$getBehavior(absPath: string, domain: string | null = null): GeneralBehavior | undefined {
     let list: { [is: string]: GeneralBehavior } | undefined
     if (domain) {
       const target = this._$importedSpaces[domain]
@@ -328,7 +314,7 @@ export class ComponentSpace {
     TMethod extends MethodList,
   >(
     def: ComponentParams<TData, TProperty, TMethod> &
-    ThisType<ComponentInstance<TData, TProperty, TMethod>>,
+      ThisType<ComponentInstance<TData, TProperty, TMethod>>,
   ): ComponentDefinition<TData, TProperty, TMethod> {
     const is = def.is
     const ret = new BehaviorBuilder(is, this).definition(def).registerComponent()
@@ -359,14 +345,7 @@ export class ComponentSpace {
    *
    * This API is generally designed for adapters which require special method callers.
    */
-  defineWithMethodCaller(is?: string): BehaviorBuilder<
-    Empty,
-    Empty,
-    Empty,
-    Empty,
-    never,
-    never
-  > {
+  defineWithMethodCaller(is?: string): BehaviorBuilder<Empty, Empty, Empty, Empty, never, never> {
     return new BehaviorBuilder(is, this)
   }
 
@@ -420,10 +399,7 @@ export class ComponentSpace {
   }
 
   /** @internal */
-  _$componentWaitingList(
-    path: string,
-    relPath: string,
-  ): ComponentWaitingList | null {
+  _$componentWaitingList(path: string, relPath: string): ComponentWaitingList | null {
     const { domain, absPath } = normalizeUrl(path, relPath)
     let waiting: {
       [path: string]: ComponentWaitingList
@@ -535,15 +511,13 @@ export class ComponentSpace {
    * Optionally, the trait behavior can add a conversion function.
    * This function can convert the implementation to another interface.
    */
-  defineTraitBehavior<TIn extends { [key: string]: any }>(): TraitBehavior<TIn, TIn>;
-  defineTraitBehavior<
-    TIn extends { [key: string]: any },
-    TOut extends { [key: string]: any },
-  >(trans: (impl: TIn) => TOut): TraitBehavior<TIn, TOut>;
-  defineTraitBehavior<
-    TIn extends { [key: string]: any },
-    TOut extends { [key: string]: any },
-  >(trans?: (impl: TIn) => TOut): TraitBehavior<TIn, TOut> {
+  defineTraitBehavior<TIn extends { [key: string]: any }>(): TraitBehavior<TIn, TIn>
+  defineTraitBehavior<TIn extends { [key: string]: any }, TOut extends { [key: string]: any }>(
+    trans: (impl: TIn) => TOut,
+  ): TraitBehavior<TIn, TOut>
+  defineTraitBehavior<TIn extends { [key: string]: any }, TOut extends { [key: string]: any }>(
+    trans?: (impl: TIn) => TOut,
+  ): TraitBehavior<TIn, TOut> {
     return new TraitBehavior<TIn, TOut>(this, trans)
   }
 }

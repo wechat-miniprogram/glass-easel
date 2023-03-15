@@ -1,17 +1,9 @@
 /* eslint-disable class-methods-use-this */
 /* global window, document */
 
-import {
-  EventOptions,
-  EventBubbleStatus,
-} from '../event'
-import {
-  safeCallback,
-} from '../func_arr'
-import {
-  BackendMode,
-  BoundingClientRect,
-} from './mode'
+import { EventOptions, EventBubbleStatus } from '../event'
+import { safeCallback } from '../func_arr'
+import { BackendMode, BoundingClientRect } from './mode'
 
 export interface Context {
   mode: BackendMode.Domlike
@@ -30,12 +22,14 @@ export interface Context {
     createTextNode(content: string): Element
     createDocumentFragment(): Element
   }
-  onEvent(listener: (
-    target: unknown,
-    type: string,
-    detail: unknown,
-    options: EventOptions,
-  ) => EventBubbleStatus): void
+  onEvent(
+    listener: (
+      target: unknown,
+      type: string,
+      detail: unknown,
+      options: EventOptions,
+    ) => EventBubbleStatus,
+  ): void
   setElementEventDefaultPrevented(element: Element, type: string, enabled: boolean): void
 }
 
@@ -64,12 +58,12 @@ export interface Element {
     type: K,
     listener: (this: HTMLElement, ev: HTMLElementEventMap[K]) => unknown,
     options?: boolean | AddEventListenerOptions,
-  ): void;
+  ): void
   addEventListener(
     type: string,
     listener: EventListenerOrEventListenerObject,
     options?: boolean | AddEventListenerOptions,
-  ): void;
+  ): void
 }
 
 const DELEGATE_EVENTS = [
@@ -147,12 +141,7 @@ export class CurrentWindowBackendContext implements Context {
 
   render(cb: (err: Error | null) => void) {
     window.requestAnimationFrame(() => {
-      safeCallback(
-        'Render Callback',
-        cb,
-        this,
-        [null],
-      )
+      safeCallback('Render Callback', cb, this, [null])
     })
   }
 
@@ -160,12 +149,14 @@ export class CurrentWindowBackendContext implements Context {
     return document.body as unknown as Element
   }
 
-  onEvent(listener: (
-    target: any,
-    type: string,
-    detail: any,
-    options: EventOptions,
-  ) => EventBubbleStatus | void) {
+  onEvent(
+    listener: (
+      target: any,
+      type: string,
+      detail: any,
+      options: EventOptions,
+    ) => EventBubbleStatus | void,
+  ) {
     if (!this._$eventListener) {
       this._$initEvent()
     }
@@ -187,13 +178,7 @@ export class CurrentWindowBackendContext implements Context {
     return detail
   }
 
-  private _$trigger(
-    ev: Event,
-    type: string,
-    detail: unknown,
-    bubbles: boolean,
-    composed: boolean,
-  ) {
+  private _$trigger(ev: Event, type: string, detail: unknown, bubbles: boolean, composed: boolean) {
     if (!this._$eventListener) return
     const target = ev.target
     const bubbleStatus = this._$eventListener(target, type, detail, {
@@ -209,13 +194,13 @@ export class CurrentWindowBackendContext implements Context {
   private _$initEvent() {
     const TAP_DIST = 10
 
-    const possibleTaps = Object.create(null) as { [id: number]: { x: number, y: number } }
+    const possibleTaps = Object.create(null) as { [id: number]: { x: number; y: number } }
     const SIMULATED_MOUSE_ID = -1
     let disableMouseEvents = false
 
     const handleTapStart = (
       _ev: Event,
-      t: { identifier: number, clientX: number, clientY: number },
+      t: { identifier: number; clientX: number; clientY: number },
     ) => {
       possibleTaps[t.identifier] = {
         x: t.clientX,
@@ -225,15 +210,12 @@ export class CurrentWindowBackendContext implements Context {
 
     const handleTapMove = (
       ev: Event,
-      t: { identifier: number, clientX: number, clientY: number },
+      t: { identifier: number; clientX: number; clientY: number },
     ) => {
       const id = t.identifier
       if (possibleTaps[id]) {
         const u = possibleTaps[id]!
-        if (
-          Math.abs(u.x - t.clientX) > TAP_DIST
-          || Math.abs(u.y - t.clientY) > TAP_DIST
-        ) {
+        if (Math.abs(u.x - t.clientX) > TAP_DIST || Math.abs(u.y - t.clientY) > TAP_DIST) {
           delete possibleTaps[id]
           this._$trigger(ev, 'canceltap', u, true, true)
         }
@@ -242,16 +224,13 @@ export class CurrentWindowBackendContext implements Context {
 
     const handleTapEnd = (
       ev: Event,
-      t: { identifier: number, clientX: number, clientY: number },
+      t: { identifier: number; clientX: number; clientY: number },
     ) => {
       const id = t.identifier
       if (possibleTaps[id]) {
         const u = possibleTaps[id]!
         delete possibleTaps[id]
-        if (
-          Math.abs(u.x - t.clientX) > TAP_DIST
-          || Math.abs(u.y - t.clientY) > TAP_DIST
-        ) {
+        if (Math.abs(u.x - t.clientX) > TAP_DIST || Math.abs(u.y - t.clientY) > TAP_DIST) {
           this._$trigger(ev, 'canceltap', u, true, true)
         } else {
           this._$trigger(ev, 'tap', u, true, true)
@@ -261,7 +240,7 @@ export class CurrentWindowBackendContext implements Context {
 
     const handleTapCancel = (
       ev: Event,
-      t: { identifier: number, clientX: number, clientY: number },
+      t: { identifier: number; clientX: number; clientY: number },
     ) => {
       const id = t.identifier
       if (possibleTaps[id]) {
@@ -271,62 +250,90 @@ export class CurrentWindowBackendContext implements Context {
       }
     }
 
-    document.body.addEventListener('touchstart', (ev) => {
-      this._$trigger(ev, 'touchstart', this._$getEventDetail(ev), ev.bubbles, ev.composed)
-      disableMouseEvents = true
-      const changedTouches = ev.changedTouches
-      for (let i = 0; i < changedTouches.length; i += 1) {
-        handleTapStart(ev, changedTouches[i]!)
-      }
-    }, { capture: true })
-    document.body.addEventListener('touchmove', (ev) => {
-      this._$trigger(ev, 'touchmove', this._$getEventDetail(ev), ev.bubbles, ev.composed)
-      const changedTouches = ev.changedTouches
-      for (let i = 0; i < changedTouches.length; i += 1) {
-        handleTapMove(ev, changedTouches[i]!)
-      }
-    }, { capture: true })
-    document.body.addEventListener('touchend', (ev) => {
-      this._$trigger(ev, 'touchend', this._$getEventDetail(ev), ev.bubbles, ev.composed)
-      const changedTouches = ev.changedTouches
-      for (let i = 0; i < changedTouches.length; i += 1) {
-        handleTapEnd(ev, changedTouches[i]!)
-      }
-    }, { capture: true })
-    document.body.addEventListener('touchcancel', (ev) => {
-      this._$trigger(ev, 'touchcancel', this._$getEventDetail(ev), ev.bubbles, ev.composed)
-      const changedTouches = ev.changedTouches
-      for (let i = 0; i < changedTouches.length; i += 1) {
-        handleTapCancel(ev, changedTouches[i]!)
-      }
-    }, { capture: true })
-    document.body.addEventListener('mousedown', (ev) => {
-      this._$trigger(ev, 'mousedown', this._$getEventDetail(ev), ev.bubbles, ev.composed)
-      if (disableMouseEvents) return
-      handleTapStart(ev, {
-        identifier: SIMULATED_MOUSE_ID,
-        clientX: ev.clientX,
-        clientY: ev.clientY,
-      })
-    }, { capture: true })
-    document.body.addEventListener('mousemove', (ev) => {
-      this._$trigger(ev, 'mousemove', this._$getEventDetail(ev), ev.bubbles, ev.composed)
-      if (disableMouseEvents) return
-      handleTapMove(ev, {
-        identifier: SIMULATED_MOUSE_ID,
-        clientX: ev.clientX,
-        clientY: ev.clientY,
-      })
-    }, { capture: true })
-    document.body.addEventListener('mouseup', (ev) => {
-      this._$trigger(ev, 'mouseup', this._$getEventDetail(ev), ev.bubbles, ev.composed)
-      if (disableMouseEvents) return
-      handleTapEnd(ev, {
-        identifier: SIMULATED_MOUSE_ID,
-        clientX: ev.clientX,
-        clientY: ev.clientY,
-      })
-    }, { capture: true })
+    document.body.addEventListener(
+      'touchstart',
+      (ev) => {
+        this._$trigger(ev, 'touchstart', this._$getEventDetail(ev), ev.bubbles, ev.composed)
+        disableMouseEvents = true
+        const changedTouches = ev.changedTouches
+        for (let i = 0; i < changedTouches.length; i += 1) {
+          handleTapStart(ev, changedTouches[i]!)
+        }
+      },
+      { capture: true },
+    )
+    document.body.addEventListener(
+      'touchmove',
+      (ev) => {
+        this._$trigger(ev, 'touchmove', this._$getEventDetail(ev), ev.bubbles, ev.composed)
+        const changedTouches = ev.changedTouches
+        for (let i = 0; i < changedTouches.length; i += 1) {
+          handleTapMove(ev, changedTouches[i]!)
+        }
+      },
+      { capture: true },
+    )
+    document.body.addEventListener(
+      'touchend',
+      (ev) => {
+        this._$trigger(ev, 'touchend', this._$getEventDetail(ev), ev.bubbles, ev.composed)
+        const changedTouches = ev.changedTouches
+        for (let i = 0; i < changedTouches.length; i += 1) {
+          handleTapEnd(ev, changedTouches[i]!)
+        }
+      },
+      { capture: true },
+    )
+    document.body.addEventListener(
+      'touchcancel',
+      (ev) => {
+        this._$trigger(ev, 'touchcancel', this._$getEventDetail(ev), ev.bubbles, ev.composed)
+        const changedTouches = ev.changedTouches
+        for (let i = 0; i < changedTouches.length; i += 1) {
+          handleTapCancel(ev, changedTouches[i]!)
+        }
+      },
+      { capture: true },
+    )
+    document.body.addEventListener(
+      'mousedown',
+      (ev) => {
+        this._$trigger(ev, 'mousedown', this._$getEventDetail(ev), ev.bubbles, ev.composed)
+        if (disableMouseEvents) return
+        handleTapStart(ev, {
+          identifier: SIMULATED_MOUSE_ID,
+          clientX: ev.clientX,
+          clientY: ev.clientY,
+        })
+      },
+      { capture: true },
+    )
+    document.body.addEventListener(
+      'mousemove',
+      (ev) => {
+        this._$trigger(ev, 'mousemove', this._$getEventDetail(ev), ev.bubbles, ev.composed)
+        if (disableMouseEvents) return
+        handleTapMove(ev, {
+          identifier: SIMULATED_MOUSE_ID,
+          clientX: ev.clientX,
+          clientY: ev.clientY,
+        })
+      },
+      { capture: true },
+    )
+    document.body.addEventListener(
+      'mouseup',
+      (ev) => {
+        this._$trigger(ev, 'mouseup', this._$getEventDetail(ev), ev.bubbles, ev.composed)
+        if (disableMouseEvents) return
+        handleTapEnd(ev, {
+          identifier: SIMULATED_MOUSE_ID,
+          clientX: ev.clientX,
+          clientY: ev.clientY,
+        })
+      },
+      { capture: true },
+    )
     const listeners = this._$delegatedEventListeners
     listeners.touchstart = true
     listeners.touchmove = true
@@ -348,9 +355,13 @@ export class CurrentWindowBackendContext implements Context {
       if (this._$delegatedEventListeners[type]) return
       this._$delegatedEventListeners[type] = true
 
-      document.body.addEventListener(type, (ev) => {
-        this._$trigger(ev, type, this._$getEventDetail(ev), ev.bubbles, ev.composed)
-      }, { capture: true })
+      document.body.addEventListener(
+        type,
+        (ev) => {
+          this._$trigger(ev, type, this._$getEventDetail(ev), ev.bubbles, ev.composed)
+        },
+        { capture: true },
+      )
       return
     }
 

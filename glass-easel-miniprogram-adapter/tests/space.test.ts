@@ -21,11 +21,15 @@ describe('define', () => {
     codeSpace.addStyleSheet('app', 'app.css')
     codeSpace.addStyleSheet('path/to/comp', 'path/to/comp.css')
 
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
       <div class="ab">{{a}}-{{b}}</div>
-    `))
+    `),
+    )
 
-    const beh = codeSpace.behavior()
+    const beh = codeSpace
+      .behavior()
       .definition({
         data: {
           a: 123,
@@ -33,7 +37,8 @@ describe('define', () => {
       })
       .register()
 
-    codeSpace.component('path/to/comp')
+    codeSpace
+      .component('path/to/comp')
       .definition({
         behaviors: [beh],
         properties: {
@@ -56,11 +61,14 @@ describe('define', () => {
 
     codeSpace.addComponentStaticConfig('path/to/comp', {})
 
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
       <div>{{a}}-{{b}}-{{c}}</div>
-    `))
+    `),
+    )
 
-    const g = {} as { Behavior: BehaviorConstructor, Component: ComponentConstructor }
+    const g = {} as { Behavior: BehaviorConstructor; Component: ComponentConstructor }
     codeSpace.globalComponentEnv(g, 'path/to/comp', () => {
       const Behavior = g.Behavior
       const Component = g.Component
@@ -87,12 +95,14 @@ describe('define', () => {
         data: () => ({
           c: 789,
         }),
-        observers: [{
-          fields: 'b',
-          observer() {
-            callOrder.push(2)
+        observers: [
+          {
+            fields: 'b',
+            observer() {
+              callOrder.push(2)
+            },
           },
-        }],
+        ],
         created() {
           callOrder.push(3)
         },
@@ -113,10 +123,14 @@ describe('define', () => {
           callOrder.push(7)
         },
         lifetimes: {
-          invalid() { /* empty */ },
+          invalid() {
+            /* empty */
+          },
         },
         pageLifetimes: {
-          invalid() { /* empty */ },
+          invalid() {
+            /* empty */
+          },
         },
         relations: {
           invalid: {
@@ -143,9 +157,12 @@ describe('define', () => {
     const codeSpace = env.createCodeSpace('', true)
     const callOrder = [] as number[]
 
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
       <div>{{a}}-{{b}}</div>
-    `))
+    `),
+    )
 
     codeSpace.componentEnv('path/to/comp', ({ Behavior, Page }) => {
       const beh = Behavior()
@@ -153,8 +170,8 @@ describe('define', () => {
         .lifetime('attached', function () {
           expect(this.hasBehavior(beh)).toBe(true)
           const self = this as unknown as {
-            myMethod: () => number,
-            myData: any,
+            myMethod: () => number
+            myData: any
           }
           expect(self.myMethod()).toBe(123)
           expect(self.myData).toStrictEqual({ myField: 456 })
@@ -193,9 +210,12 @@ describe('define', () => {
         c: true,
       },
     })
-    codeSpace.addCompiledTemplate('comp/a', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'comp/a',
+      tmpl(`
       <c />
-    `))
+    `),
+    )
     codeSpace.componentEnv('comp/a', ({ Component }) => {
       Component().register()
     })
@@ -203,9 +223,12 @@ describe('define', () => {
     codeSpace.addComponentStaticConfig('comp/b', {
       component: true,
     })
-    codeSpace.addCompiledTemplate('comp/b', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'comp/b',
+      tmpl(`
       <span>B</span>
-    `))
+    `),
+    )
     codeSpace.componentEnv('comp/b', ({ Component }) => {
       Component().register()
     })
@@ -216,9 +239,12 @@ describe('define', () => {
         b: '/comp/b',
       },
     })
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
       <a generic:c="b" />
-    `))
+    `),
+    )
     codeSpace.componentEnv('path/to/comp', ({ Component }) => {
       Component().register()
     })
@@ -235,9 +261,12 @@ describe('define', () => {
     codeSpace.addComponentStaticConfig('comp/a', {
       component: true,
     })
-    codeSpace.addCompiledTemplate('comp/a', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'comp/a',
+      tmpl(`
       <div>A</div>
-    `))
+    `),
+    )
     codeSpace.componentEnv('comp/a', ({ Component }) => {
       Component().register()
     })
@@ -251,9 +280,12 @@ describe('define', () => {
         a: 'ph',
       },
     })
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
       <a />
-    `))
+    `),
+    )
     codeSpace.componentEnv('path/to/comp', ({ Component }) => {
       Component().register()
     })
@@ -265,9 +297,12 @@ describe('define', () => {
     codeSpace.addComponentStaticConfig('comp/b', {
       component: true,
     })
-    codeSpace.addCompiledTemplate('comp/b', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'comp/b',
+      tmpl(`
       <span>B</span>
-    `))
+    `),
+    )
     codeSpace.componentEnv('comp/b', ({ Component }) => {
       Component().register()
     })
@@ -279,9 +314,12 @@ describe('define', () => {
     const env = new MiniProgramEnv()
     const codeSpace = env.createCodeSpace('', true)
 
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
       <div>{{_a}}-{{b}}</div>
-    `))
+    `),
+    )
 
     codeSpace.componentEnv('path/to/comp', ({ Component }) => {
       Component()
@@ -308,9 +346,12 @@ describe('define', () => {
       pureDataPattern: '^_',
     })
 
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
       <div>{{_a}}-{{b}}</div>
-    `))
+    `),
+    )
 
     codeSpace.componentEnv('path/to/comp', ({ Component }) => {
       Component()
@@ -338,9 +379,12 @@ describe('define', () => {
       component: true,
       addGlobalClass: true,
     })
-    codeSpace.addCompiledTemplate('child/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'child/comp',
+      tmpl(`
       <div class="def"></div>
-    `))
+    `),
+    )
     codeSpace.componentEnv('child/comp', ({ Component }) => {
       Component()
         .options({
@@ -355,11 +399,14 @@ describe('define', () => {
       },
       addGlobalClass: true,
     })
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
       <div class="abc">
         <child />
       </div>
-    `))
+    `),
+    )
     codeSpace.componentEnv('path/to/comp', ({ Component }) => {
       Component().register()
     })
@@ -367,7 +414,9 @@ describe('define', () => {
     const ab = env.associateBackend()
     ab.registerStyleSheetContent('empty-style-sheet', '')
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
-    expect(domHtml(root.getComponent())).toBe('<div class="abc"><div class="def child-comp--def"></div></div>')
+    expect(domHtml(root.getComponent())).toBe(
+      '<div class="abc"><div class="def child-comp--def"></div></div>',
+    )
   })
 
   test('options styleIsolation shared', () => {
@@ -379,9 +428,12 @@ describe('define', () => {
       component: true,
       styleIsolation: StyleIsolation.Shared,
     })
-    codeSpace.addCompiledTemplate('child/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'child/comp',
+      tmpl(`
       <div class="def"></div>
-    `))
+    `),
+    )
     codeSpace.componentEnv('child/comp', ({ Component }) => {
       Component()
         .options({
@@ -397,11 +449,14 @@ describe('define', () => {
       },
       styleIsolation: StyleIsolation.PageShared,
     })
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
       <div class="abc">
         <child />
       </div>
-    `))
+    `),
+    )
     codeSpace.componentEnv('path/to/comp', ({ Component }) => {
       Component().register()
     })
@@ -421,9 +476,12 @@ describe('define', () => {
       component: true,
       styleIsolation: StyleIsolation.ApplyShared,
     })
-    codeSpace.addCompiledTemplate('child/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'child/comp',
+      tmpl(`
       <div class="def"></div>
-    `))
+    `),
+    )
     codeSpace.componentEnv('child/comp', ({ Component }) => {
       Component()
         .options({
@@ -439,11 +497,14 @@ describe('define', () => {
       },
       styleIsolation: StyleIsolation.PageApplyShared,
     })
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
       <div class="abc">
         <child />
       </div>
-    `))
+    `),
+    )
     codeSpace.componentEnv('path/to/comp', ({ Component }) => {
       Component().register()
     })
@@ -451,7 +512,9 @@ describe('define', () => {
     const ab = env.associateBackend()
     ab.registerStyleSheetContent('empty-style-sheet', '')
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
-    expect(domHtml(root.getComponent())).toBe('<div class="abc comp--abc"><div class="def child-comp--def"></div></div>')
+    expect(domHtml(root.getComponent())).toBe(
+      '<div class="abc comp--abc"><div class="def child-comp--def"></div></div>',
+    )
   })
 
   test('options styleIsolation isolated', () => {
@@ -463,9 +526,12 @@ describe('define', () => {
       component: true,
       styleIsolation: StyleIsolation.Isolated,
     })
-    codeSpace.addCompiledTemplate('child/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'child/comp',
+      tmpl(`
       <div class="def"></div>
-    `))
+    `),
+    )
     codeSpace.componentEnv('child/comp', ({ Component }) => {
       Component()
         .options({
@@ -481,11 +547,14 @@ describe('define', () => {
       },
       styleIsolation: StyleIsolation.PageIsolated,
     })
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
       <div class="abc">
         <child />
       </div>
-    `))
+    `),
+    )
     codeSpace.componentEnv('path/to/comp', ({ Component }) => {
       Component().register()
     })
@@ -493,7 +562,9 @@ describe('define', () => {
     const ab = env.associateBackend()
     ab.registerStyleSheetContent('empty-style-sheet', '')
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
-    expect(domHtml(root.getComponent())).toBe('<div class="comp--abc"><div class="child-comp--def"></div></div>')
+    expect(domHtml(root.getComponent())).toBe(
+      '<div class="comp--abc"><div class="child-comp--def"></div></div>',
+    )
   })
 
   test('options dataDeepCopy', () => {
@@ -530,9 +601,12 @@ describe('define', () => {
     codeSpace.addComponentStaticConfig('child/comp', {
       component: true,
     })
-    codeSpace.addCompiledTemplate('child/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'child/comp',
+      tmpl(`
       <div class="def"></div>
-    `))
+    `),
+    )
     // eslint-disable-next-line arrow-body-style
     const childDef = codeSpace.componentEnv('child/comp', ({ Component }) => {
       return Component()
@@ -551,9 +625,12 @@ describe('define', () => {
       },
       styleIsolation: StyleIsolation.PageIsolated,
     })
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
       <child id="c" p="{{a}}" />
-    `))
+    `),
+    )
     codeSpace.componentEnv('path/to/comp', ({ Component }) => {
       Component()
         .options({
@@ -585,17 +662,22 @@ describe('define', () => {
     const env = new MiniProgramEnv()
     const codeSpace = env.createCodeSpace('', true)
 
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
       <div>{{a}}-{{b}}</div>
-    `))
+    `),
+    )
 
-    const beh = codeSpace.behavior()
+    const beh = codeSpace
+      .behavior()
       .data(() => ({
         a: 123,
       }))
       .register()
 
-    const filterBeh = codeSpace.behavior()
+    const filterBeh = codeSpace
+      .behavior()
       .behavior(beh)
       .definition({
         definitionFilter: (def: types.GeneralComponentDefinition) => {
@@ -605,7 +687,8 @@ describe('define', () => {
       })
       .register()
 
-    codeSpace.component('path/to/comp')
+    codeSpace
+      .component('path/to/comp')
       .definition({
         behaviors: [filterBeh],
       })
@@ -620,17 +703,22 @@ describe('define', () => {
     const env = new MiniProgramEnv()
     const codeSpace = env.createCodeSpace('', true)
 
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
       <div>{{a}}-{{b}}</div>
-    `))
+    `),
+    )
 
-    const beh = codeSpace.behavior()
+    const beh = codeSpace
+      .behavior()
       .data(() => ({
         a: 123,
       }))
       .register()
 
-    codeSpace.component('path/to/comp')
+    codeSpace
+      .component('path/to/comp')
       .behavior(beh)
       .data(() => ({
         b: 456,
@@ -646,13 +734,17 @@ describe('define', () => {
     const env = new MiniProgramEnv()
     const codeSpace = env.createCodeSpace('', true)
 
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
       <div>{{a}}-{{b}}</div>
-    `))
+    `),
+    )
 
     type TAdd = { data: <T>(this: T) => T }
     type TRemove = 'data' | 'property'
-    const beh = codeSpace.behavior()
+    const beh = codeSpace
+      .behavior()
       .chainingFilter<TAdd, TRemove>((chain) => {
         const oldData = chain.data.bind(chain)
         const newData = function () {
@@ -667,7 +759,8 @@ describe('define', () => {
       })
       .register()
 
-    codeSpace.component('path/to/comp')
+    codeSpace
+      .component('path/to/comp')
       .data(() => ({
         b: 456,
       }))
@@ -687,9 +780,12 @@ describe('define', () => {
     codeSpace.addComponentStaticConfig('child/comp', {
       component: true,
     })
-    codeSpace.addCompiledTemplate('child/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'child/comp',
+      tmpl(`
       <div class="a-class"></div>
-    `))
+    `),
+    )
     codeSpace.componentEnv('child/comp', ({ Component }) => {
       Component()
         .options({
@@ -704,11 +800,14 @@ describe('define', () => {
         child: '/child/comp',
       },
     })
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
       <div class="abc">
         <child a-class="def" />
       </div>
-    `))
+    `),
+    )
     codeSpace.componentEnv('path/to/comp', ({ Component }) => {
       Component().register()
     })
@@ -747,9 +846,12 @@ describe('define', () => {
         child: '/child/comp',
       },
     })
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
       <child id="c" />
-    `))
+    `),
+    )
     // eslint-disable-next-line arrow-body-style
     const parentType = codeSpace.componentEnv('path/to/comp', ({ Component }) => {
       return Component()
@@ -778,9 +880,12 @@ describe('define', () => {
     codeSpace.addComponentStaticConfig('child/comp', {
       component: true,
     })
-    codeSpace.addCompiledTemplate('child/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'child/comp',
+      tmpl(`
       <span>{{aa}}</span>
-    `))
+    `),
+    )
     codeSpace.componentEnv('child/comp', ({ Component }) => {
       Component()
         .options({
@@ -803,9 +908,12 @@ describe('define', () => {
         child: '/child/comp',
       },
     })
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
       <child a="{{bb}}" />
-    `))
+    `),
+    )
     codeSpace.componentEnv('path/to/comp', ({ Component }) => {
       Component()
         .data(() => ({
@@ -837,9 +945,12 @@ describe('define', () => {
     codeSpace.addComponentStaticConfig('child/comp', {
       component: true,
     })
-    codeSpace.addCompiledTemplate('child/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'child/comp',
+      tmpl(`
       <span>{{a}}-{{b}}</span>
-    `))
+    `),
+    )
     codeSpace.componentEnv('child/comp', ({ Component }) => {
       Component()
         .options({
@@ -862,9 +973,12 @@ describe('define', () => {
         child: '/child/comp',
       },
     })
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
       <child a="{{a}}" />
-    `))
+    `),
+    )
     codeSpace.componentEnv('path/to/comp', ({ Component }) => {
       Component()
         .data(() => ({
@@ -890,9 +1004,12 @@ describe('define', () => {
     codeSpace.addComponentStaticConfig('child/list', {
       component: true,
     })
-    codeSpace.addCompiledTemplate('child/list', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'child/list',
+      tmpl(`
       <div>{{count}}</div><slot />
-    `))
+    `),
+    )
     // eslint-disable-next-line arrow-body-style
     const listDef = codeSpace.componentEnv('child/list', ({ Component }) => {
       return Component()
@@ -936,12 +1053,15 @@ describe('define', () => {
         item: '/child/item',
       },
     })
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
       <list>
         <item />
         <item />
       </list>
-    `))
+    `),
+    )
     codeSpace.componentEnv('path/to/comp', ({ Component }) => {
       Component().register()
     })

@@ -13,23 +13,14 @@ import {
   GeneralComponent,
 } from '..'
 import { DataChange } from '../data_proxy'
-import {
-  ProcGenEnv,
-  ProcGen,
-  BindingMapGen,
-} from './proc_gen_wrapper'
-import {
-  ProcGenWrapperDom,
-} from './proc_gen_wrapper_dom'
-import {
-  ComponentTemplate,
-  ProcGenGroupList,
-} from './index'
+import { ProcGenEnv, ProcGen, BindingMapGen } from './proc_gen_wrapper'
+import { ProcGenWrapperDom } from './proc_gen_wrapper_dom'
+import { ComponentTemplate, ProcGenGroupList } from './index'
 
 type ElementWithEvent = Element & {
   _$wxTmplEv: { [ev: string]: (event: ShadowedEvent<unknown>) => unknown }
 }
-export type ExternalEvent = Event<unknown> & { target: Element, currentTarget: Element }
+export type ExternalEvent = Event<unknown> & { target: Element; currentTarget: Element }
 
 const DEFAULT_PROC_GEN_DOM: ProcGen = () => ({
   C: (isCreation, defineTextNode, defineElement, defineIfGroup, defineForLoop, defineSlot) => {
@@ -46,11 +37,11 @@ export class GlassEaselTemplateDOM implements templateEngine.Template {
   updateMode: string
   methods: { [name: string]: GeneralFuncType }
 
-  constructor(
-    behavior: GeneralBehavior,
-  ) {
+  constructor(behavior: GeneralBehavior) {
     if (typeof behavior._$template !== 'object' && behavior._$template !== undefined) {
-      throw new Error(`Component template of ${behavior.is} must be a valid compiled template (or "null" for default template).`)
+      throw new Error(
+        `Component template of ${behavior.is} must be a valid compiled template (or "null" for default template).`,
+      )
     } else {
       const c = (behavior._$template as ComponentTemplate | null | undefined) || {
         content: DEFAULT_PROC_GEN_GROUP_DOM,
@@ -64,15 +55,14 @@ export class GlassEaselTemplateDOM implements templateEngine.Template {
     this.methods = behavior._$methodMap
   }
 
-  createInstance(
-    comp: GeneralComponent,
-  ): templateEngine.TemplateInstance {
+  createInstance(comp: GeneralComponent): templateEngine.TemplateInstance {
     return new GlassEaselTemplateDOMInstance(this, comp)
   }
 }
 
 export class GlassEaselTemplateDOMInstance
-implements templateEngine.TemplateInstance, ExternalShadowRoot {
+  implements templateEngine.TemplateInstance, ExternalShadowRoot
+{
   template: GlassEaselTemplateDOM
   comp: GeneralComponent
   shadowRoot: ExternalShadowRoot
@@ -86,11 +76,15 @@ implements templateEngine.TemplateInstance, ExternalShadowRoot {
 
   constructor(template: GlassEaselTemplateDOM, comp: GeneralComponent) {
     if (comp.getBackendMode() !== BackendMode.Domlike) {
-      throw new Error(`Component template of ${comp.is} cannot be initialized since external rendering is only supported in Domlike backend currently.`)
+      throw new Error(
+        `Component template of ${comp.is} cannot be initialized since external rendering is only supported in Domlike backend currently.`,
+      )
     }
     const shadowRootElement = comp.getBackendElement() as unknown as Element
     if (!shadowRootElement) {
-      throw new Error(`Component template of ${comp.is} cannot be initialized as external components since no suitable backend element found.`)
+      throw new Error(
+        `Component template of ${comp.is} cannot be initialized as external components since no suitable backend element found.`,
+      )
     }
     this.comp = comp
     this.shadowRoot = this
@@ -104,15 +98,15 @@ implements templateEngine.TemplateInstance, ExternalShadowRoot {
     this.listeners = []
   }
 
-  initValues(
-    data: DataValue,
-  ) {
+  initValues(data: DataValue) {
     this.bindingMapGen = this.procGenWrapper.create(data)
     if (!this.bindingMapGen) {
-      throw new Error('The component template does not support binding-map-update, so it cannot be used as external components.')
+      throw new Error(
+        'The component template does not support binding-map-update, so it cannot be used as external components.',
+      )
     }
     const shadowRoot = this.shadowRootElement
-    if (this.slot as unknown as Element === shadowRoot && shadowRoot.childNodes.length > 0) {
+    if ((this.slot as unknown as Element) === shadowRoot && shadowRoot.childNodes.length > 0) {
       // if `<slot />` is forgot, add one at the end of the child list
       const slot = document.createElement('virtual')
       shadowRoot.appendChild(slot)
@@ -124,10 +118,7 @@ implements templateEngine.TemplateInstance, ExternalShadowRoot {
     return this.idMap as unknown as { [key: string]: GeneralBackendElement }
   }
 
-  updateValues(
-    data: DataValue,
-    changes: DataChange[],
-  ) {
+  updateValues(data: DataValue, changes: DataChange[]) {
     const bindingMapGen = this.bindingMapGen!
     for (let i = 0; i < changes.length; i += 1) {
       const [path] = changes[i]!

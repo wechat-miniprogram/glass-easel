@@ -169,18 +169,26 @@ describe('event bindings', () => {
       },
     })
 
-    const parentElem = glassEasel.Component.createWithContext(
-      'root',
-      parent,
-      domBackend,
-    )
+    const parentElem = glassEasel.Component.createWithContext('root', parent, domBackend)
     const singleElem = parentElem.$.s as glassEasel.Element
     const multiElem = parentElem.$.m as glassEasel.Element
     const dynamicElem = parentElem.$.d as glassEasel.Element
 
-    glassEasel.Event.triggerEvent(singleElem, 'customEv', null, { bubbles: true, composed: true, capturePhase: true })
-    glassEasel.Event.triggerEvent(multiElem, 'customEv', null, { bubbles: true, composed: true, capturePhase: true })
-    glassEasel.Event.triggerEvent(dynamicElem, 'customEv', null, { bubbles: true, composed: true, capturePhase: true })
+    glassEasel.Event.triggerEvent(singleElem, 'customEv', null, {
+      bubbles: true,
+      composed: true,
+      capturePhase: true,
+    })
+    glassEasel.Event.triggerEvent(multiElem, 'customEv', null, {
+      bubbles: true,
+      composed: true,
+      capturePhase: true,
+    })
+    glassEasel.Event.triggerEvent(dynamicElem, 'customEv', null, {
+      bubbles: true,
+      composed: true,
+      capturePhase: true,
+    })
 
     expect(ops).toEqual([
       'p0c',

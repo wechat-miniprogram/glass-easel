@@ -1,15 +1,7 @@
-import {
-  Element,
-} from './element'
-import {
-  TextNode,
-} from './text_node'
-import {
-  Component,
-} from './component'
-import {
-  Node,
-} from './node'
+import { Element } from './element'
+import { TextNode } from './text_node'
+import { Component } from './component'
+import { Node } from './node'
 
 /** The iterator direction and order */
 export const enum ElementIteratorType {
@@ -56,31 +48,31 @@ export class ElementIterator {
     this._$node = node
     this._$nodeTypeLimit = nodeTypeLimit || Element
     if (
-      type === ElementIteratorType.ShadowAncestors
-      || type === ElementIteratorType.ShadowDescendantsRootFirst
-      || type === ElementIteratorType.ShadowDescendantsRootLast
+      type === ElementIteratorType.ShadowAncestors ||
+      type === ElementIteratorType.ShadowDescendantsRootFirst ||
+      type === ElementIteratorType.ShadowDescendantsRootLast
     ) {
       this._$composed = false
     } else if (
-      type === ElementIteratorType.ComposedAncestors
-      || type === ElementIteratorType.ComposedDescendantsRootFirst
-      || type === ElementIteratorType.ComposedDescendantsRootLast
+      type === ElementIteratorType.ComposedAncestors ||
+      type === ElementIteratorType.ComposedDescendantsRootFirst ||
+      type === ElementIteratorType.ComposedDescendantsRootLast
     ) {
       this._$composed = true
     } else {
       throw new Error(`Unrecognized iterator type "${String(type)}"`)
     }
     if (
-      type === ElementIteratorType.ShadowAncestors
-      || type === ElementIteratorType.ComposedAncestors
+      type === ElementIteratorType.ShadowAncestors ||
+      type === ElementIteratorType.ComposedAncestors
     ) {
       this._$isAncestor = true
     } else {
       this._$isAncestor = false
     }
     if (
-      type === ElementIteratorType.ShadowDescendantsRootFirst
-      || type === ElementIteratorType.ComposedDescendantsRootFirst
+      type === ElementIteratorType.ShadowDescendantsRootFirst ||
+      type === ElementIteratorType.ComposedDescendantsRootFirst
     ) {
       this._$rootFirst = true
     } else {

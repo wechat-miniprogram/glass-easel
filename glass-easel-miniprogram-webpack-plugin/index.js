@@ -58,7 +58,9 @@ class StyleSheetManager {
 
   toCodeString() {
     const arr = Object.entries(this.map).map(([compPath, { srcPath }]) => {
-      const s = `backend.registerStyleSheetContent('${escapeJsString(compPath)}', require('${escapeJsString(srcPath)}'));`
+      const s = `backend.registerStyleSheetContent('${escapeJsString(
+        compPath,
+      )}', require('${escapeJsString(srcPath)}'));`
       return s
     })
     return `
@@ -97,7 +99,9 @@ class GlassEaselMiniprogramWebpackPlugin {
         if (parsed && (parsed.component === true || typeof parsed.usingComponents === 'object')) {
           staticConfig = parsed
         }
-      } catch (e) { /* empty */ }
+      } catch (e) {
+        /* empty */
+      }
       return staticConfig
     }
 
@@ -155,7 +159,9 @@ class GlassEaselMiniprogramWebpackPlugin {
                 )
                 return
               }
-            } catch (e) { /* empty */ }
+            } catch (e) {
+              /* empty */
+            }
             try {
               const jsFileStat = await fs.stat(path.join(codeRoot, `${compPath}.js`))
               if (jsFileStat.isFile()) {
@@ -165,7 +171,9 @@ class GlassEaselMiniprogramWebpackPlugin {
                 }
                 return
               }
-            } catch (e) { /* empty */ }
+            } catch (e) {
+              /* empty */
+            }
           }
         }
 
@@ -240,32 +248,36 @@ class GlassEaselMiniprogramWebpackPlugin {
     })
 
     // rewrite component entry paths
-    compiler.resolverFactory.hooks.resolver
-      .for('normal')
-      .tap(PLUGIN_NAME, (resolver) => {
-        resolver.hooks.result.tap(PLUGIN_NAME, (data) => {
-          const absPath = data.path
-          const extName = path.extname(absPath)
-          if (extName === '.js' || extName === '.ts') {
-            const relPath = normalizePath(absPath)
-            if (relPath && params.compInfoMap[relPath.slice(0, -3)]) {
-              const redirected = `${absPath.slice(0, -3)}.component`
-              if (data.context.issuer !== redirected) {
-                data.path = redirected
-              }
+    compiler.resolverFactory.hooks.resolver.for('normal').tap(PLUGIN_NAME, (resolver) => {
+      resolver.hooks.result.tap(PLUGIN_NAME, (data) => {
+        const absPath = data.path
+        const extName = path.extname(absPath)
+        if (extName === '.js' || extName === '.ts') {
+          const relPath = normalizePath(absPath)
+          if (relPath && params.compInfoMap[relPath.slice(0, -3)]) {
+            const redirected = `${absPath.slice(0, -3)}.component`
+            if (data.context.issuer !== redirected) {
+              data.path = redirected
             }
           }
-          return data
-        })
+        }
+        return data
       })
+    })
 
     // add loaders
     compiler.hooks.compilation.tap(PLUGIN_NAME, (compilation) => {
-      webpack.NormalModule.getCompilationHooks(compilation).beforeLoaders
-        .tap(PLUGIN_NAME, (loaders, mod) => {
+      webpack.NormalModule.getCompilationHooks(compilation).beforeLoaders.tap(
+        PLUGIN_NAME,
+        (loaders, mod) => {
           const absPath = mod.resource
           const extName = path.extname(absPath)
-          if (extName === '.ts' || extName === '.js' || extName === '.wxml' || extName === '.wxss') {
+          if (
+            extName === '.ts' ||
+            extName === '.js' ||
+            extName === '.wxml' ||
+            extName === '.wxss'
+          ) {
             const relPath = path.relative(codeRoot, absPath).split(path.sep).join('/')
             const compPath = relPath.slice(0, -extName.length)
             if (params.compInfoMap[compPath] || compPath === 'app') {
@@ -281,7 +293,8 @@ class GlassEaselMiniprogramWebpackPlugin {
               }
             }
           }
-        })
+        },
+      )
     })
 
     // collect virtual files
@@ -308,7 +321,9 @@ class GlassEaselMiniprogramWebpackPlugin {
               '${escapeJsString(compPath)}',
               ${scopeNameStr},
             )
-            index.codeSpace.globalComponentEnv(index.globalObject, '${escapeJsString(compPath)}', () => {
+            index.codeSpace.globalComponentEnv(index.globalObject, '${escapeJsString(
+              compPath,
+            )}', () => {
               require('./${escapeJsString(path.basename(compInfo.main))}')
             })
           `,
@@ -344,7 +359,9 @@ class GlassEaselMiniprogramWebpackPlugin {
         })()
       `
       const entryFooter = `
-        var root = ab.createRoot('glass-easel-root', codeSpace, '${escapeJsString(this.defaultEntry)}')
+        var root = ab.createRoot('glass-easel-root', codeSpace, '${escapeJsString(
+          this.defaultEntry,
+        )}')
         var placeholder = document.createElement('span')
         document.body.appendChild(placeholder)
         root.attach(document.body, placeholder)
@@ -353,14 +370,18 @@ class GlassEaselMiniprogramWebpackPlugin {
       if (params.appEntry) entries.unshift(params.appEntry)
       virtualModules.writeModule(
         `${codeRoot}/index.js`,
-        entryHeader + entries.map((p) => `require('./${escapeJsString(p)}')\n`).join('') + entryFooter,
+        entryHeader +
+          entries.map((p) => `require('./${escapeJsString(p)}')\n`).join('') +
+          entryFooter,
       )
 
       // copy res files
       compilation.hooks.additionalAssets.tapPromise(PLUGIN_NAME, async () => {
-        await Promise.all(Object.keys(params.resPathMap).map(async (p) => {
-          compilation.assets[p] = new RawSource(await fs.readFile(path.join(codeRoot, p)))
-        }))
+        await Promise.all(
+          Object.keys(params.resPathMap).map(async (p) => {
+            compilation.assets[p] = new RawSource(await fs.readFile(path.join(codeRoot, p)))
+          }),
+        )
       })
     })
   }

@@ -1,13 +1,8 @@
 import * as backend from './backend/backend_protocol'
 import * as composedBackend from './backend/composed_backend_protocol'
 import * as domlikeBackend from './backend/domlike_backend_protocol'
-import {
-  globalOptions,
-} from './global_options'
-import {
-  MutationObserverChildEvent,
-  MutationObserverTarget,
-} from './mutation_observer'
+import { globalOptions } from './global_options'
+import { MutationObserverChildEvent, MutationObserverTarget } from './mutation_observer'
 import {
   Event,
   EventListener,
@@ -16,18 +11,9 @@ import {
   EventTarget,
   FinalChanged,
 } from './event'
-import {
-  triggerWarning,
-} from './func_arr'
-import {
-  ParsedSelector,
-} from './selector'
-import {
-  BM,
-  BackendMode,
-  BoundingClientRect,
-  ScrollOffset,
-} from './backend/mode'
+import { triggerWarning } from './func_arr'
+import { ParsedSelector } from './selector'
+import { BM, BackendMode, BoundingClientRect, ScrollOffset } from './backend/mode'
 import {
   GeneralComponentInstance,
   DataList,
@@ -185,7 +171,7 @@ export class Element implements NodeCast {
           const e = this._$backendElement as domlikeBackend.Element | null
           if (e) e.id = val
         } else {
-          (this._$backendElement as backend.Element | composedBackend.Element | null)?.setId(val)
+          ;(this._$backendElement as backend.Element | composedBackend.Element | null)?.setId(val)
         }
       }
     }
@@ -215,7 +201,7 @@ export class Element implements NodeCast {
     }
     this._$nodeSlot = newSlot
     if (BM.SHADOW || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Shadow)) {
-      (this._$backendElement as backend.Element).setSlot(newSlot, this._$inheritSlots)
+      ;(this._$backendElement as backend.Element).setSlot(newSlot, this._$inheritSlots)
     } else {
       const parent = this.parentNode
       if (parent) {
@@ -226,13 +212,17 @@ export class Element implements NodeCast {
         if (slotParent instanceof Component && !slotParent._$external) {
           const slotParentShadowRoot = slotParent.shadowRoot as ShadowRoot
           if (slotParentShadowRoot.isDynamicSlots()) {
-            triggerWarning('nodes inside dynamic slots should change binding slots through Element#setSlotElement.')
+            triggerWarning(
+              'nodes inside dynamic slots should change binding slots through Element#setSlotElement.',
+            )
             return
           }
-          const oldSlotElement = slotParentShadowRoot
-            .getSlotElementFromName(oldSlot) as Element | null
-          const newSlotElement = slotParentShadowRoot
-            .getSlotElementFromName(newSlot) as Element | null
+          const oldSlotElement = slotParentShadowRoot.getSlotElementFromName(
+            oldSlot,
+          ) as Element | null
+          const newSlotElement = slotParentShadowRoot.getSlotElementFromName(
+            newSlot,
+          ) as Element | null
           Element.insertChildReassignComposed(
             parent,
             this,
@@ -252,8 +242,8 @@ export class Element implements NodeCast {
     }
   }
 
-  get attributes(): { name: string, value: unknown }[] {
-    const ret: { name: string, value: unknown }[] = []
+  get attributes(): { name: string; value: unknown }[] {
+    const ret: { name: string; value: unknown }[] = []
     if (this._$nodeAttributes) {
       Object.entries(this._$nodeAttributes).forEach(([name, value]) => {
         ret.push({
@@ -309,11 +299,7 @@ export class Element implements NodeCast {
     return null
   }
 
-  asInstanceOf<
-    UData extends DataList,
-    UProperty extends PropertyList,
-    UMethod extends MethodList,
-  >(
+  asInstanceOf<UData extends DataList, UProperty extends PropertyList, UMethod extends MethodList>(
     componentDefinition: ComponentDefinition<UData, UProperty, UMethod>,
   ): ComponentInstance<UData, UProperty, UMethod> | null {
     if (this instanceof Component) {
@@ -341,7 +327,7 @@ export class Element implements NodeCast {
   destroyBackendElement() {
     if (this._$backendElement) {
       if (!(BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike))) {
-        (this._$backendElement as backend.Element | composedBackend.Element).release()
+        ;(this._$backendElement as backend.Element | composedBackend.Element).release()
       }
       this._$backendElement = null
     }
@@ -364,9 +350,9 @@ export class Element implements NodeCast {
     const style = this._$styleSegments.join(';')
     if (this._$backendElement) {
       if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
-        (this._$backendElement as domlikeBackend.Element).setAttribute('style', style)
+        ;(this._$backendElement as domlikeBackend.Element).setAttribute('style', style)
       } else {
-        (this._$backendElement as backend.Element | composedBackend.Element).setStyle(style)
+        ;(this._$backendElement as backend.Element | composedBackend.Element).setStyle(style)
       }
     }
     if (this._$mutationObserverTarget) {
@@ -526,13 +512,7 @@ export class Element implements NodeCast {
       // a special use of composing process:
       // the child node might not be the direct child of the host;
       // there may be slot-inherit nodes between them.
-      Element.insertChildReassignComposed(
-        host,
-        node,
-        oldSlot,
-        newSlot,
-        ideaPosIndex,
-      )
+      Element.insertChildReassignComposed(host, node, oldSlot, newSlot, ideaPosIndex)
     })
   }
 
@@ -545,8 +525,8 @@ export class Element implements NodeCast {
   ) {
     if (oldSlot) {
       if (
-        newSlot
-        && (BM.DOMLIKE || (BM.DYNAMIC && shadowParent.getBackendMode() === BackendMode.Domlike))
+        newSlot &&
+        (BM.DOMLIKE || (BM.DYNAMIC && shadowParent.getBackendMode() === BackendMode.Domlike))
       ) {
         // removal of in-tree elements are not needed for DOM backend
         // do nothing
@@ -557,8 +537,8 @@ export class Element implements NodeCast {
           if (d) {
             const [before, removeCount] = d
             if (
-              BM.DOMLIKE
-              || (BM.DYNAMIC && shadowParent.getBackendContext().mode === BackendMode.Domlike)
+              BM.DOMLIKE ||
+              (BM.DYNAMIC && shadowParent.getBackendContext().mode === BackendMode.Domlike)
             ) {
               const rel = (before as Element)._$backendElement as domlikeBackend.Element
               for (let i = 1; i < removeCount; i += 1) {
@@ -567,7 +547,7 @@ export class Element implements NodeCast {
               }
               if (removeCount > 0) (backendParent as domlikeBackend.Element).removeChild(rel)
             } else {
-              (backendParent as composedBackend.Element).spliceRemove(
+              ;(backendParent as composedBackend.Element).spliceRemove(
                 (before as Element)._$backendElement as composedBackend.Element,
                 removeCount,
               )
@@ -577,13 +557,7 @@ export class Element implements NodeCast {
       }
     }
     if (newSlot) {
-      Element.insertChildComposed(
-        shadowParent,
-        child,
-        undefined,
-        false,
-        ideaPosIndex,
-      )
+      Element.insertChildComposed(shadowParent, child, undefined, false, ideaPosIndex)
     }
   }
 
@@ -608,9 +582,7 @@ export class Element implements NodeCast {
     }
   }
 
-  private static countNonVirtual(
-    target: Node,
-  ): [Node, number] | null {
+  private static countNonVirtual(target: Node): [Node, number] | null {
     let firstNode = null
     let removeCount = 0
     const recRelVirtual = (c: Node) => {
@@ -734,9 +706,10 @@ export class Element implements NodeCast {
         const host = shadowParent.getHostNode()
         cur = host
       } else if (shadowParent instanceof Component && !shadowParent._$external) {
-        const slotElem = slot === null
-          ? (shadowParent.shadowRoot as ShadowRoot).getSlotElementFromName(slotName)
-          : slot
+        const slotElem =
+          slot === null
+            ? (shadowParent.shadowRoot as ShadowRoot).getSlotElementFromName(slotName)
+            : slot
         if (!slotElem) return null
         cur = slotElem as Element
       } else {
@@ -800,11 +773,11 @@ export class Element implements NodeCast {
       // get the new child nodes of the backend
       let frag: composedElement | null = null
       if (newChild) {
-        const f = sharedFrag || (
-          BM.DOMLIKE || (BM.DYNAMIC && context.mode === BackendMode.Domlike)
+        const f =
+          sharedFrag ||
+          (BM.DOMLIKE || (BM.DYNAMIC && context.mode === BackendMode.Domlike)
             ? (context as domlikeBackend.Context).document.createDocumentFragment()
-            : (context as backend.Context | composedBackend.Context).createFragment()
-        )
+            : (context as backend.Context | composedBackend.Context).createFragment())
         sharedFrag = frag
         const recNewVirtual = (c: Node): boolean => {
           if (c instanceof Element && c._$virtual) {
@@ -812,8 +785,9 @@ export class Element implements NodeCast {
           } else {
             // since `TextNode` also has `backendElement` private field, just make it as `Element`
             // domlike backend also
-            (f as composedBackend.Element)
-              .appendChild((c as Element)._$backendElement as composedBackend.Element)
+            ;(f as composedBackend.Element).appendChild(
+              (c as Element)._$backendElement as composedBackend.Element,
+            )
             frag = f
           }
           return true
@@ -856,7 +830,7 @@ export class Element implements NodeCast {
         if (before) {
           if (BM.DOMLIKE || (BM.DYNAMIC && context.mode === BackendMode.Domlike)) {
             const rel = (before as Element)._$backendElement as domlikeBackend.Element
-            (backendParent as domlikeBackend.Element).insertBefore(
+            ;(backendParent as domlikeBackend.Element).insertBefore(
               frag as domlikeBackend.Element,
               rel,
             )
@@ -866,7 +840,7 @@ export class Element implements NodeCast {
             }
             if (removeCount > 0) (backendParent as domlikeBackend.Element).removeChild(rel)
           } else {
-            (backendParent as composedBackend.Element).spliceBefore(
+            ;(backendParent as composedBackend.Element).spliceBefore(
               // since `TextNode` also has `backendElement` private field, just make it as `Element`
               (before as Element)._$backendElement as composedBackend.Element,
               removeCount,
@@ -875,9 +849,11 @@ export class Element implements NodeCast {
           }
         } else {
           if (BM.DOMLIKE || (BM.DYNAMIC && context.mode === BackendMode.Domlike)) {
-            (backendParent as domlikeBackend.Element).appendChild(frag as domlikeBackend.Element)
+            ;(backendParent as domlikeBackend.Element).appendChild(frag as domlikeBackend.Element)
           } else {
-            (backendParent as composedBackend.Element).spliceAppend(frag as composedBackend.Element)
+            ;(backendParent as composedBackend.Element).spliceAppend(
+              frag as composedBackend.Element,
+            )
           }
         }
       } else if (removeCount > 0) {
@@ -889,7 +865,7 @@ export class Element implements NodeCast {
           }
           if (removeCount > 0) (backendParent as domlikeBackend.Element).removeChild(rel)
         } else {
-          (backendParent as composedBackend.Element).spliceRemove(
+          ;(backendParent as composedBackend.Element).spliceRemove(
             // since `TextNode` also has `backendElement` private field, just make it as `Element`
             (before as Element)._$backendElement as composedBackend.Element,
             removeCount,
@@ -903,35 +879,35 @@ export class Element implements NodeCast {
       if (sharedNonVirtualParent === null) {
         // for nodes with no valid non-virtual parent, do nothing
       } else if (
-        !parentConverted
-        && (!(newChild instanceof Element) || !newChild._$virtual)
-        && (!(relChild instanceof Element) || !relChild._$virtual)
+        !parentConverted &&
+        (!(newChild instanceof Element) || !newChild._$virtual) &&
+        (!(relChild instanceof Element) || !relChild._$virtual)
       ) {
         // for non-virtual children, use single child operation
         if (removal) {
           if (newChild) {
-            (sharedNonVirtualParent as composedBackend.Element).replaceChild(
+            ;(sharedNonVirtualParent as composedBackend.Element).replaceChild(
               // since `TextNode` also has `backendElement` private field, just make it as `Element`
               // domlike backend also
               (newChild as Element)._$backendElement as composedBackend.Element,
               (relChild as Element)._$backendElement as composedBackend.Element,
             )
           } else {
-            (sharedNonVirtualParent as composedBackend.Element).removeChild(
+            ;(sharedNonVirtualParent as composedBackend.Element).removeChild(
               // since `TextNode` also has `backendElement` private field, just make it as `Element`
               // domlike backend also
               (relChild as Element)._$backendElement as composedBackend.Element,
             )
           }
         } else if (relChild) {
-          (sharedNonVirtualParent as composedBackend.Element).insertBefore(
+          ;(sharedNonVirtualParent as composedBackend.Element).insertBefore(
             // since `TextNode` also has `backendElement` private field, just make it as `Element`
             // domlike backend also
             (newChild as Element)._$backendElement as composedBackend.Element,
             (relChild as Element)._$backendElement as composedBackend.Element,
           )
         } else {
-          (sharedNonVirtualParent as composedBackend.Element).appendChild(
+          ;(sharedNonVirtualParent as composedBackend.Element).appendChild(
             // since `TextNode` also has `backendElement` private field, just make it as `Element`
             // domlike backend also
             (newChild as Element)._$backendElement as composedBackend.Element,
@@ -964,8 +940,9 @@ export class Element implements NodeCast {
       for (let i = 0; i < slots.length; i += 1) {
         const slot = slots[i]!
         if (typeof slot === 'string') {
-          const s = ((slotParent as GeneralComponentInstance).shadowRoot as ShadowRoot)
-            .getSlotElementFromName(slot)
+          const s = (
+            (slotParent as GeneralComponentInstance).shadowRoot as ShadowRoot
+          ).getSlotElementFromName(slot)
           groupUpdate(s as Element | null, slot)
         } else {
           groupUpdate(slot, '')
@@ -983,7 +960,10 @@ export class Element implements NodeCast {
       }
       if (newChild instanceof Element) {
         if (shadowParent instanceof Component) {
-          newChild._$backendElement?.setAttribute('exparser:info-in-slot-of', shadowParent._$componentInstanceId)
+          newChild._$backendElement?.setAttribute(
+            'exparser:info-in-slot-of',
+            shadowParent._$componentInstanceId,
+          )
         } else {
           newChild._$backendElement?.removeAttribute('exparser:info-in-slot-of')
         }
@@ -1030,19 +1010,13 @@ export class Element implements NodeCast {
           // removal of in-tree elements are not needed for DOM backend
           // do nothing
         } else if (BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) {
-          (oldParent._$backendElement as backend.Element | null)?.removeChild(
+          ;(oldParent._$backendElement as backend.Element | null)?.removeChild(
             // since `TextNode` also has `backendElement` private field, just make it as `Element`
             (newChild as Element)._$backendElement as backend.Element,
             oldPosIndex,
           )
         } else {
-          Element.insertChildComposed(
-            parent,
-            null,
-            newChild,
-            true,
-            oldPosIndex,
-          )
+          Element.insertChildComposed(parent, null, newChild, true, oldPosIndex)
         }
       }
       newChild.parentNode = parent
@@ -1072,41 +1046,35 @@ export class Element implements NodeCast {
       if (parent._$backendElement) {
         if (removal) {
           if (newChild) {
-            (parent._$backendElement as backend.Element).replaceChild(
+            ;(parent._$backendElement as backend.Element).replaceChild(
               // since `TextNode` also has `backendElement` private field, just make it as `Element`
               (newChild as Element)._$backendElement as backend.Element,
               (relChild as Element)._$backendElement as backend.Element,
               posIndex,
             )
           } else {
-            (parent._$backendElement as backend.Element).removeChild(
+            ;(parent._$backendElement as backend.Element).removeChild(
               // since `TextNode` also has `backendElement` private field, just make it as `Element`
               (relChild as Element)._$backendElement as backend.Element,
               posIndex,
             )
           }
         } else if (relChild) {
-          (parent._$backendElement as backend.Element).insertBefore(
+          ;(parent._$backendElement as backend.Element).insertBefore(
             // since `TextNode` also has `backendElement` private field, just make it as `Element`
             (newChild as Element)._$backendElement as backend.Element,
             (relChild as Element)._$backendElement as backend.Element,
             posIndex,
           )
         } else {
-          (parent._$backendElement as backend.Element).appendChild(
+          ;(parent._$backendElement as backend.Element).appendChild(
             // since `TextNode` also has `backendElement` private field, just make it as `Element`
             (newChild as Element)._$backendElement as backend.Element,
           )
         }
       }
     } else {
-      Element.insertChildComposed(
-        parent,
-        newChild,
-        relChild,
-        removal,
-        posIndex,
-      )
+      Element.insertChildComposed(parent, newChild, relChild, removal, posIndex)
     }
 
     // remove parent of relChild if needed
@@ -1161,11 +1129,7 @@ export class Element implements NodeCast {
     }
   }
 
-  private static insertChildBatchRemoval(
-    parent: Element,
-    posIndex: number,
-    count: number,
-  ) {
+  private static insertChildBatchRemoval(parent: Element, posIndex: number, count: number) {
     const relChild = parent.childNodes[posIndex]
     let needUpdateSlotCount = false
     let slotCountDiff = 0
@@ -1173,7 +1137,7 @@ export class Element implements NodeCast {
     // spread in composed tree
     if (BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) {
       if (parent._$backendElement) {
-        (parent._$backendElement as backend.Element).spliceRemove(
+        ;(parent._$backendElement as backend.Element).spliceRemove(
           (relChild as Element)._$backendElement as backend.Element,
           count,
         )
@@ -1258,7 +1222,7 @@ export class Element implements NodeCast {
       if (BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) {
         // since `TextNode` also has `backendElement` private field, just make it as `Element`
         const be = (newChild as Element)._$backendElement as backend.Element
-        (frag as backend.Element).appendChild(be)
+        ;(frag as backend.Element).appendChild(be)
       }
     }
 
@@ -1266,17 +1230,17 @@ export class Element implements NodeCast {
     if (BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) {
       if (parent._$backendElement) {
         if (relChild) {
-          (parent._$backendElement as backend.Element).spliceBefore(
+          ;(parent._$backendElement as backend.Element).spliceBefore(
             // since `TextNode` also has `backendElement` private field, just make it as `Element`
             (relChild as Element)._$backendElement as backend.Element,
             0,
             frag as backend.Element,
           )
         } else {
-          (parent._$backendElement as backend.Element).spliceAppend(frag as backend.Element)
+          ;(parent._$backendElement as backend.Element).spliceAppend(frag as backend.Element)
         }
       }
-      (frag as backend.Element).release()
+      ;(frag as backend.Element).release()
     } else {
       for (let i = 0; i < newChildList.length; i += 1) {
         const newChild = newChildList[i]!
@@ -1342,7 +1306,7 @@ export class Element implements NodeCast {
     const replacedChildren = placeholder.childNodes
     if (BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) {
       if (replacedChildren.length > 0) {
-        (placeholder._$backendElement as backend.Element | null)?.spliceRemove(
+        ;(placeholder._$backendElement as backend.Element | null)?.spliceRemove(
           // since `TextNode` also has `backendElement` private field, just make it as `Element`
           (replacedChildren[0] as Element)._$backendElement as backend.Element,
           replacedChildren.length,
@@ -1357,15 +1321,9 @@ export class Element implements NodeCast {
       } else if (BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) {
         // since `TextNode` also has `backendElement` private field, just make it as `Element`
         const be = (child as Element)._$backendElement as backend.Element
-        (frag as backend.Element).appendChild(be)
+        ;(frag as backend.Element).appendChild(be)
       } else {
-        Element.insertChildComposed(
-          placeholder,
-          null,
-          child,
-          true,
-          i,
-        )
+        Element.insertChildComposed(placeholder, null, child, true, i)
       }
       child.parentNode = replacer
       if (child instanceof Element) {
@@ -1377,32 +1335,22 @@ export class Element implements NodeCast {
     // spread in composed tree
     if (BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) {
       if (parent._$backendElement) {
-        (parent._$backendElement as backend.Element).replaceChild(
+        ;(parent._$backendElement as backend.Element).replaceChild(
           replacer._$backendElement as backend.Element,
           placeholder._$backendElement as backend.Element,
           posIndex,
-        );
+        )
         // eslint-disable-next-line arrow-body-style
-        (replacer._$backendElement as backend.Element | null)?.spliceAppend(frag as backend.Element)
+        ;(replacer._$backendElement as backend.Element | null)?.spliceAppend(
+          frag as backend.Element,
+        )
       }
-      (frag as backend.Element).release()
+      ;(frag as backend.Element).release()
     } else {
-      Element.insertChildComposed(
-        parent,
-        replacer,
-        placeholder,
-        true,
-        posIndex,
-      )
+      Element.insertChildComposed(parent, replacer, placeholder, true, posIndex)
       for (let i = 0; i < replacedChildren.length; i += 1) {
         const child = replacedChildren[i]!
-        Element.insertChildComposed(
-          replacer,
-          child,
-          undefined,
-          false,
-          i,
-        )
+        Element.insertChildComposed(replacer, child, undefined, false, i)
       }
     }
 
@@ -1487,8 +1435,8 @@ export class Element implements NodeCast {
   }
 
   /** @internal */
-  protected static _$generateIdMap(node: ShadowRoot): {[id: string]: Element} {
-    const idMap = Object.create(null) as {[id: string]: Element}
+  protected static _$generateIdMap(node: ShadowRoot): { [id: string]: Element } {
+    const idMap = Object.create(null) as { [id: string]: Element }
     const dfs = function dfs(node: Node) {
       if (node instanceof Element) {
         const nodeId = node._$nodeId
@@ -1515,13 +1463,13 @@ export class Element implements NodeCast {
   private _$updateEventDefaultPrevented(name: string, enabled: boolean) {
     if (!this._$backendElement) return
     if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
-      (this._$nodeTreeContext as domlikeBackend.Context).setElementEventDefaultPrevented(
+      ;(this._$nodeTreeContext as domlikeBackend.Context).setElementEventDefaultPrevented(
         this._$backendElement as domlikeBackend.Element,
         name,
         enabled,
       )
     } else {
-      (this._$backendElement as backend.Element).setEventDefaultPrevented(name, enabled)
+      ;(this._$backendElement as backend.Element).setEventDefaultPrevented(name, enabled)
     }
   }
 
@@ -1648,12 +1596,12 @@ export class Element implements NodeCast {
     }
     if (element._$backendElement) {
       if (BM.DOMLIKE || (BM.DYNAMIC && element.getBackendMode() === BackendMode.Domlike)) {
-        (targetParent as domlikeBackend.Element).replaceChild(
+        ;(targetParent as domlikeBackend.Element).replaceChild(
           element._$backendElement as domlikeBackend.Element,
           targetNode as domlikeBackend.Element,
         )
       } else {
-        (targetParent as backend.Element | composedBackend.Element).replaceChild(
+        ;(targetParent as backend.Element | composedBackend.Element).replaceChild(
           element._$backendElement as backend.Element,
           targetNode as backend.Element,
         )
@@ -1710,7 +1658,7 @@ export class Element implements NodeCast {
     const needIncSlotCount = element._$slotName === null
     element._$slotName = slotName
     if (BM.SHADOW || (BM.DYNAMIC && element.getBackendMode() === BackendMode.Shadow)) {
-      (element._$backendElement as backend.Element | null)?.setSlotName(slotName)
+      ;(element._$backendElement as backend.Element | null)?.setSlotName(slotName)
     }
     const owner = element.ownerShadowRoot
     if (owner) {
@@ -1741,7 +1689,7 @@ export class Element implements NodeCast {
       throw new Error('Slot-inherit mode cannot be set when the element has any child node')
     }
     if (BM.SHADOW || (BM.DYNAMIC && element.getBackendMode() === BackendMode.Shadow)) {
-      (element._$backendElement as backend.Element | null)?.setSlot(
+      ;(element._$backendElement as backend.Element | null)?.setSlot(
         element._$nodeSlot,
         element._$inheritSlots,
       )
@@ -1869,35 +1817,31 @@ export class Element implements NodeCast {
 
   /** Select the first descendant which matches the selector */
   querySelector(selectorStr: string | ParsedSelector): Element | null {
-    const parsedSelector = selectorStr instanceof ParsedSelector
-      ? selectorStr
-      : new ParsedSelector(selectorStr)
+    const parsedSelector =
+      selectorStr instanceof ParsedSelector ? selectorStr : new ParsedSelector(selectorStr)
     const ret = parsedSelector.query(this, true) as Element | null
     return ret
   }
 
   /** Select all descendants which matches the selector */
   querySelectorAll(selectorStr: string | ParsedSelector): Element[] {
-    const parsedSelector = selectorStr instanceof ParsedSelector
-      ? selectorStr
-      : new ParsedSelector(selectorStr)
+    const parsedSelector =
+      selectorStr instanceof ParsedSelector ? selectorStr : new ParsedSelector(selectorStr)
     const ret = parsedSelector.query(this, false) as Element[]
     return ret
   }
 
   /** Test whether the target matches the selector */
   static matchSelector(selectorStr: string | ParsedSelector, target: Element): boolean {
-    const parsedSelector = selectorStr instanceof ParsedSelector
-      ? selectorStr
-      : new ParsedSelector(selectorStr)
+    const parsedSelector =
+      selectorStr instanceof ParsedSelector ? selectorStr : new ParsedSelector(selectorStr)
     return parsedSelector.testSelector(null, target)
   }
 
   /** Test whether the target in this subtree matches the selector */
   matchSelector(selectorStr: string | ParsedSelector, target: Element): boolean {
-    const parsedSelector = selectorStr instanceof ParsedSelector
-      ? selectorStr
-      : new ParsedSelector(selectorStr)
+    const parsedSelector =
+      selectorStr instanceof ParsedSelector ? selectorStr : new ParsedSelector(selectorStr)
     return parsedSelector.testSelector(this, target)
   }
 
@@ -1916,7 +1860,7 @@ export class Element implements NodeCast {
           cb(res)
         }, 0)
       } else {
-        (backendElement as backend.Element | composedBackend.Element).getBoundingClientRect(cb)
+        ;(backendElement as backend.Element | composedBackend.Element).getBoundingClientRect(cb)
       }
     } else {
       setTimeout(() => {
@@ -1950,7 +1894,7 @@ export class Element implements NodeCast {
           cb(res)
         }, 0)
       } else {
-        (backendElement as backend.Element | composedBackend.Element).getScrollOffset(cb)
+        ;(backendElement as backend.Element | composedBackend.Element).getScrollOffset(cb)
       }
     } else {
       setTimeout(() => {

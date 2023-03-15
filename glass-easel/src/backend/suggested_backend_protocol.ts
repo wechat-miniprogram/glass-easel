@@ -22,7 +22,7 @@ export interface Element {
 export interface Context {
   createContext(
     options: unknown,
-    cb: (ContextWrapper: GetWrapper<Partial<Context> & GeneralBackendContext>) => void
+    cb: (ContextWrapper: GetWrapper<Partial<Context> & GeneralBackendContext>) => void,
   ): void
 
   setFocusedNode(target: Node): void
@@ -34,50 +34,50 @@ export interface Context {
   addStyleSheetRule(
     mediaQueryStr: string,
     selector: string,
-    callback: (ruleIndex: number | null) => void
+    callback: (ruleIndex: number | null) => void,
   ): void
   getStyleSheetIndexForNewRules(callback: (sheetIndex: number) => void): void
   resetStyleSheetRule(
     sheetIndex: number,
     ruleIndex: number,
-    callback: (ruleIndex: number | null) => void
+    callback: (ruleIndex: number | null) => void,
   ): void
   modifyStyleSheetRuleSelector(
     sheetIndex: number,
     ruleIndex: number,
     selector: string,
-    callback: (ruleIndex: number | null) => void
+    callback: (ruleIndex: number | null) => void,
   ): void
   addStyleSheetProperty(
     sheetIndex: number,
     ruleIndex: number,
     inlineStyle: string,
-    callback: (propertyIndex: number | null) => void
+    callback: (propertyIndex: number | null) => void,
   ): void
   replaceStyleSheetAllProperties(
     sheetIndex: number,
     ruleIndex: number,
     inlineStyle: string,
-    callback: (propertyIndex: number | null) => void
+    callback: (propertyIndex: number | null) => void,
   ): void
   setStyleSheetPropertyDisabled(
     sheetIndex: number,
     ruleIndex: number,
     propertyIndex: number,
     disabled: boolean,
-    callback: (propertyIndex: number | null) => void
+    callback: (propertyIndex: number | null) => void,
   ): void
   removeStyleSheetProperty(
     sheetIndex: number,
     ruleIndex: number,
     propertyIndex: number,
-    callback: (propertyIndex: number | null) => void
+    callback: (propertyIndex: number | null) => void,
   ): void
   replaceStyleSheetProperty(
     sheetIndex: number,
     ruleIndex: number,
     propertyIndex: number,
     inlineStyle: string,
-    callback: (propertyIndex: number | null) => void
+    callback: (propertyIndex: number | null) => void,
   ): void
 }

@@ -1,6 +1,4 @@
-import {
-  FuncArrWithMeta,
-} from './func_arr'
+import { FuncArrWithMeta } from './func_arr'
 import {
   Element,
   Component,
@@ -64,9 +62,9 @@ const enum MutLevel {
 }
 
 type EventFuncArr<TDetail> = {
-  mutCount: number,
-  finalCount: number,
-  funcArr: FuncArrWithMeta<EventListener<TDetail>, MutLevel>,
+  mutCount: number
+  finalCount: number
+  funcArr: FuncArrWithMeta<EventListener<TDetail>, MutLevel>
 }
 
 export const enum FinalChanged {
@@ -82,9 +80,11 @@ export class EventTarget<TEvents extends { [type: string]: unknown }> {
   listeners = Object.create(null) as {
     [T in keyof TEvents]: EventFuncArr<TEvents[T]>
   }
-  captureListeners: {
-    [T in keyof TEvents]: EventFuncArr<TEvents[T]>
-  } | null = null
+  captureListeners:
+    | {
+        [T in keyof TEvents]: EventFuncArr<TEvents[T]>
+      }
+    | null = null
 
   addListener<T extends string>(
     name: T,
@@ -92,9 +92,7 @@ export class EventTarget<TEvents extends { [type: string]: unknown }> {
     options: EventListenerOptions = {},
   ): FinalChanged {
     // eslint-disable-next-line no-nested-ternary
-    const mutLevel = options.final
-      ? MutLevel.Final
-      : (options.mutated ? MutLevel.Mut : MutLevel.None)
+    const mutLevel = options.final ? MutLevel.Final : options.mutated ? MutLevel.Mut : MutLevel.None
     let listeners: { [T in keyof TEvents]: EventFuncArr<TEvents[T]> }
     if (options.capture || options.useCapture) {
       if (this.captureListeners) {
@@ -137,9 +135,7 @@ export class EventTarget<TEvents extends { [type: string]: unknown }> {
     func: EventListener<TEvents[T]>,
     options: EventListenerOptions = {},
   ): FinalChanged {
-    const listeners = (options.capture || options.useCapture)
-      ? this.captureListeners
-      : this.listeners
+    const listeners = options.capture || options.useCapture ? this.captureListeners : this.listeners
     if (!listeners) return FinalChanged.Failed
     const efa = listeners[name]
     if (!efa) return FinalChanged.Failed
@@ -276,7 +272,7 @@ export class Event<TDetail> {
         curCaller,
         [ev],
         (mulLevel) => !skipMut || mulLevel !== MutLevel.Mut,
-        isComp ? cur as GeneralComponent : undefined,
+        isComp ? (cur as GeneralComponent) : undefined,
       )
       if (ret === false || efa.finalCount > 0) {
         ev.stopPropagation()
@@ -292,9 +288,8 @@ export class Event<TDetail> {
     ) => {
       const recShadow = (target: Element): Element | null => {
         let cur = target
-        const targetCaller = target instanceof Component
-          ? target.getMethodCaller() as Element
-          : target
+        const targetCaller =
+          target instanceof Component ? (target.getMethodCaller() as Element) : target
         const mark = target.collectMarks()
         for (;;) {
           if (f(cur, targetCaller, mark) === false) return null
@@ -343,7 +338,7 @@ export class Event<TDetail> {
     // bubble phase in external component
     if (!eventBubblingControl.stopped && externalTarget) {
       if (target instanceof Component && target._$external) {
-        (target.shadowRoot as ExternalShadowRoot).handleEvent(externalTarget, this)
+        ;(target.shadowRoot as ExternalShadowRoot).handleEvent(externalTarget, this)
       }
     }
 

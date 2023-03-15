@@ -28,20 +28,18 @@ const createElem = (is, backend) => {
   return glassEasel.Component.createWithContext(is || 'test', def, backend || domBackend)
 }
 
-describe('Component', function(){
-
-  describe('#register', function(){
-
-    it('should be able to register component', function(){
+describe('Component', function () {
+  describe('#register', function () {
+    it('should be able to register component', function () {
       regElem({
-        is: 'component-a'
+        is: 'component-a',
       })
       var elem = createElem('component-a')
       expect(elem).toBeInstanceOf(glassEasel.Element)
       expect(elem.is).toBe('component-a')
     })
 
-    it('should construct typed properties and JSON-compatible data', function(){
+    it('should construct typed properties and JSON-compatible data', function () {
       regElem({
         is: 'component-b',
         options: {
@@ -60,9 +58,9 @@ describe('Component', function(){
         },
         data: {
           g: {
-            h: 1
-          }
-        }
+            h: 1,
+          },
+        },
       })
       var elem = createElem('component-b')
       var elem2 = createElem('component-b')
@@ -98,13 +96,13 @@ describe('Component', function(){
       expect(elem.z).toBe('4.0')
       elem.z = undefined
       expect(elem.z).toBe(null)
-      expect(elem.data.g).toStrictEqual({h: 1})
-      elem.data = {g: {h: 2}}
-      expect(elem.data.g).toStrictEqual({h: 2})
-      expect(elem2.data.g).toStrictEqual({h: 1})
+      expect(elem.data.g).toStrictEqual({ h: 1 })
+      elem.data = { g: { h: 2 } }
+      expect(elem.data.g).toStrictEqual({ h: 2 })
+      expect(elem2.data.g).toStrictEqual({ h: 1 })
     })
 
-    it('should support default value generator', function(){
+    it('should support default value generator', function () {
       const f = function () {}
       regElem({
         is: 'component-property-default',
@@ -112,32 +110,46 @@ describe('Component', function(){
           a: {
             type: String,
             value: 'abc',
-            default: function() { return 'def' },
+            default: function () {
+              return 'def'
+            },
           },
           b: {
             type: Number,
             value: 123,
-            default: function() { return 456 },
+            default: function () {
+              return 456
+            },
           },
           c: {
             type: Boolean,
-            default: function() { return true },
+            default: function () {
+              return true
+            },
           },
           d: {
             type: Object,
-            default: function() { return { obj: null } },
+            default: function () {
+              return { obj: null }
+            },
           },
           e: {
             type: Array,
-            default: function() { return [null] },
+            default: function () {
+              return [null]
+            },
           },
           f: {
             type: Function,
-            default: function() { return f },
+            default: function () {
+              return f
+            },
           },
           g: {
             type: null,
-            default: function() { return 789 },
+            default: function () {
+              return 789
+            },
           },
         },
       })
@@ -155,7 +167,9 @@ describe('Component', function(){
         c: false,
         d: null,
         e: [],
-        f: function () { return 123 },
+        f: function () {
+          return 123
+        },
         g: null,
       })
       expect(elem.data.a).toBe('')
@@ -185,18 +199,18 @@ describe('Component', function(){
       expect(elem.data.g).toBe(789)
     })
 
-    it('should support optional types (number and boolean)', function(){
+    it('should support optional types (number and boolean)', function () {
       regElem({
         is: 'component-optional-types',
         properties: {
           a: {
             type: String,
             optionalTypes: [Number, Boolean],
-            value: false
+            value: false,
           },
           b: {
             optionalTypes: [Boolean, Number],
-          }
+          },
         },
       })
       var elem = createElem('component-optional-types')
@@ -215,14 +229,14 @@ describe('Component', function(){
       expect(elem.data.b).toBe(false)
     })
 
-    it('should support optional types (string)', function(){
+    it('should support optional types (string)', function () {
       regElem({
         is: 'component-optional-types-string',
         properties: {
           a: {
             type: Number,
             optionalTypes: [String],
-            value: 'abc'
+            value: 'abc',
           },
         },
       })
@@ -234,14 +248,14 @@ describe('Component', function(){
       expect(elem.data.a).toBe(1)
     })
 
-    it('should support optional types (function)', function(){
+    it('should support optional types (function)', function () {
       regElem({
         is: 'component-optional-types-function',
         properties: {
           a: {
             type: Number,
             optionalTypes: [Function],
-            value: function () {}
+            value: function () {},
           },
         },
       })
@@ -253,14 +267,14 @@ describe('Component', function(){
       expect(elem.data.a).toBe(1)
     })
 
-    it('should support optional types (object)', function(){
+    it('should support optional types (object)', function () {
       regElem({
         is: 'component-optional-types-obj',
         properties: {
           a: {
             type: Number,
             optionalTypes: [Object],
-            value: { b: 1 }
+            value: { b: 1 },
           },
         },
       })
@@ -272,14 +286,14 @@ describe('Component', function(){
       expect(elem.data.a).toBe(1)
     })
 
-    it('should support optional types (array)', function(){
+    it('should support optional types (array)', function () {
       regElem({
         is: 'component-optional-types-arr',
         properties: {
           a: {
             type: Number,
             optionalTypes: [Array],
-            value: [1, 2]
+            value: [1, 2],
           },
         },
       })
@@ -291,7 +305,7 @@ describe('Component', function(){
       expect(elem.data.a).toBe(1)
     })
 
-    it('should call methods with proper arguments (method name binding)', function(){
+    it('should call methods with proper arguments (method name binding)', function () {
       var callOrder = []
       regElem({
         is: 'component-c',
@@ -300,24 +314,24 @@ describe('Component', function(){
           prop1: {
             type: String,
             value: 'OLD',
-            observer: 'func2'
-          }
+            observer: 'func2',
+          },
         },
         listeners: {
-          'a.tap': 'func3'
+          'a.tap': 'func3',
         },
         methods: {
-          func2: function F2(newVal, oldVal){
+          func2: function F2(newVal, oldVal) {
             callOrder.push('F2')
             expect(this).toBe(elem)
             expect(oldVal).toBe('OLD')
             expect(newVal).toBe('1')
           },
-          func3: function F3(){
+          func3: function F3() {
             callOrder.push('F3')
             expect(this).toBe(elem)
           },
-        }
+        },
       })
       var elem = createElem('component-c')
       expect(elem.func2.name).toBe('F2')
@@ -329,11 +343,11 @@ describe('Component', function(){
       expect(elem.prop1).toBe('1')
       expect(elem.$.a.$$.getAttribute('attr-a')).toBe('1')
       expect(elem.$.a.getAttribute('attr-a')).toBe('1')
-      glassEasel.triggerEvent(elem.$.a, 'tap', {}, {bubbles: true, composed: true})
+      glassEasel.triggerEvent(elem.$.a, 'tap', {}, { bubbles: true, composed: true })
       expect(callOrder).toStrictEqual(['F2', 'F3'])
     })
 
-    it('should call methods with proper arguments (function binding)', function(){
+    it('should call methods with proper arguments (function binding)', function () {
       var callOrder = []
       regElem({
         is: 'component-d',
@@ -342,73 +356,73 @@ describe('Component', function(){
           prop1: {
             type: String,
             value: 'OLD',
-            observer: function(newVal, oldVal){
+            observer: function (newVal, oldVal) {
               expect(newVal).toBe('NEW')
               expect(oldVal).toBe('OLD')
               callOrder.push(1)
-            }
-          }
+            },
+          },
         },
         listeners: {
-          'a.tap': function(){
+          'a.tap': function () {
             callOrder.push(2)
-          }
-        }
+          },
+        },
       })
       var elem = createElem('component-d')
       expect(elem.prop1).toBe('OLD')
       elem.prop1 = 'NEW'
       expect(elem.prop1).toBe('NEW')
-      glassEasel.triggerEvent(elem.$.a, 'tap', {}, {bubbles: true, composed: true})
+      glassEasel.triggerEvent(elem.$.a, 'tap', {}, { bubbles: true, composed: true })
       expect(callOrder).toStrictEqual([1, 2])
     })
 
-    it('should call property observers', function(){
+    it('should call property observers', function () {
       var callArgs = []
       regElem({
         is: 'component-property-observer',
         properties: {
           obj: {
             type: Object,
-            observer: function(newVal, oldVal){
+            observer: function (newVal, oldVal) {
               callArgs.push(['obj', newVal, oldVal])
-            }
+            },
           },
           str: {
             type: String,
-            observer: function(newVal, oldVal){
+            observer: function (newVal, oldVal) {
               callArgs.push(['str', newVal, oldVal])
-            }
+            },
           },
           arr: {
             type: Array,
-            observer: function(newVal, oldVal){
+            observer: function (newVal, oldVal) {
               callArgs.push(['arr', newVal, oldVal])
-            }
+            },
           },
-        }
+        },
       })
       var elem = createElem('component-property-observer')
       elem.setData({
-        obj: { f1: 1, f2: [{f3: false}] }
+        obj: { f1: 1, f2: [{ f3: false }] },
       })
       expect(callArgs.shift()).toStrictEqual(['obj', { f1: 1, f2: [{ f3: false }] }, null])
       elem.setData({
-        'obj.f2[0].f3': true
+        'obj.f2[0].f3': true,
       })
       expect(callArgs.shift()).toStrictEqual(['obj', true, undefined])
       elem.setData({
         'obj.f1': 2,
         'arr[0]': 'b',
-        'obj.f2[1].f3': false
+        'obj.f2[1].f3': false,
       })
       expect(callArgs.shift()).toStrictEqual(['obj', 2, undefined])
       expect(callArgs.shift()).toStrictEqual(['arr', 'b', undefined])
       expect(callArgs.shift()).toStrictEqual(['obj', false, undefined])
       expect(elem.data).toStrictEqual({
-        obj: { f1: 2, f2: [{f3: true}, {f3: false}] },
+        obj: { f1: 2, f2: [{ f3: true }, { f3: false }] },
         str: '',
-        arr: ['b']
+        arr: ['b'],
       })
       elem.setData({
         obj: elem.data.obj,
@@ -417,35 +431,33 @@ describe('Component', function(){
       })
       expect(callArgs.length).toBe(0)
     })
-
   })
 
-  describe('#create', function(){
-
-    it('should has a default component', function(){
+  describe('#create', function () {
+    it('should has a default component', function () {
       var elem = createElem('')
       expect(elem).toBeInstanceOf(glassEasel.Element)
       expect(elem.is).toBe('')
       expect(elem.$$).toBeInstanceOf(window.HTMLElement)
     })
 
-    it('should call lifetime methods', function(){
+    it('should call lifetime methods', function () {
       var callOrder = []
       regElem({
         is: 'component-e',
         template: '<slot></slot>',
-        created: function(){
+        created: function () {
           expect(this).toBeInstanceOf(glassEasel.Element)
           callOrder.push('c')
         },
-        attached: function(){
+        attached: function () {
           expect(this).toBeInstanceOf(glassEasel.Element)
           callOrder.push('a')
         },
-        detached: function(){
+        detached: function () {
           expect(this).toBeInstanceOf(glassEasel.Element)
           callOrder.push('d')
-        }
+        },
       })
       var elem = createElem('component-e')
       var root = createElem('root')
@@ -458,56 +470,52 @@ describe('Component', function(){
       expect(callOrder).toStrictEqual(['c', 'a', 'd'])
     })
 
-    it('should be able to prevent event bubbling out', function(){
+    it('should be able to prevent event bubbling out', function () {
       var callOrder = []
       regElem({
         is: 'component-f',
         listeners: {
-          'customevent': 'prevent'
+          customevent: 'prevent',
         },
         methods: {
-          prevent: function(){
+          prevent: function () {
             callOrder.push('a')
             return false
-          }
-        }
+          },
+        },
       })
       var elem = createElem('component-f')
       var root = createElem('root')
       root.appendChild(elem)
-      elem.addListener('customevent', function(){
+      elem.addListener('customevent', function () {
         callOrder.push('b')
       })
       glassEasel.Element.pretendAttached(root)
-      elem.shadowRoot.triggerEvent('customevent', undefined, {bubbles: true})
+      elem.shadowRoot.triggerEvent('customevent', undefined, { bubbles: true })
       expect(callOrder).toStrictEqual(['a'])
     })
-
   })
 
-  describe('#hasProperty #hasPublicProperty', function(){
-
-    it('should be able to detect properties', function(){
+  describe('#hasProperty #hasPublicProperty', function () {
+    it('should be able to detect properties', function () {
       regElem({
         is: 'component-g',
         properties: {
           a: String,
           b: {
             type: String,
-          }
-        }
+          },
+        },
       })
       var elem = createElem('component-g')
       expect(glassEasel.Component.hasProperty(elem, 'a')).toBe(true)
       expect(glassEasel.Component.hasProperty(elem, 'b')).toBe(true)
       expect(glassEasel.Component.hasProperty(elem, 'c')).toBe(false)
     })
-
   })
 
-  describe('#setData #data', function(){
-
-    it('should be able to update data and properties', function(){
+  describe('#setData #data', function () {
+    it('should be able to update data and properties', function () {
       var callOrder = []
       regElem({
         is: 'component-data-update',
@@ -516,28 +524,28 @@ describe('Component', function(){
           db: {
             type: String,
             value: 'OLD',
-            observer: function(){
+            observer: function () {
               callOrder.push(1)
             },
           },
           dc: {
             type: String,
-            observer: function(){
+            observer: function () {
               callOrder.push(2)
             },
           },
           dd: {
             type: Number,
             value: 0,
-            observer: function(){
+            observer: function () {
               callOrder.push(3)
             },
             observeAssignments: true,
-          }
+          },
         },
         data: {
-          da: 1
-        }
+          da: 1,
+        },
       })
       var elem = createElem('component-data-update')
       expect(elem.data.da).toBe(1)
@@ -556,42 +564,42 @@ describe('Component', function(){
       expect(elem.$.b.getAttribute('attr-b')).toBe('NEW')
     })
 
-    it('should be able to apply to template', function(){
+    it('should be able to apply to template', function () {
       regElem({
         is: 'component-attr-a',
         template: '<span id="a" attr-a="{{da}}"></span>',
         data: {
-          da: 1
-        }
+          da: 1,
+        },
       })
       var elem = createElem('component-attr-a')
       expect(elem.data.da).toBe(1)
       expect(elem.$.a.$$.getAttribute('attr-a')).toBe('1')
       expect(elem.$.a.getAttribute('attr-a')).toBe('1')
-      elem.data = {da: 2}
+      elem.data = { da: 2 }
       expect(elem.data.da).toBe(2)
       expect(elem.$.a.$$.getAttribute('attr-a')).toBe('2')
       expect(elem.$.a.getAttribute('attr-a')).toBe('2')
     })
 
-    it('should reflect to attributes', function(){
+    it('should reflect to attributes', function () {
       regElem({
         is: 'component-reflect-attr-a',
         properties: {
-          a1: String
-        }
+          a1: String,
+        },
       })
       regElem({
         is: 'component-reflect-attr-b',
         options: {
-          reflectToAttributes: true
+          reflectToAttributes: true,
         },
         properties: {
           a1: String,
           a2: Boolean,
           a3: Object,
-          a4: null
-        }
+          a4: null,
+        },
       })
       var elem1 = createElem('component-reflect-attr-a')
       elem1.a1 = 'A'
@@ -605,7 +613,7 @@ describe('Component', function(){
         a1: '',
         a2: true,
         a3: {},
-        a4: [ 1, 'a' ]
+        a4: [1, 'a'],
       })
       expect(elem2.$$.getAttribute('a1')).toBe('')
       expect(elem2.$$.getAttribute('a2')).toBe('')
@@ -617,13 +625,13 @@ describe('Component', function(){
       expect(elem2.$$.getAttribute('a3')).toBe('null')
     })
 
-    it('should parse path string correctly', function(){
+    it('should parse path string correctly', function () {
       regElem({
         is: 'component-data-parse',
         data: {
           arr: [1, 2, 3],
-          'o.b.j': {}
-        }
+          'o.b.j': {},
+        },
       })
       var elem = createElem('component-data-parse')
       elem.setData({
@@ -633,39 +641,38 @@ describe('Component', function(){
         'o\\.b\\.j.a': [],
         'o\\.b\\.j.a[1]': 'D',
         'o\\.b\\.j.a[0]': 'DD',
-        '\\\\.\\\\': 'E'
+        '\\\\.\\\\': 'E',
       })
       expect(elem.data).toStrictEqual({
         arr: [1, 'A', 3],
         'arr[1]': 'B',
-        'o': {
-          'b': {
-            'j': { '\\': 'C' }
-          }
+        o: {
+          b: {
+            j: { '\\': 'C' },
+          },
         },
         'o.b.j': {
-          a: ['DD', 'D']
+          a: ['DD', 'D'],
         },
         '\\': {
-          '\\': 'E'
-        }
+          '\\': 'E',
+        },
       })
     })
-
   })
 
-  it('should be able to catch exceptions', function(){
+  it('should be able to catch exceptions', function () {
     var oldConsoleError = console.error
-    console.error = function() {}
+    console.error = function () {}
 
     var waitingEvents = 3
     var elem = null
-    var id = glassEasel.addGlobalErrorListener(function(e, info){
+    var id = glassEasel.addGlobalErrorListener(function (e, info) {
       if (waitingEvents === 0) {
         return true
       }
       expect(Number(e.message)).toBe(waitingEvents)
-      waitingEvents --
+      waitingEvents--
       return false
     })
     var def = regElem({
@@ -674,23 +681,23 @@ describe('Component', function(){
       properties: {
         a: {
           type: String,
-          observer: '_observer'
-        }
+          observer: '_observer',
+        },
       },
       listeners: {
-        'customevent': '_listener'
+        customevent: '_listener',
       },
-      created: function(){
+      created: function () {
         throw new Error('3')
       },
       methods: {
-        _observer: function(){
+        _observer: function () {
           throw new Error('2')
         },
-        _listener: function(){
+        _listener: function () {
           throw new Error('1')
-        }
-      }
+        },
+      },
     })
     elem = createElem('component-h')
     elem.a = 'a'
@@ -700,7 +707,7 @@ describe('Component', function(){
     var hasError = false
     try {
       elem.a = 'b'
-    } catch(e) {
+    } catch (e) {
       hasError = true
     }
     expect(hasError).toBe(true)
@@ -708,9 +715,9 @@ describe('Component', function(){
     glassEasel.removeGlobalErrorListener(id)
   })
 
-  it('should call error lifetimes', function(){
+  it('should call error lifetimes', function () {
     var oldConsoleError = console.error
-    console.error = function() {}
+    console.error = function () {}
     glassEasel.globalOptions.throwGlobalError = false
 
     var errorCalled = 0
@@ -719,14 +726,14 @@ describe('Component', function(){
       is: 'component-error-lifetimes-a',
       template: '<div></div>',
       lifetimes: {
-        created: function(e) {
+        created: function (e) {
           throw new Error('test')
         },
-        error: function(e) {
+        error: function (e) {
           errorCalled++
           errorObj = e
-        }
-      }
+        },
+      },
     })
     createElem('component-error-lifetimes-a')
 
@@ -736,20 +743,19 @@ describe('Component', function(){
     expect(errorObj.message).toBe('test')
   })
 
-  describe('#ownerShadowRoot', function(){
-
-    beforeAll(function(){
+  describe('#ownerShadowRoot', function () {
+    beforeAll(function () {
       regElem({
         is: 'component-i',
-        template: '<span id="a"></span> <slot></slot>'
+        template: '<span id="a"></span> <slot></slot>',
       })
       regElem({
         is: 'component-j',
-        template: '<component-i id="b"></component-i> <slot></slot>'
+        template: '<component-i id="b"></component-i> <slot></slot>',
       })
     })
 
-    it('should point to the shadow root with correct id manipulation', function(){
+    it('should point to the shadow root with correct id manipulation', function () {
       var elem = createElem('component-j')
       expect(elem.ownerShadowRoot).toBe(null)
       expect(elem.shadowRoot.ownerShadowRoot).toBe(elem.shadowRoot)
@@ -763,21 +769,19 @@ describe('Component', function(){
       expect(elem.$.b).toBe(undefined)
     })
 
-    it('should update id cache when needed', function(){
+    it('should update id cache when needed', function () {
       var elem = createElem('component-j')
       expect(elem.$.b.$.a.ownerShadowRoot).toBe(elem.$.b.shadowRoot)
       elem.$.b.$.a.id = 'c'
       expect(elem.$.b.$.c.ownerShadowRoot).toBe(elem.$.b.shadowRoot)
       expect(elem.$.b.$.a).toBe(undefined)
     })
-
   })
 
-  describe('#classList', function(){
-
-    beforeAll(function(){
+  describe('#classList', function () {
+    beforeAll(function () {
       regBeh({
-        is: 'component-class-beh'
+        is: 'component-class-beh',
       })
       regElem({
         is: 'component-class-a',
@@ -785,7 +789,7 @@ describe('Component', function(){
           styleScope: componentSpace.styleScopeManager.register('component-class-a'),
         },
         behaviors: ['component-class-beh'],
-        template: '<span id="a" class="aa"></span>'
+        template: '<span id="a" class="aa"></span>',
       })
       regElem({
         is: 'component-class-b',
@@ -794,11 +798,11 @@ describe('Component', function(){
           extraStyleScope: glassEasel.StyleScopeManager.globalScope(),
         },
         behaviors: ['component-class-beh'],
-        template: '<span id="b"></span>'
+        template: '<span id="b"></span>',
       })
     })
 
-    it('should allow setting classes', function(){
+    it('should allow setting classes', function () {
       var elem = createElem('component-class-a')
       var elem2 = createElem('component-class-b')
       expect(elem.$.a.classList.contains('aa')).toBe(true)
@@ -821,7 +825,7 @@ describe('Component', function(){
       expect(elem.$.a.$$.getAttribute('class')).toBe('component-class-a--a-a')
     })
 
-    it('should allow setting classes in non-DOM backend', function(){
+    it('should allow setting classes in non-DOM backend', function () {
       var elem = createElem('component-class-a', shadowBackend)
       var elem2 = createElem('component-class-b', shadowBackend)
       expect(elem.$.a.classList.contains('aa')).toBe(true)
@@ -843,11 +847,11 @@ describe('Component', function(){
       expect(elem.$.a.classList.contains('a-a')).toBe(false)
     })
 
-    it('should be able to disable class prefix', function(){
+    it('should be able to disable class prefix', function () {
       regElem({
         is: 'component-class-prefix-empty',
         behaviors: ['component-class-beh'],
-        template: '<span id="c" class="cc"></span>'
+        template: '<span id="c" class="cc"></span>',
       })
       var elem = createElem('component-class-prefix-empty')
       var elem2 = elem.shadowRoot.createComponent('component-class-b')
@@ -857,7 +861,7 @@ describe('Component', function(){
       expect(elem.$.c.classList.contains('component-class-beh--cc')).toBe(false)
       expect(elem.$.c.classList.contains('component-class-owner-attr--cc')).toBe(false)
       expect(elem.$.c.class).toBe('cc')
-      if(glassEasel.globalOptions.documentBackend === 'dom') {
+      if (glassEasel.globalOptions.documentBackend === 'dom') {
         expect(elem.$.c.$$.getAttribute('class')).toBe('cc')
         expect(elem2.$$.getAttribute('class')).toBe('bb')
       }
@@ -868,7 +872,7 @@ describe('Component', function(){
       expect(elem2.classList.contains('component-class-owner-attr--bb')).toBe(false)
       expect(elem2.classList.contains('component-class-b--bb')).toBe(false)
       expect(elem2.class).toBe('bb')
-      if(glassEasel.globalOptions.documentBackend === 'dom') {
+      if (glassEasel.globalOptions.documentBackend === 'dom') {
         expect(elem2.$$.getAttribute('class')).toBe('bb')
       }
       elem.$.c.removeChild(elem2)
@@ -878,18 +882,18 @@ describe('Component', function(){
       expect(elem2.classList.contains('component-class-owner-attr--bb')).toBe(false)
       expect(elem2.classList.contains('component-class-b--bb')).toBe(false)
       expect(elem2.class).toBe('bb')
-      if(glassEasel.globalOptions.documentBackend === 'dom') {
+      if (glassEasel.globalOptions.documentBackend === 'dom') {
         expect(elem2.$$.getAttribute('class')).toBe('bb')
       }
     })
 
-    it('should support special class prefix', function(){
+    it('should support special class prefix', function () {
       regElem({
         is: 'component-class-special-prefix-a',
         options: {
-          styleScope: componentSpace.styleScopeManager.register('a')
+          styleScope: componentSpace.styleScopeManager.register('a'),
         },
-        template: '<span id="a" class="a ^a ^^aa ~a"></span>'
+        template: '<span id="a" class="a ^a ^^aa ~a"></span>',
       })
       regElem({
         is: 'component-class-special-prefix-b',
@@ -897,31 +901,35 @@ describe('Component', function(){
           styleScope: componentSpace.styleScopeManager.register('b'),
           extraStyleScope: glassEasel.StyleScopeManager.globalScope(),
         },
-        template: '<component-class-special-prefix-a id="b" class="b ^b ^^b ^^^bbb ~bb" />'
+        template: '<component-class-special-prefix-a id="b" class="b ^b ^^b ^^^bbb ~bb" />',
       })
       regElem({
         is: 'component-class-special-prefix-c',
         options: {
-          styleScope: componentSpace.styleScopeManager.register('c')
+          styleScope: componentSpace.styleScopeManager.register('c'),
         },
-        template: '<component-class-special-prefix-b id="c" class="c ^c ~c" />'
+        template: '<component-class-special-prefix-b id="c" class="c ^c ~c" />',
       })
       var elem = createElem('component-class-special-prefix-c')
       expect(elem.$.c.class).toBe('c ^c ~c')
       expect(elem.$.c.$$.getAttribute('class')).toBe('c--c c')
-      expect(elem.$.c.shadowRoot.querySelector('.bb').$$.getAttribute('class')).toBe('b b--b c--b bbb bb')
-      expect(elem.$.c.$.b.shadowRoot.querySelector('.aa').$$.getAttribute('class')).toBe('a--a b--a c--aa a')
+      expect(elem.$.c.shadowRoot.querySelector('.bb').$$.getAttribute('class')).toBe(
+        'b b--b c--b bbb bb',
+      )
+      expect(elem.$.c.$.b.shadowRoot.querySelector('.aa').$$.getAttribute('class')).toBe(
+        'a--a b--a c--aa a',
+      )
       expect(elem.$.c.$.b.$.a.$$.getAttribute('class')).toBe('a--a b--a c--aa a')
     })
 
-    it('should adding write ID and class prefix info to DOM when required', function(){
+    it('should adding write ID and class prefix info to DOM when required', function () {
       glassEasel.globalOptions.writeExtraInfoToAttr = true
       regElem({
         is: 'component-class-dom-id',
         options: {
-          writeIdToDOM: true
+          writeIdToDOM: true,
         },
-        template: '<span id="a" class="aa"></span>'
+        template: '<span id="a" class="aa"></span>',
       })
       var elem = createElem('component-class-dom-id')
       var elem2 = elem.shadowRoot.createComponent('component-class-b')
@@ -929,36 +937,44 @@ describe('Component', function(){
       elem2.class = 'bb'
       expect(elem2.classList.contains('cc')).toBe(false)
       expect(elem2.classList.contains('bb')).toBe(true)
-      if(glassEasel.globalOptions.documentBackend === 'dom') {
-        expect(elem.$.a.$$.getAttribute('glassEasel:info-class-prefix')).toBe('component-class-dom-id--')
+      if (glassEasel.globalOptions.documentBackend === 'dom') {
+        expect(elem.$.a.$$.getAttribute('glassEasel:info-class-prefix')).toBe(
+          'component-class-dom-id--',
+        )
         expect(elem2.$$.getAttribute('class')).toBe('component-class-dom-id--bb')
         expect(elem2.$$.id).toBe('22')
       }
       elem.$.a.appendChild(elem2)
       expect(elem2.classList.contains('cc')).toBe(false)
       expect(elem2.classList.contains('bb')).toBe(true)
-      if(glassEasel.globalOptions.documentBackend === 'dom') {
-        expect(elem2.$$.getAttribute('glassEasel:info-class-prefix')).toBe('component-class-dom-id--')
+      if (glassEasel.globalOptions.documentBackend === 'dom') {
+        expect(elem2.$$.getAttribute('glassEasel:info-class-prefix')).toBe(
+          'component-class-dom-id--',
+        )
         expect(elem2.$$.getAttribute('class')).toBe('component-class-dom-id--bb')
         expect(elem2.$$.id).toBe('22')
       }
       elem.$.a.removeChild(elem2)
       expect(elem2.classList.contains('cc')).toBe(false)
       expect(elem2.classList.contains('bb')).toBe(true)
-      if(glassEasel.globalOptions.documentBackend === 'dom') {
-        expect(elem2.$$.getAttribute('glassEasel:info-class-prefix')).toBe('component-class-dom-id--')
+      if (glassEasel.globalOptions.documentBackend === 'dom') {
+        expect(elem2.$$.getAttribute('glassEasel:info-class-prefix')).toBe(
+          'component-class-dom-id--',
+        )
         expect(elem2.$$.getAttribute('class')).toBe('component-class-dom-id--bb')
         expect(elem2.$$.id).toBe('22')
       }
     })
 
-    it('should support external classes', function(){
+    it('should support external classes', function () {
       regElem({
         is: 'component-external-classes-native',
         options: {
           externalComponent: true,
-          styleScope: componentSpace.styleScopeManager.register('component-external-classes-native'),
-        }
+          styleScope: componentSpace.styleScopeManager.register(
+            'component-external-classes-native',
+          ),
+        },
       })
       regElem({
         is: 'component-external-classes-a',
@@ -974,7 +990,8 @@ describe('Component', function(){
         options: {
           styleScope: componentSpace.styleScopeManager.register('component-external-classes-b'),
         },
-        template: '<component-external-classes-a id="a1" class="B1" /> <component-external-classes-a id="a2" class="B2 static" />',
+        template:
+          '<component-external-classes-a id="a1" class="B1" /> <component-external-classes-a id="a2" class="B2 static" />',
       })
       regElem({
         is: 'component-external-classes-c',
@@ -994,40 +1011,66 @@ describe('Component', function(){
       var elem = createElem('component-external-classes-d')
       expect(elem.$.c1.hasExternalClass('C1')).toBe(true)
       expect(elem.$.c1.hasExternalClass('C123')).toBe(false)
-  
-      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe('component-external-classes-a--static')
+
+      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
+        'component-external-classes-a--static',
+      )
       expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('')
-      expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe('component-external-classes-b--static')
+      expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
+        'component-external-classes-b--static',
+      )
       expect(elem.$.c1.$.b1.$$.getAttribute('class')).toBe('')
       expect(elem.$.c1.$$.getAttribute('class')).toBe(null)
       elem.$.c1.$.b1.$.a1.setExternalClass('A1', 'B1')
-      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe('component-external-classes-a--static')
+      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
+        'component-external-classes-a--static',
+      )
       elem.$.c1.$.b1.setExternalClass('B1', 'C1')
-      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe('component-external-classes-a--static')
+      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
+        'component-external-classes-a--static',
+      )
       expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('')
-      expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe('component-external-classes-b--static')
+      expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
+        'component-external-classes-b--static',
+      )
       elem.$.c1.setExternalClass('C1', 'AAA')
-      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe('component-external-classes-a--static component-external-classes-d--AAA')
+      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
+        'component-external-classes-a--static component-external-classes-d--AAA',
+      )
       expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('component-external-classes-d--AAA')
-      expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe('component-external-classes-b--static')
+      expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
+        'component-external-classes-b--static',
+      )
       expect(elem.$.c1.$.b1.$$.getAttribute('class')).toBe('component-external-classes-d--AAA')
       expect(elem.$.c1.$$.getAttribute('class')).toBe(null)
-  
+
       elem.$.c1.$.b1.$.a2.setExternalClass('A1', 'B2 BBB')
       elem.$.c1.$.b1.setExternalClass('B2', 'C1')
-      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe('component-external-classes-a--static component-external-classes-d--AAA')
+      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
+        'component-external-classes-a--static component-external-classes-d--AAA',
+      )
       expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('component-external-classes-d--AAA')
-      expect(elem.$.c1.$.b1.$.a2.$.child.$$.getAttribute('class')).toBe('component-external-classes-a--static component-external-classes-d--AAA component-external-classes-b--BBB')
-      expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe('component-external-classes-d--AAA component-external-classes-b--static')
+      expect(elem.$.c1.$.b1.$.a2.$.child.$$.getAttribute('class')).toBe(
+        'component-external-classes-a--static component-external-classes-d--AAA component-external-classes-b--BBB',
+      )
+      expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
+        'component-external-classes-d--AAA component-external-classes-b--static',
+      )
       expect(elem.$.c1.$.b1.$$.getAttribute('class')).toBe('component-external-classes-d--AAA')
-  
+
       elem.$.c1.setExternalClass('C1', 'BBB')
-      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe('component-external-classes-a--static component-external-classes-d--BBB')
+      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
+        'component-external-classes-a--static component-external-classes-d--BBB',
+      )
       expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('component-external-classes-d--BBB')
-      expect(elem.$.c1.$.b1.$.a2.$.child.$$.getAttribute('class')).toBe('component-external-classes-a--static component-external-classes-d--BBB component-external-classes-b--BBB')
-      expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe('component-external-classes-d--BBB component-external-classes-b--static')
+      expect(elem.$.c1.$.b1.$.a2.$.child.$$.getAttribute('class')).toBe(
+        'component-external-classes-a--static component-external-classes-d--BBB component-external-classes-b--BBB',
+      )
+      expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
+        'component-external-classes-d--BBB component-external-classes-b--static',
+      )
       expect(elem.$.c1.$.b1.$$.getAttribute('class')).toBe('component-external-classes-d--BBB')
-  
+
       var a3 = elem.$.c1.$.b1.shadowRoot.createNativeNode('div')
       a3.id = 'a3'
       a3.class = null
@@ -1036,38 +1079,54 @@ describe('Component', function(){
       expect(a3.$$.getAttribute('class')).toBe('component-external-classes-d--BBB')
       elem.$.c1.$.b1.$.a2.appendChild(a3)
       expect(elem.$.c1.$.b1.$.a3.$$.getAttribute('class')).toBe('component-external-classes-d--BBB')
-  
+
       elem.$.c1.$.b1.setExternalClass('B2', '~CCC CCCC')
-      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe('component-external-classes-a--static component-external-classes-d--BBB')
+      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
+        'component-external-classes-a--static component-external-classes-d--BBB',
+      )
       expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('component-external-classes-d--BBB')
-      expect(elem.$.c1.$.b1.$.a2.$.child.$$.getAttribute('class')).toBe('component-external-classes-a--static CCC component-external-classes-c--CCCC component-external-classes-b--BBB')
-      expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe('CCC component-external-classes-c--CCCC component-external-classes-b--static')
-      expect(elem.$.c1.$.b1.$.a3.$$.getAttribute('class')).toBe('component-external-classes-d--BBB CCC component-external-classes-c--CCCC')
+      expect(elem.$.c1.$.b1.$.a2.$.child.$$.getAttribute('class')).toBe(
+        'component-external-classes-a--static CCC component-external-classes-c--CCCC component-external-classes-b--BBB',
+      )
+      expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
+        'CCC component-external-classes-c--CCCC component-external-classes-b--static',
+      )
+      expect(elem.$.c1.$.b1.$.a3.$$.getAttribute('class')).toBe(
+        'component-external-classes-d--BBB CCC component-external-classes-c--CCCC',
+      )
       expect(elem.$.c1.$.b1.$$.getAttribute('class')).toBe('component-external-classes-d--BBB')
-  
+
       elem.$.c1.$.b1.scheduleExternalClassChange('B1', '')
       elem.$.c1.$.b1.scheduleExternalClassChange('B2', '^CCC')
-      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe('component-external-classes-a--static component-external-classes-d--BBB')
+      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
+        'component-external-classes-a--static component-external-classes-d--BBB',
+      )
       elem.$.c1.$.b1.applyExternalClassChanges()
-      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe('component-external-classes-a--static')
+      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
+        'component-external-classes-a--static',
+      )
       elem.$.c1.$.b1.applyExternalClassChanges()
-      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe('component-external-classes-a--static')
+      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
+        'component-external-classes-a--static',
+      )
       expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('')
-      expect(elem.$.c1.$.b1.$.a2.$.child.$$.getAttribute('class')).toBe('component-external-classes-a--static component-external-classes-d--CCC component-external-classes-b--BBB')
-      expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe('component-external-classes-d--CCC component-external-classes-b--static')
+      expect(elem.$.c1.$.b1.$.a2.$.child.$$.getAttribute('class')).toBe(
+        'component-external-classes-a--static component-external-classes-d--CCC component-external-classes-b--BBB',
+      )
+      expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
+        'component-external-classes-d--CCC component-external-classes-b--static',
+      )
       expect(elem.$.c1.$.b1.$.a3.$$.getAttribute('class')).toBe('component-external-classes-d--CCC')
       expect(elem.$.c1.$.b1.$$.getAttribute('class')).toBe('component-external-classes-d--BBB')
     })
 
-    afterAll(function(){
+    afterAll(function () {
       glassEasel.globalOptions.writeExtraInfoToAttr = false
     })
-
   })
 
-  describe('#setMethodCaller #getMethodCaller', function(){
-
-    it('should allow changing method caller', function(){
+  describe('#setMethodCaller #getMethodCaller', function () {
+    it('should allow changing method caller', function () {
       var newCaller = {}
       var callOrder = []
       regElem({
@@ -1076,28 +1135,28 @@ describe('Component', function(){
         properties: {
           propA: {
             type: String,
-            observer: function(){
+            observer: function () {
               callOrder.push(1)
               expect(this).toBe(newCaller)
             },
-          }
+          },
         },
-        created: function(){
+        created: function () {
           callOrder.push(2)
           expect(this).not.toBe(newCaller)
           this.setMethodCaller(newCaller)
           expect(this.getMethodCaller()).toBe(newCaller)
         },
-        attached: function(){
+        attached: function () {
           callOrder.push(3)
           expect(this).not.toBe(elem)
           expect(this).toBe(newCaller)
         },
-        moved: function(){
+        moved: function () {
           callOrder.push(4)
           expect(this).toBe(newCaller)
         },
-        detached: function(){
+        detached: function () {
           callOrder.push(5)
           expect(this).toBe(newCaller)
         },
@@ -1105,24 +1164,28 @@ describe('Component', function(){
           'this.eventA': 'funcB',
         },
         methods: {
-          funcB: function(e){
+          funcB: function (e) {
             callOrder.push(6)
             expect(this).toBe(newCaller)
             expect(e.currentTarget).toBe(newCaller)
             expect(e.target).toBe(newCaller)
-          }
-        }
+          },
+        },
       })
       var elem = createElem('component-method-caller')
-      elem.addListener('eventA', function(e){
-        callOrder.push(7)
-        expect(this).toBe(newCaller)
-        expect(e.currentTarget).toBe(newCaller)
-        expect(e.target).toBe(newCaller)
-      }, {
-        useCapture: true
-      })
-      var observer = glassEasel.Observer.create(function(){
+      elem.addListener(
+        'eventA',
+        function (e) {
+          callOrder.push(7)
+          expect(this).toBe(newCaller)
+          expect(e.currentTarget).toBe(newCaller)
+          expect(e.target).toBe(newCaller)
+        },
+        {
+          useCapture: true,
+        },
+      )
+      var observer = glassEasel.Observer.create(function () {
         callOrder.push(8)
         expect(this).toBe(elem)
       })
@@ -1140,37 +1203,36 @@ describe('Component', function(){
       expect(callOrder).toStrictEqual([2, 1, 3, 7, 6, 4, 5])
     })
 
-    it('should work with writeFieldsToNode option', function(){
+    it('should work with writeFieldsToNode option', function () {
       var methods = {
-        funcA: function(){}
+        funcA: function () {},
       }
       var caller = {}
       regElem({
         is: 'component-write-fields-to-node',
         options: {
-          writeFieldsToNode: false
+          writeFieldsToNode: false,
         },
         properties: {
           propA: String,
         },
         methods: methods,
-        created: function(){
+        created: function () {
           expect(this.propA).toBe(undefined)
           expect(this.funcA).toBe(undefined)
           this.setMethodCaller(caller)
           caller.setData = this.setData.bind(this)
-        }
+        },
       })
       var elem = createElem('component-write-fields-to-node')
       caller.setData({
-        propA: 'A'
+        propA: 'A',
       })
       expect(elem.data.propA).toBe('A')
     })
-
   })
 
-  it('should call page lifetimes successfully', function(){
+  it('should call page lifetimes successfully', function () {
     var showCallResArr = []
     var hideCallResArr = []
     var customCallResArr = []
@@ -1178,40 +1240,42 @@ describe('Component', function(){
       is: 'component-page-lifetimes-a',
       template: '<div><slot></div>',
       pageLifetimes: {
-        show: function(args){
+        show: function (args) {
           showCallResArr.push(['pa', args])
         },
-        custom: function(args){
+        custom: function (args) {
           customCallResArr.push(['pa', args])
         },
-        hide: function(args){
+        hide: function (args) {
           hideCallResArr.push(['pa', args])
         },
       },
     })
     regElem({
       is: 'component-page-lifetimes-b',
-      template: '<div><component-page-lifetimes-a><component-page-lifetimes-d></component-page-lifetimes-d></component-page-lifetimes-a></div>',
+      template:
+        '<div><component-page-lifetimes-a><component-page-lifetimes-d></component-page-lifetimes-d></component-page-lifetimes-a></div>',
       pageLifetimes: {
-        show: function(args){
+        show: function (args) {
           showCallResArr.push(['pb', args])
         },
-        hide: function(args){
+        hide: function (args) {
           hideCallResArr.push(['pb', args])
         },
       },
     })
     regElem({
       is: 'component-page-lifetimes-c',
-      template: '<div><component-page-lifetimes-a></component-page-lifetimes-a><component-page-lifetimes-b id="b"></component-page-lifetimes-b></div>',
+      template:
+        '<div><component-page-lifetimes-a></component-page-lifetimes-a><component-page-lifetimes-b id="b"></component-page-lifetimes-b></div>',
       pageLifetimes: {
-        show: function(args){
+        show: function (args) {
           showCallResArr.push(['pc', args])
         },
-        custom: function(args){
+        custom: function (args) {
           customCallResArr.push(['pc', args])
         },
-        hide: function(args){
+        hide: function (args) {
           hideCallResArr.push(['pc', args])
         },
       },
@@ -1220,13 +1284,13 @@ describe('Component', function(){
       is: 'component-page-lifetimes-d',
       template: '<div></div>',
       pageLifetimes: {
-        show: function(args){
+        show: function (args) {
           showCallResArr.push(['pd', args])
         },
-        custom: function(args){
+        custom: function (args) {
           customCallResArr.push(['pd', args])
         },
-        hide: function(args){
+        hide: function (args) {
           hideCallResArr.push(['pd', args])
         },
       },
@@ -1239,11 +1303,25 @@ describe('Component', function(){
     elem1.triggerPageLifetime('custom', [{ customProp: 'customValue' }])
 
     expect(showCallResArr.length).toBe(5)
-    expect(showCallResArr).toStrictEqual([['pc', { showProp: 'showValue' }], ['pa', { showProp: 'showValue' }], ['pb', { showProp: 'showValue' }], ['pa', { showProp: 'showValue' }], ['pd', { showProp: 'showValue' }]])
+    expect(showCallResArr).toStrictEqual([
+      ['pc', { showProp: 'showValue' }],
+      ['pa', { showProp: 'showValue' }],
+      ['pb', { showProp: 'showValue' }],
+      ['pa', { showProp: 'showValue' }],
+      ['pd', { showProp: 'showValue' }],
+    ])
     expect(hideCallResArr.length).toBe(3)
-    expect(hideCallResArr).toStrictEqual([['pb', { hideProp: 'hideValue' }], ['pa', { hideProp: 'hideValue' }], ['pd', { hideProp: 'hideValue' }]])
+    expect(hideCallResArr).toStrictEqual([
+      ['pb', { hideProp: 'hideValue' }],
+      ['pa', { hideProp: 'hideValue' }],
+      ['pd', { hideProp: 'hideValue' }],
+    ])
     expect(customCallResArr.length).toBe(4)
-    expect(customCallResArr).toStrictEqual([['pc', { customProp: 'customValue' }], ['pa', { customProp: 'customValue' }], ['pa', { customProp: 'customValue' }], ['pd', { customProp: 'customValue' }]])
+    expect(customCallResArr).toStrictEqual([
+      ['pc', { customProp: 'customValue' }],
+      ['pa', { customProp: 'customValue' }],
+      ['pa', { customProp: 'customValue' }],
+      ['pd', { customProp: 'customValue' }],
+    ])
   })
-
-});
+})

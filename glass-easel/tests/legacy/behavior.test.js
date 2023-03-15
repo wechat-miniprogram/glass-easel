@@ -28,14 +28,13 @@ const createElem = (is, backend) => {
   return glassEasel.Component.createWithContext(is || 'test', def, backend || domBackend)
 }
 
-describe('Behavior', function(){
-
-  it('should do lazy registration', function(){
+describe('Behavior', function () {
+  it('should do lazy registration', function () {
     var behA = regBeh({
       is: 'behavior-lazy-a',
       methods: {
-        fA: function fA(){}
-      }
+        fA: function fA() {},
+      },
     })
     expect(behA._$methodMap.fA).toBe(undefined)
 
@@ -43,7 +42,7 @@ describe('Behavior', function(){
     expect(typeof behA._$methodMap.fA).toBe('function')
   })
 
-  it('should combine definitions correctly', function(){
+  it('should combine definitions correctly', function () {
     var callOrder = []
     var behB = regBeh({
       is: 'behavior-b',
@@ -55,39 +54,39 @@ describe('Behavior', function(){
         d: Array,
       },
       listeners: {
-        'contentchange': 'fB',
-        'tap': 'fB2'
+        contentchange: 'fB',
+        tap: 'fB2',
       },
-      created: function cB(){
+      created: function cB() {
         callOrder.push(3)
       },
-      attached: function cB(){
+      attached: function cB() {
         callOrder.push(4)
       },
-      moved: function cB(){
+      moved: function cB() {
         callOrder.push(5)
       },
-      detached: function cB(){
+      detached: function cB() {
         callOrder.push(6)
       },
       lifetimes: {
-        created: function lrB(){
+        created: function lrB() {
           callOrder.push(7)
         },
       },
       pageLifetimes: {
-        show: function psB(){
+        show: function psB() {
           callOrder.push(8)
         },
       },
       methods: {
-        fB: function fB(){
+        fB: function fB() {
           callOrder.push(1)
         },
-        fB2: function fB2(){
+        fB2: function fB2() {
           callOrder.push(2)
         },
-      }
+      },
     })
     regElem({
       is: 'behavior-b-comp',
@@ -110,7 +109,7 @@ describe('Behavior', function(){
     expect(callOrder).toStrictEqual([7, 1, 2, 4, 5, 8, 6])
   })
 
-  it('should combine definitions correctly (diamond inherit)', function(){
+  it('should combine definitions correctly (diamond inherit)', function () {
     var callOrder = []
     var createSingleBeh = function (suffix, behaviors) {
       return regBeh({
@@ -121,35 +120,35 @@ describe('Behavior', function(){
           d: Array,
         },
         listeners: {
-          'contentchange': 'fB',
+          contentchange: 'fB',
         },
-        created: function cB(){
+        created: function cB() {
           callOrder.push(3 + suffix)
         },
-        attached: function cB(){
+        attached: function cB() {
           callOrder.push(4 + suffix)
         },
-        moved: function cB(){
+        moved: function cB() {
           callOrder.push(5 + suffix)
         },
-        detached: function cB(){
+        detached: function cB() {
           callOrder.push(6 + suffix)
         },
         lifetimes: {
-          created: function lrB(){
+          created: function lrB() {
             callOrder.push(7 + suffix)
           },
         },
         pageLifetimes: {
-          show: function psB(){
+          show: function psB() {
             callOrder.push(8 + suffix)
           },
         },
         methods: {
-          fB: function fB(){
+          fB: function fB() {
             callOrder.push(1 + suffix)
           },
-        }
+        },
       })
     }
     var behA = createSingleBeh('a', [])
@@ -180,45 +179,60 @@ describe('Behavior', function(){
     elem.triggerPageLifetime('show', [])
     glassEasel.Element.pretendDetached(elem)
     expect(callOrder).toStrictEqual([
-      '7a', '7b', '7c', '7d',
+      '7a',
+      '7b',
+      '7c',
+      '7d',
       '1d',
-      '4a', '4b', '4c', '4d',
-      '5a', '5b', '5c', '5d',
-      '8a', '8b', '8c', '8d',
-      '6a', '6b', '6c', '6d',
+      '4a',
+      '4b',
+      '4c',
+      '4d',
+      '5a',
+      '5b',
+      '5c',
+      '5d',
+      '8a',
+      '8b',
+      '8c',
+      '8d',
+      '6a',
+      '6b',
+      '6c',
+      '6d',
     ])
   })
 
-  it('should merge data correctly (with merge)', function(){
+  it('should merge data correctly (with merge)', function () {
     regBeh({
       is: 'behavior-data-merge-base',
       data: {
         obj: {
-          k1: 1
+          k1: 1,
         },
         a: 1,
-        b: 0
-      }
+        b: 0,
+      },
     })
     var behA = regBeh({
       is: 'behavior-data-merge-a',
       behaviors: ['behavior-data-merge-base'],
       data: {
         obj: {
-          k2: 2
+          k2: 2,
         },
-        b: 2
-      }
+        b: 2,
+      },
     })
     var behB = regBeh({
       is: 'behavior-data-merge-b',
       behaviors: ['behavior-data-merge-base'],
       data: {
         obj: {
-          k3: 3
+          k3: 3,
         },
-        c: 3
-      }
+        c: 3,
+      },
     })
     glassEasel.Behavior.prepare(behA)
     glassEasel.Behavior.prepare(behB)
@@ -226,7 +240,7 @@ describe('Behavior', function(){
     expect(behB._$staticData).toStrictEqual({ a: 1, b: 0, c: 3, obj: { k1: 1, k3: 3 } })
   })
 
-  it('should merge data correctly (without arrays)', function(){
+  it('should merge data correctly (without arrays)', function () {
     regBeh({
       is: 'behavior-data-a',
       data: {
@@ -235,61 +249,65 @@ describe('Behavior', function(){
           b1: 'a',
           b2: {
             b3: true,
-            b4: {}
-          }
-        }
-      }
+            b4: {},
+          },
+        },
+      },
     })
     regBeh({
       is: 'behavior-data-b',
-      data: null
+      data: null,
     })
     var behDataC = regBeh({
       is: 'behavior-data-c',
       options: {
-        lazyRegistration: false
+        lazyRegistration: false,
       },
       behaviors: ['behavior-data-a', 'behavior-data-b'],
       data: {
         b: null,
-        __proto__: {a: 1},
-        d: {d1: '1', d2: { d3: {} }}
-      }
+        __proto__: { a: 1 },
+        d: { d1: '1', d2: { d3: {} } },
+      },
     })
     behDataC.prepare()
-    expect(behDataC._$staticData).toStrictEqual({a: 1, b: null, __proto__: {a: 1}, d: {d1: '1', d2: { d3: {} }}})
+    expect(behDataC._$staticData).toStrictEqual({
+      a: 1,
+      b: null,
+      __proto__: { a: 1 },
+      d: { d1: '1', d2: { d3: {} } },
+    })
   })
 
-  it('should merge data correctly (with arrays)', function(){
+  it('should merge data correctly (with arrays)', function () {
     regBeh({
       is: 'behavior-data-d',
       data: {
-        a: [0, 1, {a1: {a2: false}}],
+        a: [0, 1, { a1: { a2: false } }],
         b: [2, null],
-        c: {0: 3}
-      }
+        c: { 0: 3 },
+      },
     })
     regBeh({
       is: 'behavior-data-e',
       data: {
-        a: {1: -1, 2: {a1: {a3: true}}, 3: ['a', 'b']},
+        a: { 1: -1, 2: { a1: { a3: true } }, 3: ['a', 'b'] },
         b: [0],
-        c: [0]
-      }
+        c: [0],
+      },
     })
     var behDataF = regBeh({
       is: 'behavior-data-f',
       options: {
-        lazyRegistration: false
+        lazyRegistration: false,
       },
-      behaviors: ['behavior-data-d', 'behavior-data-e']
+      behaviors: ['behavior-data-d', 'behavior-data-e'],
     })
     behDataF.prepare()
     expect(behDataF._$staticData).toStrictEqual({
-      a: [0, -1, {a1: {a2: false, a3: true}}, ['a', 'b']],
+      a: [0, -1, { a1: { a2: false, a3: true } }, ['a', 'b']],
       b: [0],
-      c: [0]
+      c: [0],
     })
   })
-
 })

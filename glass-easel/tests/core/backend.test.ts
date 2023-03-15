@@ -1,9 +1,4 @@
-import {
-  domBackend,
-  shadowBackend,
-  composedBackend,
-  tmpl,
-} from '../base/env'
+import { domBackend, shadowBackend, composedBackend, tmpl } from '../base/env'
 import * as glassEasel from '../../src'
 
 const componentSpace = new glassEasel.ComponentSpace()
@@ -17,16 +12,13 @@ componentSpace.defineComponent({
 
 const forEachBackend = async (
   f: (
-    context: glassEasel.composedBackend.Context
+    context:
+      | glassEasel.composedBackend.Context
       | glassEasel.backend.Context
-      | glassEasel.domlikeBackend.Context
+      | glassEasel.domlikeBackend.Context,
   ) => Promise<void>,
 ) => {
-  await Promise.all([
-    f(domBackend),
-    f(shadowBackend),
-    f(composedBackend),
-  ])
+  await Promise.all([f(domBackend), f(shadowBackend), f(composedBackend)])
 }
 
 describe('backend', () => {
@@ -78,8 +70,14 @@ describe('backend', () => {
         const styleText = '.a { color: red }'
         context.registerStyleSheetContent('/backend/test/a', styleText)
         const index = context.appendStyleSheetPath('/backend/test/a', 0)
-        try { context.appendStyleSheetPath('/backend/test/a-invalid', 0) } catch (e) { /* empty */ }
-        expect((document.querySelector('style[wx-style-scope]') as HTMLStyleElement).innerText).toBe(styleText)
+        try {
+          context.appendStyleSheetPath('/backend/test/a-invalid', 0)
+        } catch (e) {
+          /* empty */
+        }
+        expect(
+          (document.querySelector('style[wx-style-scope]') as HTMLStyleElement).innerText,
+        ).toBe(styleText)
         context.disableStyleSheet(index)
         expect(document.querySelector('style[wx-style-scope]')).toBe(null)
       }
@@ -91,19 +89,29 @@ describe('backend', () => {
     let elem: glassEasel.Node | null = null
     try {
       elem = new glassEasel.Element()
-    } catch (e) { /* empty */ }
+    } catch (e) {
+      /* empty */
+    }
     try {
       elem = new glassEasel.VirtualNode()
-    } catch (e) { /* empty */ }
+    } catch (e) {
+      /* empty */
+    }
     try {
       elem = new glassEasel.ShadowRoot()
-    } catch (e) { /* empty */ }
+    } catch (e) {
+      /* empty */
+    }
     try {
       elem = new glassEasel.NativeNode()
-    } catch (e) { /* empty */ }
+    } catch (e) {
+      /* empty */
+    }
     try {
       elem = new glassEasel.Component()
-    } catch (e) { /* empty */ }
+    } catch (e) {
+      /* empty */
+    }
     expect(elem).toBe(null)
   })
 
