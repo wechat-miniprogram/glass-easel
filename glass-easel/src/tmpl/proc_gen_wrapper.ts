@@ -23,6 +23,10 @@ export type UpdatePathTreeNode = true | { [key: string]: UpdatePathTreeNode } | 
 
 export type UpdatePathTreeRoot = UpdatePathTreeNode | undefined
 
+type ChangePropListener = (this: unknown, newValue: unknown, oldValue: unknown, host: unknown, elem: unknown) => void
+
+const emptyFilter = <T>(x: T) => x
+
 type TmplArgs = {
   key?: number | string,
   keyList?: RangeListManager,
@@ -33,6 +37,12 @@ type TmplArgs = {
   dynamicSlotNameMatched?: boolean,
   slotProps?: Record<string, [DataValue, DataPath | null, boolean]>,
   slotPropsUpdatePathTree?: Record<string, UpdatePathTreeRoot>,
+  changeProp?: {
+    [name: string]: {
+      listener: ChangePropListener,
+      oldValue: unknown,
+    },
+  },
 }
 export type TmplNode = Node & { _$wxTmplArgs?: TmplArgs }
 
@@ -144,6 +154,8 @@ export class ProcGenWrapper {
   procGen: ProcGen
   disallowNativeNode: boolean
   bindingMapDisabled = false
+  changePropFilter = emptyFilter
+  eventListenerFilter = emptyFilter
 
   constructor(
     shadowRoot: ShadowRoot,
@@ -868,18 +880,18 @@ export class ProcGenWrapper {
   v(
     elem: Element,
     evName: string,
-    v: string,
+    v: string | ((ev: ShadowedEvent<unknown>) => void) | undefined,
     final: boolean,
     mutated: boolean,
     capture: boolean,
     isDynamic: boolean,
   ) {
-    const handlerName = dataValueToString(v)
+    const handler = typeof v === 'function' ? this.eventListenerFilter(v) : dataValueToString(v)
     const listener = (ev: ShadowedEvent<unknown>) => {
       const host = elem.ownerShadowRoot!.getHostNode()
       let ret: boolean | undefined
       const methodCaller = host.getMethodCaller() as { [key: string]: unknown }
-      const f = host._$methodMap[handlerName]
+      const f = typeof handler === 'function' ? handler : host._$methodMap[handler]
       if (typeof f === 'function') {
         ret = (f as (ev: ShadowedEvent<unknown>) => boolean | undefined).call(methodCaller, ev)
       }
@@ -899,7 +911,7 @@ export class ProcGenWrapper {
       }
       dynEvListeners[evName] = listener
     }
-    if (handlerName) elem.addListener(evName, listener, evOptions)
+    if (handler) elem.addListener(evName, listener, evOptions)
   }
 
   // update a property or external class of a component, or an attribute of a native node
@@ -915,6 +927,16 @@ export class ProcGenWrapper {
             nodeDataProxy.replaceDataOnPath(lvaluePath, value)
             nodeDataProxy.applyDataUpdates(false)
           })
+        }
+        const tmplArgs = getTmplArgs(elem)
+        if (tmplArgs.changeProp?.[name]) {
+          const lv = tmplArgs.changeProp[name]!
+          const oldValue = lv.oldValue
+          if (oldValue !== v) {
+            lv.oldValue = v
+            const host = elem.ownerShadowRoot!.getHostNode()
+            lv.listener.call(host.getMethodCaller(), v, oldValue, host, elem)
+          }
         }
       } else if (elem.hasExternalClass(name)) {
         elem.setExternalClass(name, dataValueToString(v))
@@ -935,5 +957,30 @@ export class ProcGenWrapper {
     } else {
       elem.updateAttribute(name, v)
     }
+  }
+
+  // add a change property binding
+  p(elem: Element, name: string, v: ChangePropListener) {
+    if (elem instanceof Component) {
+      if (Component.hasProperty(elem, name)) {
+        const tmplArgs = getTmplArgs(elem)
+        if (!tmplArgs.changeProp) {
+          tmplArgs.changeProp = Object.create(null) as typeof tmplArgs.changeProp
+        }
+        tmplArgs.changeProp![name] = {
+          listener: this.changePropFilter(v),
+          oldValue: (elem.data as { [k: string]: DataValue })[name],
+        }
+      }
+    }
+  }
+
+  // set filter functions for change properties and event listeners
+  setFnFilter(
+    changePropFilter: <T>(v: T) => T,
+    eventListenerFilter: <T>(v: T) => T,
+  ) {
+    this.changePropFilter = changePropFilter
+    this.eventListenerFilter = eventListenerFilter
   }
 }

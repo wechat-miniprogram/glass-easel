@@ -34,7 +34,7 @@
 
 [抽象节点](interaction/generic.md)
 
-[多文件模板](interaction/template_import.md)
+[模板引用](interaction/template_import.md)
 
 ### 数据控制
 

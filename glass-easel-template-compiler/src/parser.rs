@@ -270,6 +270,7 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
         Static(U),
         Dynamic(Box<TmplExpr>),
     }
+
     fn parse_text_entity(pair: pest::iterators::Pair<'_, Rule>) -> TextEntity<String> {
         let mut is_dynamic = false;
         let segs: Vec<TextEntity<&str>> = pair
@@ -346,7 +347,68 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                 Rule::tag => {
                     let mut tag_pairs = pair.into_inner();
                     if let Some(pair) = tag_pairs.next() {
+                        let read_attr = |mut pairs: pest::iterators::Pairs<Rule>| {
+                            let name = pairs.next().unwrap();
+                            let value = match pairs.next() {
+                                None => TmplAttrValue::Dynamic {
+                                    // TODO use a better representation for default static values
+                                    expr: Box::new(TmplExpr::LitBool(true)),
+                                    binding_map_keys: None,
+                                },
+                                Some(x) => {
+                                    let value = x.into_inner().next().unwrap();
+                                    match parse_text_entity(value) {
+                                        TextEntity::Static(s) => {
+                                            TmplAttrValue::Static(s)
+                                        }
+                                        TextEntity::Dynamic(expr) => {
+                                            TmplAttrValue::Dynamic {
+                                                expr,
+                                                binding_map_keys: None,
+                                            }
+                                        }
+                                    }
+                                }
+                            };
+                            (name.as_str().to_string(), value)
+                        };
                         match pair.as_rule() {
+                            Rule::wxs_script_tag_begin => {
+                                let mut elem = TmplElement::new("wxs", TmplVirtualType::Pure);
+                                let pair = tag_pairs.next().unwrap();
+                                match pair.as_rule() {
+                                    Rule::wxs_script_tag => {
+                                        let mut wxs_pairs = pair.into_inner();
+                                        while let Some(pair) = wxs_pairs.next() {
+                                            match pair.as_rule() {
+                                                Rule::attr => {
+                                                    let pairs = pair.into_inner();
+                                                    let (name, value) = read_attr(pairs);
+                                                    elem.add_attr(name.as_str(), value);
+                                                }
+                                                Rule::wxs_script_body => {
+                                                    let text: String = pair
+                                                        .into_inner()
+                                                        .map(|pair| {
+                                                            match pair.as_rule() {
+                                                                Rule::entity => entities::decode(pair.as_str()),
+                                                                Rule::pure_text => pair.as_str(),
+                                                                _ => unreachable!(),
+                                                            }
+                                                        })
+                                                        .collect();
+                                                    elem.append_text_node(TmplTextNode::Static(text));
+                                                    break;
+                                                }
+                                                _ => unreachable!()
+                                            }
+                                        }
+                                    }
+                                    _ => unreachable!(),
+                                }
+                                pairs.next();
+                                target.append_element(elem);
+                            }
                             Rule::tag_begin => {
                                 let mut elem = {
                                     let mut pairs = pair.into_inner();
@@ -358,31 +420,9 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                                     };
                                     let mut elem = TmplElement::new(tag_name, virtual_type);
                                     while let Some(pair) = pairs.next() {
-                                        let mut pairs = pair.into_inner();
-                                        let name = pairs.next().unwrap();
-                                        let value = match pairs.next() {
-                                            None => TmplAttrValue::Dynamic {
-                                                // TODO use a better repr for default static values
-                                                expr: Box::new(TmplExpr::LitBool(true)),
-                                                binding_map_keys: None,
-                                            },
-                                            Some(x) => {
-                                                let value = x.into_inner().next().unwrap();
-                                                match parse_text_entity(value) {
-                                                    TextEntity::Static(s) => {
-                                                        TmplAttrValue::Static(s)
-                                                    }
-                                                    TextEntity::Dynamic(expr) => {
-                                                        TmplAttrValue::Dynamic {
-                                                            expr,
-                                                            binding_map_keys: None,
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        };
-                                        let name = name.as_str();
-                                        elem.add_attr(name, value);
+                                        let pairs = pair.into_inner();
+                                        let (name, value) = read_attr(pairs);
+                                        elem.add_attr(name.as_str(), value);
                                     }
                                     elem
                                 };
@@ -439,9 +479,9 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
             imports: &mut Vec<String>,
             includes: &mut Vec<String>,
             sub_templates: &mut HashMap<String, TmplElement>,
+            scripts: &mut Vec<TmplScript>,
         ) {
-            let mut old_children = vec![];
-            std::mem::swap(&mut old_children, &mut parent.children);
+            let old_children = std::mem::replace(&mut parent.children, vec![]);
             for node in old_children.into_iter() {
                 match node {
                     TmplNode::TextNode(text_node) => {
@@ -536,8 +576,7 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                         // handling special tags
                         match elem.tag_name.as_str() {
                             "include" | "import" => {
-                                let mut old_attrs = vec![];
-                                std::mem::swap(&mut old_attrs, &mut elem.attrs);
+                                let old_attrs = std::mem::replace(&mut elem.attrs, vec![]);
                                 let mut path = None;
                                 for attr in old_attrs.into_iter() {
                                     if attr.is_property("src") {
@@ -567,8 +606,7 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                                 continue;
                             }
                             "template" => {
-                                let mut old_attrs = vec![];
-                                std::mem::swap(&mut old_attrs, &mut elem.attrs);
+                                let old_attrs = std::mem::replace(&mut elem.attrs, vec![]);
                                 let mut name = None;
                                 let mut target = None;
                                 let mut data = None;
@@ -600,7 +638,7 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                                         if target.is_some() || data.is_some() {
                                             // FIXME warn unused attr
                                         }
-                                        rec(&mut elem, imports, includes, sub_templates);
+                                        rec(&mut elem, imports, includes, sub_templates, scripts);
                                         sub_templates.insert(name, elem);
                                         continue;
                                     }
@@ -620,8 +658,7 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                                 }
                             }
                             "slot" => {
-                                let mut old_attrs = vec![];
-                                std::mem::swap(&mut old_attrs, &mut elem.attrs);
+                                let old_attrs = std::mem::replace(&mut elem.attrs, vec![]);
                                 let mut name = TmplAttrValue::Static(String::new());
                                 let mut props: Option<Vec<TmplAttr>> = None;
                                 for attr in old_attrs.into_iter() {
@@ -638,6 +675,46 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                                     }
                                 }
                                 elem.virtual_type = TmplVirtualType::Slot { name, props };
+                            }
+                            "wxs" => {
+                                let old_attrs = std::mem::replace(&mut elem.attrs, vec![]);
+                                let mut module_name = String::new();
+                                let mut src = String::new();
+                                for attr in old_attrs.into_iter() {
+                                    if attr.is_property("module") {
+                                        match attr.value {
+                                            TmplAttrValue::Dynamic { .. } => {
+                                                // FIXME warn must be static
+                                            }
+                                            TmplAttrValue::Static(s) => {
+                                                module_name = s;
+                                            }
+                                        }
+                                    } else if attr.is_property("src") {
+                                        match attr.value {
+                                            TmplAttrValue::Dynamic { .. } => {
+                                                // FIXME warn must be static
+                                            }
+                                            TmplAttrValue::Static(s) => {
+                                                src = s.strip_suffix(".wxs").unwrap_or(&s).to_string();
+                                            }
+                                        }
+                                    } else {
+                                        // FIXME warn unused attr
+                                    }
+                                }
+                                if src.len() == 0 {
+                                    let content = match elem.children.get(0) {
+                                        Some(TmplNode::TextNode(TmplTextNode::Static(x))) => x.as_str(),
+                                        None => "",
+                                        _ => unreachable!(),
+                                    };
+                                    scripts.push(TmplScript::Inline { module_name, content: content.to_string() });
+                                } else {
+                                    // FIXME warn unused script content
+                                    scripts.push(TmplScript::GlobalRef { module_name, rel_path: src });
+                                }
+                                continue;
                             }
                             _ => {}
                         }
@@ -671,7 +748,7 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                                 if let Some(last) = parent.children.last_mut() {
                                     if let TmplNode::Element(last) = last {
                                         if let TmplVirtualType::IfGroup = last.virtual_type {
-                                            rec(&mut elem, imports, includes, sub_templates);
+                                            rec(&mut elem, imports, includes, sub_templates, scripts);
                                             last.append_element(elem);
                                             // FIXME here should display a warning if <for> is found
                                             continue;
@@ -687,7 +764,7 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                                 if let Some(last) = parent.children.last_mut() {
                                     if let TmplNode::Element(last) = last {
                                         if let TmplVirtualType::IfGroup = last.virtual_type {
-                                            rec(&mut elem, imports, includes, sub_templates);
+                                            rec(&mut elem, imports, includes, sub_templates, scripts);
                                             last.append_element(elem);
                                             // FIXME here should display a warning if <for> is found
                                             continue;
@@ -720,7 +797,7 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                                 TmplNode::TextNode(_) => unreachable!(),
                             }
                         }
-                        rec(next, imports, includes, sub_templates);
+                        rec(next, imports, includes, sub_templates, scripts);
 
                         // eliminate pure virtual node
                         let is_pure_virtual = if let TmplVirtualType::Pure = elem.virtual_type {
@@ -753,8 +830,9 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
             includes,
             sub_templates,
             binding_map_collector: _,
+            scripts,
         } = tree;
-        rec(root, imports, includes, sub_templates);
+        rec(root, imports, includes, sub_templates, scripts);
     }
 
     fn prepare_expr_in_tree(tree: &mut TmplTree) {
@@ -871,10 +949,16 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                 }
             }
         }
+        let scope_names = tree.scripts.iter().map(|script| {
+            match script {
+                TmplScript::Inline { module_name, .. } => module_name.to_string(),
+                TmplScript::GlobalRef { module_name, .. } => module_name.to_string(),
+            }
+        }).collect();
         rec(
             &mut tree.root,
             &mut tree.binding_map_collector,
-            &vec![],
+            &scope_names,
             false,
         );
         for tmpl in tree.sub_templates.values_mut() {

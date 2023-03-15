@@ -221,4 +221,14 @@ export class ProcGenWrapperDom {
       elem.setAttribute(name, dataValueToString(v))
     }
   }
+
+  // add a change property binding
+  p() {
+    noop()
+  }
+
+  // set filter functions for change properties and event listeners
+  setFnFilter() {
+    noop()
+  }
 }

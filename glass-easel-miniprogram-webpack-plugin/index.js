@@ -183,6 +183,14 @@ class GlassEaselMiniprogramWebpackPlugin {
           // TODO support wxss file remove
         }
 
+        // add wxs
+        if (extName === '.wxs') {
+          const src = await fs.readFile(path.join(codeRoot, relPath), { encoding: 'utf8' })
+          const scriptPath = relPath.slice(0, -extName.length)
+          params.tmplGroup.addScript(scriptPath, src)
+          // TODO support wxs file remove
+        }
+
         // find resource files
         if (this.resourceFilePattern.test(relPath)) {
           params.resPathMap[relPath] = true

@@ -23,10 +23,10 @@ impl TmplGroup {
     }
 
     #[wasm_bindgen(js_name = addTmpl)]
-    pub fn add_tmpl(&mut self, path: String, tmpl_str: &str) -> Result<usize, JsValue> {
-        let path = group::path::normalize(path.as_str());
+    pub fn add_tmpl(&mut self, path: &str, tmpl_str: &str) -> Result<usize, JsValue> {
+        let path = group::path::normalize(path);
         self.group
-            .add_tmpl(path.clone(), tmpl_str)
+            .add_tmpl(&path, tmpl_str)
             .map_err(|x| JsValue::from(format!("{}", x)))?;
         if let Some(x) = self.names.iter().position(|x| x.as_str() == path.as_str()) {
             Ok(x)
@@ -36,9 +36,23 @@ impl TmplGroup {
         }
     }
 
+    #[wasm_bindgen(js_name = addScript)]
+    pub fn add_script(&mut self, path: &str, tmpl_str: &str) -> Result<(), JsValue> {
+        let path = group::path::normalize(path);
+        self.group
+            .add_script(&path, tmpl_str)
+            .map_err(|x| JsValue::from(format!("{}", x)))?;
+        Ok(())
+    }
+
     #[wasm_bindgen(js_name = "getRuntimeString")]
-    pub fn get_runtime_string() -> String {
-        crate::TmplGroup::get_runtime_string()
+    pub fn get_runtime_string(&self) -> String {
+        self.group.get_runtime_string()
+    }
+
+    #[wasm_bindgen(js_name = "setExtraRuntimeScript")]
+    pub fn set_extra_runtime_script(&mut self, s: &str) {
+        self.group.set_extra_runtime_script(s)
     }
 
     #[wasm_bindgen(js_name = "getRuntimeVarList")]
@@ -65,52 +79,6 @@ impl TmplGroup {
         self.group
             .get_wx_gen_object_groups()
             .map_err(|x| JsValue::from(format!("{}", x)))
-    }
-
-    #[wasm_bindgen]
-    #[cfg(feature = "native_data")]
-    pub fn apply_data(&self, id: usize, data: JsValue) -> Result<js_sys::Array, JsValue> {
-        let ret = js_sys::Array::new();
-        fn handle_node(parent_js_arr: &js_sys::Array, node: TmplDataNode<TmplNativeData>) {
-            match node {
-                TmplDataNode::Element(mut elem) => {
-                    let js_elem = js_sys::Object::new();
-                    js_sys::Reflect::set(
-                        &js_elem,
-                        &JsValue::from("tag"),
-                        &JsValue::from_str(elem.tag_name()),
-                    )
-                    .unwrap();
-                    let attr = js_sys::Object::new();
-                    js_sys::Reflect::set(&js_elem, &JsValue::from("attr"), &attr).unwrap();
-                    elem.iter_attrs(|name, value| {
-                        js_sys::Reflect::set(
-                            &attr,
-                            &JsValue::from(name),
-                            &native_data_to_js_value(&value),
-                        )
-                        .unwrap();
-                    });
-                    let children = js_sys::Array::new();
-                    js_sys::Reflect::set(&js_elem, &JsValue::from("children"), &children).unwrap();
-                    elem.iter_children(|node| {
-                        handle_node(&children, node);
-                    });
-                    parent_js_arr.push(&js_elem);
-                }
-                TmplDataNode::TextNode(n) => {
-                    let js_str = JsValue::from_str(n.as_str());
-                    parent_js_arr.push(&js_str);
-                }
-            }
-        }
-        let data = js_value_to_native_data(data);
-        self.group
-            .apply_data(self.names[id].as_str(), &data, |node| {
-                handle_node(&ret, node);
-            })
-            .map_err(|x| JsValue::from(format!("{:?}", x)))?;
-        Ok(ret)
     }
 }
 

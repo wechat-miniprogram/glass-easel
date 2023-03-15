@@ -58,7 +58,11 @@ export const tmpl = (src: string, options?: TemplateOptions) => {
 export const multiTmpl = (src: { [path: string]: string }, options?: TemplateOptions) => {
   const group = new TmplGroup()
   Object.keys(src).forEach((path) => {
-    group.addTmpl(path, src[path]!)
+    if (path.endsWith('.wxs')) {
+      group.addScript(path.slice(0, -4), src[path]!)
+    } else {
+      group.addTmpl(path, src[path]!)
+    }
   })
   const genObjectSrc = `return ${group.getTmplGenObjectGroups()}`
   group.free()

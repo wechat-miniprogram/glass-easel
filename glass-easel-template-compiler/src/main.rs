@@ -111,7 +111,7 @@ fn load_wxml_files(group: &mut TmplGroup, dir: &Path, wxml_path: &mut Vec<String
                                             .unwrap()
                                             .to_string(),
                                     );
-                                    group.add_tmpl(wxml_path.join("/"), &content).unwrap();
+                                    group.add_tmpl(&wxml_path.join("/"), &content).unwrap();
                                     wxml_path.pop();
                                     size += fsize;
                                 }

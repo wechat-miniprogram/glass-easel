@@ -461,7 +461,13 @@ impl PathSliceList {
         for path_slice in self.0.iter() {
             match path_slice {
                 PathSlice::Ident(s) => write!(&mut ret, "U.{}", s)?,
-                PathSlice::ScopeIndex(i) => write!(&mut ret, "{}", scopes[*i].update_path_tree)?,
+                PathSlice::ScopeIndex(i) => {
+                    if let Some(x) = scopes[*i].update_path_tree.as_ref() {
+                        write!(&mut ret, "{}", x)?
+                    } else {
+                        write!(&mut ret, "undefined")?
+                    }
+                },
                 PathSlice::StaticMember(s) => {
                     ret = format!("Z({},{})", ret, gen_lit_str(s));
                 }
@@ -604,7 +610,11 @@ impl TmplExpr {
         let path_analysis_state: PathAnalysisState = match self {
             TmplExpr::ScopeIndex(index) => {
                 write!(value, "{}", scopes[*index].var)?;
-                PathAnalysisState::InPath(PathSliceList(vec![PathSlice::ScopeIndex(*index)]))
+                if scopes[*index].update_path_tree.is_some() {
+                    PathAnalysisState::InPath(PathSliceList(vec![PathSlice::ScopeIndex(*index)]))
+                } else {
+                    PathAnalysisState::NotInPath
+                }
             }
             TmplExpr::Ident(x) => {
                 write!(value, "D.{}", x)?;
@@ -746,9 +756,8 @@ impl TmplExpr {
                 pas
             }
             TmplExpr::FuncCall(x, y) => {
-                write!(value, "W(")?; // TODO use the imported map
                 x.to_proc_gen_rec_and_end_path(w, scopes, TmplExprLevel::Cond, path_calc, value)?;
-                write!(value, ",[")?;
+                write!(value, "(")?;
                 for (i, y) in y.iter().enumerate() {
                     if i > 0 {
                         write!(value, ",")?;
@@ -761,7 +770,7 @@ impl TmplExpr {
                         value,
                     )?;
                 }
-                write!(value, "])")?;
+                write!(value, ")")?;
                 PathAnalysisState::NotInPath
             }
 
@@ -1022,6 +1031,8 @@ impl TmplExpr {
         Ok(TmplExprProcGen { pas, sub_p, value })
     }
 
+    // this function finds which keys can be put into the binding map,
+    // and convert scope names to scope indexes at the same time.
     pub(crate) fn get_binding_map_keys(
         &mut self,
         bmc: &mut BindingMapCollector,
