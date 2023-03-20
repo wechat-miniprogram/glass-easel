@@ -15,7 +15,9 @@ componentSpace.defineComponent({
 const regElem = (config) => {
   const { template, ...c } = config
   if (template) c.template = tmpl(template)
-  return componentSpace.defineComponent(c)
+  const ret = componentSpace.defineComponent(c)
+  componentSpace.setGlobalUsingComponent(config.is, ret)
+  return ret
 }
 
 const createElemInBackend = (is, backend) => {
@@ -25,14 +27,14 @@ const createElemInBackend = (is, backend) => {
 
 var matchElementWithDom = require('../base/match').virtual
 
-const testCases = function(testBackend){
+const testCases = function (testBackend) {
   var root = null
 
-  const createElem = function(is){
+  const createElem = function (is) {
     return createElemInBackend(is, testBackend)
   }
 
-  beforeAll(function(){
+  beforeAll(function () {
     regElem({
       is: 'virtual-a',
     })
@@ -54,39 +56,39 @@ const testCases = function(testBackend){
     }
   })
 
-  beforeAll(function(){
+  beforeAll(function () {
     regElem({
       is: 'component-slot-a',
-      template: '<span id="a"></span>'
+      template: '<span id="a"></span>',
     })
     root = createElem('component-slot-a')
     regElem({
       is: 'component-slot-b',
-      template: '<span id="b"><component-slot-a> <slot></slot> </component-slot-a></span>'
+      template: '<span id="b"><component-slot-a> <slot></slot> </component-slot-a></span>',
     })
     regElem({
       is: 'component-slot-c',
       options: {
-        multipleSlots: true
+        multipleSlots: true,
       },
-      template: '<slot></slot> <span id="c"> <slot name="1"></slot> </span> <slot name="2"></slot>'
+      template: '<slot></slot> <span id="c"> <slot name="1"></slot> </span> <slot name="2"></slot>',
     })
     regElem({
       is: 'component-slot-d',
       options: {
-        multipleSlots: true
+        multipleSlots: true,
       },
-      template: '<span id="d"><component-slot-c id="child"> <span id="a" slot="">A</span> <span id="b" slot="1">B</span> <span id="c" slot="2">C</span>D</component-slot-c></span>'
+      template:
+        '<span id="d"><component-slot-c id="child"> <span id="a" slot="">A</span> <span id="b" slot="1">B</span> <span id="c" slot="2">C</span>D</component-slot-c></span>',
     })
     regElem({
       is: 'component-slot-e',
-      template: '<span id="e"> <slot/> </span>'
+      template: '<span id="e"> <slot/> </span>',
     })
   })
 
-  describe('single-slotted', function(){
-
-    it('should support non-slot components', function(){
+  describe('single-slotted', function () {
+    it('should support non-slot components', function () {
       var elem = root.shadowRoot.createComponent('component-slot-a')
       var text = glassEasel.TextNode.create('test', elem.ownerShadowRoot)
       var child = root.shadowRoot.createComponent('component-slot-b')
@@ -123,7 +125,7 @@ const testCases = function(testBackend){
       matchElementWithDom(elem)
     })
 
-    it('should support slot movement', function(){
+    it('should support slot movement', function () {
       var elem = null
       var text = glassEasel.TextNode.create('test', root.shadowRoot)
       var text2 = null
@@ -134,7 +136,10 @@ const testCases = function(testBackend){
       expect(elem.childNodes).toStrictEqual([text])
       expect(elem.shadowRoot.getContainingSlot(null).getComposedChildren()).toStrictEqual([text])
       expect(elem.shadowRoot.getContainingSlot(null).getComposedParent()).toBe(null)
-      expect(elem.$.b.childNodes[0].childNodes).toStrictEqual([elem.shadowRoot.getContainingSlot(null), text2])
+      expect(elem.$.b.childNodes[0].childNodes).toStrictEqual([
+        elem.shadowRoot.getContainingSlot(null),
+        text2,
+      ])
       expect(elem.$.b.childNodes[0].shadowRoot.getContainingSlot(null)).toBe(null)
       matchElementWithDom(elem)
 
@@ -143,80 +148,123 @@ const testCases = function(testBackend){
       glassEasel.Element.setSlotName(newSlot)
       a.shadowRoot.insertBefore(newSlot, a.$.a)
       expect(a.shadowRoot.getContainingSlot(null)).toBe(newSlot)
-      expect(a.shadowRoot.getContainingSlot(null).getComposedChildren()).toStrictEqual([elem.shadowRoot.getContainingSlot(null), text2])
+      expect(a.shadowRoot.getContainingSlot(null).getComposedChildren()).toStrictEqual([
+        elem.shadowRoot.getContainingSlot(null),
+        text2,
+      ])
       expect(elem.shadowRoot.getContainingSlot(null).getComposedChildren()).toStrictEqual([text])
       expect(elem.shadowRoot.getContainingSlot(null).getComposedParent()).toBe(newSlot)
-      expect(a.shadowRoot.childNodes[0].getComposedChildren()).toStrictEqual([elem.shadowRoot.getContainingSlot(null), text2])
+      expect(a.shadowRoot.childNodes[0].getComposedChildren()).toStrictEqual([
+        elem.shadowRoot.getContainingSlot(null),
+        text2,
+      ])
       matchElementWithDom(elem)
 
       a.shadowRoot.appendChild(newSlot)
       expect(a.shadowRoot.getContainingSlot(null)).toBe(newSlot)
-      expect(a.shadowRoot.getContainingSlot(null).getComposedChildren()).toStrictEqual([elem.shadowRoot.getContainingSlot(null), text2])
+      expect(a.shadowRoot.getContainingSlot(null).getComposedChildren()).toStrictEqual([
+        elem.shadowRoot.getContainingSlot(null),
+        text2,
+      ])
       expect(elem.shadowRoot.getContainingSlot(null).getComposedChildren()).toStrictEqual([text])
       expect(elem.shadowRoot.getContainingSlot(null).getComposedParent()).toBe(newSlot)
-      expect(a.shadowRoot.childNodes[a.shadowRoot.childNodes.length - 1].getComposedChildren()).toStrictEqual([elem.shadowRoot.getContainingSlot(null), text2])
+      expect(
+        a.shadowRoot.childNodes[a.shadowRoot.childNodes.length - 1].getComposedChildren(),
+      ).toStrictEqual([elem.shadowRoot.getContainingSlot(null), text2])
       matchElementWithDom(elem)
     })
-
   })
 
-  describe('multi-slotted (without splitting insertion)', function(){
-
-    it('should support static slotting', function(){
+  describe('multi-slotted (without splitting insertion)', function () {
+    it('should support static slotting', function () {
       var elem = root.shadowRoot.createComponent('component-slot-d')
       var child = elem.$.child
       expect(child.childNodes[3].textContent).toBe('D')
-      expect(child.shadowRoot.childNodes[0].getComposedChildren()).toStrictEqual([elem.$.a, child.childNodes[3]])
-      expect(child.shadowRoot.childNodes[1].childNodes[0].getComposedChildren()).toStrictEqual([elem.$.b])
+      expect(child.shadowRoot.childNodes[0].getComposedChildren()).toStrictEqual([
+        elem.$.a,
+        child.childNodes[3],
+      ])
+      expect(child.shadowRoot.childNodes[1].childNodes[0].getComposedChildren()).toStrictEqual([
+        elem.$.b,
+      ])
       expect(child.shadowRoot.childNodes[2].getComposedChildren()).toStrictEqual([elem.$.c])
       matchElementWithDom(elem)
 
       elem.$.a.slot = '1'
       expect(child.childNodes[3].textContent).toBe('D')
-      expect(child.shadowRoot.childNodes[0].getComposedChildren()).toStrictEqual([child.childNodes[3]])
-      expect(child.shadowRoot.childNodes[1].childNodes[0].getComposedChildren()).toStrictEqual([elem.$.a, elem.$.b])
+      expect(child.shadowRoot.childNodes[0].getComposedChildren()).toStrictEqual([
+        child.childNodes[3],
+      ])
+      expect(child.shadowRoot.childNodes[1].childNodes[0].getComposedChildren()).toStrictEqual([
+        elem.$.a,
+        elem.$.b,
+      ])
       expect(child.shadowRoot.childNodes[2].getComposedChildren()).toStrictEqual([elem.$.c])
       matchElementWithDom(elem)
 
       elem.$.c.slot = '1'
       expect(child.childNodes[3].textContent).toBe('D')
-      expect(child.shadowRoot.childNodes[0].getComposedChildren()).toStrictEqual([child.childNodes[3]])
-      expect(child.shadowRoot.childNodes[1].childNodes[0].getComposedChildren()).toStrictEqual([elem.$.a, elem.$.b, elem.$.c])
+      expect(child.shadowRoot.childNodes[0].getComposedChildren()).toStrictEqual([
+        child.childNodes[3],
+      ])
+      expect(child.shadowRoot.childNodes[1].childNodes[0].getComposedChildren()).toStrictEqual([
+        elem.$.a,
+        elem.$.b,
+        elem.$.c,
+      ])
       expect(child.shadowRoot.childNodes[2].getComposedChildren()).toStrictEqual([])
       matchElementWithDom(elem)
 
       elem.$.a.slot = '2'
       expect(child.childNodes[3].textContent).toBe('D')
-      expect(child.shadowRoot.childNodes[0].getComposedChildren()).toStrictEqual([child.childNodes[3]])
-      expect(child.shadowRoot.childNodes[1].childNodes[0].getComposedChildren()).toStrictEqual([elem.$.b, elem.$.c])
+      expect(child.shadowRoot.childNodes[0].getComposedChildren()).toStrictEqual([
+        child.childNodes[3],
+      ])
+      expect(child.shadowRoot.childNodes[1].childNodes[0].getComposedChildren()).toStrictEqual([
+        elem.$.b,
+        elem.$.c,
+      ])
       expect(child.shadowRoot.childNodes[2].getComposedChildren()).toStrictEqual([elem.$.a])
       matchElementWithDom(elem)
 
       elem.$.b.slot = 'xxx'
       expect(child.childNodes[3].textContent).toBe('D')
       expect(elem.$.b.getComposedParent()).toBe(null)
-      expect(child.shadowRoot.childNodes[0].getComposedChildren()).toStrictEqual([child.childNodes[3]])
-      expect(child.shadowRoot.childNodes[1].childNodes[0].getComposedChildren()).toStrictEqual([elem.$.c])
+      expect(child.shadowRoot.childNodes[0].getComposedChildren()).toStrictEqual([
+        child.childNodes[3],
+      ])
+      expect(child.shadowRoot.childNodes[1].childNodes[0].getComposedChildren()).toStrictEqual([
+        elem.$.c,
+      ])
       expect(child.shadowRoot.childNodes[2].getComposedChildren()).toStrictEqual([elem.$.a])
       matchElementWithDom(elem)
 
       elem.$.b.slot = 'yyy'
       expect(child.childNodes[3].textContent).toBe('D')
       expect(elem.$.b.getComposedParent()).toBe(null)
-      expect(child.shadowRoot.childNodes[0].getComposedChildren()).toStrictEqual([child.childNodes[3]])
-      expect(child.shadowRoot.childNodes[1].childNodes[0].getComposedChildren()).toStrictEqual([elem.$.c])
+      expect(child.shadowRoot.childNodes[0].getComposedChildren()).toStrictEqual([
+        child.childNodes[3],
+      ])
+      expect(child.shadowRoot.childNodes[1].childNodes[0].getComposedChildren()).toStrictEqual([
+        elem.$.c,
+      ])
       expect(child.shadowRoot.childNodes[2].getComposedChildren()).toStrictEqual([elem.$.a])
       matchElementWithDom(elem)
 
       elem.$.b.slot = ''
       expect(child.childNodes[3].textContent).toBe('D')
-      expect(child.shadowRoot.childNodes[0].getComposedChildren()).toStrictEqual([elem.$.b, child.childNodes[3]])
-      expect(child.shadowRoot.childNodes[1].childNodes[0].getComposedChildren()).toStrictEqual([elem.$.c])
+      expect(child.shadowRoot.childNodes[0].getComposedChildren()).toStrictEqual([
+        elem.$.b,
+        child.childNodes[3],
+      ])
+      expect(child.shadowRoot.childNodes[1].childNodes[0].getComposedChildren()).toStrictEqual([
+        elem.$.c,
+      ])
       expect(child.shadowRoot.childNodes[2].getComposedChildren()).toStrictEqual([elem.$.a])
       matchElementWithDom(elem)
     })
 
-    it('should support non-slot components', function(){
+    it('should support non-slot components', function () {
       var elem = root.shadowRoot.createComponent('component-slot-d')
       var child = elem.$.child
       var elem2 = root.shadowRoot.createComponent('component-slot-a')
@@ -230,7 +278,10 @@ const testCases = function(testBackend){
       newSlot.slot = 1
       child.appendChild(newSlot)
       expect(newSlot.getComposedChildren()).toStrictEqual([elem2])
-      expect(child.shadowRoot.childNodes[1].childNodes[0].getComposedChildren()).toStrictEqual([elem.$.b, newSlot])
+      expect(child.shadowRoot.childNodes[1].childNodes[0].getComposedChildren()).toStrictEqual([
+        elem.$.b,
+        newSlot,
+      ])
       matchElementWithDom(elem)
 
       var newSlot2 = elem.shadowRoot.createNativeNode('div')
@@ -238,15 +289,26 @@ const testCases = function(testBackend){
       child.appendChild(newSlot2)
       expect(newSlot2.getComposedChildren()).toStrictEqual([elem3])
       expect(child.childNodes[3].textContent).toBe('D')
-      expect(child.shadowRoot.childNodes[0].getComposedChildren()).toStrictEqual([elem.$.a, child.childNodes[3], newSlot2])
+      expect(child.shadowRoot.childNodes[0].getComposedChildren()).toStrictEqual([
+        elem.$.a,
+        child.childNodes[3],
+        newSlot2,
+      ])
       matchElementWithDom(elem)
 
       glassEasel.Element.setSlotName(newSlot, 'new2')
       expect(newSlot.getComposedChildren()).toStrictEqual([elem3])
       expect(newSlot2.getComposedChildren()).toStrictEqual([])
       expect(child.childNodes[3].textContent).toBe('D')
-      expect(child.shadowRoot.childNodes[0].getComposedChildren()).toStrictEqual([elem.$.a, child.childNodes[3], newSlot2])
-      expect(child.shadowRoot.childNodes[1].childNodes[0].getComposedChildren()).toStrictEqual([elem.$.b, newSlot])
+      expect(child.shadowRoot.childNodes[0].getComposedChildren()).toStrictEqual([
+        elem.$.a,
+        child.childNodes[3],
+        newSlot2,
+      ])
+      expect(child.shadowRoot.childNodes[1].childNodes[0].getComposedChildren()).toStrictEqual([
+        elem.$.b,
+        newSlot,
+      ])
       matchElementWithDom(elem)
 
       child.removeChild(newSlot2)
@@ -259,7 +321,7 @@ const testCases = function(testBackend){
       matchElementWithDom(elem)
     })
 
-    it('should support slot movement', function(){
+    it('should support slot movement', function () {
       var elem = root.shadowRoot.createComponent('component-slot-d')
       var child = elem.$.child
 
@@ -271,7 +333,7 @@ const testCases = function(testBackend){
       matchElementWithDom(elem)
     })
 
-    it('should support slot replacement, removal, and insertion', function(){
+    it('should support slot replacement, removal, and insertion', function () {
       var elem = root.shadowRoot.createComponent('component-slot-c')
       var elem2 = null
       var elem3 = null
@@ -310,7 +372,7 @@ const testCases = function(testBackend){
       matchElementWithDom(elem)
     })
 
-    it('should support slot children movement (multi-slotted)', function(){
+    it('should support slot children movement (multi-slotted)', function () {
       var parent1 = root.shadowRoot.createComponent('component-slot-e')
       var parent2 = root.shadowRoot.createComponent('component-slot-c')
       var virtual = root.shadowRoot.createVirtualNode('group')
@@ -347,12 +409,10 @@ const testCases = function(testBackend){
       matchElementWithDom(parent1)
       matchElementWithDom(parent2)
     })
-
   })
 
-  describe('multi-slotted (with splitting insertion)', function(){
-
-    it('should be able to insert to single slot', function(){
+  describe('multi-slotted (with splitting insertion)', function () {
+    it('should be able to insert to single slot', function () {
       var p1 = root.shadowRoot.createComponent('component-slot-e')
       var p2 = root.shadowRoot.createComponent('component-slot-e')
       var p1slot = p1.$.e.childNodes[0]
@@ -439,7 +499,7 @@ const testCases = function(testBackend){
       matchElementWithDom(s1)
     })
 
-    it('should be able to insert to multiple slots', function(){
+    it('should be able to insert to multiple slots', function () {
       var p1 = root.shadowRoot.createComponent('component-slot-c')
       var p2 = root.shadowRoot.createComponent('component-slot-c')
       var p1slot0 = p1.shadowRoot.childNodes[0]
@@ -580,7 +640,7 @@ const testCases = function(testBackend){
       matchElementWithDom(s1)
     })
 
-    it('should be able to move between single and multiple slots', function(){
+    it('should be able to move between single and multiple slots', function () {
       var p1 = root.shadowRoot.createComponent('component-slot-e')
       var p2 = root.shadowRoot.createComponent('component-slot-c')
       var p1slot = p1.$.e.childNodes[0]
@@ -696,7 +756,7 @@ const testCases = function(testBackend){
       matchElementWithDom(p2)
     })
 
-    it('should be able to change slot attributes', function(){
+    it('should be able to change slot attributes', function () {
       var p1 = root.shadowRoot.createComponent('component-slot-c')
       var p1slot0 = p1.shadowRoot.childNodes[0]
       var p1slot1 = p1.shadowRoot.childNodes[1].childNodes[0]
@@ -765,7 +825,7 @@ const testCases = function(testBackend){
       matchElementWithDom(p1)
     })
 
-    it('should be able to reassign slots in single slot', function(){
+    it('should be able to reassign slots in single slot', function () {
       var p1 = root.shadowRoot.createComponent('component-slot-e')
       var p1slot = p1.$.e.childNodes[0]
       var s1 = root.shadowRoot.createVirtualNode('s1')
@@ -815,7 +875,7 @@ const testCases = function(testBackend){
       matchElementWithDom(s1)
     })
 
-    it('should be able to reassign slots in multiple slots', function(){
+    it('should be able to reassign slots in multiple slots', function () {
       var p1 = root.shadowRoot.createComponent('component-slot-c')
       var p1slot0 = p1.shadowRoot.childNodes[0]
       var p1slot1 = p1.shadowRoot.childNodes[1].childNodes[0]
@@ -899,17 +959,15 @@ const testCases = function(testBackend){
       expect(s2.getComposedChildren()).toStrictEqual([])
       matchElementWithDom(p1)
     })
-
   })
-
 }
 
-describe('VirtualNode (DOM backend)', function(){
+describe('VirtualNode (DOM backend)', function () {
   testCases(domBackend)
 })
-describe('VirtualNode (shadow backend)', function(){
+describe('VirtualNode (shadow backend)', function () {
   testCases(shadowBackend)
 })
-describe('VirtualNode (composed backend)', function(){
+describe('VirtualNode (composed backend)', function () {
   testCases(composedBackend)
 })

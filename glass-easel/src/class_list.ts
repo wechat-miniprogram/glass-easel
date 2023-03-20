@@ -1,18 +1,11 @@
 import * as backend from './backend/backend_protocol'
 import * as composedBackend from './backend/composed_backend_protocol'
 import * as domlikeBackend from './backend/domlike_backend_protocol'
-import {
-  BM,
-  BackendMode,
-} from './backend/mode'
-import {
-  Element,
-  GeneralComponent,
-  GeneralBackendElement,
-} from '.'
+import { BM, BackendMode } from './backend/mode'
+import { Element, GeneralComponent, GeneralBackendElement } from '.'
 import { MutationObserverTarget } from './mutation_observer'
 
-const CLASS_NAME_REG_EXP = /(~|\^+)?-?[_0-9a-z][-_0-9a-z]*/ig
+const CLASS_NAME_REG_EXP = /(~|\^+)?-?[_0-9a-z][-_0-9a-z]*/gi
 
 /**
  * The style scope identifier
@@ -47,8 +40,8 @@ export class StyleScopeManager {
 }
 
 export type AliasTarget = {
-  scopeId: StyleScopeId | undefined,
-  className: string,
+  scopeId: StyleScopeId | undefined
+  className: string
 }
 
 /**
@@ -64,9 +57,9 @@ export class ClassList {
   /** @internal */
   private _$extraScope: StyleScopeId | undefined
   /** @internal */
-  private _$alias: {[externalName: string]: string[] | null} | null
+  private _$alias: { [externalName: string]: string[] | null } | null
   /** @internal */
-  private _$resolvedAlias: {[externalName: string]: AliasTarget[] | null} | null
+  private _$resolvedAlias: { [externalName: string]: AliasTarget[] | null } | null
   /** @internal */
   private _$aliasDirty = false
   /** @internal */
@@ -86,9 +79,8 @@ export class ClassList {
       const compOptions = ownerComp.getComponentOptions()
       this._$owner = ownerComp.classList
       this._$defaultScope = compOptions.styleScope
-      this._$extraScope = compOptions.extraStyleScope === null
-        ? undefined
-        : compOptions.extraStyleScope
+      this._$extraScope =
+        compOptions.extraStyleScope === null ? undefined : compOptions.extraStyleScope
     } else {
       this._$owner = null
       this._$defaultScope = StyleScopeManager.globalScope()
@@ -105,7 +97,8 @@ export class ClassList {
       this._$resolvedAlias = null
     }
     if (BM.DOMLIKE || (BM.DYNAMIC && elem.getBackendMode() === BackendMode.Domlike)) {
-      this._$prefixManager = elem.ownerShadowRoot?.getHostNode()
+      this._$prefixManager = elem.ownerShadowRoot
+        ?.getHostNode()
         .getRootBehavior().ownerSpace.styleScopeManager
     }
   }
@@ -145,9 +138,7 @@ export class ClassList {
   }
 
   /** @internal */
-  private _$updateResolvedAliases(
-    name: string,
-  ): boolean {
+  private _$updateResolvedAliases(name: string): boolean {
     const slices = this._$alias![name]
     const resolved: AliasTarget[] = []
     if (slices) {
@@ -193,7 +184,7 @@ export class ClassList {
   /** @internal */
   _$setAlias(name: string, target: string) {
     if (this._$alias) {
-      const slices = String(target).match(CLASS_NAME_REG_EXP) as string[] || null
+      const slices = (String(target).match(CLASS_NAME_REG_EXP) as string[]) || null
       this._$alias[name] = slices
       const changed = this._$updateResolvedAliases(name)
       if (changed) this._$aliasDirty = true
@@ -244,9 +235,9 @@ export class ClassList {
     if (!backendElement) return
     this._$hasResolvedNames = false
     if (BM.DOMLIKE || (BM.DYNAMIC && this._$elem.getBackendMode() === BackendMode.Domlike)) {
-      (backendElement as domlikeBackend.Element).setAttribute('class', '')
+      ;(backendElement as domlikeBackend.Element).setAttribute('class', '')
     } else {
-      (backendElement as backend.Element | composedBackend.Element).clearClasses()
+      ;(backendElement as backend.Element | composedBackend.Element).clearClasses()
     }
     this._$rawNames.forEach((name) => {
       this._$addClassToBackend(name, backendElement)
@@ -257,26 +248,25 @@ export class ClassList {
   private _$classListAdd(name: string, scope: StyleScopeId | undefined, e: GeneralBackendElement) {
     if (BM.DOMLIKE || (BM.DYNAMIC && this._$elem.getBackendMode() === BackendMode.Domlike)) {
       const prefix = scope === undefined ? '' : this._$prefixManager?.queryName(scope)
-      const val = prefix ? `${prefix}--${name}` : name;
-      (e as domlikeBackend.Element).classList.add(val)
+      const val = prefix ? `${prefix}--${name}` : name
+      ;(e as domlikeBackend.Element).classList.add(val)
     } else {
-      (e as backend.Element | composedBackend.Element)
-        .addClass(name, scope)
+      ;(e as backend.Element | composedBackend.Element).addClass(name, scope)
     }
   }
 
   /** @internal */
   private _$classListRemove(
-    name: string, scope: StyleScopeId | undefined,
+    name: string,
+    scope: StyleScopeId | undefined,
     e: GeneralBackendElement,
   ) {
     if (BM.DOMLIKE || (BM.DYNAMIC && this._$elem.getBackendMode() === BackendMode.Domlike)) {
       const prefix = scope && this._$prefixManager?.queryName(scope)
-      const val = prefix ? `${prefix}--${name}` : name;
-      (e as domlikeBackend.Element).classList.remove(val)
+      const val = prefix ? `${prefix}--${name}` : name
+      ;(e as domlikeBackend.Element).classList.remove(val)
     } else {
-      (e as backend.Element | composedBackend.Element)
-        .removeClass(name, scope)
+      ;(e as backend.Element | composedBackend.Element).removeClass(name, scope)
     }
   }
 
@@ -295,7 +285,7 @@ export class ClassList {
   }
 
   toggle(name: string, force?: boolean) {
-    const slices = String(name).match(CLASS_NAME_REG_EXP) as string[] || null
+    const slices = (String(name).match(CLASS_NAME_REG_EXP) as string[]) || null
     if (slices) {
       const backendElement = this._$elem.getBackendElement()
       slices.forEach((slice) => {

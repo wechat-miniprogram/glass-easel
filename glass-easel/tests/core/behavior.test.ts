@@ -1,8 +1,4 @@
-import {
-  domBackend,
-  execWithWarn,
-  tmpl,
-} from '../base/env'
+import { domBackend, execWithWarn, tmpl } from '../base/env'
 import * as glassEasel from '../../src'
 
 const componentSpace = new glassEasel.ComponentSpace()
@@ -20,21 +16,27 @@ const domHtml = (elem: glassEasel.Element): string => {
 
 describe('chaining-form interface', () => {
   test('chaining options and template', () => {
-    const beh = componentSpace.define()
+    const beh = componentSpace
+      .define()
       .options({
         writeIdToDOM: false,
       })
-      .template(tmpl(`
+      .template(
+        tmpl(`
         <div></div>
-      `))
+      `),
+      )
       .registerBehavior()
-    const compDef = componentSpace.define()
+    const compDef = componentSpace
+      .define()
       .options({
         writeIdToDOM: true,
       })
-      .template(tmpl(`
+      .template(
+        tmpl(`
         <div id="{{a}}"></div>
-      `))
+      `),
+      )
       .behavior(beh)
       .data(() => ({
         a: 'abc',
@@ -45,16 +47,20 @@ describe('chaining-form interface', () => {
   })
 
   test('chaining using and generics', () => {
-    const child = componentSpace.define()
+    const child = componentSpace
+      .define()
       .options({
         virtualHost: true,
       })
       .externalClasses(['a-class', 'b-class'])
-      .template(tmpl(`
+      .template(
+        tmpl(`
         <span></span>
-      `))
+      `),
+      )
       .registerComponent()
-    const beh = componentSpace.define()
+    const beh = componentSpace
+      .define()
       .usingComponents({
         'invalid-comp': child,
       })
@@ -62,7 +68,8 @@ describe('chaining-form interface', () => {
         'invalid-gen': true,
       })
       .registerBehavior()
-    const compDef = componentSpace.define()
+    const compDef = componentSpace
+      .define()
       .behavior(beh)
       .usingComponents({
         'comp-a': child,
@@ -78,14 +85,16 @@ describe('chaining-form interface', () => {
           default: 'comp-b',
         },
       })
-      .template(tmpl(`
+      .template(
+        tmpl(`
         <comp-a />
         <comp-b />
         <gen-a />
         <gen-b />
         <invalid-comp />
         <invalid-gen />
-      `))
+      `),
+      )
       .registerComponent()
     const elem = glassEasel.Component.createWithGenericsAndContext(
       'root',
@@ -97,27 +106,33 @@ describe('chaining-form interface', () => {
       },
       domBackend,
     )
-    expect(domHtml(elem)).toBe('<span></span><span></span><span></span><span></span><invalid-comp></invalid-comp><invalid-gen></invalid-gen>')
+    expect(domHtml(elem)).toBe(
+      '<span></span><span></span><span></span><span></span><invalid-comp></invalid-comp><invalid-gen></invalid-gen>',
+    )
   })
 
   test('chaining external classes', () => {
-    const beh = componentSpace.define()
-      .externalClasses(['invalid'])
-      .registerBehavior()
-    const child = componentSpace.define()
+    const beh = componentSpace.define().externalClasses(['invalid']).registerBehavior()
+    const child = componentSpace
+      .define()
       .behavior(beh)
       .externalClasses(['a-class', 'b-class'])
-      .template(tmpl(`
+      .template(
+        tmpl(`
         <div class="invalid a-class b-class"></div>
-      `))
+      `),
+      )
       .registerComponent()
-    const compDef = componentSpace.define()
+    const compDef = componentSpace
+      .define()
       .usingComponents({
         child,
       })
-      .template(tmpl(`
+      .template(
+        tmpl(`
         <child invalid="i" a-class="a" b-class="b" />
-      `))
+      `),
+      )
       .registerComponent()
     const elem = glassEasel.Component.createWithContext('root', compDef, domBackend)
     expect(domHtml(elem)).toBe('<child><div class="invalid a b"></div></child>')
@@ -125,7 +140,8 @@ describe('chaining-form interface', () => {
 
   test('chaining data and observers', () => {
     const callOrder: number[] = []
-    const beh = componentSpace.define()
+    const beh = componentSpace
+      .define()
       .data(() => ({
         a: 123,
         a2: 456,
@@ -137,7 +153,8 @@ describe('chaining-form interface', () => {
         })
       })
       .registerBehavior()
-    const compDef = componentSpace.define()
+    const compDef = componentSpace
+      .define()
       .behavior(beh)
       .data(() => ({
         b: 'abc',
@@ -152,7 +169,11 @@ describe('chaining-form interface', () => {
             b3: `${data.b}3`,
           })
           let catched = false
-          try { observer('b', () => undefined) } catch { catched = true }
+          try {
+            observer('b', () => undefined)
+          } catch {
+            catched = true
+          }
           expect(catched).toBe(true)
         })
 
@@ -198,7 +219,8 @@ describe('chaining-form interface', () => {
 
   test('chaining properties', () => {
     const callOrder: number[] = []
-    const beh = componentSpace.define()
+    const beh = componentSpace
+      .define()
       .property('propA', {
         type: Number,
         value: 123,
@@ -208,7 +230,8 @@ describe('chaining-form interface', () => {
         callOrder.push(1)
       })
       .registerBehavior()
-    const compDef = componentSpace.define()
+    const compDef = componentSpace
+      .define()
       .behavior(beh)
       .property('propB', String)
       .definition({
@@ -243,7 +266,8 @@ describe('chaining-form interface', () => {
   })
 
   test('chaining methods', () => {
-    const beh = componentSpace.define()
+    const beh = componentSpace
+      .define()
       .data(() => ({
         a1: '',
       }))
@@ -255,10 +279,13 @@ describe('chaining-form interface', () => {
         },
       })
       .registerBehavior()
-    const compDef = componentSpace.define()
-      .template(tmpl(`
+    const compDef = componentSpace
+      .define()
+      .template(
+        tmpl(`
         <div id="a" bind:customEv="cev" bind:customEv2="cev2">{{a1}}-{{a2}}-{{a3}}</div>
-      `))
+      `),
+      )
       .behavior(beh)
       .definition({
         data: {
@@ -275,12 +302,7 @@ describe('chaining-form interface', () => {
       .data(() => ({
         a3: '',
       }))
-      .init(({
-        setData,
-        method,
-        lifetime,
-        listener,
-      }) => {
+      .init(({ setData, method, lifetime, listener }) => {
         const cev = method((s: glassEasel.Event<{ detailStr: string }>) => {
           setData({ a3: s.detail.detailStr })
         })
@@ -289,8 +311,16 @@ describe('chaining-form interface', () => {
         })
         lifetime('created', () => {
           let catched = false
-          try { method(() => undefined) } catch { catched = true }
-          try { listener(() => undefined) } catch { catched = true }
+          try {
+            method(() => undefined)
+          } catch {
+            catched = true
+          }
+          try {
+            listener(() => undefined)
+          } catch {
+            catched = true
+          }
           expect(catched).toBe(false)
         })
 
@@ -306,15 +336,24 @@ describe('chaining-form interface', () => {
     expect(domHtml(elem)).toBe('<div>b1--</div>')
     elem.a2('b2')
     expect(domHtml(elem)).toBe('<div>b1-b2-</div>')
-    elem.getShadowRoot()!.getElementById('a')!.asNativeNode()?.triggerEvent('customEv', { detailStr: 'b3' })
+    elem
+      .getShadowRoot()!
+      .getElementById('a')!
+      .asNativeNode()
+      ?.triggerEvent('customEv', { detailStr: 'b3' })
     expect(domHtml(elem)).toBe('<div>b1-b2-b3</div>')
-    elem.getShadowRoot()!.getElementById('a')!.asNativeNode()?.triggerEvent('customEv2', { detailStr: 'b33' })
+    elem
+      .getShadowRoot()!
+      .getElementById('a')!
+      .asNativeNode()
+      ?.triggerEvent('customEv2', { detailStr: 'b33' })
     expect(domHtml(elem)).toBe('<div>b1-b2-b33</div>')
   })
 
   test('chaining lifetimes', () => {
     const callOrder: number[] = []
-    const beh = componentSpace.define()
+    const beh = componentSpace
+      .define()
       .data(() => ({
         a: 0,
       }))
@@ -323,10 +362,13 @@ describe('chaining-form interface', () => {
         this.setData({ a: 1 })
       })
       .registerBehavior()
-    const compDef = componentSpace.define()
-      .template(tmpl(`
+    const compDef = componentSpace
+      .define()
+      .template(
+        tmpl(`
         <div>{{a}}-{{b}}-{{c}}</div>
-      `))
+      `),
+      )
       .behavior(beh)
       .data(() => ({
         b: 0,
@@ -354,7 +396,13 @@ describe('chaining-form interface', () => {
         expect(data.c).toBe(0)
         lifetime('created', () => {
           let catched = false
-          try { lifetime('attached', () => { callOrder.push(-100) }) } catch { catched = true }
+          try {
+            lifetime('attached', () => {
+              callOrder.push(-100)
+            })
+          } catch {
+            catched = true
+          }
           expect(catched).toBe(true)
         })
       })
@@ -369,7 +417,8 @@ describe('chaining-form interface', () => {
 
   test('chaining page-lifetimes', () => {
     const callOrder: number[] = []
-    const beh = componentSpace.define()
+    const beh = componentSpace
+      .define()
       .data(() => ({
         a: 0,
       }))
@@ -380,10 +429,13 @@ describe('chaining-form interface', () => {
         r.inc += 1
       })
       .registerBehavior()
-    const compDef = componentSpace.define()
-      .template(tmpl(`
+    const compDef = componentSpace
+      .define()
+      .template(
+        tmpl(`
         <div>{{a}}-{{b}}-{{c}}</div>
-      `))
+      `),
+      )
       .behavior(beh)
       .data(() => ({
         b: 0,
@@ -401,12 +453,7 @@ describe('chaining-form interface', () => {
       .data(() => ({
         c: 0,
       }))
-      .init(({
-        data,
-        setData,
-        pageLifetime,
-        lifetime,
-      }) => {
+      .init(({ data, setData, pageLifetime, lifetime }) => {
         pageLifetime('show', (opt: { inc: number }) => {
           callOrder.push(opt.inc)
           setData({ c: opt.inc * 100 })
@@ -420,7 +467,13 @@ describe('chaining-form interface', () => {
         expect(data.c).toBe(0)
         lifetime('created', () => {
           let catched = false
-          try { pageLifetime('hide', () => { callOrder.push(-100) }) } catch { catched = true }
+          try {
+            pageLifetime('hide', () => {
+              callOrder.push(-100)
+            })
+          } catch {
+            catched = true
+          }
           expect(catched).toBe(true)
         })
       })
@@ -437,12 +490,14 @@ describe('chaining-form interface', () => {
 
   test('chaining init and methodCallerInit', () => {
     const callOrder: number[] = []
-    const beh = componentSpace.define()
+    const beh = componentSpace
+      .define()
       .init(() => {
         callOrder.push(1)
       })
       .registerBehavior()
-    const compDef = componentSpace.define()
+    const compDef = componentSpace
+      .define()
       .init(() => {
         callOrder.push(2)
       })
@@ -458,7 +513,8 @@ describe('chaining-form interface', () => {
 
   test('chaining relations', () => {
     const eventArr: number[] = []
-    const parentDef = componentSpace.define('parent-comp')
+    const parentDef = componentSpace
+      .define('parent-comp')
       .relation('child', {
         type: 'child',
         target: 'child-comp',
@@ -472,7 +528,8 @@ describe('chaining-form interface', () => {
         },
       })
       .registerComponent()
-    const childDef = componentSpace.define('child-comp')
+    const childDef = componentSpace
+      .define('child-comp')
       .template(tmpl('{{index}}'))
       .data(() => ({
         index: '',
@@ -494,21 +551,28 @@ describe('chaining-form interface', () => {
         })
         lifetime('created', () => {
           let catched = false
-          try { relation({ type: 'child' }) } catch { catched = true }
+          try {
+            relation({ type: 'child' })
+          } catch {
+            catched = true
+          }
           expect(catched).toBe(true)
         })
       })
       .registerComponent()
-    const compDef = componentSpace.define()
+    const compDef = componentSpace
+      .define()
       .usingComponents({
         parent: parentDef,
         child: childDef,
       })
-      .template(tmpl(`
+      .template(
+        tmpl(`
         <parent>
           <child wx:for="{{list}}" />
         </parent>
-      `))
+      `),
+      )
       .data(() => ({
         list: [1, 2, 3],
       }))
@@ -520,25 +584,31 @@ describe('chaining-form interface', () => {
   })
 
   test('chaining filter', () => {
-    const beh = componentSpace.define()
+    const beh = componentSpace
+      .define()
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      .chainingFilter<{ myData<T>(this: T): T }, never>((chain) => Object.create(chain, {
-        myData: {
-          value() {
-            return chain.data(() => ({
-              a: 123,
-            }))
+      .chainingFilter<{ myData<T>(this: T): T }, never>((chain) =>
+        Object.create(chain, {
+          myData: {
+            value() {
+              return chain.data(() => ({
+                a: 123,
+              }))
+            },
           },
-        },
-      }))
+        }),
+      )
       .registerBehavior()
-    const compDef = componentSpace.define()
+    const compDef = componentSpace
+      .define()
       .behavior(beh)
       .data(() => ({ b: '233' }))
       .myData()
-      .template(tmpl(`
+      .template(
+        tmpl(`
         <div>{{a}}</div>
-      `))
+      `),
+      )
       .registerComponent()
     const elem = glassEasel.Component.createWithContext('root', compDef, domBackend)
     expect(domHtml(elem)).toBe('<div>123</div>')

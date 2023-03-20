@@ -46,11 +46,14 @@ describe('binding map update enabled', () => {
       `),
       data: {
         index: 0,
-        list: [{
-          a: 123,
-        }, {
-          a: 456,
-        }],
+        list: [
+          {
+            a: 123,
+          },
+          {
+            a: 456,
+          },
+        ],
       },
     })
     const elem = glassEasel.Component.createWithContext('root', def, domBackend)
@@ -83,17 +86,21 @@ describe('binding map update forced', () => {
       using: {
         'sub-comp': subComp.general(),
       },
-      template: tmpl(`
+      template: tmpl(
+        `
         <sub-comp content="{{c}}" model:prop-a="{{a}}" />
-      `, { updateMode: 'bindingMap' }),
+      `,
+        { updateMode: 'bindingMap' },
+      ),
       data: {
         a: 123,
         c: 'abc',
       },
     })
     const elem = glassEasel.Component.createWithContext('root', def, domBackend)
-    const child = (elem.getShadowRoot()!.childNodes[0] as glassEasel.GeneralComponent)
-      .asInstanceOf(subComp)!
+    const child = (elem.getShadowRoot()!.childNodes[0] as glassEasel.GeneralComponent).asInstanceOf(
+      subComp,
+    )!
     expect(domHtml(elem)).toBe('<sub-comp><div>abc</div></sub-comp>')
     elem.setData({ c: 'def' })
     expect(domHtml(elem)).toBe('<sub-comp><div>def</div></sub-comp>')
@@ -105,12 +112,15 @@ describe('binding map update forced', () => {
 
   test('ignore fields with usage in if position', () => {
     const def = glassEasel.registerElement({
-      template: tmpl(`
+      template: tmpl(
+        `
         <div>{{a}}</div>
         <div>{{b}}</div>
         <div>{{c}}</div>
         <div wx:if="{{b}}">{{c}}</div>
-      `, { updateMode: 'bindingMap' }),
+      `,
+        { updateMode: 'bindingMap' },
+      ),
       data: {
         a: 1,
         b: 2,
@@ -131,12 +141,15 @@ describe('binding map update forced', () => {
 
   test('ignore fields with usage in for position', () => {
     const def = glassEasel.registerElement({
-      template: tmpl(`
+      template: tmpl(
+        `
         <div>{{a}}</div>
         <div>{{b}}</div>
         <div>{{c}}</div>
         <div wx:for="{{[1, b]}}">{{c}}</div>
-      `, { updateMode: 'bindingMap' }),
+      `,
+        { updateMode: 'bindingMap' },
+      ),
       data: {
         a: 1,
         b: 2,
@@ -157,7 +170,8 @@ describe('binding map update forced', () => {
 
   test('ignore fields with usage in template position', () => {
     const def = glassEasel.registerElement({
-      template: tmpl(`
+      template: tmpl(
+        `
         <template name="child">
           <div>{{c}}</div>
         </template>
@@ -165,7 +179,9 @@ describe('binding map update forced', () => {
         <div>{{b}}</div>
         <div>{{c}}</div>
         <template is="{{b}}" data="{{ {c} }}"></template>
-      `, { updateMode: 'bindingMap' }),
+      `,
+        { updateMode: 'bindingMap' },
+      ),
       data: {
         a: 1,
         b: 'child',
@@ -186,11 +202,14 @@ describe('binding map update forced', () => {
 
   test('ignore fields with usage in slot position', () => {
     const def = glassEasel.registerElement({
-      template: tmpl(`
+      template: tmpl(
+        `
         <div>{{a}}</div>
         <div>{{b}}</div>
         <slot name="{{b}}"></slot>
-      `, { updateMode: 'bindingMap' }),
+      `,
+        { updateMode: 'bindingMap' },
+      ),
       data: {
         a: 1,
         b: 2,

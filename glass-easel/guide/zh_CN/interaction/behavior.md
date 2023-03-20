@@ -30,7 +30,7 @@ export const myComponent = componentSpace.defineComponent({
 
 * `template` 模板因为无法很好合并，所以不能写在 behaviors 中。
 * `using` `generics` `placeholder` 由于涉及了模板中节点信息，也不能写在 behaviors 中。
-* `options` 是针对组件的配置，不能写在 hehaviors 中。
+* `options` 是针对组件的配置，不能写在 behaviors 中。
 
 对于 Chaining API ， behaviors 相当于链式调用中的一部分。 Chaining API 的 behaviors 也有上述字段限制。
 

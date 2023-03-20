@@ -14,7 +14,9 @@ componentSpace.defineComponent({
 const regElem = (config) => {
   const { template, ...c } = config
   if (template) c.template = tmpl(template)
-  return componentSpace.defineComponent(c)
+  const ret = componentSpace.defineComponent(c)
+  componentSpace.setGlobalUsingComponent(config.is, ret)
+  return ret
 }
 
 const createElem = (is, backend) => {
@@ -22,42 +24,40 @@ const createElem = (is, backend) => {
   return glassEasel.Component.createWithContext(is || 'test', def, backend || domBackend)
 }
 
-describe('Generics, using and write-only', function(){
-
-  beforeAll(function(){
+describe('Generics, using and write-only', function () {
+  beforeAll(function () {
     regElem({
       is: 'generics-common',
       options: {
-        writeOnly: true
+        writeOnly: true,
       },
-      template: '<span />'
+      template: '<span />',
     })
     regElem({
       is: 'generics-common-cross-domain',
       options: {
-        domain: 'XXX'
+        domain: 'XXX',
       },
-      template: '<span />'
+      template: '<span />',
     })
   })
 
-  describe('Component using', function(){
-
-    it('should support using', function(){
+  describe('Component using', function () {
+    it('should support using', function () {
       var compA = regElem({
         is: 'generics-using-a',
         properties: {
-          propA: String
+          propA: String,
         },
-        template: '<span></span>'
+        template: '<span></span>',
       })
       regElem({
         is: 'generics-using-b',
         using: {
           'a-a': 'generics-using-a',
-          'a-b': compA
+          'a-b': compA,
         },
-        template: '<a-a></a-a><a-b></a-b>'
+        template: '<a-a></a-a><a-b></a-b>',
       })
       var elem = createElem('generics-using-b')
       expect(elem.shadowRoot.childNodes[0].is).toStrictEqual('generics-using-a')
@@ -74,64 +74,66 @@ describe('Generics, using and write-only', function(){
       expect(child2.is).toStrictEqual('generics-using-a')
       expect(child2.$$.tagName).toStrictEqual('A-B')
     })
-
   })
 
-  describe('Component generics', function(){
-
-    it('should be able to declare generics', function(){
+  describe('Component generics', function () {
+    it('should be able to declare generics', function () {
       regElem({
         is: 'generics-declare-inner',
         generics: {
           'g-a': '',
           'g-b': {
-            default: 'generics-common'
+            default: 'generics-common',
           },
         },
-        template: '<g-a></g-a><g-b></g-b>'
+        template: '<g-a></g-a><g-b></g-b>',
       })
       regElem({
         is: 'generics-declare-outer',
         using: {
-          'g-common': 'generics-common'
+          'g-common': 'generics-common',
         },
-        template: '<generics-declare-inner generic:g-a="generics-common" />'
+        template: '<generics-declare-inner generic:g-a="generics-common" />',
       })
       var elem = createElem('generics-declare-outer')
       expect(elem.is).toStrictEqual('generics-declare-outer')
       expect(elem.shadowRoot.childNodes[0].is).toStrictEqual('generics-declare-inner')
       expect(elem.shadowRoot.childNodes[0].$$.tagName).toStrictEqual('GENERICS-DECLARE-INNER')
-      expect(elem.shadowRoot.childNodes[0].shadowRoot.childNodes[0].is).toStrictEqual('generics-common')
+      expect(elem.shadowRoot.childNodes[0].shadowRoot.childNodes[0].is).toStrictEqual(
+        'generics-common',
+      )
       expect(elem.shadowRoot.childNodes[0].shadowRoot.childNodes[0].$$.tagName).toStrictEqual('G-A')
-      expect(elem.shadowRoot.childNodes[0].shadowRoot.childNodes[1].is).toStrictEqual('generics-common')
+      expect(elem.shadowRoot.childNodes[0].shadowRoot.childNodes[1].is).toStrictEqual(
+        'generics-common',
+      )
       expect(elem.shadowRoot.childNodes[0].shadowRoot.childNodes[1].$$.tagName).toStrictEqual('G-B')
     })
 
-    it('should be able to pass generics', function(){
+    it('should be able to pass generics', function () {
       regElem({
         is: 'generics-passing-a',
         generics: {
-          'g-a': ''
+          'g-a': '',
         },
-        template: '<g-a id="x"></g-a>'
+        template: '<g-a id="x"></g-a>',
       })
       regElem({
         is: 'generics-passing-b',
         generics: {
-          'g-b': ''
+          'g-b': '',
         },
         using: {
-          'c-a': 'generics-passing-a'
+          'c-a': 'generics-passing-a',
         },
-        template: '<c-a generic:g-a="g-b" id="x" />'
+        template: '<c-a generic:g-a="g-b" id="x" />',
       })
       regElem({
         is: 'generics-passing-c',
         using: {
           'c-common': 'generics-common',
-          'c-b': 'generics-passing-b'
+          'c-b': 'generics-passing-b',
         },
-        template: '<c-b generic:g-b="c-common" id="x" />'
+        template: '<c-b generic:g-b="c-common" id="x" />',
       })
       var elem = createElem('generics-passing-c')
       expect(elem.is).toStrictEqual('generics-passing-c')
@@ -141,36 +143,39 @@ describe('Generics, using and write-only', function(){
       expect(elem.$.x.$.x.$.x.$$.tagName).toStrictEqual('G-A')
     })
 
-    it('should be able to pass a cross domain component', function(){
+    it('should be able to pass a cross domain component', function () {
       regElem({
         is: 'generics-cross-domain-inner',
         options: {
-          domain: 'XXX'
+          domain: 'XXX',
         },
         generics: {
-          'g-a': ''
+          'g-a': '',
         },
-        template: '<g-a></g-a>'
+        template: '<g-a></g-a>',
       })
       regElem({
         is: 'generics-cross-domain-outer',
         using: {
-          'x-domain': 'generics-cross-domain-inner'
+          'x-domain': 'generics-cross-domain-inner',
         },
-        template: '<x-domain generic:g-a="generics-common-cross-domain" /> <x-domain generic:g-a="generics-common" />'
+        template:
+          '<x-domain generic:g-a="generics-common-cross-domain" /> <x-domain generic:g-a="generics-common" />',
       })
       var elem = createElem('generics-cross-domain-outer')
       expect(elem.is).toStrictEqual('generics-cross-domain-outer')
       expect(elem.shadowRoot.childNodes[0].is).toStrictEqual('generics-cross-domain-inner')
       expect(elem.shadowRoot.childNodes[0].$$.tagName).toStrictEqual('X-DOMAIN')
-      expect(elem.shadowRoot.childNodes[0].shadowRoot.childNodes[0].is).toStrictEqual('generics-common-cross-domain')
+      expect(elem.shadowRoot.childNodes[0].shadowRoot.childNodes[0].is).toStrictEqual(
+        'generics-common-cross-domain',
+      )
       expect(elem.shadowRoot.childNodes[0].shadowRoot.childNodes[0].$$.tagName).toStrictEqual('G-A')
       expect(elem.shadowRoot.childNodes[1].is).toStrictEqual('generics-cross-domain-inner')
       expect(elem.shadowRoot.childNodes[1].$$.tagName).toStrictEqual('X-DOMAIN')
-      expect(elem.shadowRoot.childNodes[1].shadowRoot.childNodes[0].is).toStrictEqual('generics-common')
+      expect(elem.shadowRoot.childNodes[1].shadowRoot.childNodes[0].is).toStrictEqual(
+        'generics-common',
+      )
       expect(elem.shadowRoot.childNodes[1].shadowRoot.childNodes[0].$$.tagName).toStrictEqual('G-A')
     })
-
   })
-
 })

@@ -1,17 +1,8 @@
 /* eslint-disable class-methods-use-this */
 
-import {
-  EventOptions,
-  EventBubbleStatus,
-} from '../event'
-import {
-  safeCallback,
-} from '../func_arr'
-import {
-  BackendMode,
-  BoundingClientRect,
-  ScrollOffset,
-} from './mode'
+import { EventOptions, EventBubbleStatus } from '../event'
+import { safeCallback } from '../func_arr'
+import { BackendMode, BoundingClientRect, ScrollOffset } from './mode'
 
 export interface Context {
   mode: BackendMode.Composed
@@ -28,12 +19,14 @@ export interface Context {
   createElement(tagName: string): Element
   createTextNode(content: string): Element
   createFragment(): Element
-  onEvent(listener: (
-    target: unknown,
-    type: string,
-    detail: unknown,
-    options: EventOptions,
-  ) => EventBubbleStatus): void
+  onEvent(
+    listener: (
+      target: unknown,
+      type: string,
+      detail: unknown,
+      options: EventOptions,
+    ) => EventBubbleStatus,
+  ): void
 }
 
 export interface Element {
@@ -66,8 +59,7 @@ export class EmptyComposedBackendContext implements Context {
   mode: BackendMode.Composed = BackendMode.Composed
   private _$styleSheetIdInc = 1
   private _$renderCallbacks: ((err: Error) => void)[] | null = null
-  private _$rootNode: EmptyComposedBackendElement
-    = new EmptyComposedBackendElement()
+  private _$rootNode: EmptyComposedBackendElement = new EmptyComposedBackendElement()
 
   destroy(): void {
     // empty
@@ -107,16 +99,11 @@ export class EmptyComposedBackendContext implements Context {
     if (this._$renderCallbacks) {
       this._$renderCallbacks.push(cb)
     } else {
-      const callbacks = this._$renderCallbacks = [cb]
+      const callbacks = (this._$renderCallbacks = [cb])
       setTimeout(() => {
         this._$renderCallbacks = null
         callbacks.forEach((cb) => {
-          safeCallback(
-            'Render Callback',
-            cb,
-            this,
-            [null],
-          )
+          safeCallback('Render Callback', cb, this, [null])
         })
       }, 16)
     }
@@ -138,12 +125,14 @@ export class EmptyComposedBackendContext implements Context {
     return new EmptyComposedBackendElement()
   }
 
-  onEvent(_listener: (
-    target: unknown,
-    type: string,
-    detail: unknown,
-    options: EventOptions,
-  ) => EventBubbleStatus): void {
+  onEvent(
+    _listener: (
+      target: unknown,
+      type: string,
+      detail: unknown,
+      options: EventOptions,
+    ) => EventBubbleStatus,
+  ): void {
     // empty
   }
 }

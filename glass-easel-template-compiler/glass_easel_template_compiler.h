@@ -38,6 +38,12 @@ void str_ref_array_free(StrRefArray self);
 
 void str_ref_free(StrRef self);
 
+TmplParseResult tmpl_group_add_script(TmplGroup *self,
+                                      const uint8_t *path_buf,
+                                      size_t path_len,
+                                      const uint8_t *content_buf,
+                                      size_t content_len);
+
 TmplParseResult tmpl_group_add_tmpl(TmplGroup *self,
                                     const uint8_t *path_buf,
                                     size_t path_len,
@@ -59,6 +65,10 @@ StrRef tmpl_group_get_tmpl_gen_object(const TmplGroup *self,
 StrRef tmpl_group_get_tmpl_gen_object_groups(const TmplGroup *self);
 
 TmplGroup tmpl_group_new();
+
+void tmpl_group_set_extra_runtime_script(TmplGroup *self,
+                                         const uint8_t *content_buf,
+                                         size_t content_len);
 
 void tmpl_parser_result_free(TmplParseResult self);
 

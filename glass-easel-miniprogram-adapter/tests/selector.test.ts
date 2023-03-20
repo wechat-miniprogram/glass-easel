@@ -1,8 +1,6 @@
 import * as glassEasel from 'glass-easel'
 import { tmpl } from './base/env'
-import {
-  MiniProgramEnv,
-} from '../src'
+import { MiniProgramEnv } from '../src'
 
 const domHtml = (elem: glassEasel.Element): string => {
   const domElem = elem.getBackendElement() as unknown as Element
@@ -42,12 +40,15 @@ describe('selector query', () => {
         child: '/child/comp',
       },
     })
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
       <div>
         <child id="c1" />
         <child id="c2" data-a="A" />
       </div>
-    `))
+    `),
+    )
     // eslint-disable-next-line arrow-body-style
     const selfDef = codeSpace.componentEnv('path/to/comp', ({ Component }) => {
       return Component()
@@ -103,12 +104,15 @@ describe('selector query', () => {
         child: '/child/comp',
       },
     })
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
       <div id="d">
         <child id="c1" />
         <child id="c2" />
       </div>
-    `))
+    `),
+    )
     codeSpace.componentEnv('path/to/comp', ({ Component }) => {
       const selfDef = Component()
         .lifetime('attached', function () {
@@ -163,13 +167,16 @@ describe('selector query', () => {
         'child-b': '/child/comp2',
       },
     })
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
       <div id="d">
         <child class="c" />
         <child class="c" />
         <child-b class="c" />
       </div>
-    `))
+    `),
+    )
     codeSpace.componentEnv('path/to/comp', ({ Component }) => {
       const selfDef = Component()
         .lifetime('attached', function () {
@@ -185,223 +192,242 @@ describe('selector query', () => {
     const ab = env.associateBackend()
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
-    expect(domHtml(root.getComponent()))
-      .toBe('<div><child class="c">0</child><child class="c">1</child><child-b class="c">2</child-b></div>')
+    expect(domHtml(root.getComponent())).toBe(
+      '<div><child class="c">0</child><child class="c">1</child><child-b class="c">2</child-b></div>',
+    )
   })
 
-  test('query single element info', () => new Promise<any[]>((resolve) => {
-    const env = new MiniProgramEnv()
-    const codeSpace = env.createCodeSpace('', true)
-    const resList = [] as any[]
+  test('query single element info', () =>
+    new Promise<any[]>((resolve) => {
+      const env = new MiniProgramEnv()
+      const codeSpace = env.createCodeSpace('', true)
+      const resList = [] as any[]
 
-    codeSpace.addComponentStaticConfig('child/comp', {
-      component: true,
-    })
-    codeSpace.addCompiledTemplate('child/comp', tmpl('{{a}}'))
-    codeSpace.componentEnv('child/comp', ({ Component }) => {
-      Component()
-        .property('p', String)
-        .register()
-    })
+      codeSpace.addComponentStaticConfig('child/comp', {
+        component: true,
+      })
+      codeSpace.addCompiledTemplate('child/comp', tmpl('{{a}}'))
+      codeSpace.componentEnv('child/comp', ({ Component }) => {
+        Component().property('p', String).register()
+      })
 
-    codeSpace.addComponentStaticConfig('path/to/comp', {
-      usingComponents: {
-        child: '/child/comp',
-      },
-    })
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+      codeSpace.addComponentStaticConfig('path/to/comp', {
+        usingComponents: {
+          child: '/child/comp',
+        },
+      })
+      codeSpace.addCompiledTemplate(
+        'path/to/comp',
+        tmpl(`
       <div data-a="{{ 1 }}" mark:a="a2">
         <span id="bb" class="s" data-b="{{ 1 }}" mark:b="b2" />
         <child id="cc" class="s" data-c="{{ 1 }}" mark:c="c2" p="123" />
       </div>
-    `))
-    codeSpace.componentEnv('path/to/comp', ({ Component }) => {
-      Component()
-        .lifetime('attached', function () {
-          this.createSelectorQuery()
-            .select('.invalid')
-            .fields({})
-            .select('.s')
-            .boundingClientRect((res) => {
-              expect(res.id).toBe('bb')
-              expect(res.dataset).toStrictEqual({ b: 1 })
-              expect(typeof res.left).toBe('number')
-              expect(typeof res.top).toBe('number')
-              expect(typeof res.right).toBe('number')
-              expect(typeof res.bottom).toBe('number')
-              expect(typeof res.width).toBe('number')
-              expect(typeof res.height).toBe('number')
-              resList.push(res)
-            })
-            .select('#bb')
-            .scrollOffset((res) => {
-              expect(res.id).toBe('bb')
-              expect(res.dataset).toStrictEqual({ b: 1 })
-              expect(typeof res.scrollLeft).toBe('number')
-              expect(typeof res.scrollTop).toBe('number')
-              expect(typeof res.scrollWidth).toBe('number')
-              expect(typeof res.scrollHeight).toBe('number')
-              resList.push(res)
-            })
-            .select('#cc')
-            .fields({
-              mark: true,
-              rect: true,
-              size: true,
-              scrollOffset: true,
-              properties: ['p'],
-            }, (res) => {
-              expect(res.id).toBe(undefined)
-              expect(res.dataset).toBe(undefined)
-              expect(res.mark).toStrictEqual({ a: 'a2', c: 'c2' })
-              expect(typeof res.left).toBe('number')
-              expect(typeof res.top).toBe('number')
-              expect(typeof res.right).toBe('number')
-              expect(typeof res.bottom).toBe('number')
-              expect(typeof res.width).toBe('number')
-              expect(typeof res.height).toBe('number')
-              expect(typeof res.scrollLeft).toBe('number')
-              expect(typeof res.scrollTop).toBe('number')
-              expect(typeof res.scrollWidth).toBe('number')
-              expect(typeof res.scrollHeight).toBe('number')
-              expect(res.p).toBe('123')
-              resList.push(res)
-            })
-            .in(this.selectComponent('#cc'))
-            .select('#cc')
-            .boundingClientRect((res) => {
-              expect(res).toBe(null)
-            })
-            .exec((r) => {
-              r.shift()
-              r.pop()
-              expect(r).toStrictEqual(resList)
-              this.createSelectorQuery()
-                .exec(() => {
+    `),
+      )
+      codeSpace.componentEnv('path/to/comp', ({ Component }) => {
+        Component()
+          .lifetime('attached', function () {
+            this.createSelectorQuery()
+              .select('.invalid')
+              .fields({})
+              .select('.s')
+              .boundingClientRect((res) => {
+                expect(res.id).toBe('bb')
+                expect(res.dataset).toStrictEqual({ b: 1 })
+                expect(typeof res.left).toBe('number')
+                expect(typeof res.top).toBe('number')
+                expect(typeof res.right).toBe('number')
+                expect(typeof res.bottom).toBe('number')
+                expect(typeof res.width).toBe('number')
+                expect(typeof res.height).toBe('number')
+                resList.push(res)
+              })
+              .select('#bb')
+              .scrollOffset((res) => {
+                expect(res.id).toBe('bb')
+                expect(res.dataset).toStrictEqual({ b: 1 })
+                expect(typeof res.scrollLeft).toBe('number')
+                expect(typeof res.scrollTop).toBe('number')
+                expect(typeof res.scrollWidth).toBe('number')
+                expect(typeof res.scrollHeight).toBe('number')
+                resList.push(res)
+              })
+              .select('#cc')
+              .fields(
+                {
+                  mark: true,
+                  rect: true,
+                  size: true,
+                  scrollOffset: true,
+                  properties: ['p'],
+                },
+                (res) => {
+                  expect(res.id).toBe(undefined)
+                  expect(res.dataset).toBe(undefined)
+                  expect(res.mark).toStrictEqual({ a: 'a2', c: 'c2' })
+                  expect(typeof res.left).toBe('number')
+                  expect(typeof res.top).toBe('number')
+                  expect(typeof res.right).toBe('number')
+                  expect(typeof res.bottom).toBe('number')
+                  expect(typeof res.width).toBe('number')
+                  expect(typeof res.height).toBe('number')
+                  expect(typeof res.scrollLeft).toBe('number')
+                  expect(typeof res.scrollTop).toBe('number')
+                  expect(typeof res.scrollWidth).toBe('number')
+                  expect(typeof res.scrollHeight).toBe('number')
+                  expect(res.p).toBe('123')
+                  resList.push(res)
+                },
+              )
+              .in(this.selectComponent('#cc'))
+              .select('#cc')
+              .boundingClientRect((res) => {
+                expect(res).toBe(null)
+              })
+              .exec((r) => {
+                r.shift()
+                r.pop()
+                expect(r).toStrictEqual(resList)
+                this.createSelectorQuery().exec(() => {
                   resolve(resList)
                 })
-            })
-        })
-        .register()
-    })
+              })
+          })
+          .register()
+      })
 
-    const ab = env.associateBackend()
-    const root = ab.createRoot('body', codeSpace, 'path/to/comp')
-    glassEasel.Element.pretendAttached(root.getComponent())
-  }).then((resList: any[]) => {
-    expect(resList.length).toBe(3)
-    return undefined
-  }))
+      const ab = env.associateBackend()
+      const root = ab.createRoot('body', codeSpace, 'path/to/comp')
+      glassEasel.Element.pretendAttached(root.getComponent())
+    }).then((resList: any[]) => {
+      expect(resList.length).toBe(3)
+      return undefined
+    }))
 
-  test('query multiple element info', () => new Promise<undefined>((resolve) => {
-    const env = new MiniProgramEnv()
-    const codeSpace = env.createCodeSpace('', true)
+  test('query multiple element info', () =>
+    new Promise<undefined>((resolve) => {
+      const env = new MiniProgramEnv()
+      const codeSpace = env.createCodeSpace('', true)
 
-    codeSpace.addComponentStaticConfig('child/comp', {
-      component: true,
-    })
-    codeSpace.addCompiledTemplate('child/comp', tmpl('{{a}}'))
-    codeSpace.componentEnv('child/comp', ({ Component }) => {
-      Component()
-        .options({
-          propertyPassingDeepCopy: glassEasel.DeepCopyKind.None,
-        })
-        .property('p', {
-          type: Array,
-          value: [1, 2, 3],
-        })
-        .register()
-    })
+      codeSpace.addComponentStaticConfig('child/comp', {
+        component: true,
+      })
+      codeSpace.addCompiledTemplate('child/comp', tmpl('{{a}}'))
+      codeSpace.componentEnv('child/comp', ({ Component }) => {
+        Component()
+          .options({
+            propertyPassingDeepCopy: glassEasel.DeepCopyKind.None,
+          })
+          .property('p', {
+            type: Array,
+            value: [1, 2, 3],
+          })
+          .register()
+      })
 
-    codeSpace.addComponentStaticConfig('path/to/comp', {
-      usingComponents: {
-        child: '/child/comp',
-      },
-    })
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+      codeSpace.addComponentStaticConfig('path/to/comp', {
+        usingComponents: {
+          child: '/child/comp',
+        },
+      })
+      codeSpace.addCompiledTemplate(
+        'path/to/comp',
+        tmpl(`
       <div data-a="{{ 1 }}" mark:a="a2">
         <span id="bb" class="s" data-b="{{ 1 }}" mark:b="b2" />
         <child id="cc" class="s" data-c="{{ 1 }}" mark:c="c2" />
       </div>
-    `))
-    codeSpace.componentEnv('path/to/comp', ({ Component }) => {
-      Component()
-        .lifetime('attached', function () {
-          this.createSelectorQuery()
-            .selectAll('.s')
-            .fields({
-              mark: true,
-              properties: ['p'],
-            }, (res) => {
-              expect(res).toStrictEqual([{
-                mark: {
-                  a: 'a2',
-                  b: 'b2',
+    `),
+      )
+      codeSpace.componentEnv('path/to/comp', ({ Component }) => {
+        Component()
+          .lifetime('attached', function () {
+            this.createSelectorQuery()
+              .selectAll('.s')
+              .fields(
+                {
+                  mark: true,
+                  properties: ['p'],
                 },
-              }, {
-                mark: {
-                  a: 'a2',
-                  c: 'c2',
+                (res) => {
+                  expect(res).toStrictEqual([
+                    {
+                      mark: {
+                        a: 'a2',
+                        b: 'b2',
+                      },
+                    },
+                    {
+                      mark: {
+                        a: 'a2',
+                        c: 'c2',
+                      },
+                      p: [1, 2, 3],
+                    },
+                  ])
+                  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                  expect(res[1]!.p).toBe(this.selectComponent('#cc').data.p)
+                  resolve(undefined)
                 },
-                p: [1, 2, 3],
-              }])
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-              expect(res[1]!.p).toBe(this.selectComponent('#cc').data.p)
-              resolve(undefined)
-            })
-            .exec()
-        })
-        .register()
-    })
+              )
+              .exec()
+          })
+          .register()
+      })
 
-    const ab = env.associateBackend()
-    const root = ab.createRoot('body', codeSpace, 'path/to/comp')
-    glassEasel.Element.pretendAttached(root.getComponent())
-  }))
+      const ab = env.associateBackend()
+      const root = ab.createRoot('body', codeSpace, 'path/to/comp')
+      glassEasel.Element.pretendAttached(root.getComponent())
+    }))
 
-  test('query viewport info', () => new Promise<undefined>((resolve) => {
-    const env = new MiniProgramEnv()
-    const codeSpace = env.createCodeSpace('', true)
+  test('query viewport info', () =>
+    new Promise<undefined>((resolve) => {
+      const env = new MiniProgramEnv()
+      const codeSpace = env.createCodeSpace('', true)
 
-    codeSpace.addComponentStaticConfig('path/to/comp', {})
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(''))
-    codeSpace.componentEnv('path/to/comp', ({ Component }) => {
-      Component()
-        .lifetime('attached', function () {
-          this.createSelectorQuery()
-            .selectViewport()
-            .fields({
-              id: true,
-              dataset: true,
-              mark: true,
-              rect: true,
-              size: true,
-              scrollOffset: true,
-              properties: ['p'],
-            }, (res) => {
-              expect(res.id).toBe('')
-              expect(res.dataset).toStrictEqual({})
-              expect(res.mark).toStrictEqual({})
-              expect(typeof res.left).toBe('number')
-              expect(typeof res.top).toBe('number')
-              expect(typeof res.right).toBe('number')
-              expect(typeof res.bottom).toBe('number')
-              expect(typeof res.width).toBe('number')
-              expect(typeof res.height).toBe('number')
-              expect(typeof res.scrollLeft).toBe('number')
-              expect(typeof res.scrollTop).toBe('number')
-              expect(typeof res.scrollWidth).toBe('number')
-              expect(typeof res.scrollHeight).toBe('number')
-              expect(res.p).toBe(undefined)
-              resolve(undefined)
-            })
-            .exec()
-        })
-        .register()
-    })
+      codeSpace.addComponentStaticConfig('path/to/comp', {})
+      codeSpace.addCompiledTemplate('path/to/comp', tmpl(''))
+      codeSpace.componentEnv('path/to/comp', ({ Component }) => {
+        Component()
+          .lifetime('attached', function () {
+            this.createSelectorQuery()
+              .selectViewport()
+              .fields(
+                {
+                  id: true,
+                  dataset: true,
+                  mark: true,
+                  rect: true,
+                  size: true,
+                  scrollOffset: true,
+                  properties: ['p'],
+                },
+                (res) => {
+                  expect(res.id).toBe('')
+                  expect(res.dataset).toStrictEqual({})
+                  expect(res.mark).toStrictEqual({})
+                  expect(typeof res.left).toBe('number')
+                  expect(typeof res.top).toBe('number')
+                  expect(typeof res.right).toBe('number')
+                  expect(typeof res.bottom).toBe('number')
+                  expect(typeof res.width).toBe('number')
+                  expect(typeof res.height).toBe('number')
+                  expect(typeof res.scrollLeft).toBe('number')
+                  expect(typeof res.scrollTop).toBe('number')
+                  expect(typeof res.scrollWidth).toBe('number')
+                  expect(typeof res.scrollHeight).toBe('number')
+                  expect(res.p).toBe(undefined)
+                  resolve(undefined)
+                },
+              )
+              .exec()
+          })
+          .register()
+      })
 
-    const ab = env.associateBackend()
-    const root = ab.createRoot('body', codeSpace, 'path/to/comp')
-    glassEasel.Element.pretendAttached(root.getComponent())
-  }))
+      const ab = env.associateBackend()
+      const root = ab.createRoot('body', codeSpace, 'path/to/comp')
+      glassEasel.Element.pretendAttached(root.getComponent())
+    }))
 })

@@ -26,22 +26,10 @@ import {
   GetFromObserverPathString,
   IsNever,
 } from './component_params'
-import {
-  FuncArr,
-  triggerWarning,
-} from './func_arr'
-import {
-  ComponentOptions,
-  getDefaultComponentSpace,
-} from './global_options'
-import {
-  MultiPaths,
-  parseMultiPaths,
-} from './data_path'
-import {
-  DataValue,
-  DataGroupObserverTree,
-} from './data_proxy'
+import { FuncArr, triggerWarning } from './func_arr'
+import { ComponentOptions, getDefaultComponentSpace } from './global_options'
+import { MultiPaths, parseMultiPaths } from './data_path'
+import { DataValue, DataGroupObserverTree } from './data_proxy'
 import {
   ComponentDefinition,
   GeneralComponentDefinition,
@@ -55,11 +43,7 @@ import {
   RelationListener,
   RelationFailedListener,
 } from './relation'
-import {
-  normalizeUrl,
-  ComponentSpace,
-  ComponentWaitingList,
-} from './component_space'
+import { normalizeUrl, ComponentSpace, ComponentWaitingList } from './component_space'
 import { TraitBehavior } from './trait_behaviors'
 import { simpleDeepCopy } from './data_utils'
 import { EventListener } from './event'
@@ -84,14 +68,20 @@ export type PropertyDefinition = {
   reflectIdPrefix: boolean
 }
 
-export type ComponentDefinitionWithPlaceholder = {
-  final: GeneralComponentDefinition | null,
-  placeholder: string | null,
-  waiting: ComponentWaitingList | null,
-}
+export type ComponentDefinitionWithPlaceholder =
+  | {
+      final: GeneralComponentDefinition | null
+      placeholder: string | null
+      waiting: ComponentWaitingList | null
+    }
+  | NativeNodeDefinition
 
-type ResolveBehaviorBuilder<B, TChainingFilter extends ChainingFilterType> =
-  IsNever<TChainingFilter> extends false
+export type NativeNodeDefinition = string
+
+type ResolveBehaviorBuilder<
+  B,
+  TChainingFilter extends ChainingFilterType,
+> = IsNever<TChainingFilter> extends false
   ? TChainingFilter extends ChainingFilterType
     ? Omit<B, TChainingFilter['remove']> & TChainingFilter['add']
     : B
@@ -106,10 +96,10 @@ const shallowMerge = (dest: { [key: string]: unknown }, src: { [key: string]: un
         triggerWarning(`data field "${key}" from different behaviors is overriding or merging.`)
       }
       if (
-        typeof dest[key] === 'object'
-        && typeof src[key] === 'object'
-        && src[key] !== null
-        && !Array.isArray(src[key])
+        typeof dest[key] === 'object' &&
+        typeof src[key] === 'object' &&
+        src[key] !== null &&
+        !Array.isArray(src[key])
       ) {
         if (Array.isArray(dest[key])) {
           dest[key] = (dest[key] as DataValue[]).slice()
@@ -136,9 +126,7 @@ const shallowMerge = (dest: { [key: string]: unknown }, src: { [key: string]: un
   }
 }
 
-const normalizePropertyTypeShortHand = (
-  propDef: unknown,
-): PropertyDefinition | null => {
+const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefinition | null => {
   if (propDef === String) {
     return {
       type: NormalizedPropertyType.String,
@@ -193,7 +181,9 @@ const normalizePropertyTypeShortHand = (
     return {
       type: NormalizedPropertyType.Function,
       optionalTypes: null,
-      value() { /* empty */ },
+      value() {
+        /* empty */
+      },
       default: undefined,
       observer: null,
       reflectIdPrefix: false,
@@ -256,11 +246,15 @@ export const convertValueToType = (
   // for string
   if (type === NormalizedPropertyType.String) {
     if (value === null || value === undefined) {
-      triggerWarning(`property "${propName}" received type-incompatible value: expected <String> but get null value. Used default value instead.`)
+      triggerWarning(
+        `property "${propName}" received type-incompatible value: expected <String> but get null value. Used default value instead.`,
+      )
       return defaultFn === undefined ? '' : defaultFn()
     }
     if (typeof value === 'object') {
-      triggerWarning(`property "${propName}" received type-incompatible value: expected <String> but got object-typed value. Force converted.`)
+      triggerWarning(
+        `property "${propName}" received type-incompatible value: expected <String> but got object-typed value. Force converted.`,
+      )
     }
     return String(value)
   }
@@ -269,9 +263,13 @@ export const convertValueToType = (
     // eslint-disable-next-line no-restricted-globals
     if (isFinite(value as number)) return Number(value)
     if (typeof value === 'number') {
-      triggerWarning(`property "${propName}" received type-incompatible value: expected <Number> but got NaN or Infinity. Used default value instead.`)
+      triggerWarning(
+        `property "${propName}" received type-incompatible value: expected <Number> but got NaN or Infinity. Used default value instead.`,
+      )
     } else {
-      triggerWarning(`property "${propName}" received type-incompatible value: expected <Number> but got non-number value. Used default value instead.`)
+      triggerWarning(
+        `property "${propName}" received type-incompatible value: expected <Number> but got non-number value. Used default value instead.`,
+      )
     }
     return defaultFn === undefined ? 0 : defaultFn()
   }
@@ -282,21 +280,31 @@ export const convertValueToType = (
   // for array
   if (type === NormalizedPropertyType.Array) {
     if (Array.isArray(value)) return value as unknown
-    triggerWarning(`property "${propName}" received type-incompatible value: expected <Array> but got non-array value. Used default value instead.`)
+    triggerWarning(
+      `property "${propName}" received type-incompatible value: expected <Array> but got non-array value. Used default value instead.`,
+    )
     return defaultFn === undefined ? [] : defaultFn()
   }
   // for object
   if (type === NormalizedPropertyType.Object) {
     if (typeof value === 'object') return value
-    triggerWarning(`property "${propName}" received type-incompatible value: expected <Object> but got non-object value. Used default value instead.`)
+    triggerWarning(
+      `property "${propName}" received type-incompatible value: expected <Object> but got non-object value. Used default value instead.`,
+    )
     return defaultFn === undefined ? null : defaultFn()
   }
   // for function
   if (type === NormalizedPropertyType.Function) {
     if (typeof value === 'function') return value
-    triggerWarning(`property "${propName}" received type-incompatible value: expected <Function> but got non-function value. Used default value instead.`)
+    triggerWarning(
+      `property "${propName}" received type-incompatible value: expected <Function> but got non-function value. Used default value instead.`,
+    )
     // eslint-disable-next-line func-names
-    return defaultFn === undefined ? function () { /* empty */ } : defaultFn()
+    return defaultFn === undefined
+      ? function () {
+          /* empty */
+        }
+      : defaultFn()
   }
   // for any-typed, just return the value and avoid undefined
   if (value === undefined) return defaultFn === undefined ? null : defaultFn()
@@ -332,7 +340,9 @@ export const normalizeRelation = <TOut extends { [key: string]: any }>(
       return f as RelationListener
     }
     if (f !== undefined) {
-      triggerWarning(`the "${key}" relation listener is not a function (when preparing behavior "${is}").`)
+      triggerWarning(
+        `the "${key}" relation listener is not a function (when preparing behavior "${is}").`,
+      )
     }
     return null
   }
@@ -351,10 +361,13 @@ export const normalizeRelation = <TOut extends { [key: string]: any }>(
     type = RelationType.Descendant
   } else {
     const type = relation.type as string
-    triggerWarning(`the "${key}" relation has an invalid relation type "${type}" (when preparing behavior "${is}").`)
+    triggerWarning(
+      `the "${key}" relation has an invalid relation type "${type}" (when preparing behavior "${is}").`,
+    )
     return null
   }
-  let target: string
+  let target:
+    | string
     | GeneralBehavior
     | TraitBehavior<{ [key: string]: unknown }, { [key: string]: unknown }>
   let domain: string | null = null
@@ -368,7 +381,9 @@ export const normalizeRelation = <TOut extends { [key: string]: any }>(
     domain = d
   }
   if (!target) {
-    triggerWarning(`the target of relation "${key}" is not a valid behavior or component (when preparing behavior "${is}").`)
+    triggerWarning(
+      `the target of relation "${key}" is not a valid behavior or component (when preparing behavior "${is}").`,
+    )
     return null
   }
   return {
@@ -384,61 +399,55 @@ export const normalizeRelation = <TOut extends { [key: string]: any }>(
 
 export interface RelationHandler<TTarget, TOut> {
   list(): TTarget[]
-  listAsTrait: TOut extends never
-    ? undefined
-    : () => TOut[]
+  listAsTrait: TOut extends never ? undefined : () => TOut[]
 }
 
 export interface RelationInit {
   (def: RelationParams): RelationHandler<any, never>
-  <TOut extends { [key: string]: any }>(
-    def: TraitRelationParams<TOut>,
-  ): RelationHandler<unknown, TOut>
+  <TOut extends { [key: string]: any }>(def: TraitRelationParams<TOut>): RelationHandler<
+    unknown,
+    TOut
+  >
 }
 
 export interface BuilderContext<
   TPrevData extends DataList,
   TProperty extends PropertyList,
-  TMethodCaller
+  TMethodCaller,
 > extends ThisType<TMethodCaller> {
-  self: TMethodCaller;
-  data: DeepReadonly<DataWithPropertyValues<TPrevData, TProperty>>;
-  setData: (newData: Partial<SetDataSetter<TPrevData>>) => void;
+  self: TMethodCaller
+  data: DeepReadonly<DataWithPropertyValues<TPrevData, TProperty>>
+  setData: (newData: Partial<SetDataSetter<TPrevData>>) => void
   implement: <TIn extends { [x: string]: any }>(
     traitBehavior: TraitBehavior<TIn, any>,
-    impl: TIn
-  ) => void;
-  relation<TOut extends { [key: string]: any }>
-  (def: TraitRelationParams<TOut>): RelationHandler<any, TOut>
+    impl: TIn,
+  ) => void
+  relation<TOut extends { [key: string]: any }>(
+    def: TraitRelationParams<TOut>,
+  ): RelationHandler<any, TOut>
   relation(def: RelationParams): RelationHandler<any, never>
   observer<
-    P extends ObserverDataPathStrings<
-      DataWithPropertyValues<TPrevData, TProperty>
-    >,
-    V = DeepReadonly<
-      GetFromObserverPathString<DataWithPropertyValues<TPrevData, TProperty>, P>
-    >
+    P extends ObserverDataPathStrings<DataWithPropertyValues<TPrevData, TProperty>>,
+    V = DeepReadonly<GetFromObserverPathString<DataWithPropertyValues<TPrevData, TProperty>, P>>,
   >(
     paths: P,
     func: (newValue: V) => void,
-  ): void;
+  ): void
   observer<
-    P extends ObserverDataPathStrings<
-      DataWithPropertyValues<TPrevData, TProperty>
-    >[],
+    P extends ObserverDataPathStrings<DataWithPropertyValues<TPrevData, TProperty>>[],
     V = {
       [K in keyof P]: DeepReadonly<
         GetFromObserverPathString<DataWithPropertyValues<TPrevData, TProperty>, P[K]>
       >
-    }
+    },
   >(
     paths: readonly [...P],
     func: (...newValues: V extends any[] ? V : never) => void,
-  ): void;
-  lifetime: <L extends keyof Lifetimes>(name: L, func: Lifetimes[L]) => void;
-  pageLifetime: (name: string, func: (...args: any[]) => void) => void;
-  method: <Fn extends ComponentMethod>(func: Fn) => TaggedMethod<Fn>;
-  listener: <T>(func: EventListener<T>) => TaggedMethod<EventListener<T>>;
+  ): void
+  lifetime: <L extends keyof Lifetimes>(name: L, func: Lifetimes[L]) => void
+  pageLifetime: (name: string, func: (...args: any[]) => void) => void
+  method: <Fn extends ComponentMethod>(func: Fn) => TaggedMethod<Fn>
+  listener: <T>(func: EventListener<T>) => TaggedMethod<EventListener<T>>
 }
 
 export type GeneralBehaviorBuilder = BehaviorBuilder<
@@ -469,7 +478,7 @@ export class BehaviorBuilder<
   /** @internal */
   _$options?: ComponentOptions
   /** @internal */
-  _$traitBehaviors: { traitBehavior: TraitBehavior<any, any>, impl: any }[] = []
+  _$traitBehaviors: { traitBehavior: TraitBehavior<any, any>; impl: any }[] = []
   /** @internal */
   _$template?: { [key: string]: unknown }
   /** @internal */
@@ -485,37 +494,32 @@ export class BehaviorBuilder<
   /** @internal */
   _$data: (() => { [field: string]: any })[] = []
   /** @internal */
-  _$properties?: { name: string, def: PropertyListItem<PropertyType, unknown> }[]
+  _$properties?: { name: string; def: PropertyListItem<PropertyType, unknown> }[]
   /** @internal */
-  _$methods: { name: string, func: ComponentMethod }[] = []
+  _$methods: { name: string; func: ComponentMethod }[] = []
   /** @internal */
   _$observers?: {
-    dataPaths: MultiPaths,
-    func: ComponentMethod | string,
-    once: boolean,
+    dataPaths: MultiPaths
+    func: ComponentMethod | string
+    once: boolean
   }[]
   /** @internal */
-  _$lifetimes: { name: string, func: ComponentMethod, once: boolean }[] = []
+  _$lifetimes: { name: string; func: ComponentMethod; once: boolean }[] = []
   /** @internal */
-  _$pageLifetimes?: { name: string, func: ComponentMethod, once: boolean }[] = []
+  _$pageLifetimes?: { name: string; func: ComponentMethod; once: boolean }[] = []
   /** @internal */
   _$listeners?: {
-    [name: string]: ComponentMethod | string,
+    [name: string]: ComponentMethod | string
   }
   /** @internal */
-  _$relations?: { name: string, rel: RelationParams }[]
+  _$relations?: { name: string; rel: RelationParams }[]
   /** @internal */
   _$init: ((this: any, ctx: any) => any)[] = []
   /** @internal */
-  _$methodCallerInit?: (
-    this: ComponentInstance<TData, TProperty, TMethod>
-  ) => any
+  _$methodCallerInit?: (this: ComponentInstance<TData, TProperty, TMethod>) => any
 
   /** @internal */
-  constructor(
-    is: string | undefined,
-    ownerSpace: ComponentSpace,
-  ) {
+  constructor(is: string | undefined, ownerSpace: ComponentSpace) {
     this._$is = is
     this._$ownerSpace = ownerSpace
   }
@@ -542,7 +546,7 @@ export class BehaviorBuilder<
     UData extends DataList,
     UProperty extends PropertyList,
     UMethod extends MethodList,
-    UChainingFilter extends ChainingFilterType
+    UChainingFilter extends ChainingFilterType,
   >(
     behavior: Behavior<UData, UProperty, UMethod, UChainingFilter>,
   ): ResolveBehaviorBuilder<
@@ -575,10 +579,17 @@ export class BehaviorBuilder<
   >(
     func: ChainingFilterFunc<TAddedFields, TRemovedFields>,
   ): ResolveBehaviorBuilder<
-    BehaviorBuilder<TPrevData, TData, TProperty, TMethod, TChainingFilter, {
-      add: TAddedFields,
-      remove: TRemovedFields,
-    }>,
+    BehaviorBuilder<
+      TPrevData,
+      TData,
+      TProperty,
+      TMethod,
+      TChainingFilter,
+      {
+        add: TAddedFields
+        remove: TRemovedFields
+      }
+    >,
     TChainingFilter
   > {
     this._$chainingFilter = func
@@ -635,9 +646,7 @@ export class BehaviorBuilder<
    *
    * The alias SHOULD be in the using list, otherwise it will be ignored.
    */
-  placeholders(
-    list: Record<string, string>,
-  ): ResolveBehaviorBuilder<this, TChainingFilter> {
+  placeholders(list: Record<string, string>): ResolveBehaviorBuilder<this, TChainingFilter> {
     if (this._$placeholders) this._$placeholders = { ...this._$placeholders, ...list }
     else this._$placeholders = list
     return this as any
@@ -672,7 +681,7 @@ export class BehaviorBuilder<
    * The `gen` function executes once during component creation.
    */
   data<T extends DataList>(
-    gen: (() => NewFieldList<DataWithPropertyValues<TData, TProperty>, T>),
+    gen: () => NewFieldList<DataWithPropertyValues<TData, TProperty>, T>,
   ): ResolveBehaviorBuilder<
     BehaviorBuilder<T, TData & T, TProperty, TMethod, TChainingFilter, TPendingChainingFilter>,
     TChainingFilter
@@ -703,11 +712,7 @@ export class BehaviorBuilder<
    *
    * The property name should be different from other properties.
    */
-  property<
-    N extends string,
-    T extends PropertyType,
-    V extends PropertyTypeToValueType<T>,
-  >(
+  property<N extends string, T extends PropertyType, V extends PropertyTypeToValueType<T>>(
     name: N,
     def: N extends keyof (TData & TProperty) ? never : PropertyListItem<T, V>,
   ): ResolveBehaviorBuilder<
@@ -731,9 +736,7 @@ export class BehaviorBuilder<
    *
    * The public method can be used as an event handler, and can be visited in component instance.
    */
-  methods<
-    T extends MethodList,
-  >(
+  methods<T extends MethodList>(
     funcs: T & ThisType<ComponentInstance<TData, TProperty, TMethod & T>>,
   ): ResolveBehaviorBuilder<
     BehaviorBuilder<
@@ -759,26 +762,20 @@ export class BehaviorBuilder<
    * Add a data observer
    */
   observer<
-    P extends ObserverDataPathStrings<
-      DataWithPropertyValues<TPrevData, TProperty>
-    >,
-    V = DeepReadonly<
-      GetFromObserverPathString<DataWithPropertyValues<TPrevData, TProperty>, P>
-    >
+    P extends ObserverDataPathStrings<DataWithPropertyValues<TPrevData, TProperty>>,
+    V = DeepReadonly<GetFromObserverPathString<DataWithPropertyValues<TPrevData, TProperty>, P>>,
   >(
     paths: P,
     func: (this: ComponentInstance<TData, TProperty, TMethod>, newValue: V) => void,
     once?: boolean,
-  ): ResolveBehaviorBuilder<this, TChainingFilter>;
+  ): ResolveBehaviorBuilder<this, TChainingFilter>
   observer<
-    P extends ObserverDataPathStrings<
-      DataWithPropertyValues<TPrevData, TProperty>
-    >[],
+    P extends ObserverDataPathStrings<DataWithPropertyValues<TPrevData, TProperty>>[],
     V = {
       [K in keyof P]: DeepReadonly<
         GetFromObserverPathString<DataWithPropertyValues<TPrevData, TProperty>, P[K]>
       >
-    }
+    },
   >(
     paths: readonly [...P],
     func: (
@@ -786,7 +783,7 @@ export class BehaviorBuilder<
       ...newValues: V extends any[] ? V : never
     ) => void,
     once?: boolean,
-  ): ResolveBehaviorBuilder<this, TChainingFilter>;
+  ): ResolveBehaviorBuilder<this, TChainingFilter>
   observer(
     paths: string | readonly string[],
     func: (this: ComponentInstance<TData, TProperty, TMethod>, ...args: any[]) => any,
@@ -853,15 +850,18 @@ export class BehaviorBuilder<
         ComponentInstance<TData, TProperty, TMethod>
       >,
     ) => TExport,
-  // eslint-disable-next-line function-paren-newline
+    // eslint-disable-next-line function-paren-newline
   ): ResolveBehaviorBuilder<
     BehaviorBuilder<
       TPrevData,
       TData,
       TProperty,
-      TMethod & (TExport extends void ? Empty : {
-        [K in keyof TExport]: UnTaggedMethod<TExport[K]>
-      }),
+      TMethod &
+        (TExport extends void
+          ? Empty
+          : {
+              [K in keyof TExport]: UnTaggedMethod<TExport[K]>
+            }),
       TChainingFilter,
       TPendingChainingFilter
     >,
@@ -879,8 +879,7 @@ export class BehaviorBuilder<
     TNewProperty extends PropertyList = Empty,
     TNewMethod extends MethodList = Empty,
   >(
-    def:
-      ComponentParams<TNewData, TNewProperty, TNewMethod> &
+    def: ComponentParams<TNewData, TNewProperty, TNewMethod> &
       ThisType<ComponentInstance<TData & TNewData, TProperty & TNewProperty, TMethod & TNewMethod>>,
   ): ResolveBehaviorBuilder<
     BehaviorBuilder<
@@ -933,7 +932,11 @@ export class BehaviorBuilder<
       if (Array.isArray(rawObservers)) {
         for (let i = 0; i < rawObservers.length; i += 1) {
           const { fields, observer } = rawObservers[i]!
-          this._$observers.push({ dataPaths: parseMultiPaths(fields ?? '**'), func: observer, once: false })
+          this._$observers.push({
+            dataPaths: parseMultiPaths(fields ?? '**'),
+            func: observer,
+            once: false,
+          })
         }
       } else {
         const keys = Object.keys(rawObservers)
@@ -1035,14 +1038,7 @@ export class Behavior<
   is: string
   ownerSpace: ComponentSpace
   /** @internal */
-  private _$builder: BehaviorBuilder<
-    any,
-    TData,
-    TProperty,
-    TMethod,
-    any,
-    TChainingFilter
-  >
+  private _$builder: BehaviorBuilder<any, TData, TProperty, TMethod, any, TChainingFilter>
   /** @internal */
   private _$flatAncestors: Set<GeneralBehavior>
   /** @internal */
@@ -1050,7 +1046,7 @@ export class Behavior<
   /** @internal */
   _$options?: ComponentOptions
   /** @internal */
-  _$traitBehaviors?: { traitBehavior: TraitBehavior<any, any>, impl: any }[]
+  _$traitBehaviors?: { traitBehavior: TraitBehavior<any, any>; impl: any }[]
   /** @internal */
   _$template?: { [key: string]: unknown }
   /** @internal */
@@ -1058,7 +1054,7 @@ export class Behavior<
   /** @internal */
   _$generics?: string[]
   /** @internal */
-  _$genericDefaults?: { [alias: string]: null | GeneralComponentDefinition }
+  _$genericDefaults?: { [alias: string]: null | GeneralComponentDefinition | NativeNodeDefinition }
   /** @internal */
   _$externalClasses?: string[]
   /** @internal */
@@ -1070,34 +1066,28 @@ export class Behavior<
   /** @internal */
   _$methodMap: { [name: string]: ComponentMethod }
   /** @internal */
-  _$observers: { dataPaths: MultiPaths, observer: ComponentMethod, once: boolean }[]
+  _$observers: { dataPaths: MultiPaths; observer: ComponentMethod; once: boolean }[]
   /** @internal */
-  _$lifetimes: { name: string, func: ComponentMethod, once: boolean }[]
+  _$lifetimes: { name: string; func: ComponentMethod; once: boolean }[]
   /** @internal */
-  _$pageLifetimes?: { name: string, func: ComponentMethod, once: boolean }[]
+  _$pageLifetimes?: { name: string; func: ComponentMethod; once: boolean }[]
   /** @internal */
-  _$listeners?: { id: string, ev: string, listener: ComponentMethod }[]
+  _$listeners?: { id: string; ev: string; listener: ComponentMethod }[]
   /** @internal */
   _$relationMap?: { [name: string]: RelationDefinition }
   /** @internal */
   _$init: ((this: any, ctx: any) => any)[]
   /** @internal */
-  _$methodCallerInit?: (this: ComponentInstance<TData, TProperty, TMethod>) =>
-    ComponentInstance<TData, TProperty, TMethod>
+  _$methodCallerInit?: (
+    this: ComponentInstance<TData, TProperty, TMethod>,
+  ) => ComponentInstance<TData, TProperty, TMethod>
 
   /**
    * Create a behavior with classic-style definition
    */
-  static create<
-    TData extends DataList,
-    TProperty extends PropertyList,
-    TMethod extends MethodList,
-  >(
-    def: ComponentParams<
-      TData,
-      TProperty,
-      TMethod
-    > & ThisType<ComponentInstance<TData, TProperty, TMethod>>,
+  static create<TData extends DataList, TProperty extends PropertyList, TMethod extends MethodList>(
+    def: ComponentParams<TData, TProperty, TMethod> &
+      ThisType<ComponentInstance<TData, TProperty, TMethod>>,
     ownerSpace?: ComponentSpace,
   ) {
     return new BehaviorBuilder(def.is, ownerSpace || getDefaultComponentSpace())
@@ -1106,16 +1096,7 @@ export class Behavior<
   }
 
   /** @internal */
-  constructor(
-    builder: BehaviorBuilder<
-      any,
-      TData,
-      TProperty,
-      TMethod,
-      any,
-      TChainingFilter
-    >,
-  ) {
+  constructor(builder: BehaviorBuilder<any, TData, TProperty, TMethod, any, TChainingFilter>) {
     this._$unprepared = true
     this.is = builder._$is || ''
     this.ownerSpace = builder._$ownerSpace
@@ -1131,8 +1112,7 @@ export class Behavior<
     this._$externalClasses = builder._$externalClasses
     this._$staticData = undefined
     this._$data = []
-    this._$propertyMap = Object.create(null) as
-      { [name: string]: PropertyDefinition }
+    this._$propertyMap = Object.create(null) as { [name: string]: PropertyDefinition }
     this._$methodMap = Object.create(null) as { [name: string]: ComponentMethod }
     this._$observers = []
     this._$lifetimes = []
@@ -1152,9 +1132,9 @@ export class Behavior<
    *
    * This method will prepare the underlying behavior.
    */
-  getComponentDependencies(
-    genericTargets?: { [name: string]: GeneralComponentDefinition },
-  ): Set<GeneralComponentDefinition> {
+  getComponentDependencies(genericTargets?: {
+    [name: string]: GeneralComponentDefinition | NativeNodeDefinition
+  }): Set<GeneralComponentDefinition> {
     const ret: Set<GeneralComponentDefinition> = new Set()
     const rec = function (this: void, beh: GeneralBehavior) {
       if (beh._$unprepared) beh.prepare()
@@ -1162,6 +1142,7 @@ export class Behavior<
       for (let i = 0; i < keys.length; i += 1) {
         const k = keys[i]!
         const v = beh._$using[k]!
+        if (typeof v === 'string') continue
         const dep = v.final
         if (dep && !ret.has(dep)) {
           ret.add(dep)
@@ -1174,6 +1155,7 @@ export class Behavior<
       const list = Object.values(genericTargets)
       for (let i = 0; i < list.length; i += 1) {
         const dep = list[i]!
+        if (typeof dep === 'string') continue
         if (!ret.has(dep)) {
           ret.add(dep)
           rec(dep.behavior as GeneralBehavior)
@@ -1222,7 +1204,9 @@ export class Behavior<
             parent = space.getBehaviorByUrl(parentNameStr, is)
           }
           if (!parent) {
-            triggerWarning(`behavior "${parentNameStr}" is not found (when preparing behavior "${is}").`)
+            triggerWarning(
+              `behavior "${parentNameStr}" is not found (when preparing behavior "${is}").`,
+            )
           }
         }
         if (!parent) continue
@@ -1322,16 +1306,15 @@ export class Behavior<
 
     // init using
     if (typeof builder._$using === 'object' && builder._$using !== null) {
-      const hasPlaceholders = typeof builder._$placeholders === 'object' && builder._$placeholders !== null
+      const hasPlaceholders =
+        typeof builder._$placeholders === 'object' && builder._$placeholders !== null
       const keys = Object.keys(builder._$using)
       for (let i = 0; i < keys.length; i += 1) {
         const k = keys[i]!
-        const v = builder._$using[k]
+        const v = builder._$using[k]!
         let placeholder = null
         if (hasPlaceholders) {
-          placeholder = (
-            builder._$placeholders as { [name: string]: string }
-          )[k] ?? null
+          placeholder = (builder._$placeholders as { [name: string]: string })[k] ?? null
         }
         if (v instanceof ComponentDefinition) {
           this._$using[k] = {
@@ -1365,10 +1348,15 @@ export class Behavior<
             }
             this._$using[k] = p
           } else {
-            this._$using[k] = {
-              final: space.getDefaultComponent(),
-              placeholder: null,
-              waiting: null,
+            const final = space.getGlobalUsingComponent(path)
+            if (typeof final === 'string') {
+              this._$using[k] = final
+            } else {
+              this._$using[k] = {
+                final,
+                placeholder: null,
+                waiting: null,
+              }
             }
           }
         } else {
@@ -1379,24 +1367,29 @@ export class Behavior<
 
     // init generics
     if (typeof builder._$generics === 'object' && builder._$generics !== null) {
-      const generics = this._$generics = [] as string[]
+      const generics = (this._$generics = [] as string[])
       const genericDefaults = Object.create(null) as {
-        [alias: string]: null | GeneralComponentDefinition
+        [alias: string]: null | GeneralComponentDefinition | NativeNodeDefinition
       }
       this._$genericDefaults = genericDefaults
       const genericKeys = Object.keys(builder._$generics)
       for (let i = 0; i < genericKeys.length; i += 1) {
         const k = genericKeys[i]!
         const genericDef = builder._$generics[k]
-        let defaultComp: GeneralComponentDefinition | null = null
+        let defaultComp: GeneralComponentDefinition | NativeNodeDefinition | null = null
         const d = genericDef === true ? undefined : genericDef?.default
         if (d !== undefined) {
           if (d instanceof ComponentDefinition) {
             defaultComp = d
           } else if (space) {
-            defaultComp = space.getComponentByUrl(String(d), is)
+            const tagName = String(d)
+            defaultComp =
+              space.getComponentByUrlWithoutDefault(tagName, is) ||
+              space.getGlobalUsingComponent(tagName)
           } else {
-            triggerWarning(`cannot define generic "${k}" without a default implementor (when preparing behavior "${is}").`)
+            triggerWarning(
+              `cannot define generic "${k}" without a default implementor (when preparing behavior "${is}").`,
+            )
           }
         }
         generics.push(k)
@@ -1424,7 +1417,7 @@ export class Behavior<
     // init properties
     const properties = builder._$properties
     if (properties !== undefined) {
-      const initValueFuncs: { name: string, func: () => any }[] = []
+      const initValueFuncs: { name: string; func: () => any }[] = []
       for (let i = 0; i < properties.length; i += 1) {
         const { name, def } = properties[i]!
         const shortHandDef = normalizePropertyTypeShortHand(def)
@@ -1444,7 +1437,9 @@ export class Behavior<
             }
           }
           if (type === NormalizedPropertyType.Invalid) {
-            triggerWarning(`the type of property "${name}" is illegal (when preparing behavior "${is}").`)
+            triggerWarning(
+              `the type of property "${name}" is illegal (when preparing behavior "${is}").`,
+            )
           }
           let value: DataValue = propDef.value
           if (propDef.value === undefined) {
@@ -1462,7 +1457,9 @@ export class Behavior<
           } else {
             observer = null
             if (propDef.observer !== undefined) {
-              triggerWarning(`the observer of property "${name}" is not a function (when preparing behavior "${is}").`)
+              triggerWarning(
+                `the observer of property "${name}" is not a function (when preparing behavior "${is}").`,
+              )
             }
           }
           const reflectIdPrefix = !!propDef.reflectIdPrefix
@@ -1503,7 +1500,11 @@ export class Behavior<
         if (typeof observer === 'function') {
           this._$observers.push({ dataPaths, observer, once })
         } else {
-          triggerWarning(`the "${String(observer)}" observer is not a function (when preparing behavior "${is}").`)
+          triggerWarning(
+            `the "${String(
+              observer,
+            )}" observer is not a function (when preparing behavior "${is}").`,
+          )
         }
       }
     }
@@ -1542,7 +1543,9 @@ export class Behavior<
             }
             this._$listeners.push({ id, ev, listener })
           } else {
-            triggerWarning(`the "${k}" listener is not a function or a method name (when preparing behavior "${is}").`)
+            triggerWarning(
+              `the "${k}" listener is not a function or a method name (when preparing behavior "${is}").`,
+            )
           }
         }
       }
@@ -1622,7 +1625,7 @@ export class Behavior<
       if (ret[name]) {
         ret[name]!.add(func)
       } else {
-        const fa = ret[name] = new FuncArr()
+        const fa = (ret[name] = new FuncArr())
         fa.add(func)
       }
     }
@@ -1639,7 +1642,7 @@ export class Behavior<
       if (ret[name]) {
         ret[name]!.add(func)
       } else {
-        const fa = ret[name] = new FuncArr()
+        const fa = (ret[name] = new FuncArr())
         fa.add(func)
       }
     }

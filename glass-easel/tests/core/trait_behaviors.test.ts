@@ -1,7 +1,4 @@
-import {
-  domBackend,
-  tmpl,
-} from '../base/env'
+import { domBackend, tmpl } from '../base/env'
 import * as glassEasel from '../../src'
 
 const componentSpace = new glassEasel.ComponentSpace()
@@ -29,7 +26,8 @@ describe('trait behaviors', () => {
     const tbAdd1 = componentSpace.defineTraitBehavior<Add>()
     const tbAdd2 = componentSpace.defineTraitBehavior<Add>()
     const tbMul1 = componentSpace.defineTraitBehavior<Mul>()
-    const compDef = componentSpace.define()
+    const compDef = componentSpace
+      .define()
       .implement(tbAdd1, {
         op(a: number, b: number) {
           return a + b
@@ -49,7 +47,9 @@ describe('trait behaviors', () => {
                 return a + b
               },
             })
-          } catch { catched = true }
+          } catch {
+            catched = true
+          }
           expect(catched).toBe(true)
         })
       })
@@ -75,7 +75,8 @@ describe('trait behaviors', () => {
         return impl.add(a, -b)
       },
     }))
-    const compDef = componentSpace.define()
+    const compDef = componentSpace
+      .define()
       .implement(tb, {
         add(a: number, b: number) {
           return a + b
@@ -94,7 +95,8 @@ describe('trait behaviors', () => {
     const tbChild = componentSpace.defineTraitBehavior<{
       setIndex(index: number): void
     }>()
-    const parentDef = componentSpace.define()
+    const parentDef = componentSpace
+      .define()
       .init(({ implement, relation }) => {
         implement(tbParent, {})
         const child = relation({
@@ -109,7 +111,8 @@ describe('trait behaviors', () => {
         })
       })
       .registerComponent()
-    const childDef = componentSpace.define()
+    const childDef = componentSpace
+      .define()
       .template(tmpl('{{index}}'))
       .data(() => ({
         index: '',
@@ -131,16 +134,19 @@ describe('trait behaviors', () => {
         })
       })
       .registerComponent()
-    const compDef = componentSpace.define()
+    const compDef = componentSpace
+      .define()
       .usingComponents({
         parent: parentDef,
         child: childDef,
       })
-      .template(tmpl(`
+      .template(
+        tmpl(`
         <parent>
           <child wx:for="{{list}}" />
         </parent>
-      `))
+      `),
+      )
       .data(() => ({
         list: [1, 2, 3],
       }))

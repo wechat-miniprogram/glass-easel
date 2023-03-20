@@ -27,7 +27,7 @@ export const propCheck = componentSpace.defineBehavior({
 ```js
 export const myComponent = componentSpace.defineComponent({
   // 引入含有 definitionFilter 的 behavior
-  hehaviors: [propCheck],
+  behaviors: [propCheck],
   properties: {
     a: {
       type: String,

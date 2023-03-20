@@ -1,4 +1,4 @@
-# 多文件模板
+# 模板引用
 
 ## 模板片段
 
@@ -92,3 +92,51 @@ group.addTmpl('path/to/a/component', `
   </div>
 `)
 ```
+
+## 嵌入 JavaScript 代码
+
+在编译多个模板的同时，可以嵌入若干段 JavaScript 代码，与模板一同生成编译结果。
+
+嵌入的每段 JavaScript 代码都必须是一个合法的 JavaScript 文件内容，并需要为它指定一个路径。例如：
+
+```js
+group.addScript('path/to/script', `
+  // JavaScript 文件内容
+`)
+```
+
+代码中可以访问 `require` 和 `exports` 。类似于 Node.js ， `require` 用于导入其他路径的代码， `exports` 用于导出。例如：
+
+```js
+exports.hello = function () {
+  return 'Hello!'
+}
+```
+
+在模板文件中，可以通过 `<wxs>` 来引用指定路径对应的 JavaScript 代码，并将这个 JavaScript 函数的返回值作为 wxs module 值。例如：
+
+```xml
+<wxs module="helloModule" src="/path/to/script" />
+```
+
+这样，模板中的数据绑定表达式中就可以访问 `helloModule` 变量（它的值就是对应 JavaScript 函数的导出）。
+
+```xml
+<wxs module="helloModule" src="/path/to/script" />
+<div> {{ helloModule.hello() }} </div>
+```
+
+此外， `<wxs>` 也可以不使用 `src` 引入，而是直接将 JavaScript 代码内联在 `<wxs>` 内部。
+
+## 模板全局 JavaScript 代码
+
+除了按路径嵌入的 JavaScript 代码，还可以添加一段全局 JavaScript 代码。
+
+```js
+group.addExtraRuntimeScript(`
+  // JavaScript 代码
+  // ...
+`)
+```
+
+这段代码无论如何都会执行，它可以定义一些全局量供所有其他 JavaScript 代码使用，但这些全局量无法被模板中的数据绑定表达式直接访问到。

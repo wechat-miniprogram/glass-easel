@@ -10,8 +10,7 @@ export const tmpl = (src: string): glassEasel.template.ComponentTemplate => {
   const genObjectSrc = `return ${group.getTmplGenObjectGroups()}`
   group.free()
   // console.info(genObjectSrc)
-  const genObjectGroupList = (new Function(genObjectSrc))() as
-    { [key: string]: any }
+  const genObjectGroupList = new Function(genObjectSrc)() as { [key: string]: any }
   return {
     groupList: genObjectGroupList,
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment

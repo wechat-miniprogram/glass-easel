@@ -32,14 +32,16 @@ expectType<string>(definitionInstance.func())
 
 const definitionGeneralInstance = glassEasel.createElement(
   'comp',
-  glassEasel.registerElement({
-    properties: {
-      propStr: String,
-    },
-    data: {
-      foo: { foo: 'foo' },
-    },
-  }).general(),
+  glassEasel
+    .registerElement({
+      properties: {
+        propStr: String,
+      },
+      data: {
+        foo: { foo: 'foo' },
+      },
+    })
+    .general(),
 )
 
 expectType<{ readonly [x: string]: any }>(definitionGeneralInstance.data)

@@ -32,7 +32,7 @@ const optimization = {
 }
 
 const resolve = {
-  extensions: [ '.ts', '.js' ],
+  extensions: ['.ts', '.js'],
 }
 
 const performance = {
@@ -42,16 +42,19 @@ const performance = {
 
 class BundleDeclarationEntrancePlugin {
   apply(compiler) {
-    compiler.hooks.compilation.tap('BundleDeclarationEntrancePlugin', (compilation, compilationParams) => {
-      compilation.hooks.additionalAssets.tapPromise('ExtraAssetPlugin', async () => {
-        Object.keys(compilation.assets).forEach((file) => {
-          if (file.endsWith('.js')) {
-            const dtsFile = file.replace(/\.js$/, '.d.ts')
-            compilation.assets[dtsFile] = new RawSource('export * from "./types/src/index"')
-          }
+    compiler.hooks.compilation.tap(
+      'BundleDeclarationEntrancePlugin',
+      (compilation, compilationParams) => {
+        compilation.hooks.additionalAssets.tapPromise('ExtraAssetPlugin', async () => {
+          Object.keys(compilation.assets).forEach((file) => {
+            if (file.endsWith('.js')) {
+              const dtsFile = file.replace(/\.js$/, '.d.ts')
+              compilation.assets[dtsFile] = new RawSource('export * from "./types/src/index"')
+            }
+          })
         })
-      })
-    })
+      },
+    )
   }
 }
 
@@ -72,7 +75,5 @@ module.exports = {
   resolve,
   externals: 'glass-easel',
   performance,
-  plugins: [
-    ...globalPlugins
-  ],
+  plugins: [...globalPlugins],
 }

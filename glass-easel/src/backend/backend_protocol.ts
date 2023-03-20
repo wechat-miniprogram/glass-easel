@@ -1,17 +1,8 @@
 /* eslint-disable class-methods-use-this */
 
-import {
-  safeCallback,
-} from '../func_arr'
-import {
-  EventOptions,
-  EventBubbleStatus,
-} from '../event'
-import {
-  BackendMode,
-  BoundingClientRect,
-  ScrollOffset,
-} from './mode'
+import { safeCallback } from '../func_arr'
+import { EventOptions, EventBubbleStatus } from '../event'
+import { BackendMode, BoundingClientRect, ScrollOffset } from './mode'
 
 export interface Context {
   mode: BackendMode.Shadow
@@ -26,12 +17,14 @@ export interface Context {
   render(cb: (err: Error | null) => void): void
   getRootNode(): Element
   createFragment(): Element
-  onEvent(listener: (
-    target: unknown,
-    type: string,
-    detail: unknown,
-    options: EventOptions,
-  ) => EventBubbleStatus): void
+  onEvent(
+    listener: (
+      target: unknown,
+      type: string,
+      detail: unknown,
+      options: EventOptions,
+    ) => EventBubbleStatus,
+  ): void
 }
 
 export interface Element {
@@ -125,16 +118,11 @@ export class EmptyBackendContext implements Context {
     if (this._$renderCallbacks) {
       this._$renderCallbacks.push(cb)
     } else {
-      const callbacks = this._$renderCallbacks = [cb]
+      const callbacks = (this._$renderCallbacks = [cb])
       setTimeout(() => {
         this._$renderCallbacks = null
         callbacks.forEach((cb) => {
-          safeCallback(
-            'Render Callback',
-            cb,
-            this,
-            [null],
-          )
+          safeCallback('Render Callback', cb, this, [null])
         })
       }, 16)
     }
@@ -148,12 +136,14 @@ export class EmptyBackendContext implements Context {
     return new EmptyBackendElement(EmptyBackendElementType.Fragment)
   }
 
-  onEvent(_listener: (
-    target: unknown,
-    type: string,
-    detail: unknown,
-    options: EventOptions,
-  ) => EventBubbleStatus): void {
+  onEvent(
+    _listener: (
+      target: unknown,
+      type: string,
+      detail: unknown,
+      options: EventOptions,
+    ) => EventBubbleStatus,
+  ): void {
     // empty
   }
 }
@@ -288,8 +278,9 @@ export class EmptyBackendElement implements Element {
 
 /** A shadow root for empty backend implementation */
 export class EmptyBackendShadowRootContext implements ShadowRootContext {
-  private _$rootNode: EmptyBackendElement =
-    new EmptyBackendElement(EmptyBackendElementType.VirtualNode)
+  private _$rootNode: EmptyBackendElement = new EmptyBackendElement(
+    EmptyBackendElementType.VirtualNode,
+  )
 
   getRootNode(): Element {
     return this._$rootNode

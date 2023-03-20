@@ -83,13 +83,16 @@ describe('model value binding', () => {
         </block>
       `),
       data: {
-        list: [{
-          a: 'X',
-          b: 123,
-        }, {
-          a: 'Y',
-          b: 456,
-        }],
+        list: [
+          {
+            a: 'X',
+            b: 123,
+          },
+          {
+            a: 'Y',
+            b: 456,
+          },
+        ],
       },
     })
     const elem = glassEasel.Component.createWithContext('root', def, domBackend)
@@ -98,10 +101,16 @@ describe('model value binding', () => {
     expect(domHtml(elem)).toBe('<comp>123:X</comp><comp>456:Y</comp>')
     comp0.setData({ propA: 'X0', propB: 1230 })
     expect(domHtml(elem)).toBe('<comp>1230:X0</comp><comp>456:Y</comp>')
-    expect(elem.data.list).toEqual([{ a: 'X0', b: 1230 }, { a: 'Y', b: 456 }])
+    expect(elem.data.list).toEqual([
+      { a: 'X0', b: 1230 },
+      { a: 'Y', b: 456 },
+    ])
     comp1.setData({ propA: 'Y0', propB: 4560 })
     expect(domHtml(elem)).toBe('<comp>1230:X0</comp><comp>4560:Y0</comp>')
-    expect(elem.data.list).toEqual([{ a: 'X0', b: 1230 }, { a: 'Y0', b: 4560 }])
+    expect(elem.data.list).toEqual([
+      { a: 'X0', b: 1230 },
+      { a: 'Y0', b: 4560 },
+    ])
     elem.setData({ list: [{ a: 'Z', b: 789 }] })
     expect(domHtml(elem)).toBe('<comp>789:Z</comp>')
   })

@@ -1,8 +1,6 @@
 import * as glassEasel from 'glass-easel'
 import { tmpl } from './base/env'
-import {
-  MiniProgramEnv,
-} from '../src'
+import { MiniProgramEnv } from '../src'
 
 const domHtml = (elem: glassEasel.Element): string => {
   const domElem = elem.getBackendElement() as unknown as Element
@@ -13,16 +11,20 @@ describe('env', () => {
   test('add global components', () => {
     const env = new MiniProgramEnv()
     const globalCodeSpace = env.getGlobalCodeSpace()
-    globalCodeSpace.getComponentSpace().define('external')
+    const def = globalCodeSpace
+      .getComponentSpace()
+      .define('external')
       .options({
         virtualHost: true,
       })
-      .template(tmpl(`
+      .template(
+        tmpl(`
         <span class="inner" />
-      `))
+      `),
+      )
       .registerComponent()
-    globalCodeSpace.getComponentSpace().exportComponent('external', 'external')
     const codeSpace = env.createCodeSpace('', true)
+    codeSpace.getComponentSpace().setGlobalUsingComponent('external', def)
 
     codeSpace.addComponentStaticConfig('path/to/comp', {
       usingComponents: {
@@ -30,11 +32,14 @@ describe('env', () => {
       },
     })
 
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
       <div class="outer">
         <external />
       </div>
-    `))
+    `),
+    )
 
     codeSpace.componentEnv('path/to/comp', ({ Component }) => {
       Component().register()
@@ -43,22 +48,28 @@ describe('env', () => {
     const backend = new glassEasel.domlikeBackend.CurrentWindowBackendContext()
     const ab = env.associateBackend(backend)
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
-    expect(domHtml(root.getComponent())).toBe('<div class="outer"><span class="inner"></span></div>')
+    expect(domHtml(root.getComponent())).toBe(
+      '<div class="outer"><span class="inner"></span></div>',
+    )
   })
 
   test('add global components', () => {
     const env = new MiniProgramEnv()
     const globalCodeSpace = env.getGlobalCodeSpace()
-    globalCodeSpace.getComponentSpace().define('external')
+    const def = globalCodeSpace
+      .getComponentSpace()
+      .define('external')
       .options({
         virtualHost: true,
       })
-      .template(tmpl(`
+      .template(
+        tmpl(`
         <span class="inner" />
-      `))
+      `),
+      )
       .registerComponent()
-    globalCodeSpace.getComponentSpace().exportComponent('external', 'external')
     const codeSpace = env.createCodeSpace('', true)
+    codeSpace.getComponentSpace().setGlobalUsingComponent('external', def)
 
     codeSpace.addComponentStaticConfig('path/to/comp', {
       usingComponents: {
@@ -66,11 +77,14 @@ describe('env', () => {
       },
     })
 
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
       <div class="outer">
         <external />
       </div>
-    `))
+    `),
+    )
 
     codeSpace.componentEnv('path/to/comp', ({ Component }) => {
       Component().register()
@@ -79,7 +93,9 @@ describe('env', () => {
     const backend = new glassEasel.domlikeBackend.CurrentWindowBackendContext()
     const ab = env.associateBackend(backend)
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
-    expect(domHtml(root.getComponent())).toBe('<div class="outer"><span class="inner"></span></div>')
+    expect(domHtml(root.getComponent())).toBe(
+      '<div class="outer"><span class="inner"></span></div>',
+    )
   })
 
   test('multiple code spaces', () => {
@@ -118,13 +134,16 @@ describe('env', () => {
         'c-b': 'plugin-private://plugin-2-id/inner-comp-2',
       },
     })
-    codeSpace.addCompiledTemplate('path/to/comp', tmpl(`
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
       <c-a />
       <c-aa />
       <i-a />
       <i-b />
       <c-b />
-    `))
+    `),
+    )
     codeSpace.componentEnv('path/to/comp', ({ Component }) => {
       Component().register()
     })
@@ -136,6 +155,8 @@ describe('env', () => {
     const backend = new glassEasel.domlikeBackend.CurrentWindowBackendContext()
     const ab = env.associateBackend(backend)
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
-    expect(domHtml(root.getComponent())).toBe('<c-a>A</c-a><c-aa>A</c-aa><i-a></i-a><i-b></i-b><c-b>B</c-b>')
+    expect(domHtml(root.getComponent())).toBe(
+      '<c-a>A</c-a><c-aa>A</c-aa><i-a></i-a><i-b></i-b><c-b>B</c-b>',
+    )
   })
 })

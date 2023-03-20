@@ -1,7 +1,5 @@
 import * as glassEasel from 'glass-easel'
-import {
-  utils as typeUtils,
-} from './types'
+import { utils as typeUtils } from './types'
 import { ComponentType, GeneralBehavior, TraitBehavior } from './behavior'
 import { SelectorQuery } from './selector_query'
 
@@ -18,11 +16,9 @@ type ExportType<
   UProperty extends PropertyList,
   UMethod extends MethodList,
   UComponentExport,
-> = (
-  UComponentExport extends undefined
-    ? Component<UData, UProperty, UMethod, UComponentExport>
-    : UComponentExport
-)
+> = UComponentExport extends undefined
+  ? Component<UData, UProperty, UMethod, UComponentExport>
+  : UComponentExport
 
 const filterComponentExportWithType = <
   UData extends DataList,
@@ -30,10 +26,10 @@ const filterComponentExportWithType = <
   UMethod extends MethodList,
   UComponentExport,
 >(
-    source: ComponentCaller<any, any, any, any>,
-    elem: glassEasel.Element,
-    componentType: ComponentType<UData, UProperty, UMethod, UComponentExport>,
-  ): ExportType<UData, UProperty, UMethod, UComponentExport> | undefined => {
+  source: ComponentCaller<any, any, any, any>,
+  elem: glassEasel.Element,
+  componentType: ComponentType<UData, UProperty, UMethod, UComponentExport>,
+): ExportType<UData, UProperty, UMethod, UComponentExport> | undefined => {
   const comp = elem.asInstanceOf(componentType._$)
   if (comp === null) return undefined
   const selectedSpace = comp.getRootBehavior().ownerSpace
@@ -78,8 +74,9 @@ export type Component<
   TProperty extends PropertyList,
   TMethod extends MethodList,
   TComponentExport,
-> = ComponentCaller<TData, TProperty, TMethod, TComponentExport>
-  & { [k in keyof TMethod]: TMethod[k] }
+> = ComponentCaller<TData, TProperty, TMethod, TComponentExport> & {
+  [k in keyof TMethod]: TMethod[k]
+}
 
 export class ComponentCaller<
   TData extends DataList,
@@ -88,11 +85,7 @@ export class ComponentCaller<
   TComponentExport,
 > {
   /** @internal */
-  _$!: glassEasel.Component<
-    TData,
-    TProperty,
-    TMethod
-  >
+  _$!: glassEasel.Component<TData, TProperty, TMethod>
   /** @internal */
   _$export?: (source: GeneralComponent | null) => TComponentExport
 
@@ -218,12 +211,10 @@ export class ComponentCaller<
    * All data observers will not be triggered immediately before applied.
    * Reads of the data will get the unchanged value before applied.
    */
-  replaceDataOnPath<
-    T extends (string | number)[],
-  >(
+  replaceDataOnPath<T extends (string | number)[]>(
     path: readonly [...T],
     data: typeUtils.GetFromDataPath<typeUtils.DataWithPropertyValues<TData, TProperty>, T>,
-  ): void;
+  ): void
   replaceDataOnPath(path: any, data: any) {
     this._$.replaceDataOnPath(path, data)
   }
@@ -239,23 +230,27 @@ export class ComponentCaller<
    * All data observers will not be triggered immediately before applied.
    * Reads of the data will get the unchanged value before applied.
    */
-  spliceArrayDataOnPath<
-    T extends (string | number)[],
-  >(
+  spliceArrayDataOnPath<T extends (string | number)[]>(
     path: readonly [...T],
     index: typeUtils.GetFromDataPath<
       typeUtils.DataWithPropertyValues<TData, TProperty>,
       T
-    > extends any[] ? number | undefined : never,
+    > extends any[]
+      ? number | undefined
+      : never,
     del: typeUtils.GetFromDataPath<
       typeUtils.DataWithPropertyValues<TData, TProperty>,
       T
-    > extends any[] ? number | undefined : never,
+    > extends any[]
+      ? number | undefined
+      : never,
     inserts: typeUtils.GetFromDataPath<
       typeUtils.DataWithPropertyValues<TData, TProperty>,
       T
-    > extends (infer I)[] ? I[] : never
-  ): void;
+    > extends (infer I)[]
+      ? I[]
+      : never,
+  ): void
   spliceArrayDataOnPath(
     path: (string | number)[],
     index: number | undefined,
@@ -308,9 +303,9 @@ export class ComponentCaller<
     name: string,
     detail: any,
     options: {
-      bubbles?: boolean,
-      composed?: boolean,
-      capturePhase?: boolean,
+      bubbles?: boolean
+      composed?: boolean
+      capturePhase?: boolean
     },
   ) {
     return this._$.triggerEvent(name, detail, options)
@@ -464,8 +459,12 @@ export class ComponentProto<
   private proto: Component<TData, TProperty, TMethod, TComponentExport>
 
   constructor(methods: TMethod, componentExport?: () => TComponentExport) {
-    this.proto = Object.create(ComponentCaller.prototype) as
-      Component<TData, TProperty, TMethod, TComponentExport>
+    this.proto = Object.create(ComponentCaller.prototype) as Component<
+      TData,
+      TProperty,
+      TMethod,
+      TComponentExport
+    >
     Object.assign(this.proto, methods)
     this.proto._$export = componentExport
   }

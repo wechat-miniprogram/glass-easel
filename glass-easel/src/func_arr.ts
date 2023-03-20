@@ -1,10 +1,5 @@
-import {
-  Component,
-  GeneralComponent,
-} from '.'
-import {
-  globalOptions,
-} from './global_options'
+import { Component, GeneralComponent } from '.'
+import { globalOptions } from './global_options'
 
 export type GeneralFuncType = (this: any, ...args: any[]) => any
 
@@ -57,11 +52,7 @@ export class FuncArr<F extends GeneralFuncType> {
     return ret
   }
 
-  call(
-    caller: ThisType<F>,
-    args: Parameters<F>,
-    relatedComponent?: GeneralComponent,
-  ): boolean {
+  call(caller: ThisType<F>, args: Parameters<F>, relatedComponent?: GeneralComponent): boolean {
     const arr = this._$arr
     let ret = true
     if (arr) {
@@ -99,13 +90,17 @@ export class FuncArr<F extends GeneralFuncType> {
       if (relatedComponent) {
         relatedComponent.triggerLifetime('error', [e])
       }
-      dispatchError(e, {
-        message: msg,
-        type,
-        element: caller,
-        method,
-        args,
-      }, avoidErrorHandler)
+      dispatchError(
+        e,
+        {
+          message: msg,
+          type,
+          element: caller,
+          method,
+          args,
+        },
+        avoidErrorHandler,
+      )
       return undefined
     }
   }
@@ -142,7 +137,7 @@ const warningFuncArr = new FuncArr()
 export class FuncArrWithMeta<F extends GeneralFuncType, T> {
   empty = true
   private _$type = ''
-  private _$arr: { f: F, data: T }[] | null = null
+  private _$arr: { f: F; data: T }[] | null = null
 
   add(func: F, data: T) {
     const item = { f: func, data }
@@ -154,7 +149,7 @@ export class FuncArrWithMeta<F extends GeneralFuncType, T> {
   remove(func: F): T | null {
     let ret: T | null = null
     if (this._$arr) {
-      const newArr: { f: F, data: T }[] = []
+      const newArr: { f: F; data: T }[] = []
       const oldArr = this._$arr
       for (let i = 0; i < oldArr.length; i += 1) {
         const v = oldArr[i]!

@@ -34,18 +34,17 @@ export class TraitBehavior<
 export class TraitGroup {
   private _$traits: WeakMap<TraitBehavior<any, any>, unknown> = new WeakMap()
 
-  implement<
-    TIn extends { [key: string]: unknown },
-    TOut extends { [key: string]: unknown }
-  >(traitBehavior: TraitBehavior<TIn, TOut>, impl: TIn) {
+  implement<TIn extends { [key: string]: unknown }, TOut extends { [key: string]: unknown }>(
+    traitBehavior: TraitBehavior<TIn, TOut>,
+    impl: TIn,
+  ) {
     const traitImpl = traitBehavior._$implement(impl)
     this._$traits.set(traitBehavior, traitImpl)
   }
 
-  get<
-    TIn extends { [key: string]: unknown },
-    TOut extends { [key: string]: unknown }
-  >(traitBehavior: TraitBehavior<TIn, TOut>): TOut | undefined {
+  get<TIn extends { [key: string]: unknown }, TOut extends { [key: string]: unknown }>(
+    traitBehavior: TraitBehavior<TIn, TOut>,
+  ): TOut | undefined {
     return this._$traits.get(traitBehavior) as TOut | undefined
   }
 }

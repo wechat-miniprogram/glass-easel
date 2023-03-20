@@ -1,7 +1,4 @@
-import {
-  tmpl,
-  domBackend,
-} from '../base/env'
+import { tmpl, domBackend } from '../base/env'
 import * as glassEasel from '../../src'
 
 const componentSpace = new glassEasel.ComponentSpace()
@@ -20,16 +17,18 @@ describe('dump element', () => {
     })
     const elem = glassEasel.Component.createWithContext('root', compDef.general(), domBackend)
     const shadowDump = glassEasel.dumpElementToString(elem.shadowRoot, false)
-    expect(shadowDump).toBe([
-      '<(virtual):shadow>',
-      '  <(virtual):wx:if>',
-      '    <div id="a" class="a" style="color: red">',
-      '      A',
-    ].join('\n'))
+    expect(shadowDump).toBe(
+      [
+        '<(virtual):shadow>',
+        '  <(virtual):wx:if>',
+        '    <div id="a" class="a" style="color: red">',
+        '      A',
+      ].join('\n'),
+    )
   })
 
   test('dump node structure (composed)', () => {
-    componentSpace.defineComponent({
+    const compDefA = componentSpace.defineComponent({
       is: 'comp-a',
       options: { multipleSlots: true },
       properties: {
@@ -37,22 +36,25 @@ describe('dump element', () => {
       },
       template: tmpl('<block wx:if="1"> <slot name="a" /> </block>'),
     })
+    componentSpace.setGlobalUsingComponent('comp-a', compDefA.general())
     const compDef = componentSpace.defineComponent({
       is: 'comp-b',
       template: tmpl('<comp-a prop="p"><div attr="c" slot="a">A</div></comp-a>'),
     })
     const elem = glassEasel.Component.createWithContext('root', compDef.general(), domBackend)
     const composedDump = glassEasel.dumpElementToString(elem, true)
-    expect(composedDump).toBe([
-      '<root:comp-b>',
-      '  <(virtual):shadow>',
-      '    <comp-a:comp-a prop="p">',
-      '      <(virtual):shadow>',
-      '        <(virtual):wx:if>',
-      '        <(virtual):slot (slot) name="a">',
-      '          <div slot="a" attr="c">',
-      '            A',
-    ].join('\n'))
+    expect(composedDump).toBe(
+      [
+        '<root:comp-b>',
+        '  <(virtual):shadow>',
+        '    <comp-a:comp-a prop="p">',
+        '      <(virtual):shadow>',
+        '        <(virtual):wx:if>',
+        '        <(virtual):slot (slot) name="a">',
+        '          <div slot="a" attr="c">',
+        '            A',
+      ].join('\n'),
+    )
   })
 
   test('dump node structure (external component)', () => {
@@ -65,10 +67,7 @@ describe('dump element', () => {
     })
     const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
     const composedDump = glassEasel.dumpElementToString(elem, true)
-    expect(composedDump).toBe([
-      '<root: prop="">',
-      '  <(external)>',
-    ].join('\n'))
+    expect(composedDump).toBe(['<root: prop="">', '  <(external)>'].join('\n'))
   })
 
   test('dump invalid node', () => {
@@ -136,27 +135,33 @@ describe('event', () => {
 
   test('legacy event binding syntax', () => {
     const eventArr: number[] = []
-    const childCompDef = glassEasel.Component.register({
-      lifetimes: {
-        attached() {
-          this.triggerEvent('abc', 123, { capturePhase: true })
-          this.triggerEvent('abc', 456)
+    const childCompDef = glassEasel.Component.register(
+      {
+        lifetimes: {
+          attached() {
+            this.triggerEvent('abc', 123, { capturePhase: true })
+            this.triggerEvent('abc', 456)
+          },
         },
       },
-    }, componentSpace)
-    const compDef = glassEasel.Component.register({
-      using: {
-        child: childCompDef,
-      },
-      template: tmpl(`
+      componentSpace,
+    )
+    const compDef = glassEasel.Component.register(
+      {
+        using: {
+          child: childCompDef,
+        },
+        template: tmpl(`
         <child bindabc="handler" capture-bindabc="handler" catchabc="handler" capture-catchabc="handler" onabc="handler" />
       `),
-      methods: {
-        handler(ev: glassEasel.ShadowedEvent<number>) {
-          eventArr.push(ev.detail)
+        methods: {
+          handler(ev: glassEasel.ShadowedEvent<number>) {
+            eventArr.push(ev.detail)
+          },
         },
       },
-    }, componentSpace)
+      componentSpace,
+    )
     const comp = glassEasel.createElement('root', compDef)
     glassEasel.Element.pretendAttached(comp)
     expect(eventArr).toEqual([123, 123, 456, 456, 456])
@@ -164,93 +169,114 @@ describe('event', () => {
 
   test('listener change lifetimes', () => {
     const eventArr: [boolean, string, any][] = []
-    const childCompDef = glassEasel.Component.register({
-      options: {
-        listenerChangeLifetimes: true,
-      },
-      lifetimes: {
-        listenerChanged: (
-          isAdd: boolean,
-          eventName: string,
-          listener: any,
-          options: EventListenerOptions,
-        ) => {
-          eventArr.push([isAdd, eventName, listener])
-          expect(options.capture).toBe(true)
+    const childCompDef = glassEasel.Component.register(
+      {
+        options: {
+          listenerChangeLifetimes: true,
+        },
+        lifetimes: {
+          listenerChanged: (
+            isAdd: boolean,
+            eventName: string,
+            listener: any,
+            options: EventListenerOptions,
+          ) => {
+            eventArr.push([isAdd, eventName, listener])
+            expect(options.capture).toBe(true)
+          },
         },
       },
-    }, componentSpace)
-    const compDef = glassEasel.Component.register({
-      using: {
-        child: childCompDef,
-      },
-      template: tmpl(`
+      componentSpace,
+    )
+    const compDef = glassEasel.Component.register(
+      {
+        using: {
+          child: childCompDef,
+        },
+        template: tmpl(`
         <child id="a" />
       `),
-    }, componentSpace)
+      },
+      componentSpace,
+    )
     const comp = glassEasel.createElement('root', compDef)
     const child = comp.getShadowRoot()!.getElementById('a')!.asInstanceOf(childCompDef)!
-    const listener = () => { /* empty */ }
+    const listener = () => {
+      /* empty */
+    }
     child.addListener('testEv', listener, { capture: true })
     child.removeListener('testEv', listener, { capture: true })
     child.removeListener('testEv', listener, { capture: true })
     child.removeListener('testEv2', listener, { capture: true })
-    expect(eventArr).toEqual([[true, 'testEv', listener], [false, 'testEv', listener]])
+    expect(eventArr).toEqual([
+      [true, 'testEv', listener],
+      [false, 'testEv', listener],
+    ])
   })
 })
 
 describe('component utils', () => {
   test('#getMethodsFromDef #getMethod', () => {
-    const compDef = glassEasel.Component.register({
-      methods: {
-        abc() {
-          return 'abc'
+    const compDef = glassEasel.Component.register(
+      {
+        methods: {
+          abc() {
+            return 'abc'
+          },
         },
       },
-    }, componentSpace)
+      componentSpace,
+    )
     expect(compDef.isPrepared()).toBe(false)
     compDef.prepare()
     expect(compDef.isPrepared()).toBe(true)
-    expect(glassEasel.Component.getMethodsFromDef(compDef.general()).abc!())
-      .toBe('abc')
+    expect(glassEasel.Component.getMethodsFromDef(compDef.general()).abc!()).toBe('abc')
     const comp = glassEasel.createElement('root', compDef.general())
-    expect(glassEasel.Component.getMethod(comp.general(), 'abc')!())
-      .toBe('abc')
+    expect(glassEasel.Component.getMethod(comp.general(), 'abc')!()).toBe('abc')
   })
 
   test('#isInnerDataExcluded', () => {
-    const compDef = glassEasel.Component.register({
-      options: {
-        pureDataPattern: /^_/,
+    const compDef = glassEasel.Component.register(
+      {
+        options: {
+          pureDataPattern: /^_/,
+        },
       },
-    }, componentSpace)
+      componentSpace,
+    )
     const comp = glassEasel.createElement('root', compDef.general())
     expect(comp.isInnerDataExcluded('_a')).toBe(true)
     expect(comp.isInnerDataExcluded('a')).toBe(false)
   })
 
   test('#getInnerData', () => {
-    const compDef = glassEasel.Component.register({
-      options: {
-        dataDeepCopy: glassEasel.DeepCopyKind.Simple,
+    const compDef = glassEasel.Component.register(
+      {
+        options: {
+          dataDeepCopy: glassEasel.DeepCopyKind.Simple,
+        },
+        data: {
+          a: 123,
+        },
       },
-      data: {
-        a: 123,
-      },
-    }, componentSpace)
+      componentSpace,
+    )
     const comp = glassEasel.createElement('root', compDef.general())
     expect(glassEasel.Component.getInnerData(comp.general())).toStrictEqual(comp.data)
   })
 
   test('#getInnerData', () => {
-    const compDef = glassEasel.Component.register({
-      options: {
-        dataDeepCopy: glassEasel.DeepCopyKind.Simple,
+    const compDef = glassEasel.Component.register(
+      {
+        options: {
+          dataDeepCopy: glassEasel.DeepCopyKind.Simple,
+        },
+        data: {
+          a: 123,
+        },
       },
-      data: {
-        a: 123,
-      },
-    }, componentSpace)
+      componentSpace,
+    )
     const comp = glassEasel.createElement('root', compDef.general())
     const oldData = comp.data
     glassEasel.Component.replaceWholeData(comp.general(), { b: 456 })
@@ -261,9 +287,16 @@ describe('component utils', () => {
   test('getComponentDependencies', () => {
     const def0 = componentSpace.defineComponent({ is: 'common/def0', using: { p: '/common/def1' } })
     const def1 = componentSpace.defineComponent({ is: 'common/def1', using: { p: '/common/def0' } })
-    const def2 = componentSpace.defineComponent({ is: 'common/def2', using: { p: './none' }, placeholders: { p: './def1' } })
+    const def2 = componentSpace.defineComponent({
+      is: 'common/def2',
+      using: { p: './none' },
+      placeholders: { p: './def1' },
+    })
     const def3 = componentSpace.defineComponent({ is: 'def3', using: { p: 'common/def1' } })
-    const def4 = componentSpace.defineComponent({ is: 'def4', using: { 'p-a': '/common/def2', 'p-b': def3 } })
+    const def4 = componentSpace.defineComponent({
+      is: 'def4',
+      using: { 'p-a': '/common/def2', 'p-b': def3 },
+    })
     def3.prepare()
     const ret = def4.getComponentDependencies()
     expect(ret).toContain(def0)
@@ -274,9 +307,12 @@ describe('component utils', () => {
   })
 
   test('disallowNativeNode', () => {
-    const template = Object.assign(tmpl(`
+    const template = Object.assign(
+      tmpl(`
       <div />
-    `), { disallowNativeNode: true })
+    `),
+      { disallowNativeNode: true },
+    )
     const compDef = componentSpace.defineComponent({ template })
     const elem = glassEasel.createElement('root', compDef.general())
     expect(elem.getShadowRoot()!.childNodes[0]).toBeInstanceOf(glassEasel.Component)
@@ -284,12 +320,15 @@ describe('component utils', () => {
 
   test('propertyEarlyInit', () => {
     const callOrder: number[] = []
-    const lateInit = componentSpace.define()
+    const lateInit = componentSpace
+      .define()
       .options({ propertyEarlyInit: false })
       .property('a', Boolean)
-      .template(tmpl(`
+      .template(
+        tmpl(`
         <div wx:if="{{a}}" id="a">{{a}}</div>
-      `))
+      `),
+      )
       .observer('a', function () {
         callOrder.push(1)
         expect(this.getShadowRoot()!.getElementById('a')).toBe(undefined)
@@ -303,12 +342,15 @@ describe('component utils', () => {
         expect(this.getShadowRoot()!.getElementById('a')).toBeInstanceOf(glassEasel.NativeNode)
       })
       .registerComponent()
-    const earlyInit = componentSpace.define()
+    const earlyInit = componentSpace
+      .define()
       .options({ propertyEarlyInit: true })
       .property('a', Boolean)
-      .template(tmpl(`
+      .template(
+        tmpl(`
         <div wx:if="{{a}}" id="a">{{a}}</div>
-      `))
+      `),
+      )
       .observer('a', function () {
         callOrder.push(4)
         expect(this.getShadowRoot()!.getElementById('a')).toBe(undefined)
@@ -322,15 +364,18 @@ describe('component utils', () => {
         expect(this.getShadowRoot()!.getElementById('a')).toBeInstanceOf(glassEasel.NativeNode)
       })
       .registerComponent()
-    const compDef = componentSpace.define()
+    const compDef = componentSpace
+      .define()
       .usingComponents({
         'early-init': earlyInit.general(),
         'late-init': lateInit.general(),
       })
-      .template(tmpl(`
+      .template(
+        tmpl(`
         <late-init a="{{true}}" />
         <early-init a="{{true}}" />
-      `))
+      `),
+      )
       .registerComponent()
     const elem = glassEasel.createElement('root', compDef.general())
     glassEasel.Element.pretendAttached(elem)

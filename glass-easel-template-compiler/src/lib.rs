@@ -6,8 +6,6 @@ extern crate pest;
 extern crate pest_derive;
 #[macro_use]
 extern crate lazy_static;
-#[cfg(feature = "native_data_from_json")]
-extern crate serde_json;
 
 mod tree;
 pub use tree::TmplTree;

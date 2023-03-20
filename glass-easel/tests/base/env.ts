@@ -46,7 +46,7 @@ export const tmpl = (src: string, options?: TemplateOptions) => {
   group.free()
   // console.info(genObjectSrc)
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  const genObjectGroupList = (new Function(genObjectSrc))() as { [key: string]: any }
+  const genObjectGroupList = new Function(genObjectSrc)() as { [key: string]: any }
   return {
     groupList: genObjectGroupList,
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -58,13 +58,17 @@ export const tmpl = (src: string, options?: TemplateOptions) => {
 export const multiTmpl = (src: { [path: string]: string }, options?: TemplateOptions) => {
   const group = new TmplGroup()
   Object.keys(src).forEach((path) => {
-    group.addTmpl(path, src[path]!)
+    if (path.endsWith('.wxs')) {
+      group.addScript(path.slice(0, -4), src[path]!)
+    } else {
+      group.addTmpl(path, src[path]!)
+    }
   })
   const genObjectSrc = `return ${group.getTmplGenObjectGroups()}`
   group.free()
   // console.info(genObjectSrc)
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  const genObjectGroupList = (new Function(genObjectSrc))() as { [key: string]: any }
+  const genObjectGroupList = new Function(genObjectSrc)() as { [key: string]: any }
   return {
     groupList: genObjectGroupList,
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment

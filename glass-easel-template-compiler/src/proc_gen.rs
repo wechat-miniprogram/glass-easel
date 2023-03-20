@@ -114,6 +114,18 @@ impl<'a, W: fmt::Write> JsFunctionScopeWriter<'a, W> {
         JsIdent { name: var_name }
     }
 
+    pub(crate) fn custom_stmt_str(
+        &mut self,
+        content: &str,
+    ) -> Result<(), TmplError> {
+        if self.block.need_stat_sep {
+            write!(&mut self.w, ";")?;
+        }
+        self.block.need_stat_sep = false;
+        write!(&mut self.w, "{}", content)?;
+        Ok(())
+    }
+
     fn stat<R>(
         &mut self,
         f: impl FnOnce(&mut Self) -> Result<R, TmplError>,
@@ -209,6 +221,6 @@ impl<'a, W: fmt::Write> fmt::Write for JsExprWriter<'a, W> {
 
 pub(crate) struct ScopeVar {
     pub(crate) var: JsIdent,
-    pub(crate) update_path_tree: JsIdent,
+    pub(crate) update_path_tree: Option<JsIdent>,
     pub(crate) lvalue_path: Option<JsIdent>,
 }

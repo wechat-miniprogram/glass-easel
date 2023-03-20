@@ -1,21 +1,14 @@
 import * as glassEasel from 'glass-easel'
-import {
-  GeneralComponentDefinition,
-  utils as typeUtils,
-} from './types'
+import { GeneralComponentDefinition, utils as typeUtils } from './types'
 
 type DataList = typeUtils.DataList
 type PropertyList = typeUtils.PropertyList
 type MethodList = typeUtils.MethodList
 type ChainingFilterType = typeUtils.ChainingFilterType
 
-export type DefinitionFilter =
-(
+export type DefinitionFilter = (
   target: GeneralComponentDefinition,
-  childFilters: (
-    ((target: GeneralComponentDefinition) => void)
-    | null
-  )[],
+  childFilters: (((target: GeneralComponentDefinition) => void) | null)[],
 ) => void
 
 export type GeneralBehavior = Behavior<
@@ -34,16 +27,11 @@ export class Behavior<
   /** @internal */
   _$: glassEasel.GeneralBehavior
   /** @internal */
-  _$bindedDefinitionFilter?: ((target: GeneralComponentDefinition) => void)
+  _$bindedDefinitionFilter?: (target: GeneralComponentDefinition) => void
 
   /** @internal */
   constructor(
-    inner: glassEasel.Behavior<
-      TData,
-      TProperty,
-      TMethod,
-      TChainingFilter
-    >,
+    inner: glassEasel.Behavior<TData, TProperty, TMethod, TChainingFilter>,
     parents: GeneralBehavior[],
     definitionFilter: DefinitionFilter | undefined,
   ) {
@@ -67,20 +55,10 @@ export class ComponentType<
   TComponentExport,
 > {
   /** @internal */
-  _$: glassEasel.ComponentDefinition<
-    TData,
-    TProperty,
-    TMethod
-  >
+  _$: glassEasel.ComponentDefinition<TData, TProperty, TMethod>
 
   /** @internal */
-  constructor(
-    inner: glassEasel.ComponentDefinition<
-      TData,
-      TProperty,
-      TMethod
-    >,
-  ) {
+  constructor(inner: glassEasel.ComponentDefinition<TData, TProperty, TMethod>) {
     this._$ = inner
   }
 }

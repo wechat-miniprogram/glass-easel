@@ -3,14 +3,8 @@
 import * as backend from './backend/backend_protocol'
 import * as composedBackend from './backend/composed_backend_protocol'
 import * as domlikeBackend from './backend/domlike_backend_protocol'
-import {
-  FuncArr,
-  GeneralFuncType,
-  triggerWarning,
-} from './func_arr'
-import {
-  Element,
-} from './element'
+import { FuncArr, GeneralFuncType, triggerWarning } from './func_arr'
+import { Element } from './element'
 import {
   globalOptions,
   normalizeComponentOptions,
@@ -18,9 +12,7 @@ import {
   getDefaultComponentSpace,
   getDefaultBackendContext,
 } from './global_options'
-import {
-  ShadowRoot,
-} from './shadow_root'
+import { ShadowRoot } from './shadow_root'
 import {
   ComponentInstance,
   ComponentParams,
@@ -45,13 +37,10 @@ import {
   RelationHandler,
   normalizeRelation,
   BuilderContext,
+  NativeNodeDefinition,
 } from './behavior'
-import {
-  ComponentSpace,
-} from './component_space'
-import {
-  simpleDeepCopy,
-} from './data_utils'
+import { ComponentSpace } from './component_space'
+import { simpleDeepCopy } from './data_utils'
 import {
   DataGroup,
   DataGroupObserverTree,
@@ -59,37 +48,14 @@ import {
   DeepCopyStrategy,
   getDeepCopyStrategy,
 } from './data_proxy'
-import {
-  Relation,
-  generateRelationDefinitionGroup,
-  RelationDefinitionGroup,
-} from './relation'
-import {
-  Template,
-  TemplateEngine,
-} from './template_engine'
-import {
-  ClassList,
-} from './class_list'
-import {
-  GeneralBackendContext,
-  GeneralBackendElement,
-} from './node'
-import {
-  DataPath,
-  parseSinglePath,
-  parseMultiPaths,
-} from './data_path'
-import {
-  ExternalShadowRoot,
-} from './external_shadow_tree'
-import {
-  BM,
-  BackendMode,
-} from './backend/mode'
-import {
-  EventListener,
-} from './event'
+import { Relation, generateRelationDefinitionGroup, RelationDefinitionGroup } from './relation'
+import { Template, TemplateEngine } from './template_engine'
+import { ClassList } from './class_list'
+import { GeneralBackendContext, GeneralBackendElement } from './node'
+import { DataPath, parseSinglePath, parseMultiPaths } from './data_path'
+import { ExternalShadowRoot } from './external_shadow_tree'
+import { BM, BackendMode } from './backend/mode'
+import { EventListener } from './event'
 import { TraitBehavior, TraitGroup } from './trait_behaviors'
 
 export const convertGenerics = (
@@ -117,18 +83,24 @@ export const convertGenerics = (
           } else if (hostGenericImpls && hostGenericImpls[target]) {
             genericImpls[key] = hostGenericImpls[target]!
           } else {
-            const comp = space.getComponentByUrlWithoutDefault(target, '')
-            if (comp) {
+            const comp = space.getGlobalUsingComponent(target)
+            if (typeof comp === 'string') {
+              genericImpls[key] = comp
+            } else if (comp) {
               genericImpls[key] = {
                 final: comp,
                 placeholder: null,
                 waiting: null,
               }
             } else {
-              triggerWarning(`Generic "${key}" value "${target}" is not valid (on component "${compDef.is}").`)
+              triggerWarning(
+                `Generic "${key}" value "${target}" is not valid (on component "${compDef.is}").`,
+              )
               const defaultComp = space.getDefaultComponent()
               if (!defaultComp) {
-                throw new Error(`Cannot find default component for generic "${key}" (on component "${compDef.is}")`)
+                throw new Error(
+                  `Cannot find default component for generic "${key}" (on component "${compDef.is}")`,
+                )
               }
               genericImpls[key] = {
                 final: defaultComp,
@@ -143,13 +115,18 @@ export const convertGenerics = (
       } else {
         const defaultComp = genericDefaults[key] || space.getDefaultComponent()
         if (!defaultComp) {
-          throw new Error(`Cannot find default component for generic "${key}" (on component "${compDef.is}")`)
+          throw new Error(
+            `Cannot find default component for generic "${key}" (on component "${compDef.is}")`,
+          )
         }
-        genericImpls[key] = {
-          final: defaultComp,
-          placeholder: null,
-          waiting: null,
-        }
+        genericImpls[key] =
+          typeof defaultComp === 'string'
+            ? defaultComp
+            : {
+                final: defaultComp,
+                placeholder: null,
+                waiting: null,
+              }
       }
     }
   } else {
@@ -163,31 +140,37 @@ export const resolvePlaceholder = (
   space: ComponentSpace,
   behavior: GeneralBehavior,
   genericImpls: { [key: string]: ComponentDefinitionWithPlaceholder } | null,
-): GeneralComponentDefinition => {
+): GeneralComponentDefinition | NativeNodeDefinition => {
   const using = behavior._$using
   const usingTarget = using[placeholder] || (genericImpls && genericImpls[placeholder])
-  let ret: GeneralComponentDefinition | null = null
+  let ret: GeneralComponentDefinition | NativeNodeDefinition | null = null
   if (usingTarget) {
-    if (usingTarget.placeholder === null) {
+    if (typeof usingTarget === 'string') {
+      ret = usingTarget
+    } else if (usingTarget.placeholder === null) {
       ret = usingTarget.final
     } else {
-      triggerWarning(`Placeholder on generic implementation is not valid (on component "${behavior.is}")`)
+      triggerWarning(
+        `Placeholder on generic implementation is not valid (on component "${behavior.is}")`,
+      )
     }
   }
   if (ret) return ret
   const defaultComp = space.getDefaultComponent()
   if (!defaultComp) {
-    throw new Error(`Cannot find default component for placeholder target "${placeholder}" (on component "${behavior.is}")`)
+    throw new Error(
+      `Cannot find default component for placeholder target "${placeholder}" (on component "${behavior.is}")`,
+    )
   }
   return defaultComp
 }
 
 export type Lifetimes = {
-  created: () => void,
-  attached: () => void,
-  moved: () => void,
-  detached: () => void,
-  ready: () => void,
+  created: () => void
+  attached: () => void
+  moved: () => void
+  detached: () => void
+  ready: () => void
 }
 
 export type LifetimeFuncs = {
@@ -195,7 +178,7 @@ export type LifetimeFuncs = {
 } & Record<string, FuncArr<GeneralFuncType>>
 
 export type PageLifetimeFuncs = {
-  [name: string]: FuncArr<GeneralFuncType>,
+  [name: string]: FuncArr<GeneralFuncType>
 }
 
 type ComponentDefinitionDetail<
@@ -226,9 +209,7 @@ export class ComponentDefinition<
   private _$templateEngine: TemplateEngine
 
   /** @internal */
-  constructor(
-    behavior: Behavior<TData, TProperty, TMethod, any>,
-  ) {
+  constructor(behavior: Behavior<TData, TProperty, TMethod, any>) {
     this.behavior = behavior
     this.is = this.behavior.is
     this._$detail = null
@@ -269,14 +250,16 @@ export class ComponentDefinition<
     const behavior = this.behavior
     const options = this._$options
     const propSetters = {} as {
-      [key: string]: {
-        enumerable: boolean,
-        get: (this: Component<TData, TProperty, TMethod>) => unknown,
-        set: (this: Component<TData, TProperty, TMethod>, v: unknown) => void,
-      } | {
-        enumerable: boolean,
-        value: (...args: unknown[]) => unknown,
-      }
+      [key: string]:
+        | {
+            enumerable: boolean
+            get: (this: Component<TData, TProperty, TMethod>) => unknown
+            set: (this: Component<TData, TProperty, TMethod>, v: unknown) => void
+          }
+        | {
+            enumerable: boolean
+            value: (...args: unknown[]) => unknown
+          }
     }
 
     // add properties to component prototype if needed
@@ -307,9 +290,14 @@ export class ComponentDefinition<
     }
 
     // create prototype
-    const protoFunc = function ComponentInst() { /* empty */ }
-    protoFunc.prototype = Object.create(Component.prototype, propSetters) as
-      ComponentInstProto<TData, TProperty, TMethod>
+    const protoFunc = function ComponentInst() {
+      /* empty */
+    }
+    protoFunc.prototype = Object.create(Component.prototype, propSetters) as ComponentInstProto<
+      TData,
+      TProperty,
+      TMethod
+    >
     const proto = protoFunc.prototype
     proto._$behavior = behavior
     proto._$definition = this
@@ -398,7 +386,7 @@ export class Component<
   >(
     componentDefinition: ComponentDefinition<UData, UProperty, UMethod>,
   ): ComponentInstance<UData, UProperty, UMethod> | null {
-    if (this._$behavior as any !== componentDefinition.behavior) {
+    if ((this._$behavior as any) !== componentDefinition.behavior) {
       return null
     }
     return this as unknown as ComponentInstance<UData, UProperty, UMethod>
@@ -419,7 +407,7 @@ export class Component<
   /** @internal */
   static _$tagMethod<Fn extends ComponentMethod>(func: Fn): TaggedMethod<Fn> {
     const taggedMethod = func as unknown as TaggedMethod<Fn>
-    (taggedMethod as unknown as { [tag: symbol]: true })[METHOD_TAG] = true
+    ;(taggedMethod as unknown as { [tag: symbol]: true })[METHOD_TAG] = true
     return taggedMethod
   }
 
@@ -443,13 +431,8 @@ export class Component<
     initPropValues?: (comp: ComponentInstance<TData, TProperty, TMethod>) => void,
   ): ComponentInstance<TData, TProperty, TMethod> {
     if (!def._$detail) def.prepare()
-    const {
-      proto,
-      template,
-      dataDeepCopy,
-      propertyPassingDeepCopy,
-      relationDefinitionGroup,
-    } = def._$detail!
+    const { proto, template, dataDeepCopy, propertyPassingDeepCopy, relationDefinitionGroup } =
+      def._$detail!
     let dataGroupObserverTree = def._$detail!.dataGroupObserverTree
     const options = def._$options
     const behavior = def.behavior
@@ -461,8 +444,7 @@ export class Component<
     const writeExtraInfoToAttr = globalOptions.writeExtraInfoToAttr
 
     // initialize component instance object
-    const comp = Object.create(proto) as
-      ComponentInstance<TData, TProperty, TMethod>
+    const comp = Object.create(proto) as ComponentInstance<TData, TProperty, TMethod>
     comp._$genericImpls = genericImpls
     comp._$placeholderHandler = placeholderHandler
     comp._$external = external
@@ -486,8 +468,9 @@ export class Component<
       }
     } else if (owner) {
       if (BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike)) {
-        backendElement = (owner._$nodeTreeContext as domlikeBackend.Context)
-          .document.createElement(tagName)
+        backendElement = (owner._$nodeTreeContext as domlikeBackend.Context).document.createElement(
+          tagName,
+        )
       } else if (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Shadow)) {
         const backend = owner._$backendShadowRoot
         backendElement = backend?.createComponent(tagName, false) || null
@@ -498,8 +481,7 @@ export class Component<
       comp._$initialize(false, backendElement, owner, nodeTreeContext)
     } else {
       if (BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike)) {
-        backendElement = (nodeTreeContext as domlikeBackend.Context)
-          .document.createElement(tagName)
+        backendElement = (nodeTreeContext as domlikeBackend.Context).document.createElement(tagName)
       } else if (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Shadow)) {
         const sr = (nodeTreeContext as backend.Context).getRootNode().getShadowRoot()
         if (!sr) throw new Error('Failed getting backend shadow tree')
@@ -523,11 +505,12 @@ export class Component<
       const styleScope = owner.getHostNode()._$definition._$options.styleScope
       if (styleScope) {
         if (!(BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike))) {
-          (backendElement as backend.Element | composedBackend.Element).setStyleScope(styleScope)
+          ;(backendElement as backend.Element | composedBackend.Element).setStyleScope(styleScope)
         }
       }
       if (writeExtraInfoToAttr) {
-        const prefix = owner.getHostNode()
+        const prefix = owner
+          .getHostNode()
           ._$behavior.ownerSpace?.styleScopeManager.queryName(styleScope)
         if (prefix) {
           backendElement.setAttribute('exparser:info-class-prefix', `${prefix}--`)
@@ -538,7 +521,7 @@ export class Component<
     // associate in backend
     if (!(BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike))) {
       if (backendElement) {
-        (backendElement as backend.Element | composedBackend.Element).associateValue(comp)
+        ;(backendElement as backend.Element | composedBackend.Element).associateValue(comp)
       }
     }
 
@@ -549,7 +532,9 @@ export class Component<
       comp._$componentInstanceId = componentInstanceId
       backendElement.setAttribute('exparser:info-component-id', componentInstanceId)
     }
-    comp._$idPrefix = options.idPrefixGenerator ? options.idPrefixGenerator.call(comp as unknown as GeneralComponentInstance) : ''
+    comp._$idPrefix = options.idPrefixGenerator
+      ? options.idPrefixGenerator.call(comp as unknown as GeneralComponentInstance)
+      : ''
 
     // combine initial data
     const staticData = behavior._$staticData
@@ -575,10 +560,10 @@ export class Component<
     }
 
     // init relations
-    const relation = comp._$relation = new Relation(
+    const relation = (comp._$relation = new Relation(
       comp as unknown as GeneralComponentInstance,
       relationDefinitionGroup,
-    )
+    ))
 
     // init trait group
     comp._$traitGroup = new TraitGroup()
@@ -619,10 +604,13 @@ export class Component<
         const targetNodes = relation.getLinkedTargets(key)
         return targetNodes.map((x) => x.getMethodCaller())
       }
-      const listAsTrait = target instanceof TraitBehavior ? () => {
-        const targetNodes = relation.getLinkedTargets(key)
-        return targetNodes.map((x: GeneralComponent) => x.traitBehavior(target))
-      } : undefined
+      const listAsTrait =
+        target instanceof TraitBehavior
+          ? () => {
+              const targetNodes = relation.getLinkedTargets(key)
+              return targetNodes.map((x: GeneralComponent) => x.traitBehavior(target))
+            }
+          : undefined
       return { list, listAsTrait } as any
     }
     if (behavior._$init.length > 0) {
@@ -661,7 +649,7 @@ export class Component<
           if (fag[name]) {
             fag[name]!.add(func)
           } else {
-            const fa = fag[name] = new FuncArr()
+            const fa = (fag[name] = new FuncArr())
             fa.add(func)
           }
         },
@@ -675,7 +663,7 @@ export class Component<
           if (fag[name]) {
             fag[name]!.add(func)
           } else {
-            const fa = fag[name] = new FuncArr()
+            const fa = (fag[name] = new FuncArr())
             fa.add(func)
           }
         },
@@ -686,7 +674,8 @@ export class Component<
       for (let i = 0; i < initFuncs.length; i += 1) {
         const init = initFuncs[i]!
         const exported = init.call(methodCaller, builderContext) as
-          { [x: string]: unknown } | undefined
+          | { [x: string]: unknown }
+          | undefined
         if (exported) {
           const exportedKeys = Object.keys(exported)
           for (let j = 0; j < exportedKeys.length; j += 1) {
@@ -706,9 +695,7 @@ export class Component<
     initDone = true
 
     // init data
-    const tmplInst = template.createInstance(
-      comp as unknown as GeneralComponentInstance,
-    )
+    const tmplInst = template.createInstance(comp as unknown as GeneralComponentInstance)
     const shadowRoot = tmplInst.shadowRoot
     comp.shadowRoot = shadowRoot
     const dataGroup = new DataGroup(
@@ -724,12 +711,8 @@ export class Component<
 
     // init template with init data
     if (propEarlyInit && initPropValues !== undefined) initPropValues(comp)
-    tmplInst.initValues(
-      dataGroup.innerData || dataGroup.data,
-    )
-    dataGroup.setUpdateListener(
-      tmplInst.updateValues.bind(tmplInst),
-    )
+    tmplInst.initValues(dataGroup.innerData || dataGroup.data)
+    dataGroup.setUpdateListener(tmplInst.updateValues.bind(tmplInst))
 
     // bind behavior listeners
     const listeners = behavior._$listeners
@@ -863,11 +846,7 @@ export class Component<
     )
   }
 
-  static create<
-    TData extends DataList,
-    TProperty extends PropertyList,
-    TMethod extends MethodList,
-  >(
+  static create<TData extends DataList, TProperty extends PropertyList, TMethod extends MethodList>(
     tagName: string | ComponentDefinition<TData, TProperty, TMethod>,
     componentDefinition: ComponentDefinition<TData, TProperty, TMethod> | null,
     initPropValues?: (comp: ComponentInstance<TData, TProperty, TMethod>) => void,
@@ -922,9 +901,7 @@ export class Component<
     TData extends DataList,
     TProperty extends PropertyList,
     TMethod extends MethodList,
-  >(
-    comp: ComponentInstance<TData, TProperty, TMethod>,
-  ): string[] {
+  >(comp: ComponentInstance<TData, TProperty, TMethod>): string[] {
     return Object.keys(comp._$behavior._$propertyMap)
   }
 
@@ -941,9 +918,7 @@ export class Component<
     TData extends DataList,
     TProperty extends PropertyList,
     TMethod extends MethodList,
-  >(
-    compDef: ComponentDefinition<TData, TProperty, TMethod>,
-  ): { [name: string]: GeneralFuncType } {
+  >(compDef: ComponentDefinition<TData, TProperty, TMethod>): { [name: string]: GeneralFuncType } {
     return compDef.behavior._$methodMap
   }
 
@@ -952,10 +927,7 @@ export class Component<
     TData extends DataList,
     TProperty extends PropertyList,
     TMethod extends MethodList,
-  >(
-    comp: Component<TData, TProperty, TMethod>,
-    methodName: string,
-  ): GeneralFuncType | undefined {
+  >(comp: Component<TData, TProperty, TMethod>, methodName: string): GeneralFuncType | undefined {
     return comp._$behavior._$methodMap[methodName]
   }
 
@@ -1080,20 +1052,20 @@ export class Component<
 
   /** Update an external class value */
   setExternalClass(name: string, target: string) {
-    const cl = (this.classList as ClassList)
+    const cl = this.classList as ClassList
     cl._$setAlias(name, target)
     cl._$spreadAliasUpdate()
   }
 
   /** Schedule an update for an external class value */
   scheduleExternalClassChange(name: string, target: string) {
-    const cl = (this.classList as ClassList)
+    const cl = this.classList as ClassList
     cl._$setAlias(name, target)
   }
 
   /** Update multiple external class values */
   applyExternalClassChanges() {
-    (this.classList as ClassList)._$spreadAliasUpdate()
+    ;(this.classList as ClassList)._$spreadAliasUpdate()
   }
 
   /** Check a field is excluded by pureDataPattern or not */
@@ -1105,9 +1077,7 @@ export class Component<
     TData extends DataList,
     TProperty extends PropertyList,
     TMethod extends MethodList,
-  >(
-    comp: Component<TData, TProperty, TMethod>,
-  ): { [key: string]: DataValue } | null {
+  >(comp: Component<TData, TProperty, TMethod>): { [key: string]: DataValue } | null {
     return comp._$dataGroup.innerData
   }
 
@@ -1115,9 +1085,7 @@ export class Component<
     TData extends DataList,
     TProperty extends PropertyList,
     TMethod extends MethodList,
-  >(
-    comp: Component<TData, TProperty, TMethod>,
-  ): DataGroup<TData, TProperty, TMethod> {
+  >(comp: Component<TData, TProperty, TMethod>): DataGroup<TData, TProperty, TMethod> {
     return comp._$dataGroup
   }
 
@@ -1125,10 +1093,7 @@ export class Component<
     TData extends DataList,
     TProperty extends PropertyList,
     TMethod extends MethodList,
-  >(
-    comp: Component<TData, TProperty, TMethod>,
-    newData: DataWithPropertyValues<TData, TProperty>,
-  ) {
+  >(comp: Component<TData, TProperty, TMethod>, newData: DataWithPropertyValues<TData, TProperty>) {
     comp._$dataGroup.replaceWholeData(newData)
   }
 
@@ -1139,12 +1104,10 @@ export class Component<
    * All data observers will not be triggered immediately before applied.
    * Reads of the data will get the unchanged value before applied.
    */
-  replaceDataOnPath<
-    T extends DataPath,
-  >(
+  replaceDataOnPath<T extends DataPath>(
     path: readonly [...T],
     data: GetFromDataPath<DataWithPropertyValues<TData, TProperty>, T>,
-  ): void;
+  ): void
   replaceDataOnPath(path: DataPath, data: unknown) {
     const dataProxy = this._$dataGroup
     if (dataProxy === undefined) {
@@ -1164,23 +1127,18 @@ export class Component<
    * All data observers will not be triggered immediately before applied.
    * Reads of the data will get the unchanged value before applied.
    */
-  spliceArrayDataOnPath<
-    T extends DataPath,
-  >(
+  spliceArrayDataOnPath<T extends DataPath>(
     path: readonly [...T],
-    index: GetFromDataPath<
-      DataWithPropertyValues<TData, TProperty>,
-      T
-    > extends any[] ? number | undefined : never,
-    del: GetFromDataPath<
-      DataWithPropertyValues<TData, TProperty>,
-      T
-    > extends any[] ? number | undefined : never,
-    inserts: GetFromDataPath<
-      DataWithPropertyValues<TData, TProperty>,
-      T
-    > extends (infer I)[] ? I[] : never
-  ): void;
+    index: GetFromDataPath<DataWithPropertyValues<TData, TProperty>, T> extends any[]
+      ? number | undefined
+      : never,
+    del: GetFromDataPath<DataWithPropertyValues<TData, TProperty>, T> extends any[]
+      ? number | undefined
+      : never,
+    inserts: GetFromDataPath<DataWithPropertyValues<TData, TProperty>, T> extends (infer I)[]
+      ? I[]
+      : never,
+  ): void
   spliceArrayDataOnPath(
     path: DataPath,
     index: number | undefined,

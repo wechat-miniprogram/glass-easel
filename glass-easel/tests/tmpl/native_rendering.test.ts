@@ -23,13 +23,17 @@ describe('native rendering mode', () => {
     })
     const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
     expect(elem.$$).toBeInstanceOf(Element)
-    expect(domHtml(elem)).toBe('<div class="A" hidden=""><span style="color: red" custom-attr="v"> A </span></div><virtual></virtual>')
+    expect(domHtml(elem)).toBe(
+      '<div class="A" hidden=""><span style="color: red" custom-attr="v"> A </span></div><virtual></virtual>',
+    )
     elem.setData({
       a: 'BB',
       b: true,
       hidden: false,
     })
-    expect(domHtml(elem)).toBe('<div class="BB" custom-attr=""><span style="color: red" custom-attr="v"> BB </span></div><virtual></virtual>')
+    expect(domHtml(elem)).toBe(
+      '<div class="BB" custom-attr=""><span style="color: red" custom-attr="v"> BB </span></div><virtual></virtual>',
+    )
   })
 
   test('slot shrinking', () => {
@@ -148,8 +152,20 @@ describe('native rendering mode', () => {
       bubbles: true,
       composed: true,
     }
-    glassEasel.triggerExternalEvent(elem, elem.$.inner as glassEasel.GeneralBackendElement, 'touchstart', {}, evOps)
-    glassEasel.triggerExternalEvent(elem, elem.$.inner as glassEasel.GeneralBackendElement, 'touchend', {}, evOps)
+    glassEasel.triggerExternalEvent(
+      elem,
+      elem.$.inner as glassEasel.GeneralBackendElement,
+      'touchstart',
+      {},
+      evOps,
+    )
+    glassEasel.triggerExternalEvent(
+      elem,
+      elem.$.inner as glassEasel.GeneralBackendElement,
+      'touchend',
+      {},
+      evOps,
+    )
     expect(ops).toStrictEqual([2, 1, 3])
   })
 })

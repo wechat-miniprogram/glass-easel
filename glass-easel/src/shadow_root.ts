@@ -1,7 +1,5 @@
 import * as backend from './backend/backend_protocol'
-import {
-  VirtualNode,
-} from './virtual_node'
+import { VirtualNode } from './virtual_node'
 import {
   Component,
   GeneralComponentDefinition,
@@ -9,34 +7,14 @@ import {
   convertGenerics,
   resolvePlaceholder,
 } from './component'
-import {
-  TextNode,
-} from './text_node'
-import {
-  ExtendedNativeNodeDefinition,
-  NativeNode,
-} from './native_node'
-import {
-  Element,
-} from './element'
-import {
-  Node,
-} from './node'
-import {
-  ComponentDefinitionWithPlaceholder,
-} from './behavior'
-import {
-  BM,
-  BackendMode,
-} from './backend/mode'
-import {
-  DeepCopyStrategy,
-  getDeepCopyStrategy,
-} from './data_proxy'
-import {
-  deepCopy,
-  simpleDeepCopy,
-} from './data_utils'
+import { TextNode } from './text_node'
+import { ExtendedNativeNodeDefinition, NativeNode } from './native_node'
+import { Element } from './element'
+import { Node } from './node'
+import { ComponentDefinitionWithPlaceholder, NativeNodeDefinition } from './behavior'
+import { BM, BackendMode } from './backend/mode'
+import { DeepCopyStrategy, getDeepCopyStrategy } from './data_proxy'
+import { deepCopy, simpleDeepCopy } from './data_utils'
 
 const enum SlotMode {
   Single,
@@ -45,13 +23,13 @@ const enum SlotMode {
 }
 
 type AppliedSlotMeta = {
-  slotName: string,
-  updatePathTree: { [key: string]: true } | undefined,
+  slotName: string
+  updatePathTree: { [key: string]: true } | undefined
 }
 
 const wrapPlaceholderCallback = (
   f: (c: GeneralComponentDefinition) => void,
-  cwp: ComponentDefinitionWithPlaceholder,
+  cwp: Exclude<ComponentDefinitionWithPlaceholder, string>,
 ) => {
   const waiting = cwp.waiting
   if (waiting) {
@@ -96,9 +74,7 @@ export class ShadowRoot extends VirtualNode {
     super()
   }
 
-  static createShadowRoot(
-    host: GeneralComponent,
-  ): ShadowRoot {
+  static createShadowRoot(host: GeneralComponent): ShadowRoot {
     const node = Object.create(ShadowRoot.prototype) as ShadowRoot
     node._$initializeVirtual('shadow', null, host._$nodeTreeContext)
     node._$idMap = null
@@ -123,9 +99,10 @@ export class ShadowRoot extends VirtualNode {
       node._$removeDynamicSlotHandler = undefined
       node._$updateDynamicSlotHandler = undefined
     }
-    const sr = BM.SHADOW || (BM.DYNAMIC && host.getBackendMode() === BackendMode.Shadow)
-      ? (host.getBackendElement() as backend.Element | null)?.getShadowRoot() || null
-      : null
+    const sr =
+      BM.SHADOW || (BM.DYNAMIC && host.getBackendMode() === BackendMode.Shadow)
+        ? (host.getBackendElement() as backend.Element | null)?.getShadowRoot() || null
+        : null
     node._$backendShadowRoot = sr
     const backendElement = node._$backendShadowRoot?.getRootNode() || null
     node._$initialize(true, backendElement, node, host._$nodeTreeContext)
@@ -150,12 +127,26 @@ export class ShadowRoot extends VirtualNode {
     return VirtualNode.create(virtualName, this)
   }
 
+  createNativeNodeWithInit(
+    tagName: string,
+    initPropValues?: (comp: NativeNode) => void,
+  ): NativeNode {
+    const ret = NativeNode.create(tagName, this)
+    initPropValues?.(ret)
+    return ret
+  }
+
+  /**
+   * Create a component if possible
+   *
+   * Placeholding status should be checked with `checkComponentPlaceholder` .
+   * This function may create a native node if the using target is native node.
+   */
   createComponent(
     tagName: string,
     usingKey?: string,
     genericTargets?: { [key: string]: string },
-    placeholderCallback?:
-      (c: GeneralComponentDefinition) => void,
+    placeholderCallback?: (c: GeneralComponentDefinition) => void,
     initPropValues?: (comp: GeneralComponent | NativeNode) => void,
   ): GeneralComponent | NativeNode {
     const host = this._$host
@@ -166,12 +157,20 @@ export class ShadowRoot extends VirtualNode {
 
     // if the target is in using list, then use the one in using list
     const using = beh._$using[compName] || beh._$using[compName]
+    if (typeof using === 'string') {
+      return this.createNativeNodeWithInit(using, initPropValues)
+    }
     if (using) {
-      const usingTarget = using.final
-        || (
-          using.placeholder !== null
-          && resolvePlaceholder(using.placeholder, space, beh, hostGenericImpls)
-        )
+      let usingTarget: GeneralComponentDefinition | undefined
+      if (using.final) {
+        usingTarget = using.final
+      } else if (using.placeholder !== null) {
+        const target = resolvePlaceholder(using.placeholder, space, beh, hostGenericImpls)
+        if (typeof target === 'string') {
+          return this.createNativeNodeWithInit(target, initPropValues)
+        }
+        usingTarget = target
+      }
       const placeholderHandler = placeholderCallback
         ? wrapPlaceholderCallback(placeholderCallback, using)
         : undefined
@@ -191,12 +190,20 @@ export class ShadowRoot extends VirtualNode {
 
     // if the target is in generics list, then use the one
     const g = hostGenericImpls && hostGenericImpls[compName]
+    if (typeof g === 'string') {
+      return this.createNativeNodeWithInit(g, initPropValues)
+    }
     if (g) {
-      const genImpl = g.final
-        || (
-          g.placeholder !== null
-          && resolvePlaceholder(g.placeholder, space, beh, hostGenericImpls)
-        )
+      let genImpl: GeneralComponentDefinition | undefined
+      if (g.final) {
+        genImpl = g.final
+      } else if (g.placeholder !== null) {
+        const target = resolvePlaceholder(g.placeholder, space, beh, hostGenericImpls)
+        if (typeof target === 'string') {
+          return this.createNativeNodeWithInit(target, initPropValues)
+        }
+        genImpl = target
+      }
       const placeholderHandler = placeholderCallback
         ? wrapPlaceholderCallback(placeholderCallback, g)
         : undefined
@@ -221,9 +228,12 @@ export class ShadowRoot extends VirtualNode {
     }
 
     // find in the space otherwise
-    const comp = space.getComponentByUrl(compName, '')
+    const comp = space.getGlobalUsingComponent(compName) ?? space.getDefaultComponent()
     if (!comp) {
       throw new Error(`Cannot find component "${compName}"`)
+    }
+    if (typeof comp === 'string') {
+      return this.createNativeNodeWithInit(comp, initPropValues)
     }
     return Component._$advancedCreate(
       tagName,
@@ -252,7 +262,10 @@ export class ShadowRoot extends VirtualNode {
     const space = beh.ownerSpace
 
     // find in the space otherwise
-    const comp = space.getComponentByUrlWithoutDefault(tagName, '')
+    const comp = space.getGlobalUsingComponent(tagName)
+    if (typeof comp === 'string') {
+      return this.createNativeNodeWithInit(comp, initPropValues)
+    }
     if (comp) {
       return Component._$advancedCreate(
         tagName,
@@ -290,6 +303,7 @@ export class ShadowRoot extends VirtualNode {
       if (g) compDef = g
       else return undefined
     }
+    if (typeof compDef === 'string') return false
     if (compDef.final) return false
     if (compDef.placeholder !== null) return true
     return false

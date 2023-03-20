@@ -169,18 +169,26 @@ describe('event bindings', () => {
       },
     })
 
-    const parentElem = glassEasel.Component.createWithContext(
-      'root',
-      parent,
-      domBackend,
-    )
+    const parentElem = glassEasel.Component.createWithContext('root', parent, domBackend)
     const singleElem = parentElem.$.s as glassEasel.Element
     const multiElem = parentElem.$.m as glassEasel.Element
     const dynamicElem = parentElem.$.d as glassEasel.Element
 
-    glassEasel.Event.triggerEvent(singleElem, 'customEv', null, { bubbles: true, composed: true, capturePhase: true })
-    glassEasel.Event.triggerEvent(multiElem, 'customEv', null, { bubbles: true, composed: true, capturePhase: true })
-    glassEasel.Event.triggerEvent(dynamicElem, 'customEv', null, { bubbles: true, composed: true, capturePhase: true })
+    glassEasel.Event.triggerEvent(singleElem, 'customEv', null, {
+      bubbles: true,
+      composed: true,
+      capturePhase: true,
+    })
+    glassEasel.Event.triggerEvent(multiElem, 'customEv', null, {
+      bubbles: true,
+      composed: true,
+      capturePhase: true,
+    })
+    glassEasel.Event.triggerEvent(dynamicElem, 'customEv', null, {
+      bubbles: true,
+      composed: true,
+      capturePhase: true,
+    })
 
     expect(ops).toEqual([
       'p0c',
@@ -202,5 +210,57 @@ describe('event bindings', () => {
       'd1',
       'p2',
     ])
+  })
+
+  test('event function bindings', () => {
+    const abc = glassEasel.registerElement({
+      properties: { abc: String },
+    })
+    const def = glassEasel.registerElement({
+      using: { abc: abc.general() },
+      template: tmpl(`
+        <wxs module="modA">
+          exports.fA = function (newVal, oldVal, self, target) {
+            self._test = 789
+            target._test = newVal + ':' + oldVal
+          }
+        </wxs>
+        <abc id="a" change:abc="{{ modA.fA }}" abc="{{ abc }}" />
+      `),
+      data: {
+        abc: 123,
+      },
+    })
+    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    const a = elem.getShadowRoot()!.getElementById('a')!
+    expect((elem as unknown as { _test: number })._test).toBe(789)
+    expect((a as unknown as { _test: string })._test).toBe('123:')
+    elem.setData({ abc: 456 })
+    expect((a as unknown as { _test: string })._test).toBe('456:123')
+  })
+
+  test('change property bindings', () => {
+    const abc = glassEasel.registerElement({
+      lifetimes: {
+        attached() {
+          this.triggerEvent('abc')
+        },
+      },
+    })
+    const def = glassEasel.registerElement({
+      using: { abc: abc.general() },
+      template: tmpl(`
+        <wxs module="modA">
+          exports.fA = function (ev) {
+            ev.target._test = 123
+          }
+        </wxs>
+        <abc id="a" bind:abc="{{ modA.fA }}" />
+      `),
+    })
+    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    glassEasel.Element.pretendAttached(elem)
+    const a = elem.getShadowRoot()!.getElementById('a')!
+    expect((a as unknown as { _test: string })._test).toBe(123)
   })
 })

@@ -1,12 +1,6 @@
-import {
-  safeCallback,
-} from './func_arr'
-import {
-  Element,
-} from './element'
-import {
-  GeneralBackendContext,
-} from './node'
+import { safeCallback } from './func_arr'
+import { Element } from './element'
+import { GeneralBackendContext } from './node'
 
 const triggerRenderOnContext = (
   context: GeneralBackendContext,

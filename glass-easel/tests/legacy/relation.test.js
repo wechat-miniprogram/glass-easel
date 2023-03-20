@@ -18,7 +18,9 @@ const regBeh = (config) => {
 const regElem = (config) => {
   const { template, ...c } = config
   if (template) c.template = tmpl(template)
-  return componentSpace.defineComponent(c)
+  const ret = componentSpace.defineComponent(c)
+  componentSpace.setGlobalUsingComponent(config.is, ret)
+  return ret
 }
 
 const createElem = (is, backend) => {
@@ -26,66 +28,65 @@ const createElem = (is, backend) => {
   return glassEasel.Component.createWithContext(is || 'test', def, backend || domBackend)
 }
 
-describe('Component Relations', function(){
-
-  describe('#relations', function(){
-
-    beforeAll(function(){
+describe('Component Relations', function () {
+  describe('#relations', function () {
+    beforeAll(function () {
       regElem({
-        is: 'relation-empty'
+        is: 'relation-empty',
       })
     })
 
-    it('should link immediate parent and children', function(){
+    it('should link immediate parent and children', function () {
       regElem({
         is: 'relation-parent-common-node-a',
         relations: {
           'relation-child-common-node-a': {
             type: 'child-common-node',
-            linked: function(target){
+            linked: function (target) {
               expect(expectStatus).toBe('linked')
               expect(this).toBe(expectCallerOrder.shift())
               expect(target).toBe(expectTargetOrder.shift())
             },
-            linkChanged: function(target){
+            linkChanged: function (target) {
               expect(expectStatus).toBe('linkChanged')
               expect(this).toBe(expectCallerOrder.shift())
               expect(target).toBe(expectTargetOrder.shift())
             },
-            unlinked: function(target){
+            unlinked: function (target) {
               expect(expectStatus).toBe('unlinked')
               expect(this).toBe(expectCallerOrder.shift())
               expect(target).toBe(expectTargetOrder.shift())
-            }
-          }
-        }
+            },
+          },
+        },
       })
       regElem({
         is: 'relation-child-common-node-a',
         relations: {
           'relation-parent-common-node-a': {
             type: 'parent-common-node',
-            linked: function(target){
+            linked: function (target) {
               expect(expectStatus).toBe('linked')
               expect(this).toBe(expectCallerOrder.shift())
               expect(target).toBe(expectTargetOrder.shift())
             },
-            linkChanged: function(target){
+            linkChanged: function (target) {
               expect(expectStatus).toBe('linkChanged')
               expect(this).toBe(expectCallerOrder.shift())
               expect(target).toBe(expectTargetOrder.shift())
             },
-            unlinked: function(target){
+            unlinked: function (target) {
               expect(expectStatus).toBe('unlinked')
               expect(this).toBe(expectCallerOrder.shift())
               expect(target).toBe(expectTargetOrder.shift())
-            }
-          }
-        }
+            },
+          },
+        },
       })
       regElem({
         is: 'relation-parent-child-common-node',
-        template: '<relation-parent-common-node-a id="p"> <relation-child-common-node-a id="c1"> <relation-child-common-node-a id="c2"></relation-child-common-node-a> </relation-child-common-node-a> <block wx:if="1"> <relation-child-common-node-a id="c3"></relation-child-common-node-a> <relation-child-common-node-a id="c4"></relation-child-common-node-a> </block> </relation-parent-common-node-a>'
+        template:
+          '<relation-parent-common-node-a id="p"> <relation-child-common-node-a id="c1"> <relation-child-common-node-a id="c2"></relation-child-common-node-a> </relation-child-common-node-a> <block wx:if="1"> <relation-child-common-node-a id="c3"></relation-child-common-node-a> <relation-child-common-node-a id="c4"></relation-child-common-node-a> </block> </relation-parent-common-node-a>',
       })
       var elem = createElem('relation-parent-child-common-node')
       var p = elem.$.p
@@ -148,56 +149,57 @@ describe('Component Relations', function(){
       expect(c2.getRelationNodes('relation-parent-common-node-a')).toStrictEqual([])
     })
 
-    it('should link parent and children component', function(){
+    it('should link parent and children component', function () {
       regElem({
         is: 'relation-parent-a',
         relations: {
           'relation-child-a': {
             type: 'child',
-            linked: function(target){
+            linked: function (target) {
               expect(expectStatus).toBe('linked')
               expect(this).toBe(expectCallerOrder.shift())
               expect(target).toBe(expectTargetOrder.shift())
             },
-            linkChanged: function(target){
+            linkChanged: function (target) {
               expect(expectStatus).toBe('linkChanged')
               expect(this).toBe(expectCallerOrder.shift())
               expect(target).toBe(expectTargetOrder.shift())
             },
-            unlinked: function(target){
+            unlinked: function (target) {
               expect(expectStatus).toBe('unlinked')
               expect(this).toBe(expectCallerOrder.shift())
               expect(target).toBe(expectTargetOrder.shift())
-            }
-          }
-        }
+            },
+          },
+        },
       })
       regElem({
         is: 'relation-child-a',
         relations: {
           'relation-parent-a': {
             type: 'parent',
-            linked: function(target){
+            linked: function (target) {
               expect(expectStatus).toBe('linked')
               expect(this).toBe(expectCallerOrder.shift())
               expect(target).toBe(expectTargetOrder.shift())
             },
-            linkChanged: function(target){
+            linkChanged: function (target) {
               expect(expectStatus).toBe('linkChanged')
               expect(this).toBe(expectCallerOrder.shift())
               expect(target).toBe(expectTargetOrder.shift())
             },
-            unlinked: function(target){
+            unlinked: function (target) {
               expect(expectStatus).toBe('unlinked')
               expect(this).toBe(expectCallerOrder.shift())
               expect(target).toBe(expectTargetOrder.shift())
-            }
-          }
-        }
+            },
+          },
+        },
       })
       regElem({
         is: 'relation-parent-child',
-        template: '<relation-parent-a id="p"> <div> <relation-child-a id="c1"> <relation-child-a id="c2"></relation-child-a> </relation-child-a> <block wx:if="1"> <relation-child-a id="c3"></relation-child-a> <relation-child-a id="c4"></relation-child-a> </block> </div> </relation-parent-a>'
+        template:
+          '<relation-parent-a id="p"> <div> <relation-child-a id="c1"> <relation-child-a id="c2"></relation-child-a> </relation-child-a> <block wx:if="1"> <relation-child-a id="c3"></relation-child-a> <relation-child-a id="c4"></relation-child-a> </block> </div> </relation-parent-a>',
       })
       var elem = createElem('relation-parent-child')
       var p = elem.$.p
@@ -260,7 +262,7 @@ describe('Component Relations', function(){
       expect(c2.getRelationNodes('relation-parent-a')).toStrictEqual([])
     })
 
-    it('should link ancestors and descendants', function(){
+    it('should link ancestors and descendants', function () {
       var commonBeh = regBeh({})
       var ancestorBeh = regBeh({})
       var descendantBeh = regBeh({})
@@ -271,23 +273,23 @@ describe('Component Relations', function(){
           'relation-descendant-a': {
             target: descendantBeh,
             type: 'descendant',
-            linked: function(target){
+            linked: function (target) {
               expect(expectStatus).toBe('linked')
               expect(this).toBe(expectCallerOrder.shift())
               expect(target).toBe(expectTargetOrder.shift())
             },
-            linkChanged: function(target){
+            linkChanged: function (target) {
               expect(expectStatus).toBe('linkChanged')
               expect(this).toBe(expectCallerOrder.shift())
               expect(target).toBe(expectTargetOrder.shift())
             },
-            unlinked: function(target){
+            unlinked: function (target) {
               expect(expectStatus).toBe('unlinked')
               expect(this).toBe(expectCallerOrder.shift())
               expect(target).toBe(expectTargetOrder.shift())
-            }
-          }
-        }
+            },
+          },
+        },
       })
       regElem({
         is: 'relation-descendant-a',
@@ -296,27 +298,28 @@ describe('Component Relations', function(){
           '': {
             target: ancestorBeh,
             type: 'ancestor',
-            linked: function(target){
+            linked: function (target) {
               expect(expectStatus).toBe('linked')
               expect(this).toBe(expectCallerOrder.shift())
               expect(target).toBe(expectTargetOrder.shift())
             },
-            linkChanged: function(target){
+            linkChanged: function (target) {
               expect(expectStatus).toBe('linkChanged')
               expect(this).toBe(expectCallerOrder.shift())
               expect(target).toBe(expectTargetOrder.shift())
             },
-            unlinked: function(target){
+            unlinked: function (target) {
               expect(expectStatus).toBe('unlinked')
               expect(this).toBe(expectCallerOrder.shift())
               expect(target).toBe(expectTargetOrder.shift())
-            }
-          }
-        }
+            },
+          },
+        },
       })
       regElem({
         is: 'relation-ancestor-descendant',
-        template: '<relation-ancestor-a id="p"> <virtual> <relation-descendant-a id="c1"></relation-descendant-a> <relation-descendant-a id="c2"></relation-descendant-a> </virtual> <relation-descendant-a id="c3"> <relation-descendant-a id="c4"></relation-descendant-a> </relation-descendant-a> </relation-ancestor-a>'
+        template:
+          '<relation-ancestor-a id="p"> <virtual> <relation-descendant-a id="c1"></relation-descendant-a> <relation-descendant-a id="c2"></relation-descendant-a> </virtual> <relation-descendant-a id="c3"> <relation-descendant-a id="c4"></relation-descendant-a> </relation-descendant-a> </relation-ancestor-a>',
       })
       var elem = createElem('relation-ancestor-descendant')
       var elem2 = createElem('relation-ancestor-descendant')
@@ -390,10 +393,10 @@ describe('Component Relations', function(){
       expect(c3.getRelationNodes('')).toStrictEqual([])
     })
 
-    it('should trigger linkFailed handler when cannot link two nodes', function(){
+    it('should trigger linkFailed handler when cannot link two nodes', function () {
       regElem({
         is: 'relation-cnt-failed',
-        template: '<div><slot></slot></div>'
+        template: '<div><slot></slot></div>',
       })
 
       regElem({
@@ -402,21 +405,21 @@ describe('Component Relations', function(){
         relations: {
           'relation-parent-failed': {
             type: 'parent',
-            linkFailed: function(){
+            linkFailed: function () {
               expect(expectStatus).toBe('linkFailed')
               expect(this).toBe(expectCallerOrder.shift())
             },
-          }
-        }
+          },
+        },
       })
       regElem({
         is: 'relation-parent-failed',
         relations: {
           'relation-child-failed': {
-            type: 'child'
-          }
+            type: 'child',
+          },
         },
-        template: '<div><slot></slot></div>'
+        template: '<div><slot></slot></div>',
       })
 
       regElem({
@@ -425,30 +428,32 @@ describe('Component Relations', function(){
         relations: {
           'relation-ancestor-failed': {
             type: 'ancestor',
-            linkFailed: function(){
+            linkFailed: function () {
               expect(expectStatus).toBe('linkFailed')
               expect(this).toBe(expectCallerOrder.shift())
             },
-          }
-        }
+          },
+        },
       })
       regElem({
         is: 'relation-ancestor-failed',
         relations: {
           'relation-descendant-failed': {
-            type: 'descendant'
-          }
+            type: 'descendant',
+          },
         },
-        template: '<div><slot></slot></div>'
+        template: '<div><slot></slot></div>',
       })
 
       regElem({
         is: 'relation-parent-child-failed-a',
-        template: '<relation-parent-failed><relation-child-failed id="q"></relation-child-failed><relation-child-failed id="z"></relation-child-failed></relation-parent-failed><relation-cnt-failed><relation-child-failed id="p"></relation-child-failed></relation-cnt-failed>'
+        template:
+          '<relation-parent-failed><relation-child-failed id="q"></relation-child-failed><relation-child-failed id="z"></relation-child-failed></relation-parent-failed><relation-cnt-failed><relation-child-failed id="p"></relation-child-failed></relation-cnt-failed>',
       })
       regElem({
         is: 'relation-parent-child-failed-b',
-        template: '<relation-ancestor-failed><div><relation-descendant-failed id="q"></relation-descendant-failed></div><div><div><relation-descendant-failed id="z"></relation-descendant-failed></div></div></relation-ancestor-failed><relation-cnt-failed><div><relation-descendant-failed id="p"></relation-descendant-failed></div></relation-cnt-failed>'
+        template:
+          '<relation-ancestor-failed><div><relation-descendant-failed id="q"></relation-descendant-failed></div><div><div><relation-descendant-failed id="z"></relation-descendant-failed></div></div></relation-ancestor-failed><relation-cnt-failed><div><relation-descendant-failed id="p"></relation-descendant-failed></div></relation-cnt-failed>',
       })
       var elem1 = createElem('relation-parent-child-failed-a')
       var elem2 = createElem('relation-parent-child-failed-b')
@@ -470,7 +475,7 @@ describe('Component Relations', function(){
       expect(expectCallerOrder.length).toBe(0)
     })
 
-    it('should link virtual-host components', function(){
+    it('should link virtual-host components', function () {
       var expectOrder = [1, 2]
       regElem({
         is: 'relation-virtual-host-a',
@@ -481,11 +486,11 @@ describe('Component Relations', function(){
         relations: {
           'relation-virtual-host-b': {
             type: 'descendant',
-            linked: function(target){
+            linked: function (target) {
               expect(expectOrder.shift()).toBe(1)
             },
-          }
-        }
+          },
+        },
       })
       regElem({
         is: 'relation-virtual-host-b',
@@ -495,15 +500,16 @@ describe('Component Relations', function(){
         relations: {
           'relation-virtual-host-a': {
             type: 'ancestor',
-            linked: function(target){
+            linked: function (target) {
               expect(expectOrder.shift()).toBe(2)
             },
-          }
-        }
+          },
+        },
       })
       regElem({
         is: 'relation-virtual-host',
-        template: '<relation-virtual-host-a id="a"> <relation-virtual-host-b id="b" /> </relation-virtual-host-a>'
+        template:
+          '<relation-virtual-host-a id="a"> <relation-virtual-host-b id="b" /> </relation-virtual-host-a>',
       })
       var elem = createElem('relation-virtual-host')
       glassEasel.Element.pretendAttached(elem)
@@ -511,7 +517,5 @@ describe('Component Relations', function(){
       expect(elem.$.a.getRelationNodes('relation-virtual-host-b')[0]).toBe(elem.$.b)
       expect(elem.$.b.getRelationNodes('relation-virtual-host-a')[0]).toBe(elem.$.a)
     })
-
   })
-
 })

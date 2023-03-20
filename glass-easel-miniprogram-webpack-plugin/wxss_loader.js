@@ -14,17 +14,19 @@ module.exports = function (src, prevMap, meta) {
     if (prevMap) {
       const destConsumer = new SourceMapConsumer(ssSourceMap)
       const srcConsumer = new SourceMapConsumer(prevMap)
-      Promise.all([destConsumer, srcConsumer]).then(([destConsumer, srcConsumer]) => {
-        const gen = SourceMapGenerator.fromSourceMap(destConsumer)
-        gen.applySourceMap(srcConsumer, this.resourcePath)
-        destConsumer.destroy()
-        srcConsumer.destroy()
-        map = gen.toJSON()
-        callback(null, ss, map, meta)
-        return undefined
-      }).catch((err) => {
-        callback(err)
-      })
+      Promise.all([destConsumer, srcConsumer])
+        .then(([destConsumer, srcConsumer]) => {
+          const gen = SourceMapGenerator.fromSourceMap(destConsumer)
+          gen.applySourceMap(srcConsumer, this.resourcePath)
+          destConsumer.destroy()
+          srcConsumer.destroy()
+          map = gen.toJSON()
+          callback(null, ss, map, meta)
+          return undefined
+        })
+        .catch((err) => {
+          callback(err)
+        })
     } else {
       map = ssSourceMap
       callback(null, ss, map, meta)

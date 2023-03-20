@@ -1,21 +1,8 @@
-import {
-  VirtualNode,
-} from './virtual_node'
-import {
-  Behavior,
-  GeneralBehavior,
-} from './behavior'
-import {
-  Component,
-  GeneralComponent,
-} from './component'
-import {
-  Element,
-} from './element'
-import {
-  safeCallback,
-  triggerWarning,
-} from './func_arr'
+import { VirtualNode } from './virtual_node'
+import { Behavior, GeneralBehavior } from './behavior'
+import { Component, GeneralComponent } from './component'
+import { Element } from './element'
+import { safeCallback, triggerWarning } from './func_arr'
 import { TraitBehavior } from './trait_behaviors'
 
 export const enum RelationType {
@@ -34,7 +21,8 @@ export type RelationListener = (target: unknown) => void
 export type RelationFailedListener = () => void
 
 export type RelationDefinition = {
-  target: string
+  target:
+    | string
     | GeneralBehavior
     | TraitBehavior<{ [x: string]: unknown }, { [x: string]: unknown }>
   domain: string | null
@@ -46,13 +34,13 @@ export type RelationDefinition = {
 }
 
 export type RelationDefinitionGroup = {
-  definitions: RelationDefinition[][],
-  keyMap: { [key: string | symbol]: [RelationType, number] },
+  definitions: RelationDefinition[][]
+  keyMap: { [key: string | symbol]: [RelationType, number] }
 }
 
-export const generateRelationDefinitionGroup = (
-  relations?: { [key: string]: RelationDefinition },
-): RelationDefinitionGroup | null => {
+export const generateRelationDefinitionGroup = (relations?: {
+  [key: string]: RelationDefinition
+}): RelationDefinitionGroup | null => {
   if (relations === undefined) return null
   const group = {
     definitions: new Array(RELATION_TYPE_COUNT) as RelationDefinition[][],
@@ -81,8 +69,9 @@ export const cloneRelationDefinitionGroup = (
 ): RelationDefinitionGroup => {
   const newGroup = {
     definitions: group.definitions.slice(),
-    keyMap: Object.assign(Object.create(null), group.keyMap) as
-      { [key: string]: [RelationType, number] },
+    keyMap: Object.assign(Object.create(null), group.keyMap) as {
+      [key: string]: [RelationType, number]
+    },
   }
   return newGroup
 }
@@ -91,21 +80,22 @@ export class Relation {
   private _$comp: GeneralComponent
   private _$group: RelationDefinitionGroup | null
   private _$sharedGroup: boolean
-  private _$links: ({ target: GeneralComponent, def: RelationDefinition } | null)[][]
+  private _$links: ({ target: GeneralComponent; def: RelationDefinition } | null)[][]
 
-  constructor(
-    associatedComponent: GeneralComponent,
-    group: RelationDefinitionGroup | null,
-  ) {
+  constructor(associatedComponent: GeneralComponent, group: RelationDefinitionGroup | null) {
     this._$comp = associatedComponent
-    const links = new Array(RELATION_TYPE_COUNT) as
-      ({ target: GeneralComponent, def: RelationDefinition } | null)[][]
+    const links = new Array(RELATION_TYPE_COUNT) as ({
+      target: GeneralComponent
+      def: RelationDefinition
+    } | null)[][]
     if (group) {
       for (let type = 0; type < RELATION_TYPE_COUNT; type += 1) {
         const definitions = group.definitions[type]
         if (definitions) {
-          const link = new Array(definitions.length) as
-            ({ target: GeneralComponent, def: RelationDefinition } | null)[]
+          const link = new Array(definitions.length) as ({
+            target: GeneralComponent
+            def: RelationDefinition
+          } | null)[]
           for (let i = 0; i < definitions.length; i += 1) {
             link[i] = null
           }
@@ -125,8 +115,9 @@ export class Relation {
       if (group) {
         this._$group = {
           definitions: group.definitions.slice(),
-          keyMap: Object.assign(Object.create(null), group.keyMap) as
-            { [key: string]: [RelationType, number] },
+          keyMap: Object.assign(Object.create(null), group.keyMap) as {
+            [key: string]: [RelationType, number]
+          },
         }
       } else {
         this._$group = {
@@ -156,7 +147,8 @@ export class Relation {
   }
 
   triggerLinkEvent(
-    parentType: RelationType.ParentComponent
+    parentType:
+      | RelationType.ParentComponent
       | RelationType.ParentNonVirtualNode
       | RelationType.Ancestor,
     isDetach: boolean,
@@ -168,9 +160,10 @@ export class Relation {
     for (let i = 0; i < selfDefs.length; i += 1) {
       const links = linksGroup[parentType]!
       const oldLink = links[i]!
-      let newLink: { target: GeneralComponent, def: RelationDefinition } | null = null
+      let newLink: { target: GeneralComponent; def: RelationDefinition } | null = null
       const def = selfDefs[i]!
-      let parentBeheviorTest: GeneralBehavior
+      let parentBeheviorTest:
+        | GeneralBehavior
         | TraitBehavior<{ [x: string]: unknown }, { [x: string]: unknown }>
         | null
       if (def.target instanceof Behavior || def.target instanceof TraitBehavior) {
@@ -210,7 +203,8 @@ export class Relation {
                   if (parentDefs) {
                     for (let j = 0; j < parentDefs.length; j += 1) {
                       const def = parentDefs[j]!
-                      let requiredBehavior: GeneralBehavior
+                      let requiredBehavior:
+                        | GeneralBehavior
                         | TraitBehavior<{ [x: string]: unknown }, { [x: string]: unknown }>
                         | null
                       if (def.target instanceof Behavior || def.target instanceof TraitBehavior) {
@@ -244,7 +238,7 @@ export class Relation {
       if (oldLink) {
         const oldTarget = oldLink.target
         const oldDef = oldLink.def
-        if ((!newLink || oldLink.target !== newLink.target || oldLink.def !== newLink.def)) {
+        if (!newLink || oldLink.target !== newLink.target || oldLink.def !== newLink.def) {
           if (oldDef.unlinked) {
             safeCallback(
               'Relation Unlinked Callback',
@@ -328,9 +322,9 @@ export class Relation {
     }
     const [type, index] = typeWithIndex
     if (
-      type === RelationType.ParentComponent
-        || type === RelationType.ParentNonVirtualNode
-        || type === RelationType.Ancestor
+      type === RelationType.ParentComponent ||
+      type === RelationType.ParentNonVirtualNode ||
+      type === RelationType.Ancestor
     ) {
       const link = this._$links[type]?.[index]
       if (link) return [link.target]

@@ -8,7 +8,5 @@ module.exports = {
   roots: ['tests'],
   testMatch: ['**/?(*.)+(spec|test).[jt]s?(x)', '!**/types/**'],
   testEnvironment: 'jsdom',
-  "collectCoverageFrom": [
-    "src/**/*.ts"
-  ],
+  collectCoverageFrom: ['src/**/*.ts'],
 }

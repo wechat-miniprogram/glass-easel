@@ -18,7 +18,8 @@ const domHtml = (elem: glassEasel.Element): string => {
 
 describe('placeholder', () => {
   test('using simple placeholder and waiting', () => {
-    const def = componentSpace.define()
+    const def = componentSpace
+      .define()
       .placeholders({
         child: '',
       })
@@ -51,7 +52,9 @@ describe('placeholder', () => {
     elem.setData({
       b: true,
     })
-    expect(domHtml(elem)).toBe('<div><child>child<div><span></span></div></child><child-another id="b"></child-another></div>')
+    expect(domHtml(elem)).toBe(
+      '<div><child>child<div><span></span></div></child><child-another id="b"></child-another></div>',
+    )
     matchElementWithDom(elem)
   })
 

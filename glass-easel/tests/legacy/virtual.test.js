@@ -15,7 +15,9 @@ componentSpace.defineComponent({
 const regElem = (config) => {
   const { template, ...c } = config
   if (template) c.template = tmpl(template)
-  return componentSpace.defineComponent(c)
+  const ret = componentSpace.defineComponent(c)
+  componentSpace.setGlobalUsingComponent(config.is, ret)
+  return ret
 }
 
 const createElemInBackend = (is, backend) => {
@@ -25,14 +27,14 @@ const createElemInBackend = (is, backend) => {
 
 var matchElementWithDom = require('../base/match').virtual
 
-const testCases = function(testBackend){
+const testCases = function (testBackend) {
   var root = null
 
-  const createElem = function(is){
+  const createElem = function (is) {
     return createElemInBackend(is, testBackend)
   }
 
-  beforeAll(function(){
+  beforeAll(function () {
     regElem({
       is: 'virtual-a',
     })
@@ -54,9 +56,8 @@ const testCases = function(testBackend){
     }
   })
 
-  describe('#appendChild', function(){
-
-    it('should convert to correct DOM appendChild (directly)', function(){
+  describe('#appendChild', function () {
+    it('should convert to correct DOM appendChild (directly)', function () {
       var e1 = glassEasel.NativeNode.create('span', root.shadowRoot)
       var e2 = glassEasel.NativeNode.create('span', root.shadowRoot)
       var e3 = glassEasel.TextNode.create('text', root.shadowRoot)
@@ -69,7 +70,7 @@ const testCases = function(testBackend){
       matchElementWithDom(e1)
     })
 
-    it('should convert to correct DOM appendChild (with more convertion)', function(){
+    it('should convert to correct DOM appendChild (with more convertion)', function () {
       var e1 = glassEasel.NativeNode.create('span', root.shadowRoot)
       var e2 = glassEasel.NativeNode.create('span', root.shadowRoot)
       var e3 = glassEasel.TextNode.create('text', root.shadowRoot)
@@ -84,7 +85,7 @@ const testCases = function(testBackend){
       matchElementWithDom(e1)
     })
 
-    it('should convert to correct DOM insertBefore', function(){
+    it('should convert to correct DOM insertBefore', function () {
       var e1 = glassEasel.NativeNode.create('span', root.shadowRoot)
       var e2 = glassEasel.NativeNode.create('span', root.shadowRoot)
       var e3 = glassEasel.TextNode.create('text', root.shadowRoot)
@@ -99,7 +100,7 @@ const testCases = function(testBackend){
       matchElementWithDom(e1)
     })
 
-    it('should work in a virtual root', function(){
+    it('should work in a virtual root', function () {
       var e1 = glassEasel.NativeNode.create('span', root.shadowRoot)
       var e2 = glassEasel.NativeNode.create('span', root.shadowRoot)
       var e3 = glassEasel.TextNode.create('text', root.shadowRoot)
@@ -112,31 +113,30 @@ const testCases = function(testBackend){
       matchElementWithDom(e1)
     })
 
-    if (testBackend === domBackend) it('should work in a native-rendered root', function(){
-      regElem({
-        is: 'virtual-node-a',
-        options: {
-          externalComponent: true,
-        },
-        template: '<div><slot></slot></div>',
+    if (testBackend === domBackend)
+      it('should work in a native-rendered root', function () {
+        regElem({
+          is: 'virtual-node-a',
+          options: {
+            externalComponent: true,
+          },
+          template: '<div><slot></slot></div>',
+        })
+        var e1 = root.shadowRoot.createComponent('virtual-node-a')
+        var e2 = glassEasel.NativeNode.create('span', root.shadowRoot)
+        var e3 = glassEasel.TextNode.create('text', root.shadowRoot)
+        var v1 = glassEasel.VirtualNode.create('virtual', root.shadowRoot)
+        var v2 = glassEasel.VirtualNode.create('virtual', root.shadowRoot)
+        v1.appendChild(e2)
+        v1.appendChild(e3)
+        e2.appendChild(v2)
+        e1.appendChild(v1)
+        matchElementWithDom(e1, e1.shadowRoot.root)
       })
-      var e1 = root.shadowRoot.createComponent('virtual-node-a')
-      var e2 = glassEasel.NativeNode.create('span', root.shadowRoot)
-      var e3 = glassEasel.TextNode.create('text', root.shadowRoot)
-      var v1 = glassEasel.VirtualNode.create('virtual', root.shadowRoot)
-      var v2 = glassEasel.VirtualNode.create('virtual', root.shadowRoot)
-      v1.appendChild(e2)
-      v1.appendChild(e3)
-      e2.appendChild(v2)
-      e1.appendChild(v1)
-      matchElementWithDom(e1, e1.shadowRoot.root)
-    })
-
   })
 
-  describe('#insertBefore', function(){
-
-    it('should convert to correct DOM insertBefore (directly)', function(){
+  describe('#insertBefore', function () {
+    it('should convert to correct DOM insertBefore (directly)', function () {
       var e1 = glassEasel.NativeNode.create('span', root.shadowRoot)
       var e2 = glassEasel.NativeNode.create('span', root.shadowRoot)
       var e3 = glassEasel.TextNode.create('text', root.shadowRoot)
@@ -152,7 +152,7 @@ const testCases = function(testBackend){
       matchElementWithDom(e1)
     })
 
-    it('should convert to correct DOM insertBefore (with more convertion)', function(){
+    it('should convert to correct DOM insertBefore (with more convertion)', function () {
       var e1 = glassEasel.NativeNode.create('span', root.shadowRoot)
       var e2 = glassEasel.NativeNode.create('span', root.shadowRoot)
       var e3 = glassEasel.TextNode.create('text', root.shadowRoot)
@@ -167,7 +167,7 @@ const testCases = function(testBackend){
       matchElementWithDom(e1)
     })
 
-    it('should convert to correct DOM appendChild', function(){
+    it('should convert to correct DOM appendChild', function () {
       var e1 = glassEasel.NativeNode.create('span', root.shadowRoot)
       var e2 = glassEasel.TextNode.create('text', root.shadowRoot)
       var v1 = glassEasel.VirtualNode.create('virtual', root.shadowRoot)
@@ -182,12 +182,10 @@ const testCases = function(testBackend){
       v3.insertBefore(e2)
       matchElementWithDom(e1)
     })
-
   })
 
-  describe('#removeChild', function(){
-
-    it('should convert to correct DOM removeChild (directly)', function(){
+  describe('#removeChild', function () {
+    it('should convert to correct DOM removeChild (directly)', function () {
       var e1 = glassEasel.NativeNode.create('span', root.shadowRoot)
       var e2 = glassEasel.NativeNode.create('span', root.shadowRoot)
       var e3 = glassEasel.TextNode.create('text', root.shadowRoot)
@@ -203,7 +201,7 @@ const testCases = function(testBackend){
       expect(e4.parentNode).toBe(null)
     })
 
-    it('should convert to correct DOM removeChild (with more convertion)', function(){
+    it('should convert to correct DOM removeChild (with more convertion)', function () {
       var e1 = glassEasel.NativeNode.create('span', root.shadowRoot)
       var e2 = glassEasel.NativeNode.create('span', root.shadowRoot)
       var e3 = glassEasel.TextNode.create('text', root.shadowRoot)
@@ -220,12 +218,10 @@ const testCases = function(testBackend){
       matchElementWithDom(v1)
       expect(v1.parentNode).toBe(null)
     })
-
   })
 
-  describe('#replaceChild', function(){
-
-    it('should convert to correct DOM replaceChild (replacing directly at the end)', function(){
+  describe('#replaceChild', function () {
+    it('should convert to correct DOM replaceChild (replacing directly at the end)', function () {
       var e1 = glassEasel.NativeNode.create('span', root.shadowRoot)
       var e2 = glassEasel.NativeNode.create('span', root.shadowRoot)
       var e3 = glassEasel.TextNode.create('text', root.shadowRoot)
@@ -244,7 +240,7 @@ const testCases = function(testBackend){
       expect(v3.parentNode).toBe(null)
     })
 
-    it('should convert to correct DOM replaceChild (replacing indirectly at the end)', function(){
+    it('should convert to correct DOM replaceChild (replacing indirectly at the end)', function () {
       var e1 = glassEasel.NativeNode.create('span', root.shadowRoot)
       var e2 = glassEasel.NativeNode.create('span', root.shadowRoot)
       var e3 = glassEasel.TextNode.create('text', root.shadowRoot)
@@ -263,7 +259,7 @@ const testCases = function(testBackend){
       expect(v3.parentNode).toBe(null)
     })
 
-    it('should convert to correct DOM replaceChild (replacing not at the end)', function(){
+    it('should convert to correct DOM replaceChild (replacing not at the end)', function () {
       var e1 = glassEasel.NativeNode.create('span', root.shadowRoot)
       var e2 = glassEasel.NativeNode.create('span', root.shadowRoot)
       var e3 = glassEasel.TextNode.create('text', root.shadowRoot)
@@ -282,12 +278,10 @@ const testCases = function(testBackend){
       matchElementWithDom(v3)
       expect(v3.parentNode).toBe(null)
     })
-
   })
 
-  describe('#insertChildren #removeChildren', function(){
-
-    it('should able to do batch-insertion', function(){
+  describe('#insertChildren #removeChildren', function () {
+    it('should able to do batch-insertion', function () {
       var e1 = glassEasel.NativeNode.create('span', root.shadowRoot)
       var e2 = glassEasel.NativeNode.create('span', root.shadowRoot)
       var e3 = glassEasel.TextNode.create('text', root.shadowRoot)
@@ -301,7 +295,7 @@ const testCases = function(testBackend){
       matchElementWithDom(e1)
     })
 
-    it('should able to do batch-removal', function(){
+    it('should able to do batch-removal', function () {
       var e1 = glassEasel.NativeNode.create('span', root.shadowRoot)
       var e2 = glassEasel.NativeNode.create('span', root.shadowRoot)
       var e3 = glassEasel.TextNode.create('text', root.shadowRoot)
@@ -318,12 +312,10 @@ const testCases = function(testBackend){
       matchElementWithDom(v1)
       expect(v1.parentNode).toBe(null)
     })
-
   })
 
-  describe('component virtualHost', function(){
-
-    it('should create virtualized host node', function(){
+  describe('component virtualHost', function () {
+    it('should create virtualized host node', function () {
       regElem({
         is: 'virtual-host-a',
         options: {
@@ -336,7 +328,8 @@ const testCases = function(testBackend){
         options: {
           virtualHost: true,
         },
-        template: '<span><virtual-host-a><slot /></virtual-host-a></span><virtual-host-a></virtual-host-a>',
+        template:
+          '<span><virtual-host-a><slot /></virtual-host-a></span><virtual-host-a></virtual-host-a>',
       })
       var parent = glassEasel.NativeNode.create('span', root.shadowRoot)
       var elem = root.shadowRoot.createComponent('virtual-host-b')
@@ -344,51 +337,51 @@ const testCases = function(testBackend){
       matchElementWithDom(parent)
     })
 
-    if (testBackend === domBackend) it('should handles tree manipulations', function(){
-      regElem({
-        is: 'virtual-host-c',
-        options: {
-          virtualHost: true,
-        },
-        template: '<slot />',
+    if (testBackend === domBackend)
+      it('should handles tree manipulations', function () {
+        regElem({
+          is: 'virtual-host-c',
+          options: {
+            virtualHost: true,
+          },
+          template: '<slot />',
+        })
+        regElem({
+          is: 'virtual-host-d',
+          options: {
+            virtualHost: true,
+          },
+          template: '<div id="v"><span id="s"><slot /></span></div>',
+        })
+        regElem({
+          is: 'virtual-host-e',
+          template:
+            '<virtual-host-c id="c"><virtual-host-d /></virtual-host-c><virtual-host-d id="d"><virtual-host-c /></virtual-host-d>',
+        })
+        var elem = createElem('virtual-host-e')
+        expect(elem.$$.childNodes[0]).toBe(elem.$.c.childNodes[0].$.v.$$)
+        expect(elem.$$.childNodes[1]).toBe(elem.$.d.$.v.$$)
+        matchElementWithDom(elem)
+        elem.$.d.shadowRoot.insertBefore(elem.$.d.$.s, elem.$.d.$.v)
+        expect(elem.$$.childNodes[1]).toBe(elem.$.d.$.s.$$)
+        matchElementWithDom(elem)
+        elem.$.c.replaceChild(elem.$.d, elem.$.c.childNodes[0])
+        expect(elem.$$.childNodes[0]).toBe(elem.$.d.$.s.$$)
+        expect(elem.$$.childNodes.length).toBe(2)
+        matchElementWithDom(elem)
+        elem.$.c.removeChild(elem.$.c.childNodes[0])
+        expect(elem.$$.childNodes.length).toBe(0)
+        matchElementWithDom(elem)
       })
-      regElem({
-        is: 'virtual-host-d',
-        options: {
-          virtualHost: true,
-        },
-        template: '<div id="v"><span id="s"><slot /></span></div>',
-      })
-      regElem({
-        is: 'virtual-host-e',
-        template: '<virtual-host-c id="c"><virtual-host-d /></virtual-host-c><virtual-host-d id="d"><virtual-host-c /></virtual-host-d>'
-      })
-      var elem = createElem('virtual-host-e')
-      expect(elem.$$.childNodes[0]).toBe(elem.$.c.childNodes[0].$.v.$$)
-      expect(elem.$$.childNodes[1]).toBe(elem.$.d.$.v.$$)
-      matchElementWithDom(elem)
-      elem.$.d.shadowRoot.insertBefore(elem.$.d.$.s, elem.$.d.$.v)
-      expect(elem.$$.childNodes[1]).toBe(elem.$.d.$.s.$$)
-      matchElementWithDom(elem)
-      elem.$.c.replaceChild(elem.$.d, elem.$.c.childNodes[0])
-      expect(elem.$$.childNodes[0]).toBe(elem.$.d.$.s.$$)
-      expect(elem.$$.childNodes.length).toBe(2)
-      matchElementWithDom(elem)
-      elem.$.c.removeChild(elem.$.c.childNodes[0])
-      expect(elem.$$.childNodes.length).toBe(0)
-      matchElementWithDom(elem)
-    })
-
   })
-
 }
 
-describe('VirtualNode (DOM backend)', function(){
+describe('VirtualNode (DOM backend)', function () {
   testCases(domBackend)
 })
-describe('VirtualNode (shadow backend)', function(){
+describe('VirtualNode (shadow backend)', function () {
   testCases(shadowBackend)
 })
-describe('VirtualNode (composed backend)', function(){
+describe('VirtualNode (composed backend)', function () {
   testCases(composedBackend)
 })

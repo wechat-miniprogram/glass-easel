@@ -38,7 +38,8 @@ export class AssociatedBackend {
     url: string,
     genericTargets?: { [key: string]: string },
   ): Root {
-    if (this._$env !== codeSpace._$env) throw new Error('The code space is not in the same environment as the backend')
+    if (this._$env !== codeSpace._$env)
+      throw new Error('The code space is not in the same environment as the backend')
     return new Root(this._$, tagName, codeSpace, url, genericTargets)
   }
 }
@@ -57,20 +58,17 @@ export class Root {
     url: string,
     genericTargets?: { [key: string]: string },
   ) {
-    this._$comp = codeSpace.getComponentSpace().createComponentByUrl(
-      tagName,
-      url,
-      genericTargets || null,
-      backendContext,
-    )
+    this._$comp = codeSpace
+      .getComponentSpace()
+      .createComponentByUrl(tagName, url, genericTargets || null, backendContext)
     if (codeSpace.isMainSpace()) {
       const globalStyleSheet = codeSpace.getStyleSheet('app')
       if (globalStyleSheet !== undefined) {
         const styleIsolation = codeSpace._$styleIsolationMap[this._$comp.is]
         if (
-          styleIsolation === StyleIsolation.Isolated
-          || styleIsolation === StyleIsolation.ApplyShared
-          || styleIsolation === StyleIsolation.Shared
+          styleIsolation === StyleIsolation.Isolated ||
+          styleIsolation === StyleIsolation.ApplyShared ||
+          styleIsolation === StyleIsolation.Shared
         ) {
           backendContext.appendStyleSheetPath(globalStyleSheet, codeSpace._$sharedStyleScope)
         }
