@@ -24,7 +24,7 @@ export class VirtualNode extends Element {
         const shadowRoot = owner._$backendShadowRoot
         backendElement = shadowRoot?.createVirtualNode() || null
         this._$initialize(true, backendElement, owner)
-        backendElement?.associateValue(this)
+        backendElement?.associateValue?.(this)
       } else {
         this._$initialize(true, null, owner)
       }

@@ -82,7 +82,7 @@ export class NativeNode extends Element {
     }
     if (!(BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike))) {
       if (backendElement) {
-        ;(backendElement as backend.Element | composedBackend.Element).associateValue(node)
+        ;(backendElement as backend.Element | composedBackend.Element).associateValue?.(node)
       }
     }
 

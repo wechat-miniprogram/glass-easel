@@ -521,7 +521,7 @@ export class Component<
     // associate in backend
     if (!(BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike))) {
       if (backendElement) {
-        ;(backendElement as backend.Element | composedBackend.Element).associateValue(comp)
+        ;(backendElement as backend.Element | composedBackend.Element).associateValue?.(comp)
       }
     }
 
