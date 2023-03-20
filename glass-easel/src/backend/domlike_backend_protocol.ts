@@ -3,7 +3,13 @@
 
 import { EventOptions, EventBubbleStatus } from '../event'
 import { safeCallback } from '../func_arr'
-import { BackendMode, BoundingClientRect } from './mode'
+import {
+  BackendMode,
+  BoundingClientRect,
+  Observer,
+  MediaQueryStatus,
+  IntersectionStatus,
+} from './mode'
 
 export interface Context {
   mode: BackendMode.Domlike
@@ -31,6 +37,17 @@ export interface Context {
     ) => EventBubbleStatus,
   ): void
   setElementEventDefaultPrevented(element: Element, type: string, enabled: boolean): void
+  createIntersectionObserver(
+    targetElement: Element,
+    relativeElement: Element,
+    relativeElementMargin: string,
+    thresholds: number[],
+    listener: (res: IntersectionStatus) => void,
+  ): Observer
+  createMediaQueryObserver(
+    status: MediaQueryStatus,
+    listener: (res: { matches: boolean }) => void,
+  ): Observer
 }
 
 export interface Element {
@@ -377,5 +394,70 @@ export class CurrentWindowBackendContext implements Context {
       this._$triggedEvents.add(ev)
       this._$trigger(ev, type, this._$getEventDetail(ev), ev.bubbles, ev.composed)
     })
+  }
+
+  createIntersectionObserver(
+    targetElement: Element,
+    relativeElement: Element,
+    relativeElementMargin: string,
+    thresholds: number[],
+    listener: (res: IntersectionStatus) => void,
+  ): Observer {
+    const observer = new IntersectionObserver(
+      (info) => {
+        info.forEach((entry) => {
+          listener({
+            intersectionRatio: entry.intersectionRatio,
+            boundingClientRect: entry.boundingClientRect,
+            intersectionRect: entry.intersectionRect,
+            relativeRect: entry.rootBounds!,
+            time: entry.time,
+          })
+        })
+      },
+      {
+        root: relativeElement as unknown as HTMLElement,
+        rootMargin: relativeElementMargin,
+        threshold: thresholds,
+      },
+    )
+    observer.observe(targetElement as unknown as HTMLElement)
+    return {
+      disconnect() {
+        observer.disconnect()
+      },
+    }
+  }
+
+  createMediaQueryObserver(
+    status: MediaQueryStatus,
+    listener: (res: { matches: boolean }) => void,
+  ): Observer {
+    const calcMatches = () => {
+      const width = document.documentElement.clientWidth
+      const height = document.documentElement.clientHeight
+      if (width !== status.width) return false
+      if (width > status.maxWidth) return false
+      if (width < status.minWidth) return false
+      if (height !== status.height) return false
+      if (height > status.maxHeight) return false
+      if (height < status.minHeight) return false
+      const orientation = width > height ? 'landscape' : 'portrait'
+      if (orientation !== status.orientation) return false
+      return true
+    }
+    let curMatches = calcMatches()
+    const listenerFunc = () => {
+      const matches = calcMatches()
+      if (curMatches === matches) return
+      curMatches = matches
+      listener({ matches })
+    }
+    window.addEventListener('resize', listenerFunc)
+    return {
+      disconnect() {
+        window.removeEventListener('resize', listenerFunc)
+      },
+    }
   }
 }

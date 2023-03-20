@@ -13,7 +13,14 @@ import {
 } from './event'
 import { triggerWarning } from './func_arr'
 import { ParsedSelector } from './selector'
-import { BM, BackendMode, BoundingClientRect, ScrollOffset } from './backend/mode'
+import {
+  BM,
+  BackendMode,
+  BoundingClientRect,
+  ScrollOffset,
+  Observer,
+  IntersectionStatus,
+} from './backend/mode'
 import {
   GeneralComponentInstance,
   DataList,
@@ -1906,5 +1913,32 @@ export class Element implements NodeCast {
         })
       }, 0)
     }
+  }
+
+  createIntersectionObserver(
+    relativeElement: Element,
+    relativeElementMargin: string,
+    thresholds: number[],
+    listener: (res: IntersectionStatus) => void,
+  ): Observer | null {
+    const backendElement = this._$backendElement
+    if (backendElement && relativeElement._$backendElement) {
+      if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
+        return (this._$nodeTreeContext as domlikeBackend.Context).createIntersectionObserver(
+          backendElement as domlikeBackend.Element,
+          relativeElement._$backendElement as domlikeBackend.Element,
+          relativeElementMargin,
+          thresholds,
+          listener,
+        )
+      }
+      return (backendElement as backend.Element).createIntersectionObserver(
+        relativeElement._$backendElement as backend.Element,
+        relativeElementMargin,
+        thresholds,
+        listener,
+      )
+    }
+    return null
   }
 }

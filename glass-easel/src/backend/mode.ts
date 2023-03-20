@@ -49,3 +49,25 @@ export type GetMatchedRulesResponese = {
 export type GetAllComputedStylesResponese = {
   properties: CSSProperty[]
 }
+
+export interface Observer {
+  disconnect(): void
+}
+
+export type IntersectionStatus = {
+  intersectionRatio: number
+  boundingClientRect: BoundingClientRect
+  intersectionRect: BoundingClientRect
+  relativeRect: BoundingClientRect
+  time: number
+}
+
+export type MediaQueryStatus = {
+  minWidth: number
+  maxWidth: number
+  width: number
+  minHeight: number
+  maxHeight: number
+  height: number
+  orientation: string
+}

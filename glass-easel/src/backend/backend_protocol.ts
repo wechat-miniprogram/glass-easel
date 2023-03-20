@@ -2,7 +2,14 @@
 
 import { safeCallback } from '../func_arr'
 import { EventOptions, EventBubbleStatus } from '../event'
-import { BackendMode, BoundingClientRect, ScrollOffset } from './mode'
+import {
+  BackendMode,
+  BoundingClientRect,
+  ScrollOffset,
+  Observer,
+  MediaQueryStatus,
+  IntersectionStatus,
+} from './mode'
 
 export interface Context {
   mode: BackendMode.Shadow
@@ -25,6 +32,10 @@ export interface Context {
       options: EventOptions,
     ) => EventBubbleStatus,
   ): void
+  createMediaQueryObserver(
+    status: MediaQueryStatus,
+    listener: (res: { matches: boolean }) => void,
+  ): Observer
 }
 
 export interface Element {
@@ -52,6 +63,12 @@ export interface Element {
   getBoundingClientRect(cb: (res: BoundingClientRect) => void): void
   getScrollOffset(cb: (res: ScrollOffset) => void): void
   setEventDefaultPrevented(type: string, enabled: boolean): void
+  createIntersectionObserver(
+    relativeElement: Element,
+    relativeElementMargin: string,
+    thresholds: number[],
+    listener: (res: IntersectionStatus) => void,
+  ): Observer
   __wxElement?: unknown
 }
 
@@ -145,6 +162,17 @@ export class EmptyBackendContext implements Context {
     ) => EventBubbleStatus,
   ): void {
     // empty
+  }
+
+  createMediaQueryObserver(
+    _status: MediaQueryStatus,
+    _listener: (res: { matches: boolean }) => void,
+  ): Observer {
+    return {
+      disconnect: () => {
+        /* empty */
+      },
+    }
   }
 }
 
@@ -273,6 +301,19 @@ export class EmptyBackendElement implements Element {
 
   setEventDefaultPrevented(_type: string, _enabled: boolean): void {
     // empty
+  }
+
+  createIntersectionObserver(
+    _relativeElement: Element,
+    _relativeElementMargin: string,
+    _thresholds: number[],
+    _listener: (res: IntersectionStatus) => void,
+  ): Observer {
+    return {
+      disconnect: () => {
+        /* empty */
+      },
+    }
   }
 }
 
