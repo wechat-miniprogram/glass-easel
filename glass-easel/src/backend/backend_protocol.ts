@@ -57,9 +57,9 @@ export interface Element {
 
 export interface ShadowRootContext {
   getRootNode(): Element
-  createElement(tagName: string): Element
+  createElement(logicalName: string, stylingName: string): Element
   createTextNode(content: string): Element
-  createComponent(tagName: string, isVirtual: boolean): Element
+  createComponent(stylingName: string, isVirtual: boolean): Element
   createVirtualNode(): Element
 }
 

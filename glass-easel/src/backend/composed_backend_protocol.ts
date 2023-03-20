@@ -16,7 +16,7 @@ export interface Context {
   disableStyleSheet(index: number): void
   render(cb: (err: Error | null) => void): void
   getRootNode(): Element
-  createElement(tagName: string): Element
+  createElement(logicalName: string, stylingName: string): Element
   createTextNode(content: string): Element
   createFragment(): Element
   onEvent(

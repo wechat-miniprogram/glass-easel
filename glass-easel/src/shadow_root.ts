@@ -11,7 +11,7 @@ import { TextNode } from './text_node'
 import { NativeNode } from './native_node'
 import { Element } from './element'
 import { Node } from './node'
-import { ComponentDefinitionWithPlaceholder, NativeNodeDefinition } from './behavior'
+import { ComponentDefinitionWithPlaceholder } from './behavior'
 import { BM, BackendMode } from './backend/mode'
 import { DeepCopyStrategy, getDeepCopyStrategy } from './data_proxy'
 import { deepCopy, simpleDeepCopy } from './data_utils'
@@ -129,6 +129,7 @@ export class ShadowRoot extends VirtualNode {
 
   createNativeNodeWithInit(
     tagName: string,
+    stylingName: string,
     initPropValues?: (comp: NativeNode) => void,
   ): NativeNode {
     const ret = NativeNode.create(tagName, this)
@@ -158,7 +159,7 @@ export class ShadowRoot extends VirtualNode {
     // if the target is in using list, then use the one in using list
     const using = beh._$using[compName] || beh._$using[compName]
     if (typeof using === 'string') {
-      return this.createNativeNodeWithInit(using, initPropValues)
+      return this.createNativeNodeWithInit(using, tagName, initPropValues)
     }
     if (using) {
       let usingTarget: GeneralComponentDefinition | undefined
@@ -167,7 +168,7 @@ export class ShadowRoot extends VirtualNode {
       } else if (using.placeholder !== null) {
         const target = resolvePlaceholder(using.placeholder, space, beh, hostGenericImpls)
         if (typeof target === 'string') {
-          return this.createNativeNodeWithInit(target, initPropValues)
+          return this.createNativeNodeWithInit(target, tagName, initPropValues)
         }
         usingTarget = target
       }
@@ -191,7 +192,7 @@ export class ShadowRoot extends VirtualNode {
     // if the target is in generics list, then use the one
     const g = hostGenericImpls && hostGenericImpls[compName]
     if (typeof g === 'string') {
-      return this.createNativeNodeWithInit(g, initPropValues)
+      return this.createNativeNodeWithInit(g, tagName, initPropValues)
     }
     if (g) {
       let genImpl: GeneralComponentDefinition | undefined
@@ -200,7 +201,7 @@ export class ShadowRoot extends VirtualNode {
       } else if (g.placeholder !== null) {
         const target = resolvePlaceholder(g.placeholder, space, beh, hostGenericImpls)
         if (typeof target === 'string') {
-          return this.createNativeNodeWithInit(target, initPropValues)
+          return this.createNativeNodeWithInit(target, tagName, initPropValues)
         }
         genImpl = target
       }
@@ -226,7 +227,7 @@ export class ShadowRoot extends VirtualNode {
       throw new Error(`Cannot find component "${compName}"`)
     }
     if (typeof comp === 'string') {
-      return this.createNativeNodeWithInit(comp, initPropValues)
+      return this.createNativeNodeWithInit(comp, tagName, initPropValues)
     }
     return Component._$advancedCreate(
       tagName,
@@ -257,7 +258,7 @@ export class ShadowRoot extends VirtualNode {
     // find in the space otherwise
     const comp = space.getGlobalUsingComponent(tagName)
     if (typeof comp === 'string') {
-      return this.createNativeNodeWithInit(comp, initPropValues)
+      return this.createNativeNodeWithInit(comp, tagName, initPropValues)
     }
     if (comp) {
       return Component._$advancedCreate(
