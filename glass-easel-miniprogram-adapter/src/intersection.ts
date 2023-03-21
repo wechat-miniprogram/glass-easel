@@ -1,0 +1,116 @@
+import * as glassEasel from 'glass-easel'
+import { GeneralComponent } from './component'
+
+export type IntersectionObserverMargins = {
+  left: number
+  top: number
+  right: number
+  bottom: number
+}
+
+const defaultMargins = {
+  left: 0,
+  top: 0,
+  right: 0,
+  bottom: 0,
+}
+
+export class IntersectionObserver {
+  private _$comp: GeneralComponent
+  private _$thresholds: number[]
+  private _$initialRatio: number
+  private _$observeAll: boolean
+  private _$selector: string | null = null
+  private _$margins: IntersectionObserverMargins | null = null
+  private _$observers: glassEasel.backend.Observer[] = []
+
+  /** @internal */
+  constructor(
+    comp: GeneralComponent,
+    thresholds: number[],
+    initialRatio: number,
+    observeAll: boolean,
+  ) {
+    this._$comp = comp
+    this._$thresholds = thresholds
+    this._$initialRatio = initialRatio
+    this._$observeAll = observeAll
+  }
+
+  relativeTo(selector: string, margins?: IntersectionObserverMargins): this {
+    this._$selector = selector
+    this._$margins = margins ?? defaultMargins
+    return this
+  }
+
+  relativeToViewport(margins?: IntersectionObserverMargins): this {
+    this._$selector = null
+    this._$margins = margins ?? defaultMargins
+    return this
+  }
+
+  observe(
+    targetSelector: string,
+    listener: (status: glassEasel.backend.IntersectionStatus) => void,
+  ) {
+    let targets: glassEasel.Element[]
+    if (this._$observeAll) {
+      targets = this._$comp._$.querySelectorAll(targetSelector)
+    } else {
+      const elem = this._$comp._$.querySelector(targetSelector)
+      if (elem === null) {
+        targets = []
+      } else {
+        targets = [elem]
+      }
+    }
+    let relativeElement: glassEasel.Element | null
+    if (this._$selector === null) {
+      relativeElement = null
+    } else {
+      const rel = this._$comp._$.querySelector(this._$selector)
+      if (rel === null) {
+        // TODO warn no matched relative element
+      } else {
+        relativeElement = rel
+      }
+    }
+    if (!this._$margins) {
+      throw new Error('`relativeTo` or `relativeToViewport` should be called before observe')
+    }
+    const { left, top, right, bottom } = this._$margins
+    const margin = `${top}px ${right}px ${bottom}px ${left}px`
+    targets.forEach((target) => {
+      let initial: number | null = this._$initialRatio
+      const observer = target.createIntersectionObserver(
+        relativeElement,
+        margin,
+        this._$thresholds,
+        (args) => {
+          if (initial !== null) {
+            let i = 0
+            for (; i < this._$thresholds.length; i += 1) {
+              const threshold = this._$thresholds[i]!
+              if (initial === args.intersectionRatio) continue
+              if ((initial - threshold) * (args.intersectionRatio - threshold) <= 0) break
+            }
+            initial = null
+            if (i < this._$thresholds.length) return
+          }
+          listener(args)
+        },
+      )
+      if (observer === null) {
+        // TODO warn no observer attached
+      } else {
+        this._$observers.push(observer)
+      }
+    })
+  }
+
+  disconnect() {
+    const observers = this._$observers
+    this._$observers = []
+    observers.forEach((observer) => observer.disconnect())
+  }
+}

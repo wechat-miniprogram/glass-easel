@@ -39,7 +39,7 @@ export interface Context {
   setElementEventDefaultPrevented(element: Element, type: string, enabled: boolean): void
   createIntersectionObserver(
     targetElement: Element,
-    relativeElement: Element,
+    relativeElement: Element | null,
     relativeElementMargin: string,
     thresholds: number[],
     listener: (res: IntersectionStatus) => void,
@@ -398,7 +398,7 @@ export class CurrentWindowBackendContext implements Context {
 
   createIntersectionObserver(
     targetElement: Element,
-    relativeElement: Element,
+    relativeElement: Element | null,
     relativeElementMargin: string,
     thresholds: number[],
     listener: (res: IntersectionStatus) => void,
@@ -436,23 +436,24 @@ export class CurrentWindowBackendContext implements Context {
     const calcMatches = () => {
       const width = document.documentElement.clientWidth
       const height = document.documentElement.clientHeight
-      if (width !== status.width) return false
-      if (width > status.maxWidth) return false
-      if (width < status.minWidth) return false
-      if (height !== status.height) return false
-      if (height > status.maxHeight) return false
-      if (height < status.minHeight) return false
+      if (status.width !== undefined && width !== status.width) return false
+      if (status.maxWidth !== undefined && width > status.maxWidth) return false
+      if (status.minWidth !== undefined && width < status.minWidth) return false
+      if (status.width !== undefined && height !== status.height) return false
+      if (status.maxHeight !== undefined && height > status.maxHeight) return false
+      if (status.minHeight !== undefined && height < status.minHeight) return false
       const orientation = width > height ? 'landscape' : 'portrait'
       if (orientation !== status.orientation) return false
       return true
     }
-    let curMatches = calcMatches()
+    let curMatches: boolean | null = null
     const listenerFunc = () => {
       const matches = calcMatches()
       if (curMatches === matches) return
       curMatches = matches
       listener({ matches })
     }
+    setTimeout(listenerFunc, 0)
     window.addEventListener('resize', listenerFunc)
     return {
       disconnect() {

@@ -1915,25 +1915,36 @@ export class Element implements NodeCast {
     }
   }
 
+  /**
+   * Create an intersection observer
+   *
+   * The `relativeElement` is the element to calculate intersection with ( `null` for the viewport).
+   * The `relativeElementMargin` is the margins of the `relativeElement` .
+   * The `thresholds` is a list of intersection ratios to trigger the `listener` .
+   * The listener always triggers once immediately after this call.
+   */
   createIntersectionObserver(
-    relativeElement: Element,
+    relativeElement: Element | null,
     relativeElementMargin: string,
     thresholds: number[],
     listener: (res: IntersectionStatus) => void,
   ): Observer | null {
     const backendElement = this._$backendElement
-    if (backendElement && relativeElement._$backendElement) {
+    if (backendElement) {
+      if (relativeElement && !relativeElement._$backendElement) {
+        return null
+      }
       if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
         return (this._$nodeTreeContext as domlikeBackend.Context).createIntersectionObserver(
           backendElement as domlikeBackend.Element,
-          relativeElement._$backendElement as domlikeBackend.Element,
+          relativeElement?._$backendElement as domlikeBackend.Element | undefined || null,
           relativeElementMargin,
           thresholds,
           listener,
         )
       }
       return (backendElement as backend.Element).createIntersectionObserver(
-        relativeElement._$backendElement as backend.Element,
+        relativeElement?._$backendElement as backend.Element | undefined || null,
         relativeElementMargin,
         thresholds,
         listener,

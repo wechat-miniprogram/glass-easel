@@ -63,7 +63,7 @@ export interface Element {
   getScrollOffset(cb: (res: ScrollOffset) => void): void
   setEventDefaultPrevented(type: string, enabled: boolean): void
   createIntersectionObserver(
-    relativeElement: Element,
+    relativeElement: Element | null,
     relativeElementMargin: string,
     thresholds: number[],
     listener: (res: IntersectionStatus) => void,
@@ -268,7 +268,7 @@ export class EmptyComposedBackendElement implements Element {
   }
 
   createIntersectionObserver(
-    _relativeElement: Element,
+    _relativeElement: Element | null,
     _relativeElementMargin: string,
     _thresholds: number[],
     _listener: (res: IntersectionStatus) => void,

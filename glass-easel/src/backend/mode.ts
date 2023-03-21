@@ -63,11 +63,11 @@ export type IntersectionStatus = {
 }
 
 export type MediaQueryStatus = {
-  minWidth: number
-  maxWidth: number
-  width: number
-  minHeight: number
-  maxHeight: number
-  height: number
-  orientation: string
+  minWidth?: number
+  maxWidth?: number
+  width?: number
+  minHeight?: number
+  maxHeight?: number
+  height?: number
+  orientation?: string
 }

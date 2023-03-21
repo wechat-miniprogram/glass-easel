@@ -2,6 +2,8 @@ import * as glassEasel from 'glass-easel'
 import { utils as typeUtils } from './types'
 import { ComponentType, GeneralBehavior, TraitBehavior } from './behavior'
 import { SelectorQuery } from './selector_query'
+import { IntersectionObserver } from './intersection'
+import { MediaQueryObserver } from './media_query'
 
 type DataList = typeUtils.DataList
 type PropertyList = typeUtils.PropertyList
@@ -316,9 +318,26 @@ export class ComponentCaller<
     return new SelectorQuery(this)
   }
 
+  /** Create an intersection observer */
+  createIntersectionObserver(options?: {
+    thresholds?: number[]
+    initialRatio?: number
+    observeAll?: boolean
+  }): IntersectionObserver {
+    return new IntersectionObserver(
+      this,
+      options?.thresholds || [0],
+      options?.initialRatio || 0,
+      options?.observeAll || false,
+    )
+  }
+
+  /** Create an media query observer */
+  createMediaQueryObserver(): MediaQueryObserver {
+    return new MediaQueryObserver(this)
+  }
+
   // TODO support animate / applyAnimation / clearAnimation
-  // TODO support createIntersectionObserver
-  // TODO support createMediaQueryObserver
   // TODO support setUpdatePerformanceListener
 
   /**
