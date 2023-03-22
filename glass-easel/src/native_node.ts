@@ -45,6 +45,7 @@ export class NativeNode extends Element {
   static create(
     tagName: string,
     owner: ShadowRoot,
+    stylingName?: string,
     extendedDefinition?: ExtendedNativeNodeDefinition,
   ): NativeNode {
     const node = Object.create(NativeNode.prototype) as NativeNode
@@ -57,10 +58,10 @@ export class NativeNode extends Element {
       )
     } else if (BM.SHADOW || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Shadow)) {
       const backend = owner._$backendShadowRoot
-      backendElement = backend?.createElement(tagName) || null
+      backendElement = backend?.createElement(tagName, stylingName ?? tagName) || null
     } else {
       const backend = owner._$nodeTreeContext as composedBackend.Context
-      backendElement = backend.createElement(tagName)
+      backendElement = backend.createElement(tagName, stylingName ?? tagName)
     }
     node._$initialize(false, backendElement, owner)
     node.classList = new ClassList(node, null)

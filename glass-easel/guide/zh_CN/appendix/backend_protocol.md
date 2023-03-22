@@ -219,6 +219,12 @@ glass-easel 并不会自行调用这个接口。应由其他模块调用这个�
 
 **这只是一个建议性质的接口。** glass-easel 并不会自行调用这个接口，但其他相关模块很可能调用。
 
+### `Element#createMediaQueryObserver(...)`
+
+创建一个 MediaQueryObserver 用于监听媒体查询状态变化。
+
+监听器必然在开始监听时触发一次，用于返回初始的媒体查询状态信息。
+
 
 ## Element
 
@@ -421,7 +427,11 @@ type glass-easelCSSRule = {
 
 如果节点没有布局信息，返回全 0 值。
 
-**这只是一个建议性质的接口。** glass-easel 并不会自行调用这个接口，但其他相关模块很可能调用。
+### `Element#createIntersectionObserver(...)`
+
+创建一个 IntersectionObserver 用于监听相交状态变化。
+
+监听器必然在开始监听时触发一次，用于返回初始的相交状态信息。
 
 ### `async Element#getScrollPosition(): { scrollLeft: number, scrollTop: number, scrollWidth: number, scrollHeight: number }`
 

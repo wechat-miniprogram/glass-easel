@@ -1,5 +1,5 @@
 import * as glassEasel from '../../src'
-import { composedBackend, tmpl } from '../base/env'
+import { composedBackend, domBackend, tmpl } from '../base/env'
 
 describe('Component Space', () => {
   test('update and get component options', () => {
@@ -255,11 +255,14 @@ describe('Component Space', () => {
     cs.setGlobalUsingComponent('child', childCompDef.general())
     cs.setGlobalUsingComponent('native-node', 'span')
     const comp = cs
-      .createComponentByUrl('root', '/comp/parent', null, composedBackend)
+      .createComponentByUrl('root', '/comp/parent', null, domBackend)
       .asInstanceOf(compDef)!
     const a = (comp.$.a as glassEasel.GeneralComponent).asInstanceOf(childCompDef)!
     const b = (comp.$.b as glassEasel.GeneralComponent).asNativeNode()!
     expect(a.is).toBe('comp/child')
     expect(b.is).toBe('span')
+    expect(a.tagName).toBe('c')
+    expect((a.$$ as unknown as HTMLElement).tagName).toBe('C')
+    expect((b.$$ as unknown as HTMLElement).tagName).toBe('SPAN')
   })
 })

@@ -476,7 +476,7 @@ export class Component<
         backendElement = backend?.createComponent(tagName, false) || null
       } else {
         const backend = owner._$nodeTreeContext as composedBackend.Context
-        backendElement = backend.createElement(tagName)
+        backendElement = backend.createElement('wx-x', tagName)
       }
       comp._$initialize(false, backendElement, owner, nodeTreeContext)
     } else {
@@ -487,7 +487,8 @@ export class Component<
         if (!sr) throw new Error('Failed getting backend shadow tree')
         backendElement = sr.createComponent(tagName, false) || null
       } else {
-        backendElement = (nodeTreeContext as composedBackend.Context).createElement(tagName) || null
+        backendElement =
+          (nodeTreeContext as composedBackend.Context).createElement('wx-x', tagName) || null
       }
       comp._$initialize(false, backendElement, owner, nodeTreeContext)
     }

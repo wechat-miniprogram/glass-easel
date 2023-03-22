@@ -431,3 +431,83 @@ describe('selector query', () => {
       glassEasel.Element.pretendAttached(root.getComponent())
     }))
 })
+
+describe('intersection observer', () => {
+  test('create intersection observer', () => {
+    const env = new MiniProgramEnv()
+    const codeSpace = env.createCodeSpace('', true)
+
+    codeSpace.addComponentStaticConfig('path/to/comp', {
+      usingComponents: {},
+    })
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
+        <div id="a">
+          <div id="b" />
+          <div id="b" />
+        </div>
+      `),
+    )
+    // eslint-disable-next-line arrow-body-style
+    codeSpace.componentEnv('path/to/comp', ({ Component }) => {
+      return Component()
+        .lifetime('attached', function () {
+          const o1 = this.createIntersectionObserver().relativeToViewport()
+          o1.observe('#a', () => {
+            /* empty */
+          })
+          const o2 = this.createIntersectionObserver({
+            thresholds: [1],
+            initialRatio: 0,
+            observeAll: true,
+          }).relativeTo('#a')
+          o2.observe('#b', () => {
+            /* empty */
+          })
+          o1.disconnect()
+          o2.disconnect()
+        })
+        .register()
+    })
+
+    const ab = env.associateBackend()
+    const root = ab.createRoot('body', codeSpace, 'path/to/comp')
+    glassEasel.Element.pretendAttached(root.getComponent())
+    expect(domHtml(root.getComponent())).toBe('<div><div></div><div></div></div>')
+  })
+})
+
+describe('media query observer', () => {
+  test('create media query observer', () => {
+    const env = new MiniProgramEnv()
+    const codeSpace = env.createCodeSpace('', true)
+
+    codeSpace.addComponentStaticConfig('path/to/comp', {
+      usingComponents: {},
+    })
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
+        <div id="a" />
+      `),
+    )
+    // eslint-disable-next-line arrow-body-style
+    codeSpace.componentEnv('path/to/comp', ({ Component }) => {
+      return Component()
+        .lifetime('attached', function () {
+          const o = this.createMediaQueryObserver()
+          o.observe({ orientation: 'landscape' }, () => {
+            /* empty */
+          })
+          o.disconnect()
+        })
+        .register()
+    })
+
+    const ab = env.associateBackend()
+    const root = ab.createRoot('body', codeSpace, 'path/to/comp')
+    glassEasel.Element.pretendAttached(root.getComponent())
+    expect(domHtml(root.getComponent())).toBe('<div></div>')
+  })
+})
