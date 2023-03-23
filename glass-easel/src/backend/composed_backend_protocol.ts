@@ -130,7 +130,7 @@ export class EmptyComposedBackendContext implements Context {
     return this._$rootNode
   }
 
-  createElement(_tagName: string): Element {
+  createElement(_tagName: string, _stylingName: string): Element {
     return new EmptyComposedBackendElement()
   }
 

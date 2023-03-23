@@ -132,7 +132,7 @@ export class ShadowRoot extends VirtualNode {
     stylingName: string,
     initPropValues?: (comp: NativeNode) => void,
   ): NativeNode {
-    const ret = NativeNode.create(tagName, this)
+    const ret = NativeNode.create(tagName, this, stylingName)
     initPropValues?.(ret)
     return ret
   }

@@ -336,7 +336,7 @@ export class EmptyBackendShadowRootContext implements ShadowRootContext {
     return this._$rootNode
   }
 
-  createElement(_tagName: string): Element {
+  createElement(_tagName: string, _stylingName: string): Element {
     return new EmptyBackendElement(EmptyBackendElementType.Element)
   }
 
@@ -344,7 +344,7 @@ export class EmptyBackendShadowRootContext implements ShadowRootContext {
     return new EmptyBackendElement(EmptyBackendElementType.TextNode)
   }
 
-  createComponent(_tagName: string, _isVirtual: boolean): Element {
+  createComponent(_stylingName: string, _isVirtual: boolean): Element {
     return new EmptyBackendElement(EmptyBackendElementType.Component)
   }
 

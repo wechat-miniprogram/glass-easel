@@ -1937,14 +1937,14 @@ export class Element implements NodeCast {
       if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
         return (this._$nodeTreeContext as domlikeBackend.Context).createIntersectionObserver(
           backendElement as domlikeBackend.Element,
-          relativeElement?._$backendElement as domlikeBackend.Element | undefined || null,
+          (relativeElement?._$backendElement as domlikeBackend.Element | undefined) || null,
           relativeElementMargin,
           thresholds,
           listener,
         )
       }
       return (backendElement as backend.Element).createIntersectionObserver(
-        relativeElement?._$backendElement as backend.Element | undefined || null,
+        (relativeElement?._$backendElement as backend.Element | undefined) || null,
         relativeElementMargin,
         thresholds,
         listener,
