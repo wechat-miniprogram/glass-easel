@@ -701,16 +701,16 @@ describe('node tree structure', () => {
       .registerElement({
         template: multiTmpl({
           child: `
-          <template name="child">
-            <span wx:for="{{list}}" wx:if="{{item.shown}}">{{index}}:{{item.data}}</span>
-          </template>
-        `,
+            <template name="child">
+              <span wx:for="{{list}}" wx:if="{{item.shown}}">{{index}}:{{item.data}}</span>
+            </template>
+          `,
           '': `
-          <import src="./child" />
-          <div>
-            <template is="child" data="{{ list: arr }}" />
-          </div>
-        `,
+            <import src="./child" />
+            <div>
+              <template is="child" data="{{ list: arr }}" />
+            </div>
+          `,
         }),
         data: {
           arr: [
@@ -732,6 +732,31 @@ describe('node tree structure', () => {
       ],
     })
     expect(domHtml(elem)).toBe('<div><span>1:456</span></div>')
+  })
+
+  test('template-name data shortcut', () => {
+    const def = glassEasel
+      .registerElement({
+        template: multiTmpl({
+          child: `
+            <template name="child">
+              <span>{{ obj.a }}</span>
+            </template>
+          `,
+          '': `
+          <import src="./child" />
+            <div>
+              <template is="child" data="{{ obj }}" />
+            </div>
+          `,
+        }),
+        data: {
+          obj: { a: 123 },
+        },
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    expect(domHtml(elem)).toBe('<div><span>123</span></div>')
   })
 
   test('static template-is', () => {

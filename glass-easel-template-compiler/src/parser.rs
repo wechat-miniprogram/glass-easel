@@ -647,9 +647,33 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                                             Some(target) => {
                                                 elem.virtual_type = TmplVirtualType::TemplateRef {
                                                     target,
-                                                    data: data.unwrap_or_else(|| {
-                                                        TmplAttrValue::Static("".into())
-                                                    }),
+                                                    data: match data {
+                                                        Some(field) => {
+                                                            if let TmplAttrValue::Dynamic { expr, binding_map_keys } = field {
+                                                                let expr = match *expr {
+                                                                    TmplExpr::Ident(s) => TmplExpr::LitObj(vec![(Some(s.clone()), TmplExpr::Ident(s))]),
+                                                                    TmplExpr::LitObj(x) => TmplExpr::LitObj(x),
+                                                                    _ => {
+                                                                        // FIXME warn must be object
+                                                                        TmplExpr::LitObj(vec![])
+                                                                    }
+                                                                };
+                                                                TmplAttrValue::Dynamic { expr: Box::new(expr), binding_map_keys }
+                                                            } else {
+                                                                // FIXME warn must be object data binding
+                                                                TmplAttrValue::Dynamic {
+                                                                    expr: Box::new(TmplExpr::LitObj(vec![])),
+                                                                    binding_map_keys: None,
+                                                                }
+                                                            }
+                                                        }
+                                                        None => {
+                                                            TmplAttrValue::Dynamic {
+                                                                expr: Box::new(TmplExpr::LitObj(vec![])),
+                                                                binding_map_keys: None,
+                                                            }
+                                                        }
+                                                    },
                                                 }
                                             }
                                             None => {} // FIXME warn no src attr found
