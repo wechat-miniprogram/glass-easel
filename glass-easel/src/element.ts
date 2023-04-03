@@ -1506,7 +1506,7 @@ export class Element implements NodeCast {
     return null
   }
 
-  /** Update an attribute value */
+  /** Update an attribute value in the backend, removing if the value is undefined */
   updateAttribute(name: string, value: unknown) {
     if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
       if (typeof value === 'boolean') {
@@ -1515,8 +1515,10 @@ export class Element implements NodeCast {
         } else {
           this.removeAttribute(name)
         }
+      } else if (value === undefined) {
+        this.removeAttribute(name)
       } else {
-        this.setAttribute(name, value === undefined || value === null ? '' : String(value))
+        this.setAttribute(name, value === null ? '' : String(value))
       }
     } else {
       if (value === undefined) {

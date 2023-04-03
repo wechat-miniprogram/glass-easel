@@ -37,6 +37,7 @@ export interface Context {
     ) => EventBubbleStatus,
   ): void
   setElementEventDefaultPrevented(element: Element, type: string, enabled: boolean): void
+  setModelBindingStat(element: Element, attributeName: string, binded: boolean): void
   createIntersectionObserver(
     targetElement: Element,
     relativeElement: Element | null,
@@ -55,6 +56,7 @@ export interface Element {
   removeChild(child: Element, index?: number): void
   insertBefore(child: Element, before?: Element, index?: number): void
   replaceChild(child: Element, oldChild?: Element, index?: number): void
+  tagName: string
   id: string
   classList: {
     add(elementClass: string): void
@@ -394,6 +396,11 @@ export class CurrentWindowBackendContext implements Context {
       this._$triggedEvents.add(ev)
       this._$trigger(ev, type, this._$getEventDetail(ev), ev.bubbles, ev.composed)
     })
+  }
+
+  setModelBindingStat(element: Element, attributeName: string, binded: boolean): void {
+    const tagName = element.tagName
+    // TODO list model-binded attributes
   }
 
   createIntersectionObserver(

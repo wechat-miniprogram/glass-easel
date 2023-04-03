@@ -990,8 +990,16 @@ export class ProcGenWrapper {
           )
         }
       }
-    } else {
+    } else if (elem instanceof NativeNode) {
       elem.updateAttribute(name, v)
+      if (lvaluePath) {
+        elem.setModelBindingListener(name, (value) => {
+          const host = elem.ownerShadowRoot!.getHostNode()
+          const nodeDataProxy = Component.getDataProxy(host)
+          nodeDataProxy.replaceDataOnPath(lvaluePath, value)
+          nodeDataProxy.applyDataUpdates(false)
+        })
+      }
     }
   }
 
