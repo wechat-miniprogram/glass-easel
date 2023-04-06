@@ -34,10 +34,10 @@ describe('Selector', function () {
       var selector = glassEasel.Element.parseSelector('#b:.-c._d_')
       expect(typeof selector).toBe('object')
       regElem({
-        is: 'glassEasel-selector-parse',
+        is: 'glass-easel-selector-parse',
         template: '<div id="b:" class="_d_ -c"/>',
       })
-      var elem = createElem('glassEasel-selector-parse').shadowRoot
+      var elem = createElem('glass-easel-selector-parse').shadowRoot
       expect(elem.matchSelector(selector, elem.childNodes[0])).toBe(true)
     })
 
@@ -49,18 +49,18 @@ describe('Selector', function () {
   describe('#matchSelector', function () {
     beforeAll(function () {
       regElem({
-        is: 'glassEasel-selector-match-selector-a',
+        is: 'glass-easel-selector-match-selector-a',
         template: '<div id="b" class="b"> b <slot/> </div> <div id="c" class="c"/>',
       })
       regElem({
-        is: 'glassEasel-selector-match-selector-b',
+        is: 'glass-easel-selector-match-selector-b',
         template:
-          '<glassEasel-selector-match-selector-a id="a" class="a"> a <span id="b" class="b"> b <span id="c" class="c"/></span> </glassEasel-selector-match-selector-a>',
+          '<glass-easel-selector-match-selector-a id="a" class="a"> a <span id="b" class="b"> b <span id="c" class="c"/></span> </glass-easel-selector-match-selector-a>',
       })
     })
 
     it('should be able to test selector (without deep selector)', function () {
-      var elem = createElem('glassEasel-selector-match-selector-b')
+      var elem = createElem('glass-easel-selector-match-selector-b')
       expect(elem.matchSelector('.a .b', elem.$.b)).toBe(false)
       expect(glassEasel.Element.matchSelector('.a .b', elem.$.b)).toBe(true)
       expect(elem.$.a.shadowRoot.matchSelector('.a, .b', elem)).toBe(false)
@@ -80,8 +80,8 @@ describe('Selector', function () {
     })
 
     it('should be able to test selector (with deep selector)', function () {
-      var owner = createElem('glassEasel-selector-match-selector-a')
-      var elem = owner.shadowRoot.createComponent('glassEasel-selector-match-selector-b')
+      var owner = createElem('glass-easel-selector-match-selector-a')
+      var elem = owner.shadowRoot.createComponent('glass-easel-selector-match-selector-b')
       elem.classList.toggle('e', true)
       var parent = owner.shadowRoot.createVirtualNode()
       parent.appendChild(elem)
@@ -115,48 +115,48 @@ describe('Selector', function () {
 
     beforeAll(function () {
       regElem({
-        is: 'glassEasel-selector-query-selector-a',
+        is: 'glass-easel-selector-query-selector-a',
         template: '<div id="a1" class="a common"/> <slot/> <div id="a2" class="common a"/>',
       })
       regElem({
-        is: 'glassEasel-selector-query-selector-b',
+        is: 'glass-easel-selector-query-selector-b',
         template:
-          '<glassEasel-selector-query-selector-a id="a1" class="a"> <span id="b" class="common"/> </glassEasel-selector-query-selector-a> <glassEasel-selector-query-selector-a id="a2" class="a"/>',
+          '<glass-easel-selector-query-selector-a id="a1" class="a"> <span id="b" class="common"/> </glass-easel-selector-query-selector-a> <glass-easel-selector-query-selector-a id="a2" class="a"/>',
       })
       componentSpace.exportComponent(
-        'glassEasel-selector-query-selector-a',
-        'glassEasel-selector-query-selector-a',
+        'glass-easel-selector-query-selector-a',
+        'glass-easel-selector-query-selector-a',
       )
       const componentSpace2 = new glassEasel.ComponentSpace('', componentSpace)
       compDefC = componentSpace2.defineComponent({
-        is: 'glassEasel-selector-query-selector-c',
+        is: 'glass-easel-selector-query-selector-c',
         template: tmpl(
-          '<glassEasel-selector-query-selector-a id="a" class="a"/> <div id="c" class="c"/>',
+          '<glass-easel-selector-query-selector-a id="a" class="a"/> <div id="c" class="c"/>',
         ),
       })
     })
 
     it('should be able to select virtual-host components', function () {
       regElem({
-        is: 'glassEasel-selector-query-selector-virtual-host-a',
+        is: 'glass-easel-selector-query-selector-virtual-host-a',
         options: {
           virtualHost: true,
         },
         template: '<slot />',
       })
       regElem({
-        is: 'glassEasel-selector-query-selector-virtual-host-b',
+        is: 'glass-easel-selector-query-selector-virtual-host-b',
         options: {
           virtualHost: true,
         },
-        template: '<div><glassEasel-selector-query-selector-virtual-host-a class="a" /></div>',
+        template: '<div><glass-easel-selector-query-selector-virtual-host-a class="a" /></div>',
       })
-      var elem = createElem('glassEasel-selector-query-selector-virtual-host-b')
+      var elem = createElem('glass-easel-selector-query-selector-virtual-host-b')
       expect(elem.shadowRoot.querySelector('.a')).toBe(elem.shadowRoot.childNodes[0].childNodes[0])
     })
 
     it('should be able to select the first matched node (without deep selector)', function () {
-      var elem = createElem('glassEasel-selector-query-selector-b')
+      var elem = createElem('glass-easel-selector-query-selector-b')
       expect(elem.querySelector('.a')).toBe(null)
       expect(elem.shadowRoot.querySelector('.a')).toBe(elem.$.a1)
       expect(elem.shadowRoot.querySelector('#a1, #a2')).toBe(elem.$.a1)
@@ -169,8 +169,8 @@ describe('Selector', function () {
     })
 
     it('should be able to select the first matched node (with deep selector)', function () {
-      var owner = createElem('glassEasel-selector-query-selector-a')
-      var elem = owner.shadowRoot.createComponent('glassEasel-selector-query-selector-b')
+      var owner = createElem('glass-easel-selector-query-selector-a')
+      var elem = owner.shadowRoot.createComponent('glass-easel-selector-query-selector-b')
       elem.classList.toggle('b', true)
       var parent = owner.shadowRoot.createVirtualNode()
       parent.appendChild(elem)
@@ -189,7 +189,7 @@ describe('Selector', function () {
     })
 
     it('should be able to select all matched nodes (without deep selector)', function () {
-      var elem = createElem('glassEasel-selector-query-selector-b')
+      var elem = createElem('glass-easel-selector-query-selector-b')
       expect(elem.querySelectorAll('.a')).toStrictEqual([])
       expect(elem.shadowRoot.querySelectorAll('.a')).toStrictEqual([elem.$.a1, elem.$.a2])
       expect(elem.shadowRoot.querySelectorAll('#a1, #a2')).toStrictEqual([elem.$.a1, elem.$.a2])
@@ -202,8 +202,8 @@ describe('Selector', function () {
     })
 
     it('should be able to select all matched nodes (with deep selector)', function () {
-      var owner = createElem('glassEasel-selector-query-selector-a')
-      var elem = owner.shadowRoot.createComponent('glassEasel-selector-query-selector-b')
+      var owner = createElem('glass-easel-selector-query-selector-a')
+      var elem = owner.shadowRoot.createComponent('glass-easel-selector-query-selector-b')
       elem.classList.toggle('b', true)
       var parent = owner.shadowRoot.createVirtualNode()
       parent.appendChild(elem)

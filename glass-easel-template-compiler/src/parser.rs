@@ -442,7 +442,7 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                                 let tag_name_matched = {
                                     let mut pairs = pair.into_inner();
                                     let tag_name = pairs.next().unwrap().as_str();
-                                    tag_name == target.tag_name
+                                    target.tag_name_is(tag_name)
                                 };
                                 if tag_name_matched {
                                     pairs.next();

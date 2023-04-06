@@ -990,6 +990,67 @@ describe('node tree structure', () => {
     expect(domHtml(elem)).toBe('<child-comp><div></div></child-comp>')
   })
 
+  test('tag name cases', () => {
+    const def = glassEasel
+      .registerElement({
+        template: tmpl(`
+          <Div></diV>
+        `),
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe('<div></div>')
+  })
+
+  test('dataset name cases', () => {
+    const def = glassEasel
+      .registerElement({
+        template: tmpl(`
+          <div data-camelCase="{{ 123 }}"></div>
+        `),
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe('<div></div>')
+    expect(elem.getShadowRoot()!.childNodes[0]!.asElement()!.dataset!.camelcase).toBe(123)
+  })
+
+  test('attribute name cases', () => {
+    const def = glassEasel
+      .registerElement({
+        template: tmpl(`
+          <div hidDen></div>
+        `),
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe('<div hidden=""></div>')
+  })
+
+  test('property name cases', () => {
+    const subComp = glassEasel.registerElement({
+      properties: {
+        propname: String,
+      },
+    })
+    const def = glassEasel
+      .registerElement({
+        using: {
+          child: subComp.general(),
+        },
+        template: tmpl(`
+          <child propName="abc" />
+        `),
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(elem.getShadowRoot()!.childNodes[0]!.asInstanceOf(subComp)!.data.propname).toBe('abc')
+  })
+
   test('setting native node attr', () => {
     const def = glassEasel
       .registerElement({

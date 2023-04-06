@@ -593,7 +593,7 @@ impl TmplElement {
     pub(crate) fn new(tag_name: &str, virtual_type: TmplVirtualType) -> Self {
         Self {
             virtual_type,
-            tag_name: String::from(tag_name),
+            tag_name: tag_name.to_ascii_lowercase(),
             attrs: vec![],
             children: vec![],
             generics: None,
@@ -603,23 +603,27 @@ impl TmplElement {
         }
     }
 
+    pub(crate) fn tag_name_is(&self, tag_name: &str) -> bool {
+        self.tag_name == tag_name.to_ascii_lowercase()
+    }
+
     pub(crate) fn add_attr(&mut self, name: &str, value: TmplAttrValue) {
         let kind = if let Some((prefix, name)) = name.split_once(':') {
             let name = name.to_string();
             match prefix {
-                "wx" => TmplAttrKind::WxDirective { name },
-                "generic" => TmplAttrKind::Generic { name },
+                "wx" => TmplAttrKind::WxDirective { name: name.to_ascii_lowercase() },
+                "generic" => TmplAttrKind::Generic { name: name.to_ascii_lowercase() },
                 "slot" => TmplAttrKind::SlotProperty {
-                    name: dash_to_camel(&name),
+                    name: dash_to_camel(&name.to_ascii_lowercase()),
                 },
                 "model" => TmplAttrKind::ModelProperty {
-                    name: dash_to_camel(&name),
+                    name: dash_to_camel(&name.to_ascii_lowercase()),
                 },
                 "change" => TmplAttrKind::ChangeProperty {
-                    name: dash_to_camel(&name),
+                    name: dash_to_camel(&name.to_ascii_lowercase()),
                 },
                 "worklet" => TmplAttrKind::WorkletProperty {
-                    name: dash_to_camel(&name),
+                    name: dash_to_camel(&name.to_ascii_lowercase()),
                 },
                 "data" => TmplAttrKind::Data { name },
                 "bind" => TmplAttrKind::Event {
@@ -665,7 +669,7 @@ impl TmplElement {
                 }
             }
         } else {
-            match name {
+            match name.to_ascii_lowercase().as_str() {
                 "slot" => TmplAttrKind::Slot,
                 "id" => TmplAttrKind::Id,
                 "class" => TmplAttrKind::Class,
