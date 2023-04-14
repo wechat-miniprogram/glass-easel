@@ -593,7 +593,7 @@ impl TmplElement {
     pub(crate) fn new(tag_name: &str, virtual_type: TmplVirtualType) -> Self {
         Self {
             virtual_type,
-            tag_name: tag_name.to_ascii_lowercase(),
+            tag_name: String::from(tag_name),
             attrs: vec![],
             children: vec![],
             generics: None,
@@ -604,26 +604,26 @@ impl TmplElement {
     }
 
     pub(crate) fn tag_name_is(&self, tag_name: &str) -> bool {
-        self.tag_name == tag_name.to_ascii_lowercase()
+        self.tag_name == tag_name
     }
 
     pub(crate) fn add_attr(&mut self, name: &str, value: TmplAttrValue) {
         let kind = if let Some((prefix, name)) = name.split_once(':') {
             let name = name.to_string();
             match prefix {
-                "wx" => TmplAttrKind::WxDirective { name: name.to_ascii_lowercase() },
+                "wx" => TmplAttrKind::WxDirective { name },
                 "generic" => TmplAttrKind::Generic { name: name.to_ascii_lowercase() },
                 "slot" => TmplAttrKind::SlotProperty {
                     name: dash_to_camel(&name.to_ascii_lowercase()),
                 },
                 "model" => TmplAttrKind::ModelProperty {
-                    name: dash_to_camel(&name.to_ascii_lowercase()),
+                    name: dash_to_camel(&name),
                 },
                 "change" => TmplAttrKind::ChangeProperty {
-                    name: dash_to_camel(&name.to_ascii_lowercase()),
+                    name: dash_to_camel(&name),
                 },
                 "worklet" => TmplAttrKind::WorkletProperty {
-                    name: dash_to_camel(&name.to_ascii_lowercase()),
+                    name: dash_to_camel(&name),
                 },
                 "data" => TmplAttrKind::Data { name },
                 "bind" => TmplAttrKind::Event {
@@ -669,13 +669,13 @@ impl TmplElement {
                 }
             }
         } else {
-            match name.to_ascii_lowercase().as_str() {
+            match name {
                 "slot" => TmplAttrKind::Slot,
                 "id" => TmplAttrKind::Id,
                 "class" => TmplAttrKind::Class,
                 "style" => TmplAttrKind::Style,
                 name if name.starts_with("data-") => {
-                    let camel_name = dash_to_camel(&name[5..]);
+                    let camel_name = dash_to_camel(&name[5..].to_ascii_lowercase());
                     TmplAttrKind::Data { name: camel_name }
                 }
                 name => TmplAttrKind::PropertyOrExternalClass {

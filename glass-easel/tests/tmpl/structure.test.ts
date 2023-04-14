@@ -994,7 +994,7 @@ describe('node tree structure', () => {
     const def = glassEasel
       .registerElement({
         template: tmpl(`
-          <Div></diV>
+          <Div></Div>
         `),
       })
       .general()
@@ -1033,7 +1033,7 @@ describe('node tree structure', () => {
   test('property name cases', () => {
     const subComp = glassEasel.registerElement({
       properties: {
-        propname: String,
+        propName: String,
       },
     })
     const def = glassEasel
@@ -1048,7 +1048,7 @@ describe('node tree structure', () => {
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, domBackend)
     glassEasel.Element.pretendAttached(elem)
-    expect(elem.getShadowRoot()!.childNodes[0]!.asInstanceOf(subComp)!.data.propname).toBe('abc')
+    expect(elem.getShadowRoot()!.childNodes[0]!.asInstanceOf(subComp)!.data.propName).toBe('abc')
   })
 
   test('setting native node attr', () => {
