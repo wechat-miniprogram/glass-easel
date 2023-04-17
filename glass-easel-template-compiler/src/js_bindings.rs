@@ -45,6 +45,16 @@ impl TmplGroup {
         Ok(())
     }
 
+    #[wasm_bindgen(js_name = "getDirectDependencies")]
+    pub fn get_direct_dependencies(&self, path: &str) -> Result<js_sys::Array, JsValue> {
+        let deps = self.group.get_direct_dependencies(&path).map_err(|x| JsValue::from(format!("{}", x)))?;
+        let ret = js_sys::Array::new_with_length(deps.len() as u32);
+        for dep in deps {
+            ret.push(&JsValue::from(dep));
+        }
+        Ok(ret)
+    }
+
     #[wasm_bindgen(js_name = "getRuntimeString")]
     pub fn get_runtime_string(&self) -> String {
         self.group.get_runtime_string()
