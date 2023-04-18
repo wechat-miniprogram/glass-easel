@@ -67,27 +67,26 @@ export class NativeNode extends Element {
     if (!this._$modelBindingListeners[propName]) {
       const backendElement = this.getBackendElement()
       if (backendElement) {
+        const listener = (value: DataValue) => {
+          const listener = this._$modelBindingListeners?.[propName]
+          if (listener) {
+            listener.call(this, value)
+          }
+        }
         if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
           ;(this.getBackendContext() as domlikeBackend.Context).setModelBindingStat(
             backendElement as domlikeBackend.Element,
             propName,
-            true,
+            listener,
           )
         } else {
           ;(backendElement as backend.Element | composedBackend.Element).setModelBindingStat(
             propName,
-            true,
+            listener,
           )
         }
       }
     }
     this._$modelBindingListeners[propName] = listener
-  }
-
-  callModelBindingListener(propName: string, value: DataValue) {
-    const listener = this._$modelBindingListeners?.[propName]
-    if (listener) {
-      listener.call(this, value)
-    }
   }
 }

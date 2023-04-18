@@ -2,7 +2,7 @@
 /* global window, document */
 
 import { EventOptions, EventBubbleStatus } from '../event'
-import { safeCallback } from '../func_arr'
+import { safeCallback, triggerWarning } from '../func_arr'
 import {
   BackendMode,
   BoundingClientRect,
@@ -37,7 +37,11 @@ export interface Context {
     ) => EventBubbleStatus,
   ): void
   setElementEventDefaultPrevented(element: Element, type: string, enabled: boolean): void
-  setModelBindingStat(element: Element, attributeName: string, binded: boolean): void
+  setModelBindingStat(
+    element: Element,
+    attributeName: string,
+    listener: ((newValue: unknown) => void) | null,
+  ): void
   createIntersectionObserver(
     targetElement: Element,
     relativeElement: Element | null,
@@ -52,6 +56,9 @@ export interface Context {
 }
 
 export interface Element {
+  _$wxArgs?: {
+    modelListeners: { [name: string]: ((newValue: unknown) => void) | null }
+  }
   appendChild(child: Element): void
   removeChild(child: Element, index?: number): void
   insertBefore(child: Element, before?: Element, index?: number): void
@@ -398,9 +405,68 @@ export class CurrentWindowBackendContext implements Context {
     })
   }
 
-  setModelBindingStat(element: Element, attributeName: string, binded: boolean): void {
+  setModelBindingStat(
+    element: Element,
+    attributeName: string,
+    listener: ((newValue: unknown) => void) | null,
+  ): void {
+    const updateEventListener = (evName: string, valueFn: () => void) => {
+      if (!element._$wxArgs) {
+        element._$wxArgs = {
+          modelListeners: Object.create(null) as {
+            [name: string]: ((newValue: unknown) => void) | null
+          },
+        }
+      }
+      if (element._$wxArgs.modelListeners[attributeName] === undefined) {
+        if (!listener) return
+        element._$wxArgs.modelListeners[attributeName] = listener
+        element.addEventListener(evName, () => {
+          const listener = element._$wxArgs?.modelListeners[attributeName]
+          listener?.(valueFn())
+        })
+      }
+      element._$wxArgs.modelListeners[attributeName] = listener
+    }
     const tagName = element.tagName
-    // TODO list model-binded attributes
+    let valid = false
+    if (tagName === 'INPUT') {
+      const elem = element as unknown as HTMLInputElement
+      const type = elem.type
+      if (type === 'checkbox') {
+        if (attributeName === 'checked') {
+          valid = true
+          updateEventListener('change', () => elem.checked)
+        }
+      } else if (type === 'radio') {
+        if (attributeName === 'checked') {
+          valid = true
+          updateEventListener('change', () => elem.checked)
+        }
+      } else {
+        if (attributeName === 'value') {
+          valid = true
+          updateEventListener('input', () => elem.value)
+        }
+      }
+    } else if (tagName === 'TEXTAREA') {
+      const elem = element as unknown as HTMLTextAreaElement
+      if (attributeName === 'value') {
+        valid = true
+        updateEventListener('input', () => elem.value)
+      }
+    } else if (tagName === 'SELECT') {
+      const elem = element as unknown as HTMLSelectElement
+      if (attributeName === 'value') {
+        valid = true
+        updateEventListener('change', () => elem.value)
+      }
+    }
+    if (!valid) {
+      triggerWarning(
+        `unsupported model binding on "${attributeName}" of "${tagName.toLowerCase()}" element.`,
+      )
+    }
   }
 
   createIntersectionObserver(
