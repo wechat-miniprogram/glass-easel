@@ -997,6 +997,15 @@ export class ProcGenWrapper {
     }
   }
 
+  // set a worklet directive value
+  wl(elem: Element, name: string, value: unknown) {
+    if (elem instanceof Component) {
+      elem.triggerWorkletChangeLifetime(name, value)
+    } else {
+      // TODO warn unused worklet
+    }
+  }
+
   // add a change property binding
   p(elem: Element, name: string, v: ChangePropListener) {
     if (elem instanceof Component) {

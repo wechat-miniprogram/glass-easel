@@ -125,6 +125,9 @@ pub(crate) enum TmplAttrKind {
     ChangeProperty {
         name: String,
     },
+    WorkletProperty {
+        name: String,
+    },
     Data {
         name: String,
     },
@@ -600,19 +603,26 @@ impl TmplElement {
         }
     }
 
+    pub(crate) fn tag_name_is(&self, tag_name: &str) -> bool {
+        self.tag_name == tag_name
+    }
+
     pub(crate) fn add_attr(&mut self, name: &str, value: TmplAttrValue) {
         let kind = if let Some((prefix, name)) = name.split_once(':') {
             let name = name.to_string();
             match prefix {
                 "wx" => TmplAttrKind::WxDirective { name },
-                "generic" => TmplAttrKind::Generic { name },
+                "generic" => TmplAttrKind::Generic { name: name.to_ascii_lowercase() },
                 "slot" => TmplAttrKind::SlotProperty {
-                    name: dash_to_camel(&name),
+                    name: dash_to_camel(&name.to_ascii_lowercase()),
                 },
                 "model" => TmplAttrKind::ModelProperty {
                     name: dash_to_camel(&name),
                 },
                 "change" => TmplAttrKind::ChangeProperty {
+                    name: dash_to_camel(&name),
+                },
+                "worklet" => TmplAttrKind::WorkletProperty {
                     name: dash_to_camel(&name),
                 },
                 "data" => TmplAttrKind::Data { name },
@@ -665,7 +675,7 @@ impl TmplElement {
                 "class" => TmplAttrKind::Class,
                 "style" => TmplAttrKind::Style,
                 name if name.starts_with("data-") => {
-                    let camel_name = dash_to_camel(&name[5..]);
+                    let camel_name = dash_to_camel(&name[5..].to_ascii_lowercase());
                     TmplAttrKind::Data { name: camel_name }
                 }
                 name => TmplAttrKind::PropertyOrExternalClass {
@@ -1484,6 +1494,39 @@ impl TmplAttr {
                     }
                 }
             }
+            TmplAttrKind::WorkletProperty { name } => {
+                let attr_name = gen_lit_str(&name);
+                match &self.value {
+                    TmplAttrValue::Static(_) => {}
+                    TmplAttrValue::Dynamic {
+                        expr,
+                        binding_map_keys,
+                    } => {
+                        let p = expr.to_proc_gen_prepare(w, scopes)?;
+                        w.expr_stmt(|w| {
+                            write!(w, "if(C||K||")?;
+                            p.lvalue_state_expr(w, scopes)?;
+                            write!(w, ")R.wl(N,{},", attr_name)?;
+                            p.value_expr(w)?;
+                            write!(w, ")")?;
+                            Ok(())
+                        })?;
+                        if let Some(binding_map_keys) = binding_map_keys {
+                            if !binding_map_keys.is_empty(bmc) {
+                                binding_map_keys.to_proc_gen_write_map(w, bmc, |w| {
+                                    let p = expr.to_proc_gen_prepare(w, scopes)?;
+                                    w.expr_stmt(|w| {
+                                        write!(w, "R.wl(N,{},", attr_name)?;
+                                        p.value_expr(w)?;
+                                        write!(w, ")")?;
+                                        Ok(())
+                                    })
+                                })?;
+                            }
+                        }
+                    }
+                }
+            }
             TmplAttrKind::Data { name } => {
                 write_value!("R.d", gen_lit_str(name));
             }
@@ -1568,6 +1611,7 @@ impl fmt::Display for TmplAttr {
             TmplAttrKind::PropertyOrExternalClass { name } => format!("{}", name),
             TmplAttrKind::ModelProperty { name } => format!("model:{}", name),
             TmplAttrKind::ChangeProperty { name } => format!("change:{}", name),
+            TmplAttrKind::WorkletProperty { name } => format!("worklet:{}", name),
             TmplAttrKind::Data { name } => format!("data:{}", name),
             TmplAttrKind::Event {
                 capture,

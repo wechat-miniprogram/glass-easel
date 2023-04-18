@@ -701,16 +701,16 @@ describe('node tree structure', () => {
       .registerElement({
         template: multiTmpl({
           child: `
-          <template name="child">
-            <span wx:for="{{list}}" wx:if="{{item.shown}}">{{index}}:{{item.data}}</span>
-          </template>
-        `,
+            <template name="child">
+              <span wx:for="{{list}}" wx:if="{{item.shown}}">{{index}}:{{item.data}}</span>
+            </template>
+          `,
           '': `
-          <import src="./child" />
-          <div>
-            <template is="child" data="{{ list: arr }}" />
-          </div>
-        `,
+            <import src="./child" />
+            <div>
+              <template is="child" data="{{ list: arr }}" />
+            </div>
+          `,
         }),
         data: {
           arr: [
@@ -732,6 +732,31 @@ describe('node tree structure', () => {
       ],
     })
     expect(domHtml(elem)).toBe('<div><span>1:456</span></div>')
+  })
+
+  test('template-name data shortcut', () => {
+    const def = glassEasel
+      .registerElement({
+        template: multiTmpl({
+          child: `
+            <template name="child">
+              <span>{{ obj.a }}</span>
+            </template>
+          `,
+          '': `
+          <import src="./child" />
+            <div>
+              <template is="child" data="{{ obj }}" />
+            </div>
+          `,
+        }),
+        data: {
+          obj: { a: 123 },
+        },
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    expect(domHtml(elem)).toBe('<div><span>123</span></div>')
   })
 
   test('static template-is', () => {
@@ -963,6 +988,67 @@ describe('node tree structure', () => {
       d: '',
     })
     expect(domHtml(elem)).toBe('<child-comp><div></div></child-comp>')
+  })
+
+  test('tag name cases', () => {
+    const def = glassEasel
+      .registerElement({
+        template: tmpl(`
+          <Div></Div>
+        `),
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe('<div></div>')
+  })
+
+  test('dataset name cases', () => {
+    const def = glassEasel
+      .registerElement({
+        template: tmpl(`
+          <div data-camelCase="{{ 123 }}"></div>
+        `),
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe('<div></div>')
+    expect(elem.getShadowRoot()!.childNodes[0]!.asElement()!.dataset!.camelcase).toBe(123)
+  })
+
+  test('attribute name cases', () => {
+    const def = glassEasel
+      .registerElement({
+        template: tmpl(`
+          <div hidDen></div>
+        `),
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe('<div hidden=""></div>')
+  })
+
+  test('property name cases', () => {
+    const subComp = glassEasel.registerElement({
+      properties: {
+        propName: String,
+      },
+    })
+    const def = glassEasel
+      .registerElement({
+        using: {
+          child: subComp.general(),
+        },
+        template: tmpl(`
+          <child propName="abc" />
+        `),
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(elem.getShadowRoot()!.childNodes[0]!.asInstanceOf(subComp)!.data.propName).toBe('abc')
   })
 
   test('setting native node attr', () => {

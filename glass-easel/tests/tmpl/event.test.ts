@@ -263,4 +263,26 @@ describe('event bindings', () => {
     const a = elem.getShadowRoot()!.getElementById('a')!
     expect((a as unknown as { _test: string })._test).toBe(123)
   })
+
+  test('worklet directives', () => {
+    let triggered = false
+    const abc = glassEasel.registerElement({
+      lifetimes: {
+        workletChange(name: string, value: number) {
+          expect(name).toBe('abc')
+          expect(value).toBe(123)
+          triggered = true
+        },
+      },
+    })
+    const def = glassEasel.registerElement({
+      using: { abc: abc.general() },
+      template: tmpl(`
+        <abc id="a" worklet:abc="{{ 123 }}" />
+      `),
+    })
+    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(triggered).toBe(true)
+  })
 })

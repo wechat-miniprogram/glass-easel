@@ -55,7 +55,7 @@ import { GeneralBackendContext, GeneralBackendElement } from './node'
 import { DataPath, parseSinglePath, parseMultiPaths } from './data_path'
 import { ExternalShadowRoot } from './external_shadow_tree'
 import { BM, BackendMode } from './backend/mode'
-import { EventListener } from './event'
+import { EventListener, EventOptions, ShadowedEvent } from './event'
 import { TraitBehavior, TraitGroup } from './trait_behaviors'
 
 export const convertGenerics = (
@@ -171,6 +171,13 @@ export type Lifetimes = {
   moved: () => void
   detached: () => void
   ready: () => void
+  listenerChange: (
+    isAdd: boolean,
+    name: string,
+    func: (ev: ShadowedEvent<unknown>) => void,
+    options: EventOptions,
+  ) => void
+  workletChange: (name: string, value: unknown) => void
 }
 
 export type LifetimeFuncs = {
@@ -640,7 +647,7 @@ export class Component<
           }
           dataGroupObserverTree.addObserver(func, parseMultiPaths(dataPaths as string | string[]))
         },
-        lifetime: (name: string, func: (...args: unknown[]) => void): void => {
+        lifetime: <T extends keyof Lifetimes>(name: T, func: Lifetimes[T]): void => {
           if (initDone) throw new Error('Cannot execute init-time functions after initialization')
           if (cowLifetime) {
             cowLifetime = false
@@ -648,10 +655,10 @@ export class Component<
           }
           const fag = comp._$lifetimeFuncs
           if (fag[name]) {
-            fag[name]!.add(func)
+            fag[name]!.add(func as GeneralFuncType)
           } else {
-            const fa = (fag[name] = new FuncArr())
-            fa.add(func)
+            const fa = (fag[name] = new FuncArr() as LifetimeFuncs[T])
+            fa!.add(func as GeneralFuncType)
           }
         },
         pageLifetime: (name: string, func: (...args: unknown[]) => void): void => {
@@ -1067,6 +1074,11 @@ export class Component<
   /** Update multiple external class values */
   applyExternalClassChanges() {
     ;(this.classList as ClassList)._$spreadAliasUpdate()
+  }
+
+  /** Triggers a worklet change lifetime */
+  triggerWorkletChangeLifetime(name: string, value: unknown) {
+    this.triggerLifetime('workletChange', [name, value])
   }
 
   /** Check a field is excluded by pureDataPattern or not */
