@@ -194,12 +194,12 @@ describe('model value binding', () => {
         <input type="checkbox" id="a" model:checked="{{v}}" />
       `),
       data: {
-        s: false,
+        v: false,
       },
     })
     const elem = glassEasel.Component.createWithContext('root', def, domBackend)
     glassEasel.Element.pretendAttached(elem)
-    expect(domHtml(elem)).toBe('<div></div><input type="checkbox">')
+    expect(domHtml(elem)).toBe('<div>false</div><input type="checkbox">')
     const input = elem.getShadowRoot()!.getElementById('a')!.$$ as unknown as HTMLInputElement
     input.checked = true
     const ev = new Event('change') as InputEvent
