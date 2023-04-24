@@ -265,24 +265,27 @@ describe('event bindings', () => {
   })
 
   test('worklet directives', () => {
-    let triggered = false
+    const triggered: string[] = []
     const abc = glassEasel.registerElement({
       lifetimes: {
         workletChange(name: string, value: number) {
-          expect(name).toBe('abc')
-          expect(value).toBe(123)
-          triggered = true
+          if (name === 'abc') {
+            expect(value).toBe(123)
+          } else if (name === 'def') {
+            expect(value).toBe('456')
+          }
+          triggered.push(name)
         },
       },
     })
     const def = glassEasel.registerElement({
       using: { abc: abc.general() },
       template: tmpl(`
-        <abc id="a" worklet:abc="{{ 123 }}" />
+        <abc id="a" worklet:abc="{{ 123 }}" worklet:def="456" />
       `),
     })
     const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
     glassEasel.Element.pretendAttached(elem)
-    expect(triggered).toBe(true)
+    expect(triggered).toStrictEqual(['abc', 'def'])
   })
 })

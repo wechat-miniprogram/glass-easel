@@ -1497,7 +1497,12 @@ impl TmplAttr {
             TmplAttrKind::WorkletProperty { name } => {
                 let attr_name = gen_lit_str(&name);
                 match &self.value {
-                    TmplAttrValue::Static(_) => {}
+                    TmplAttrValue::Static(v) => {
+                        w.expr_stmt(|w| {
+                            write!(w, "if(C)R.wl(N,{},{})", attr_name, gen_lit_str(v))?;
+                            Ok(())
+                        })?;
+                    }
                     TmplAttrValue::Dynamic {
                         expr,
                         binding_map_keys,
