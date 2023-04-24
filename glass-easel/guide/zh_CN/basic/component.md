@@ -133,6 +133,23 @@ export const helloWorld = componentSpace.defineComponent({
 })
 ```
 
+使用组件时可能会更新组件的属性值。组件可以使用 `comparison` 来决定该属性是否需要更新，这样做有时可以提升性能。
+
+```js
+export const addComponent = componentSpace.defineComponent({
+  properties: {
+    b: {
+      type: Object, // 对象类型
+      value: { myField: '' },
+      comparison(newValue, oldValue) {
+        // 只有 myField 变了之后才更新属性
+        return newValue.myField !== oldValue.myField
+      },
+    },
+  },
+})
+```
+
 ## init 函数
 
 init 函数是可以使用 Chaining API 定义的函数，每次创建实例时，函数会被执行一次。

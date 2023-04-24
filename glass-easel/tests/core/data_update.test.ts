@@ -479,6 +479,57 @@ describe('partial update', () => {
     expect(execArr).toStrictEqual(['1:C'])
   })
 
+  test('should support custom property value comparison', () => {
+    let execArr = [] as string[]
+    const childCompDef = componentSpace
+      .define()
+      .property('p', {
+        type: String,
+        value: 'def',
+        comparison(newValue, oldValue) {
+          execArr.push('A')
+          if (newValue === 'abc') return false
+          return newValue !== oldValue
+        },
+        observer() {
+          execArr.push('C')
+        },
+      })
+      .observer('p', () => {
+        execArr.push('B')
+      })
+      .registerComponent()
+    const compDef = componentSpace
+      .define()
+      .usingComponents({
+        child: childCompDef.general(),
+      })
+      .template(
+        tmpl(`
+          <child p="{{p}}" />
+        `),
+      )
+      .data(() => ({
+        p: 'def',
+      }))
+      .registerComponent()
+    const comp = glassEasel.Component.createWithContext('root', compDef, domBackend)
+    expect(execArr).toStrictEqual(['A'])
+    execArr = []
+    glassEasel.Element.pretendAttached(comp)
+    comp.setData({ p: '' })
+    expect(execArr).toStrictEqual(['A', 'B', 'C'])
+    execArr = []
+    comp.setData({ p: 'abc' })
+    expect(execArr).toStrictEqual(['A'])
+    execArr = []
+    comp.setData({ p: '' })
+    expect(execArr).toStrictEqual(['A'])
+    execArr = []
+    comp.setData({ p: 'def' })
+    expect(execArr).toStrictEqual(['A', 'B', 'C'])
+  })
+
   test('should not allow updates before init done', () => {
     const compDef = componentSpace
       .define()

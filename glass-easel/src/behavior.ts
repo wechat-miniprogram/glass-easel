@@ -65,6 +65,7 @@ export type PropertyDefinition = {
   value: unknown | undefined
   default: (() => unknown) | undefined
   observer: ((newValue: unknown, oldValue: unknown) => void) | null
+  comparison: ((newValue: unknown, oldValue: unknown) => boolean) | null
   reflectIdPrefix: boolean
 }
 
@@ -134,6 +135,7 @@ const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefinition | 
       value: '',
       default: undefined,
       observer: null,
+      comparison: null,
       reflectIdPrefix: false,
     }
   }
@@ -144,6 +146,7 @@ const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefinition | 
       value: 0,
       default: undefined,
       observer: null,
+      comparison: null,
       reflectIdPrefix: false,
     }
   }
@@ -154,6 +157,7 @@ const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefinition | 
       value: false,
       default: undefined,
       observer: null,
+      comparison: null,
       reflectIdPrefix: false,
     }
   }
@@ -164,6 +168,7 @@ const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefinition | 
       value: null,
       default: undefined,
       observer: null,
+      comparison: null,
       reflectIdPrefix: false,
     }
   }
@@ -174,6 +179,7 @@ const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefinition | 
       value: [],
       default: undefined,
       observer: null,
+      comparison: null,
       reflectIdPrefix: false,
     }
   }
@@ -186,6 +192,7 @@ const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefinition | 
       },
       default: undefined,
       observer: null,
+      comparison: null,
       reflectIdPrefix: false,
     }
   }
@@ -196,6 +203,7 @@ const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefinition | 
       value: null,
       default: undefined,
       observer: null,
+      comparison: null,
       reflectIdPrefix: false,
     }
   }
@@ -1462,6 +1470,17 @@ export class Behavior<
               )
             }
           }
+          let comparison: ((newValue: unknown, oldValue: unknown) => boolean) | null
+          if (typeof propDef.comparison === 'function') {
+            comparison = propDef.comparison
+          } else {
+            comparison = null
+            if (propDef.comparison !== undefined) {
+              triggerWarning(
+                `the comparison of property "${name}" is not a function (when preparing behavior "${is}").`,
+              )
+            }
+          }
           const reflectIdPrefix = !!propDef.reflectIdPrefix
           d = {
             type,
@@ -1469,6 +1488,7 @@ export class Behavior<
             value,
             default: propDef.default,
             observer,
+            comparison,
             reflectIdPrefix,
           }
         }

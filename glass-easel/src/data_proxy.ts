@@ -337,7 +337,8 @@ export class DataGroup<
    */
   replaceProperty(propName: string, newData: DataValue): boolean {
     let data = newData
-    if (!this._$propFields[propName]) return false
+    const prop = this._$propFields[propName]
+    if (!prop) return false
     if (this._$propertyPassingDeepCopy !== DeepCopyStrategy.None) {
       if (this._$propertyPassingDeepCopy === DeepCopyStrategy.SimpleWithRecursion) {
         data = deepCopy(newData, true)
@@ -345,6 +346,7 @@ export class DataGroup<
         data = simpleDeepCopy(newData)
       }
     }
+    if (prop.comparison && !prop.comparison(data, this.data[propName])) return false
     this._$pendingChanges.push([[propName], data, undefined, undefined])
     return true
   }
