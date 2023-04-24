@@ -62,6 +62,7 @@ export interface Element {
   getBoundingClientRect(cb: (res: BoundingClientRect) => void): void
   getScrollOffset(cb: (res: ScrollOffset) => void): void
   setEventDefaultPrevented(type: string, enabled: boolean): void
+  setModelBindingStat(attributeName: string, listener: ((newValue: unknown) => void) | null): void
   createIntersectionObserver(
     relativeElement: Element | null,
     relativeElementMargin: string,
@@ -264,6 +265,13 @@ export class EmptyComposedBackendElement implements Element {
   }
 
   setEventDefaultPrevented(_type: string, _enabled: boolean): void {
+    // empty
+  }
+
+  setModelBindingStat(
+    _attributeName: string,
+    _listener: ((newValue: unknown) => void) | null,
+  ): void {
     // empty
   }
 

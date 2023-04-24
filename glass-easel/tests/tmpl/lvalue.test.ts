@@ -166,4 +166,44 @@ describe('model value binding', () => {
     expect(compB.data.propB).toBe(89)
     expect(compA.data.propA).toBe(89)
   })
+
+  test('model value binding on native node (DOM input)', () => {
+    const def = glassEasel.registerElement({
+      template: tmpl(`
+        <div>{{s}}</div>
+        <textarea id="a" model:value="{{s}}" />
+      `),
+      data: {
+        s: 'initial',
+      },
+    })
+    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe('<div>initial</div><textarea value="initial"></textarea>')
+    const input = elem.getShadowRoot()!.getElementById('a')!.$$ as unknown as HTMLInputElement
+    input.value = 'changed'
+    const ev = new Event('input') as InputEvent
+    input.dispatchEvent(ev)
+    expect(domHtml(elem)).toBe('<div>changed</div><textarea value="changed"></textarea>')
+  })
+
+  test('model value binding on native node (DOM checkbox)', () => {
+    const def = glassEasel.registerElement({
+      template: tmpl(`
+        <div>{{v}}</div>
+        <input type="checkbox" id="a" model:checked="{{v}}" />
+      `),
+      data: {
+        v: false,
+      },
+    })
+    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe('<div>false</div><input type="checkbox">')
+    const input = elem.getShadowRoot()!.getElementById('a')!.$$ as unknown as HTMLInputElement
+    input.checked = true
+    const ev = new Event('change') as InputEvent
+    input.dispatchEvent(ev)
+    expect(domHtml(elem)).toBe('<div>true</div><input type="checkbox" checked="">')
+  })
 })
