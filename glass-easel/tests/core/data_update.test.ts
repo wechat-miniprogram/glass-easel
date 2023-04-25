@@ -479,14 +479,14 @@ describe('partial update', () => {
     expect(execArr).toStrictEqual(['1:C'])
   })
 
-  test('should support custom property value comparison', () => {
+  test('should support custom property value comparer', () => {
     let execArr = [] as string[]
     const childCompDef = componentSpace
       .define()
       .property('p', {
         type: String,
         value: 'def',
-        comparison(newValue, oldValue) {
+        comparer(newValue, oldValue) {
           execArr.push('A')
           if (newValue === 'abc') return false
           return newValue !== oldValue

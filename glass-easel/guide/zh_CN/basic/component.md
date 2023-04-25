@@ -141,7 +141,7 @@ export const addComponent = componentSpace.defineComponent({
     b: {
       type: Object, // 对象类型
       value: { myField: '' },
-      comparison(newValue, oldValue) {
+      comparer(newValue, oldValue) {
         // 只有 myField 变了之后才更新属性
         return newValue.myField !== oldValue.myField
       },

@@ -306,7 +306,7 @@ export type PropertyOption<T extends PropertyType, V> = {
   value?: V
   default?: () => V
   observer?: ((newValue: DeepReadonly<V>, oldValue: DeepReadonly<V>) => void) | string
-  comparison?: (newValue: DeepReadonly<V>, oldValue: DeepReadonly<V>) => boolean
+  comparer?: (newValue: DeepReadonly<V>, oldValue: DeepReadonly<V>) => boolean
   reflectIdPrefix?: boolean
 }
 

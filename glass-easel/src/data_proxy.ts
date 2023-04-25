@@ -346,7 +346,7 @@ export class DataGroup<
         data = simpleDeepCopy(newData)
       }
     }
-    if (prop.comparison && !prop.comparison(data, this.data[propName])) return false
+    if (prop.comparer && !prop.comparer(data, this.data[propName])) return false
     this._$pendingChanges.push([[propName], data, undefined, undefined])
     return true
   }
