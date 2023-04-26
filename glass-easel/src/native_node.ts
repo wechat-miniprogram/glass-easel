@@ -7,6 +7,7 @@ import { Element } from './element'
 import { ShadowRoot } from './shadow_root'
 import { GeneralBackendElement } from '.'
 import { BM, BackendMode } from './backend/mode'
+import { DataValue, ModelBindingListener } from './data_proxy'
 
 export type NativeNodeAttributeFilter = (
   // eslint-disable-next-line no-use-before-define
@@ -35,6 +36,7 @@ export interface ExtendedNativeNodeDefinition {
 export class NativeNode extends Element {
   is: string
   private _$attributeFilters: Record<string, NativeNodeAttributeFilter>
+  private _$modelBindingListeners?: { [name: string]: ModelBindingListener }
 
   constructor() {
     throw new Error('Element cannot be constructed directly')
@@ -117,5 +119,35 @@ export class NativeNode extends Element {
       return
     }
     this._$attributeFilters[propName]!(this, propName, propValue, callback)
+  }
+
+  setModelBindingListener(propName: string, listener: ModelBindingListener) {
+    if (!this._$modelBindingListeners) {
+      this._$modelBindingListeners = Object.create(null) as { [name: string]: ModelBindingListener }
+    }
+    if (!this._$modelBindingListeners[propName]) {
+      const backendElement = this.getBackendElement()
+      if (backendElement) {
+        const listener = (value: DataValue) => {
+          const listener = this._$modelBindingListeners?.[propName]
+          if (listener) {
+            listener.call(this, value)
+          }
+        }
+        if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
+          ;(this.getBackendContext() as domlikeBackend.Context).setModelBindingStat(
+            backendElement as domlikeBackend.Element,
+            propName,
+            listener,
+          )
+        } else {
+          ;(backendElement as backend.Element | composedBackend.Element).setModelBindingStat(
+            propName,
+            listener,
+          )
+        }
+      }
+    }
+    this._$modelBindingListeners[propName] = listener
   }
 }
