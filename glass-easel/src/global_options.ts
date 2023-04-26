@@ -73,6 +73,8 @@ export const getDefaultBackendContext = (): GeneralBackendContext => {
 export type ComponentOptions = {
   /** Is external component or not */
   externalComponent?: boolean
+  /** The host node tag name (only valid in external components) */
+  hostNodeTagName?: string
   /** The template engine */
   templateEngine?: TemplateEngine
   /** The style scope */
@@ -107,6 +109,7 @@ export type ComponentOptions = {
 
 export type NormalizedComponentOptions = {
   externalComponent: boolean
+  hostNodeTagName: string
   templateEngine: TemplateEngine
   styleScope: StyleScopeId
   extraStyleScope: StyleScopeId | null
@@ -147,6 +150,7 @@ export const globalOptions: NormalizedComponentOptions & EnvironmentOptions = {
   templateEngine: new GlassEaselTemplateEngine(),
   styleScope: StyleScopeManager.globalScope(),
   extraStyleScope: null,
+  hostNodeTagName: 'wx-x',
   multipleSlots: false,
   dynamicSlots: false,
   reflectToAttributes: false,
@@ -178,6 +182,7 @@ export const normalizeComponentOptions = (
       p.externalComponent !== undefined ? p.externalComponent : b.externalComponent,
     templateEngine: p.templateEngine !== undefined ? p.templateEngine : b.templateEngine,
     styleScope: p.styleScope !== undefined ? p.styleScope : b.styleScope,
+    hostNodeTagName: p.hostNodeTagName !== undefined ? p.hostNodeTagName : b.hostNodeTagName,
     extraStyleScope: p.extraStyleScope !== undefined ? p.extraStyleScope : b.extraStyleScope,
     multipleSlots: p.multipleSlots !== undefined ? p.multipleSlots : b.multipleSlots,
     dynamicSlots: p.dynamicSlots !== undefined ? p.dynamicSlots : b.dynamicSlots,

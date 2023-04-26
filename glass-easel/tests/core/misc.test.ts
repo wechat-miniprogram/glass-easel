@@ -381,4 +381,49 @@ describe('component utils', () => {
     glassEasel.Element.pretendAttached(elem)
     expect(callOrder).toStrictEqual([2, 1, 4, 5, 3, 6])
   })
+
+  test('hostNodeTagName', () => {
+    const normalComp = componentSpace
+      .define()
+      .options({ externalComponent: false, hostNodeTagName: 'wx-normal' })
+      .registerComponent()
+    const compDef = componentSpace
+      .define()
+      .usingComponents({
+        'normal-comp': normalComp.general(),
+      })
+      .template(
+        tmpl(`
+          <normal-comp />
+        `),
+      )
+      .registerComponent()
+
+    class MyBackendContext extends glassEasel.composedBackend.EmptyComposedBackendContext {
+      // eslint-disable-next-line class-methods-use-this
+      override createElement(tagName: string, stylingName: string): MyBackendElement {
+        return new MyBackendElement(tagName, stylingName)
+      }
+    }
+    class MyBackendElement extends glassEasel.composedBackend.EmptyComposedBackendElement {
+      tagName: string
+      stylingName: string
+
+      constructor(tagName: string, stylingName: string) {
+        super()
+        this.tagName = tagName
+        this.stylingName = stylingName
+      }
+    }
+
+    const elem = glassEasel.Component.createWithContext(
+      'root',
+      compDef.general(),
+      new MyBackendContext(),
+    )
+    glassEasel.Element.pretendAttached(elem)
+    const e = elem.getShadowRoot()!.childNodes[0]!.asElement()!.$$ as MyBackendElement
+    expect(e.tagName).toBe('wx-normal')
+    expect(e.stylingName).toBe('normal-comp')
+  })
 })

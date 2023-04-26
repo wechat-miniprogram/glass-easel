@@ -483,7 +483,7 @@ export class Component<
         backendElement = backend?.createComponent(tagName, false) || null
       } else {
         const backend = owner._$nodeTreeContext as composedBackend.Context
-        backendElement = backend.createElement('wx-x', tagName)
+        backendElement = backend.createElement(options.hostNodeTagName, tagName)
       }
       comp._$initialize(false, backendElement, owner, nodeTreeContext)
     } else {
@@ -495,7 +495,10 @@ export class Component<
         backendElement = sr.createComponent(tagName, false) || null
       } else {
         backendElement =
-          (nodeTreeContext as composedBackend.Context).createElement('wx-x', tagName) || null
+          (nodeTreeContext as composedBackend.Context).createElement(
+            options.hostNodeTagName,
+            tagName,
+          ) || null
       }
       comp._$initialize(false, backendElement, owner, nodeTreeContext)
     }
