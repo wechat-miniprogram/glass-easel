@@ -74,9 +74,25 @@ export const normalizeUrl = (
 export class ComponentWaitingList {
   /** @internal */
   private _$callbacks: ((c: GeneralComponentDefinition) => void)[] = []
+  /** @internal */
+  private _$ownerSpace: ComponentSpace
+  /** @internal */
+  private _$isPub: boolean
+  /** @internal */
+  private _$alias: string
+
+  constructor(ownerSpace: ComponentSpace, isPub: boolean, alias: string) {
+    this._$ownerSpace = ownerSpace
+    this._$isPub = isPub
+    this._$alias = alias
+  }
 
   add(callback: (c: GeneralComponentDefinition) => void) {
     this._$callbacks.push(callback)
+  }
+
+  hintUsed() {
+    this._$ownerSpace._$componentWaitingListener?.(this._$isPub, this._$alias)
   }
 
   remove(callback: (c: GeneralComponentDefinition) => void) {
@@ -129,6 +145,8 @@ export class ComponentSpace {
   private _$pubListWaiting = Object.create(null) as {
     [path: string]: ComponentWaitingList
   }
+  /** @internal */
+  _$componentWaitingListener: ((isPub: boolean, alias: string) => void) | null = null
 
   /**
    * Create a new component space
@@ -377,9 +395,9 @@ export class ComponentSpace {
       throw new Error(`There is no component "${is}" for aliasing`)
     }
     this._$pubList[alias] = comp
-    const arr = this._$pubListWaiting[is]
+    const arr = this._$pubListWaiting[alias]
     if (arr) {
-      delete this._$pubListWaiting[is]
+      delete this._$pubListWaiting[alias]
       arr.call(comp)
     }
   }
@@ -404,11 +422,14 @@ export class ComponentSpace {
     let waiting: {
       [path: string]: ComponentWaitingList
     } | null
+    let space: ComponentSpace
+    let isPub: boolean
     if (domain) {
       const target = this._$importedSpaces[domain]
       if (target) {
-        const { space, privateUse } = target
-        if (privateUse) {
+        space = target.space
+        isPub = !target.privateUse
+        if (!isPub) {
           if (space._$list[absPath]) {
             return null
           }
@@ -423,6 +444,8 @@ export class ComponentSpace {
         return null
       }
     } else {
+      space = this
+      isPub = false
       if (this._$list[absPath]) {
         return null
       }
@@ -430,12 +453,19 @@ export class ComponentSpace {
     }
     let wl = waiting[absPath]
     if (wl) return wl
-    wl = waiting[absPath] = new ComponentWaitingList()
+    wl = waiting[absPath] = new ComponentWaitingList(space, isPub, absPath)
     return wl
   }
 
-  getWaitingComponents() {
-    return Object.keys(this._$listWaiting)
+  /**
+   * Set a listener which will be called when a placeholded component is used.
+   *
+   * This can be used as a hint for a component that should be registered later.
+   * If `isPub` is false, the `alias` is the path of the component, a.k.a. `is` .
+   * Otherwise, it is the exported `alias` instead.
+   */
+  setComponentWaitingListener(listener: ((isPub: boolean, alias: string) => void) | null) {
+    this._$componentWaitingListener = listener
   }
 
   /**

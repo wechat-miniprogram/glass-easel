@@ -34,6 +34,7 @@ const wrapPlaceholderCallback = (
   const waiting = cwp.waiting
   if (waiting) {
     waiting.add(f)
+    waiting.hintUsed()
     return () => {
       waiting.remove(f)
     }
@@ -166,7 +167,7 @@ export class ShadowRoot extends VirtualNode {
       if (using.final) {
         usingTarget = using.final
       } else if (using.placeholder !== null) {
-        const target = resolvePlaceholder(using.placeholder, space, beh, hostGenericImpls)
+        const target = resolvePlaceholder(using.placeholder, space, using.source, hostGenericImpls)
         if (typeof target === 'string') {
           return this.createNativeNodeWithInit(target, tagName, initPropValues)
         }
@@ -181,7 +182,7 @@ export class ShadowRoot extends VirtualNode {
           usingTarget,
           this,
           null,
-          convertGenerics(usingTarget, space, host, genericTargets),
+          convertGenerics(usingTarget, beh, host, genericTargets),
           placeholderHandler,
           initPropValues,
         )
@@ -199,7 +200,7 @@ export class ShadowRoot extends VirtualNode {
       if (g.final) {
         genImpl = g.final
       } else if (g.placeholder !== null) {
-        const target = resolvePlaceholder(g.placeholder, space, beh, hostGenericImpls)
+        const target = resolvePlaceholder(g.placeholder, space, g.source, hostGenericImpls)
         if (typeof target === 'string') {
           return this.createNativeNodeWithInit(target, tagName, initPropValues)
         }
@@ -214,7 +215,7 @@ export class ShadowRoot extends VirtualNode {
           genImpl,
           this,
           null,
-          convertGenerics(genImpl, space, host, genericTargets),
+          convertGenerics(genImpl, beh, host, genericTargets),
           placeholderHandler,
           initPropValues,
         )
@@ -234,7 +235,7 @@ export class ShadowRoot extends VirtualNode {
       comp,
       this,
       null,
-      convertGenerics(comp, space, host, genericTargets),
+      convertGenerics(comp, beh, host, genericTargets),
       undefined,
       initPropValues,
     )
@@ -266,7 +267,7 @@ export class ShadowRoot extends VirtualNode {
         comp,
         this,
         null,
-        convertGenerics(comp, space, host, genericTargets),
+        convertGenerics(comp, beh, host, genericTargets),
         undefined,
         initPropValues,
       )

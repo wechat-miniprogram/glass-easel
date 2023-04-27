@@ -72,6 +72,7 @@ export type PropertyDefinition = {
 export type ComponentDefinitionWithPlaceholder =
   | {
       final: GeneralComponentDefinition | null
+      source: GeneralBehavior
       placeholder: string | null
       waiting: ComponentWaitingList | null
     }
@@ -1327,6 +1328,7 @@ export class Behavior<
         if (v instanceof ComponentDefinition) {
           this._$using[k] = {
             final: v,
+            source: this as GeneralBehavior,
             placeholder,
             waiting: null,
           }
@@ -1336,12 +1338,14 @@ export class Behavior<
           if (final) {
             this._$using[k] = {
               final,
+              source: this as GeneralBehavior,
               placeholder: null,
               waiting: null,
             }
           } else if (placeholder !== null) {
             const p: ComponentDefinitionWithPlaceholder = {
               final: null,
+              source: this as GeneralBehavior,
               placeholder,
               waiting: null,
             }
@@ -1362,6 +1366,7 @@ export class Behavior<
             } else {
               this._$using[k] = {
                 final,
+                source: this as GeneralBehavior,
                 placeholder: null,
                 waiting: null,
               }

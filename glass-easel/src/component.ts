@@ -60,10 +60,11 @@ import { TraitBehavior, TraitGroup } from './trait_behaviors'
 
 export const convertGenerics = (
   compDef: GeneralComponentDefinition,
-  space: ComponentSpace,
+  sourceBehavior: GeneralBehavior,
   owner?: GeneralComponent,
   genericTargets?: { [key: string]: string | ComponentDefinitionWithPlaceholder },
 ): { [key: string]: ComponentDefinitionWithPlaceholder } | null => {
+  const space = sourceBehavior.ownerSpace
   const hostUsing = owner?._$behavior._$using
   const hostGenericImpls = owner?._$genericImpls
   if (!compDef._$detail) compDef.prepare()
@@ -89,6 +90,7 @@ export const convertGenerics = (
             } else if (comp) {
               genericImpls[key] = {
                 final: comp,
+                source: sourceBehavior,
                 placeholder: null,
                 waiting: null,
               }
@@ -104,6 +106,7 @@ export const convertGenerics = (
               }
               genericImpls[key] = {
                 final: defaultComp,
+                source: sourceBehavior,
                 placeholder: null,
                 waiting: null,
               }
@@ -124,6 +127,7 @@ export const convertGenerics = (
             ? defaultComp
             : {
                 final: defaultComp,
+                source: sourceBehavior,
                 placeholder: null,
                 waiting: null,
               }
@@ -772,7 +776,6 @@ export class Component<
     initPropValues?: (comp: ComponentInstance<TData, TProperty, TMethod>) => void,
   ): ComponentInstance<TData, TProperty, TMethod> {
     const collectGenericImpls = (def: GeneralComponentDefinition) => {
-      const space = def.behavior.ownerSpace
       let genericImpls: { [key: string]: ComponentDefinitionWithPlaceholder } | undefined
       if (genericTargets) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -780,12 +783,13 @@ export class Component<
         Object.entries(genericTargets).forEach(([key, g]) => {
           genericImpls![key] = {
             final: g,
+            source: def.behavior,
             placeholder: null,
             waiting: null,
           }
         })
       }
-      return convertGenerics(def, space, undefined, genericImpls)
+      return convertGenerics(def, def.behavior, undefined, genericImpls)
     }
     if (componentDefinition) {
       return Component._$advancedCreate(
