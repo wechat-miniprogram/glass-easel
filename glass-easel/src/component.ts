@@ -160,13 +160,13 @@ export const resolvePlaceholder = (
     }
   }
   if (ret) return ret
-  const defaultComp = space.getDefaultComponent()
-  if (!defaultComp) {
+  const comp = space.getGlobalUsingComponent(placeholder) ?? space.getDefaultComponent()
+  if (!comp) {
     throw new Error(
       `Cannot find default component for placeholder target "${placeholder}" (on component "${behavior.is}")`,
     )
   }
-  return defaultComp
+  return comp
 }
 
 export type Lifetimes = {
