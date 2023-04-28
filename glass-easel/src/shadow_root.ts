@@ -158,7 +158,7 @@ export class ShadowRoot extends VirtualNode {
     const compName = usingKey === undefined ? tagName : usingKey
 
     // if the target is in using list, then use the one in using list
-    const using = beh._$using[compName] || beh._$using[compName]
+    const using = beh._$using[compName]
     if (typeof using === 'string') {
       return this.createNativeNodeWithInit(using, tagName, initPropValues)
     }
