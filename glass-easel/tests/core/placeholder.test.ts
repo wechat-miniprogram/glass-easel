@@ -75,6 +75,28 @@ describe('placeholder', () => {
     matchElementWithDom(elem)
   })
 
+  test('using other component as placeholder', () => {
+    const componentSpace = new glassEasel.ComponentSpace()
+    const viewDef = componentSpace.define('view').registerComponent()
+    componentSpace.setGlobalUsingComponent('view', viewDef)
+
+    const def = componentSpace
+      .define()
+      .placeholders({
+        child: 'view',
+      })
+      .definition({
+        using: {
+          child: 'placeholder/simple/child',
+        },
+        template: tmpl('<child>test</child>'),
+      })
+      .registerComponent()
+    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    expect(domHtml(elem)).toBe('<child>test</child>')
+    matchElementWithDom(elem)
+  })
+
   test('using placeholder across component spaces and waiting', () => {
     const mainCs = new glassEasel.ComponentSpace()
     mainCs.defineComponent({ is: '' })
