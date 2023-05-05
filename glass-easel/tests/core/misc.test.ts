@@ -216,7 +216,7 @@ describe('event', () => {
 })
 
 describe('component utils', () => {
-  test('#getMethodsFromDef #getMethod', () => {
+  test('#getMethodsFromDef #getMethod #callMethod', () => {
     const compDef = glassEasel.Component.register(
       {
         methods: {
@@ -233,9 +233,10 @@ describe('component utils', () => {
     expect(glassEasel.Component.getMethodsFromDef(compDef.general()).abc!()).toBe('abc')
     const comp = glassEasel.createElement('root', compDef.general())
     expect(glassEasel.Component.getMethod(comp.general(), 'abc')!()).toBe('abc')
+    expect(comp.callMethod('abc')).toBe('abc')
   })
 
-  test('#getMethodsFromDef #getMethod (in init function)', () => {
+  test('#getMethodsFromDef #getMethod #callMethod (in init function)', () => {
     const compDef = componentSpace
       .define()
       .init(({ method }) => {
@@ -251,6 +252,7 @@ describe('component utils', () => {
     expect(glassEasel.Component.getMethodsFromDef(compDef.general()).abc).toBe(undefined)
     const comp = glassEasel.createElement('root', compDef.general())
     expect(glassEasel.Component.getMethod(comp.general(), 'abc')!()).toBe('abc')
+    expect(comp.callMethod('abc')).toBe('abc')
   })
 
   test('#isInnerDataExcluded', () => {
