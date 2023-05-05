@@ -702,6 +702,14 @@ export class Component<
                 comp._$methodMap = Object.create(comp._$methodMap) as MethodList
               }
               comp._$methodMap[exportedKey] = exportItem
+              if (options.writeFieldsToNode) {
+                Object.defineProperty(comp, exportedKey, {
+                  enumerable: true,
+                  value: exportItem,
+                  writable: true,
+                  configurable: true,
+                })
+              }
             }
           }
         }
@@ -943,7 +951,7 @@ export class Component<
     TProperty extends PropertyList,
     TMethod extends MethodList,
   >(comp: Component<TData, TProperty, TMethod>, methodName: string): GeneralFuncType | undefined {
-    return comp._$behavior._$methodMap[methodName]
+    return comp._$methodMap[methodName]
   }
 
   /**
