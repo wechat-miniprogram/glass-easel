@@ -3,7 +3,7 @@
 import * as backend from './backend/backend_protocol'
 import * as composedBackend from './backend/composed_backend_protocol'
 import * as domlikeBackend from './backend/domlike_backend_protocol'
-import { FuncArr, GeneralFuncType, triggerWarning } from './func_arr'
+import { FuncArr, GeneralFuncType, safeCallback, triggerWarning } from './func_arr'
 import { Element } from './element'
 import {
   globalOptions,
@@ -688,9 +688,13 @@ export class Component<
       const initFuncs = behavior._$init
       for (let i = 0; i < initFuncs.length; i += 1) {
         const init = initFuncs[i]!
-        const exported = init.call(methodCaller, builderContext) as
-          | { [x: string]: unknown }
-          | undefined
+        const exported = safeCallback(
+          'Component Init',
+          init,
+          methodCaller,
+          [builderContext],
+          methodCaller as unknown as GeneralComponentInstance,
+        ) as { [x: string]: unknown } | undefined
         if (exported) {
           const exportedKeys = Object.keys(exported)
           for (let j = 0; j < exportedKeys.length; j += 1) {
