@@ -706,6 +706,9 @@ export class Component<
                 comp._$methodMap = Object.create(comp._$methodMap) as MethodList
               }
               comp._$methodMap[exportedKey] = exportItem
+              if (options.writeFieldsToNode) {
+                ;(comp as { [key: string]: GeneralFuncType })[exportedKey] = exportItem
+              }
             }
           }
         }
@@ -947,7 +950,15 @@ export class Component<
     TProperty extends PropertyList,
     TMethod extends MethodList,
   >(comp: Component<TData, TProperty, TMethod>, methodName: string): GeneralFuncType | undefined {
-    return comp._$behavior._$methodMap[methodName]
+    return comp._$methodMap[methodName]
+  }
+
+  /** Call a method */
+  callMethod<T extends string>(
+    methodName: T,
+    ...args: Parameters<MethodList[T]>
+  ): ReturnType<MethodList[T]> | undefined {
+    return this._$methodMap[methodName]?.call(this, ...args)
   }
 
   /**
