@@ -693,7 +693,7 @@ export class Component<
           init,
           methodCaller,
           [builderContext],
-          methodCaller as unknown as GeneralComponentInstance,
+          undefined,
         ) as { [x: string]: unknown } | undefined
         if (exported) {
           const exportedKeys = Object.keys(exported)
