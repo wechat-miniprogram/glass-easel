@@ -23,6 +23,16 @@ fn basic_expr_parsing() {
 }
 
 #[test]
+fn basic_keywords_parsing() {
+    let tree =
+        parse_tmpl(r#"<div attr="{{ true }}">{{ truetrue }}</div>"#).unwrap();
+    assert_eq!(
+        tree.to_string(),
+        r#"<div attr="{{true}}">{{truetrue}}</div>"#
+    );
+}
+
+#[test]
 fn basic_block_parsing() {
     let tree = parse_tmpl(r#"<div wx:if="{{v}}" wx:for="{{list}}" wx:for-item="v" wx:for-index="i" wx:key="k">{{i}}</div>"#).unwrap();
     assert_eq!(
@@ -38,7 +48,7 @@ fn basic_sub_template_parsing() {
             .unwrap();
     assert_eq!(
         tree.to_string(),
-        r#"<template name="sub"><block wx:for="{{a}}" wx:for-item="$0" wx:for-index="$1"><view>{{$0}}</view></block></template><div><template is="sub" data=""></template></div>"#
+        r#"<template name="sub"><block wx:for="{{a}}" wx:for-item="$0" wx:for-index="$1"><view>{{$0}}</view></block></template><div><template is="sub" data="{{{}}}"></template></div>"#
     );
 }
 

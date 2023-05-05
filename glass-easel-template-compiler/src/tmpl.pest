@@ -100,20 +100,12 @@ spread = { "..." }
 
 value = {
     "(" ~ cond ~ ")"
-    | lit_undefined
-    | lit_null
-    | lit_true
-    | lit_false
     | lit_str
     | lit_number
     | lit_obj
     | lit_arr
     | ident
 }
-lit_undefined = { "undefined" }
-lit_null = { "null" }
-lit_true = { "true" }
-lit_false = { "false" }
 
 lit_str = ${
     "\"" ~ (lit_str_escaped | lit_str_q)* ~ "\""

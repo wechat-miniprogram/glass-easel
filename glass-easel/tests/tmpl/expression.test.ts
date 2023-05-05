@@ -9,12 +9,18 @@ describe('binding expression', () => {
         <div id="n2" data-a="{{ true }}"></div>
         <div id="n3" data-a="{{ null }}"></div>
         <div id="n4" data-a="{{ undefined }}"></div>
+        <div id="n5" data-a="{{ truefalse }}"></div>
+        <div id="n6" data-a="{{ { null: nullnull.undefined, truefalse } }}"></div>
       `),
       data: {
         false: 1,
         true: 1,
         null: 1,
         undefined: 1,
+        nullnull: {
+          undefined: 456,
+        },
+        truefalse: 123,
       },
     })
     const elem = glassEasel.createElement('root', def.general())
@@ -22,10 +28,14 @@ describe('binding expression', () => {
     const n2 = elem.getShadowRoot()!.getElementById('n2')!
     const n3 = elem.getShadowRoot()!.getElementById('n3')!
     const n4 = elem.getShadowRoot()!.getElementById('n4')!
+    const n5 = elem.getShadowRoot()!.getElementById('n5')!
+    const n6 = elem.getShadowRoot()!.getElementById('n6')!
     expect(n1.dataset!.a).toEqual(false)
     expect(n2.dataset!.a).toEqual(true)
     expect(n3.dataset!.a).toEqual(null)
     expect(n4.dataset!.a).toEqual(undefined)
+    expect(n5.dataset!.a).toEqual(123)
+    expect(n6.dataset!.a).toStrictEqual({ null: 456, truefalse: 123 })
   })
 
   test('basic operators', () => {
