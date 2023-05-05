@@ -60,8 +60,15 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
     })?;
 
     fn parse_expr_or_obj(pair: pest::iterators::Pair<'_, Rule>) -> Box<TmplExpr> {
-        fn parse_ident(pair: pest::iterators::Pair<'_, Rule>) -> Box<TmplExpr> {
-            Box::new(TmplExpr::Ident(pair.as_str().to_string()))
+        fn parse_ident_or_keyword(pair: pest::iterators::Pair<'_, Rule>) -> Box<TmplExpr> {
+            let name = pair.as_str();
+            match name {
+                "undefined" => Box::new(TmplExpr::LitUndefined),
+                "null" => Box::new(TmplExpr::LitNull),
+                "true" => Box::new(TmplExpr::LitBool(true)),
+                "false" => Box::new(TmplExpr::LitBool(false)),
+                x => Box::new(TmplExpr::Ident(x.to_string())),
+            }
         }
         fn parse_str_content(pair: pest::iterators::Pair<'_, Rule>) -> String {
             let pairs = pair.into_inner();
@@ -149,15 +156,11 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
             let pair = pair.into_inner().next().unwrap();
             match pair.as_rule() {
                 Rule::cond => parse_cond(pair),
-                Rule::lit_undefined => Box::new(TmplExpr::LitUndefined),
-                Rule::lit_null => Box::new(TmplExpr::LitNull),
-                Rule::lit_true => Box::new(TmplExpr::LitBool(true)),
-                Rule::lit_false => Box::new(TmplExpr::LitBool(false)),
                 Rule::lit_str => parse_str(pair),
                 Rule::lit_number => parse_number(pair),
                 Rule::lit_obj => parse_obj(pair),
                 Rule::lit_arr => parse_arr(pair),
-                Rule::ident => parse_ident(pair),
+                Rule::ident => parse_ident_or_keyword(pair),
                 _ => unreachable!(),
             }
         }

@@ -18,6 +18,22 @@ const domHtml = (elem: glassEasel.Element): string => {
 
 describe('placeholder', () => {
   test('using simple placeholder and waiting', () => {
+    const componentSpace = new glassEasel.ComponentSpace()
+    componentSpace.updateComponentOptions({
+      writeFieldsToNode: true,
+      writeIdToDOM: true,
+    })
+    componentSpace.defineComponent({
+      is: '',
+    })
+
+    let listenerTriggered = false
+    componentSpace.setComponentWaitingListener((isPub, alias) => {
+      expect(isPub).toBe(false)
+      expect(alias).toBe('placeholder/simple/child')
+      listenerTriggered = true
+    })
+
     const def = componentSpace
       .define()
       .placeholders({
@@ -39,6 +55,7 @@ describe('placeholder', () => {
       })
       .registerComponent()
     const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    expect(listenerTriggered).toBe(true)
     expect(domHtml(elem)).toBe('<div><child><span></span></child></div>')
     matchElementWithDom(elem)
 
@@ -58,6 +75,28 @@ describe('placeholder', () => {
     matchElementWithDom(elem)
   })
 
+  test('using other component as placeholder', () => {
+    const componentSpace = new glassEasel.ComponentSpace()
+    const viewDef = componentSpace.define('view').registerComponent()
+    componentSpace.setGlobalUsingComponent('view', viewDef)
+
+    const def = componentSpace
+      .define()
+      .placeholders({
+        child: 'view',
+      })
+      .definition({
+        using: {
+          child: 'placeholder/simple/child',
+        },
+        template: tmpl('<child>test</child>'),
+      })
+      .registerComponent()
+    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    expect(domHtml(elem)).toBe('<child>test</child>')
+    matchElementWithDom(elem)
+  })
+
   test('using placeholder across component spaces and waiting', () => {
     const mainCs = new glassEasel.ComponentSpace()
     mainCs.defineComponent({ is: '' })
@@ -65,9 +104,19 @@ describe('placeholder', () => {
     mainCs.importSpace('space://extra', extraCs, false)
     mainCs.importSpace('space-private://extra', extraCs, true)
 
+    const listenerTriggered = [] as boolean[]
+    extraCs.setComponentWaitingListener((isPub, alias) => {
+      if (isPub) {
+        expect(alias).toBe('child-pub')
+      } else {
+        expect(alias).toBe('child')
+      }
+      listenerTriggered.push(isPub)
+    })
+
     const def = mainCs.defineComponent({
       using: {
-        child: 'space://extra/child',
+        child: 'space://extra/child-pub',
         'child-private': 'space-private://extra/child',
       },
       placeholders: {
@@ -80,6 +129,7 @@ describe('placeholder', () => {
       `),
     })
     const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    expect(listenerTriggered).toStrictEqual([true, false])
     expect(domHtml(elem)).toBe('<child></child><child-private></child-private>')
     matchElementWithDom(elem)
 
@@ -90,7 +140,7 @@ describe('placeholder', () => {
     expect(domHtml(elem)).toBe('<child></child><child-private>A</child-private>')
     matchElementWithDom(elem)
 
-    extraCs.exportComponent('child', 'child')
+    extraCs.exportComponent('child-pub', 'child')
     expect(domHtml(elem)).toBe('<child>A</child><child-private>A</child-private>')
     matchElementWithDom(elem)
   })
