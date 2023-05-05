@@ -195,6 +195,10 @@ export class ComponentSpace {
     return this._$componentOptions
   }
 
+  updateBaseExtendedNativeList(baseSpace: ComponentSpace) {
+    Object.assign(this._$extendedNativeList, baseSpace._$pubExtendedNativeList)
+  }
+
   /**
    * Set (or update) a global using component item
    *
