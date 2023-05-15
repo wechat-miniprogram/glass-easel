@@ -49,7 +49,11 @@ text_entity = ${
     "{{" ~ WHITE_SPACE* ~ expr_or_obj ~ WHITE_SPACE* ~ "}}"
     | !"{{" ~ (entity | pure_text)
 }
-entity = @{ "&" ~ ASCII_ALPHA* ~ ";"? }
+entity = @{ "&" ~ (
+    "#x" ~ ASCII_HEX_DIGIT*
+    | "#" ~ ASCII_DIGIT*
+    | ASCII_ALPHA*
+) ~ ";"?}
 pure_text = @{ ANY }
 
 WHITESPACE = _{ " " | "\r" | "\n" | "\t" }
