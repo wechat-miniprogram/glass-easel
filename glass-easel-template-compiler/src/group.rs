@@ -401,7 +401,6 @@ impl TmplGroup {
         w.expr_scope(|w| {
             w.paren(|w| {
                 w.function(|w| {
-                    self.write_group_global_content(w)?;
                     w.expr_stmt(|w| {
                         write!(w, "var G={{}}")?;
                         Ok(())
@@ -410,6 +409,7 @@ impl TmplGroup {
                         write!(w, "var R={{}}")?;
                         Ok(())
                     })?;
+                    self.write_group_global_content(w)?;
                     for (path, tree) in self.trees.iter() {
                         w.expr_stmt(|w| {
                             write!(w, r#"__wxCodeSpace__.addCompiledTemplate({path},{{groupList:G,content:G[{path}]="#, path = gen_lit_str(path))?;
