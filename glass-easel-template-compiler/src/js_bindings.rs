@@ -45,31 +45,26 @@ impl TmplGroup {
     #[wasm_bindgen(js_name = addScript)]
     pub fn add_script(&mut self, path: &str, tmpl_str: &str) -> Result<(), JsError> {
         let path = group::path::normalize(path);
-        self.group.add_script(&path, tmpl_str).map_err(Into::into)
+        self.group.add_script(&path, tmpl_str)?;
+        Ok(())
     }
 
     #[wasm_bindgen(js_name = "getDirectDependencies")]
     pub fn get_direct_dependencies(&self, path: &str) -> Result<js_sys::Array, JsError> {
-        self.group
-            .get_direct_dependencies(&path)
-            .map(|x| convert_str_arr(&x))
-            .map_err(Into::into)
+        let dependencies = self.group.get_direct_dependencies(&path)?;
+        Ok(convert_str_arr(&dependencies))
     }
 
     #[wasm_bindgen(js_name = "getInlineScriptModuleNames")]
     pub fn get_inline_script_module_names(&self, path: &str) -> Result<js_sys::Array, JsError> {
-        self.group
-            .get_inline_script_module_names(path)
-            .map(|x| convert_str_arr(&x))
-            .map_err(Into::into)
+        let names = self.group.get_inline_script_module_names(path)?;
+        Ok(convert_str_arr(&names))
     }
 
     #[wasm_bindgen(js_name = "getInlineScript")]
     pub fn get_inline_script(&self, path: &str, module_name: &str) -> Result<String, JsError> {
-        self.group
-            .get_inline_script(&path, &module_name)
-            .map(|x| x.to_string())
-            .map_err(Into::into)
+        let script = self.group.get_inline_script(&path, &module_name)?;
+        Ok(script.to_string())
     }
 
     #[wasm_bindgen(js_name = "setInlineScript")]
@@ -80,8 +75,8 @@ impl TmplGroup {
         new_content: &str,
     ) -> Result<(), JsError> {
         self.group
-            .set_inline_script(&path, &module_name, &new_content)
-            .map_err(Into::into)
+            .set_inline_script(&path, &module_name, &new_content)?;
+        Ok(())
     }
 
     #[wasm_bindgen(js_name = "getRuntimeString")]
@@ -101,27 +96,27 @@ impl TmplGroup {
 
     #[wasm_bindgen(js_name = "getTmplGenObject")]
     pub fn get_tmpl_gen_object(&self, path: &str) -> Result<String, JsError> {
-        self.group.get_tmpl_gen_object(path).map_err(Into::into)
+        Ok(self.group.get_tmpl_gen_object(path)?)
     }
 
     #[wasm_bindgen(js_name = "getTmplGenObjectGroups")]
     pub fn get_tmpl_gen_object_groups(&self) -> Result<String, JsError> {
-        self.group.get_tmpl_gen_object_groups().map_err(Into::into)
+        Ok(self.group.get_tmpl_gen_object_groups()?)
     }
 
     #[wasm_bindgen(js_name = "getWxGenObjectGroups")]
     pub fn get_wx_gen_object_groups(&self) -> Result<String, JsError> {
-        self.group.get_wx_gen_object_groups().map_err(Into::into)
+        Ok(self.group.get_wx_gen_object_groups()?)
     }
 
     #[wasm_bindgen(js_name = "exportGlobals")]
     pub fn export_globals(&self) -> Result<String, JsError> {
-        self.group.export_globals().map_err(Into::into)
+        Ok(self.group.export_globals()?)
     }
 
     #[wasm_bindgen(js_name = "exportAllScripts")]
     pub fn export_all_scripts(&self) -> Result<String, JsError> {
-        self.group.export_all_scripts().map_err(Into::into)
+        Ok(self.group.export_all_scripts()?)
     }
 }
 
