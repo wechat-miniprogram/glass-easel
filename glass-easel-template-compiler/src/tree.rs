@@ -237,6 +237,26 @@ impl TmplTree {
         None
     }
 
+    pub(crate) fn set_inline_script(&mut self, module_name: &str, new_content: &str) {
+        match self.scripts.iter_mut().find(|script| match script {
+            TmplScript::GlobalRef { .. } => false,
+            TmplScript::Inline { module_name: m, .. } => module_name == m,
+        }) {
+            Some(script) => {
+                if let TmplScript::Inline {
+                    ref mut content, ..
+                } = script
+                {
+                    *content = String::from(new_content)
+                }
+            }
+            None => self.scripts.push(TmplScript::Inline {
+                module_name: String::from(module_name),
+                content: String::from(new_content),
+            }),
+        }
+    }
+
     pub(crate) fn to_proc_gen<W: std::fmt::Write>(
         &self,
         w: &mut JsExprWriter<W>,

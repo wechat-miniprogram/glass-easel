@@ -227,6 +227,16 @@ impl TmplGroup {
         }
     }
 
+    /// Get a mutable ref of a parsed tree in the group.
+    pub fn get_tree_mut(&mut self, path: &str) -> Result<&mut TmplTree, TmplError> {
+        match self.trees.get_mut(path) {
+            Some(x) => Ok(x),
+            None => Err(TmplError {
+                message: format!(r#"no template "{}" found"#, path),
+            }),
+        }
+    }
+
     /// Add a template into the group.
     pub fn add_tmpl(&mut self, path: &str, tmpl_str: &str) -> Result<(), TmplParseError> {
         let mut tmpl = parse_tmpl(tmpl_str)?;
@@ -297,8 +307,25 @@ impl TmplGroup {
     }
 
     /// Get inline script content.
-    pub fn get_inline_script(&self, path: &str, module_name: &str) -> Result<Option<&str>, TmplError> {
-        Ok(self.get_tree(path)?.get_inline_script(module_name))
+    pub fn get_inline_script(&self, path: &str, module_name: &str) -> Result<&str, TmplError> {
+        match self.get_tree(path)?.get_inline_script(module_name) {
+            Some(x) => Ok(x),
+            None => Err(TmplError {
+                message: format!(r#"no inline script "{}" found in "{}""#, path, module_name),
+            }),
+        }
+    }
+
+    /// Set inline script content.
+    pub fn set_inline_script(
+        &mut self,
+        path: &str,
+        module_name: &str,
+        new_content: &str,
+    ) -> Result<(), TmplError> {
+        Ok(self
+            .get_tree_mut(path)?
+            .set_inline_script(module_name, new_content))
     }
 
     /// Convert to WXML GenObject js string.
@@ -317,11 +344,12 @@ impl TmplGroup {
         if self.extra_runtime_string.len() > 0 {
             w.custom_stmt_str(&self.extra_runtime_string)?;
         }
+        self.write_all_scripts(w)?;
+        Ok(())
+    }
+
+    fn write_all_scripts(&self, w: &mut JsFunctionScopeWriter<String>) -> Result<(), TmplError> {
         if self.scripts.len() > 0 {
-            w.expr_stmt(|w| {
-                write!(w, "var R={{}}")?;
-                Ok(())
-            })?;
             for (p, script) in self.scripts.iter() {
                 w.expr_stmt(|w| {
                     write!(w, r#"R[{path}]=D({path},(require,exports,module)=>{{{}}})"#, script, path = gen_lit_str(p))?;
@@ -338,11 +366,15 @@ impl TmplGroup {
         w.expr_scope(|w| {
             w.paren(|w| {
                 w.function(|w| {
-                    self.write_group_global_content(w)?;
                     w.expr_stmt(|w| {
                         write!(w, "var G={{}}")?;
                         Ok(())
                     })?;
+                    w.expr_stmt(|w| {
+                        write!(w, "var R={{}}")?;
+                        Ok(())
+                    })?;
+                    self.write_group_global_content(w)?;
                     for (path, tree) in self.trees.iter() {
                         w.expr_stmt(|w| {
                             write!(w, r#"G[{}]="#, gen_lit_str(path))?;
@@ -369,11 +401,15 @@ impl TmplGroup {
         w.expr_scope(|w| {
             w.paren(|w| {
                 w.function(|w| {
-                    self.write_group_global_content(w)?;
                     w.expr_stmt(|w| {
                         write!(w, "var G={{}}")?;
                         Ok(())
                     })?;
+                    w.expr_stmt(|w| {
+                        write!(w, "var R={{}}")?;
+                        Ok(())
+                    })?;
+                    self.write_group_global_content(w)?;
                     for (path, tree) in self.trees.iter() {
                         w.expr_stmt(|w| {
                             write!(w, r#"__wxCodeSpace__.addCompiledTemplate({path},{{groupList:G,content:G[{path}]="#, path = gen_lit_str(path))?;
@@ -386,6 +422,27 @@ impl TmplGroup {
                 })
             })?;
             w.paren(|_| Ok(()))?;
+            Ok(())
+        })?;
+        Ok(w.finish())
+    }
+
+    pub fn export_globals(&self) -> Result<String, TmplError> {
+        let mut w = JsWriter::new(String::new());
+        w.function_scope(|w| {
+            runtime_fns(w, self.has_scripts)?;
+            if self.extra_runtime_string.len() > 0 {
+                w.custom_stmt_str(&self.extra_runtime_string)?;
+            }
+            Ok(())
+        })?;
+        Ok(w.finish())
+    }
+
+    pub fn export_all_scripts(&self) -> Result<String, TmplError> {
+        let mut w = JsWriter::new(String::new());
+        w.function_scope(|w| {
+            self.write_all_scripts(w)?;
             Ok(())
         })?;
         Ok(w.finish())
