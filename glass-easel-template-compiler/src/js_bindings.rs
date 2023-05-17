@@ -12,18 +12,6 @@ pub struct TmplGroup {
     names: Vec<String>,
 }
 
-impl From<TmplError> for JsValue {
-    fn from(value: TmplError) -> Self {
-        JsValue::from(format!("{}", value))
-    }
-}
-
-impl From<TmplParseError> for JsValue {
-    fn from(value: TmplParseError) -> Self {
-        JsValue::from(format!("{}", value))
-    }
-}
-
 fn convert_str_arr(arr: &Vec<String>) -> js_sys::Array {
     let ret = js_sys::Array::new_with_length(arr.len() as u32);
     for item in arr {
@@ -45,7 +33,9 @@ impl TmplGroup {
     #[wasm_bindgen(js_name = addTmpl)]
     pub fn add_tmpl(&mut self, path: &str, tmpl_str: &str) -> Result<usize, JsValue> {
         let path = group::path::normalize(path);
-        self.group.add_tmpl(&path, tmpl_str)?;
+        self.group
+            .add_tmpl(&path, tmpl_str)
+            .map_err(|x| JsValue::from(format!("{}", x)))?;
         if let Some(x) = self.names.iter().position(|x| x.as_str() == path.as_str()) {
             Ok(x)
         } else {
@@ -57,31 +47,45 @@ impl TmplGroup {
     #[wasm_bindgen(js_name = addScript)]
     pub fn add_script(&mut self, path: &str, tmpl_str: &str) -> Result<(), JsValue> {
         let path = group::path::normalize(path);
-        self.group.add_script(&path, tmpl_str)?;
-        Ok(())
+        self.group
+            .add_script(&path, tmpl_str)
+            .map_err(|x| JsValue::from(format!("{}", x)))
     }
 
     #[wasm_bindgen(js_name = "getDirectDependencies")]
     pub fn get_direct_dependencies(&self, path: &str) -> Result<js_sys::Array, JsValue> {
-        let deps = self.group.get_direct_dependencies(&path)?;
-        Ok(convert_str_arr(&deps))
+        self.group
+            .get_direct_dependencies(&path)
+            .map(|x| convert_str_arr(&x))
+            .map_err(|x| JsValue::from(format!("{}", x)))
     }
 
     #[wasm_bindgen(js_name = "getInlineScriptModuleNames")]
     pub fn get_inline_script_module_names(&self, path: &str) -> Result<js_sys::Array, JsValue> {
-        let names = self.group.get_inline_script_module_names(path)?;
-        Ok(convert_str_arr(&names))
+        self.group
+            .get_inline_script_module_names(path)
+            .map(|x| convert_str_arr(&x))
+            .map_err(|x| JsValue::from(format!("{}", x)))
     }
 
     #[wasm_bindgen(js_name = "getInlineScript")]
     pub fn get_inline_script(&self, path: &str, module_name: &str) -> Result<String, JsValue> {
-        Ok(self.group.get_inline_script(&path, &module_name)?.to_string())
+        self.group
+            .get_inline_script(&path, &module_name)
+            .map(|x| x.to_string())
+            .map_err(|x| JsValue::from(format!("{}", x)))
     }
 
     #[wasm_bindgen(js_name = "setInlineScript")]
-    pub fn set_inline_script(&mut self, path: &str, module_name: &str, new_content: &str) -> Result<(), JsValue> {
-        self.group.set_inline_script(&path, &module_name, &new_content)?;
-        Ok(())
+    pub fn set_inline_script(
+        &mut self,
+        path: &str,
+        module_name: &str,
+        new_content: &str,
+    ) -> Result<(), JsValue> {
+        self.group
+            .set_inline_script(&path, &module_name, &new_content)
+            .map_err(|x| JsValue::from(format!("{}", x)))
     }
 
     #[wasm_bindgen(js_name = "getRuntimeString")]
@@ -101,27 +105,37 @@ impl TmplGroup {
 
     #[wasm_bindgen(js_name = "getTmplGenObject")]
     pub fn get_tmpl_gen_object(&self, path: &str) -> Result<String, JsValue> {
-        Ok(self.group.get_tmpl_gen_object(path)?)
+        self.group
+            .get_tmpl_gen_object(path)
+            .map_err(|x| JsValue::from(format!("{}", x)))
     }
 
     #[wasm_bindgen(js_name = "getTmplGenObjectGroups")]
     pub fn get_tmpl_gen_object_groups(&self) -> Result<String, JsValue> {
-        Ok(self.group.get_tmpl_gen_object_groups()?)
+        self.group
+            .get_tmpl_gen_object_groups()
+            .map_err(|x| JsValue::from(format!("{}", x)))
     }
 
     #[wasm_bindgen(js_name = "getWxGenObjectGroups")]
     pub fn get_wx_gen_object_groups(&self) -> Result<String, JsValue> {
-        Ok(self.group.get_wx_gen_object_groups()?)
+        self.group
+            .get_wx_gen_object_groups()
+            .map_err(|x| JsValue::from(format!("{}", x)))
     }
 
     #[wasm_bindgen(js_name = "exportGlobals")]
     pub fn export_globals(&self) -> Result<String, JsValue> {
-        Ok(self.group.export_globals()?)
+        self.group
+            .export_globals()
+            .map_err(|x| JsValue::from(format!("{}", x)))
     }
 
     #[wasm_bindgen(js_name = "exportAllScripts")]
     pub fn export_all_scripts(&self) -> Result<String, JsValue> {
-        Ok(self.group.export_all_scripts()?)
+        self.group
+            .export_all_scripts()
+            .map_err(|x| JsValue::from(format!("{}", x)))
     }
 }
 
