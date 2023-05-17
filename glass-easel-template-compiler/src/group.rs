@@ -227,7 +227,7 @@ impl TmplGroup {
         }
     }
 
-    /// Add a mutable ref of a parsed tree in the group.
+    /// Get a mutable ref of a parsed tree in the group.
     pub fn get_tree_mut(&mut self, path: &str) -> Result<&mut TmplTree, TmplError> {
         match self.trees.get_mut(path) {
             Some(x) => Ok(x),
