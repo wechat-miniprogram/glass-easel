@@ -301,15 +301,11 @@ export class ComponentDefinition<
     }
 
     // create prototype
-    const protoFunc = function ComponentInst() {
-      /* empty */
-    }
-    protoFunc.prototype = Object.create(Component.prototype, propSetters) as ComponentInstProto<
+    const proto = Object.create(Component.prototype, propSetters) as ComponentInstProto<
       TData,
       TProperty,
       TMethod
     >
-    const proto = protoFunc.prototype
     proto._$behavior = behavior
     proto._$definition = this
     proto._$methodMap = behavior._$methodMap
