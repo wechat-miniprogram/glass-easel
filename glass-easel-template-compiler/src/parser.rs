@@ -1,6 +1,7 @@
 //! The basic parser logic
 
 use pest::Parser;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt;
 
@@ -276,7 +277,7 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
 
     fn parse_text_entity(pair: pest::iterators::Pair<'_, Rule>) -> TextEntity<String> {
         let mut is_dynamic = false;
-        let segs: Vec<TextEntity<&str>> = pair
+        let segs: Vec<TextEntity<Cow<str>>> = pair
             .into_inner()
             .map(|pair| {
                 let pair = pair.into_inner().next().unwrap();
@@ -285,8 +286,10 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                         is_dynamic = true;
                         TextEntity::Dynamic(parse_expr_or_obj(pair))
                     }
-                    Rule::entity => TextEntity::Static(entities::decode(pair.as_str())),
-                    Rule::pure_text => TextEntity::Static(pair.as_str()),
+                    Rule::entity => {
+                        TextEntity::Static(entities::decode(pair.as_str()))
+                    }
+                    Rule::pure_text => TextEntity::Static(Cow::Borrowed(pair.as_str())),
                     _ => unreachable!(),
                 }
             })
@@ -305,14 +308,14 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                 }
             };
             for seg in segs {
-                if let TextEntity::Static(dest) = seg {
+                if let TextEntity::Static(dest) = &seg {
                     if let TmplExpr::Plus(_, cur) = &mut *cur {
                         if let TmplExpr::LitStr(src) = &mut **cur {
-                            **cur = TmplExpr::LitStr((src.clone() + dest).into());
+                            **cur = TmplExpr::LitStr((src.clone() + &dest).into());
                             continue;
                         }
                     } else if let TmplExpr::LitStr(src) = &mut *cur {
-                        *cur = TmplExpr::LitStr((src.clone() + dest).into());
+                        *cur = TmplExpr::LitStr((src.clone() + &dest).into());
                         continue;
                     }
                 }
@@ -331,9 +334,10 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
             TextEntity::Dynamic(cur)
         } else {
             let s: Vec<&str> = segs
-                .into_iter()
+                .iter()
                 .map(|x| {
                     if let TextEntity::Static(x) = x {
+                        let x: &str = &x;
                         x
                     } else {
                         unreachable!()
@@ -395,7 +399,7 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                                                         .map(|pair| {
                                                             match pair.as_rule() {
                                                                 Rule::entity => entities::decode(pair.as_str()),
-                                                                Rule::pure_text => pair.as_str(),
+                                                                Rule::pure_text => Cow::Borrowed(pair.as_str()),
                                                                 _ => unreachable!(),
                                                             }
                                                         })

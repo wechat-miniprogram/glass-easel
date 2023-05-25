@@ -13,6 +13,18 @@ fn basic_parsing() {
 }
 
 #[test]
+fn basic_entities_parsing() {
+    let tree = parse_tmpl(
+        r#"<div> &lt; &#xA9; &#169; </div>"#,
+    )
+    .unwrap();
+    assert_eq!(
+        tree.to_string(),
+        r#"<div> &lt; © © </div>"#
+    );
+}
+
+#[test]
 fn basic_expr_parsing() {
     let tree =
         parse_tmpl(r#"<div attr=" {{ (a + 1).b }} "> {{ c - ( d + e ) * 3 }} </div>"#).unwrap();
