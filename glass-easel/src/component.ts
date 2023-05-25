@@ -261,6 +261,10 @@ export class ComponentDefinition<
     const behavior = this.behavior
     const options = this._$options
     const propSetters = {} as {
+      constructor: {
+        writable: true
+        value: () => void
+      }
       [key: string]:
         | {
             enumerable: boolean
@@ -270,6 +274,10 @@ export class ComponentDefinition<
         | {
             enumerable: boolean
             value: (...args: unknown[]) => unknown
+          }
+        | {
+            writable: true
+            value: () => void
           }
     }
 
@@ -302,7 +310,11 @@ export class ComponentDefinition<
 
     // create prototype
     const protoFunc = function ComponentInst() {
-      /* empty */
+      /* a component */
+    }
+    propSetters.constructor = {
+      value: protoFunc,
+      writable: true,
     }
     protoFunc.prototype = Object.create(Component.prototype, propSetters) as ComponentInstProto<
       TData,
