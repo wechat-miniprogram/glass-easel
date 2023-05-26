@@ -3,7 +3,7 @@
 import * as backend from './backend/backend_protocol'
 import * as composedBackend from './backend/composed_backend_protocol'
 import * as domlikeBackend from './backend/domlike_backend_protocol'
-import { FuncArr, GeneralFuncType, triggerWarning } from './func_arr'
+import { FuncArr, GeneralFuncType, safeCallback, triggerWarning } from './func_arr'
 import { Element } from './element'
 import {
   globalOptions,
@@ -261,6 +261,10 @@ export class ComponentDefinition<
     const behavior = this.behavior
     const options = this._$options
     const propSetters = {} as {
+      constructor: {
+        writable: true
+        value: () => void
+      }
       [key: string]:
         | {
             enumerable: boolean
@@ -270,6 +274,10 @@ export class ComponentDefinition<
         | {
             enumerable: boolean
             value: (...args: unknown[]) => unknown
+          }
+        | {
+            writable: true
+            value: () => void
           }
     }
 
@@ -302,7 +310,11 @@ export class ComponentDefinition<
 
     // create prototype
     const protoFunc = function ComponentInst() {
-      /* empty */
+      /* a component */
+    }
+    propSetters.constructor = {
+      value: protoFunc,
+      writable: true,
     }
     protoFunc.prototype = Object.create(Component.prototype, propSetters) as ComponentInstProto<
       TData,
@@ -688,9 +700,13 @@ export class Component<
       const initFuncs = behavior._$init
       for (let i = 0; i < initFuncs.length; i += 1) {
         const init = initFuncs[i]!
-        const exported = init.call(methodCaller, builderContext) as
-          | { [x: string]: unknown }
-          | undefined
+        const exported = safeCallback(
+          'Component Init',
+          init,
+          methodCaller,
+          [builderContext],
+          undefined,
+        ) as { [x: string]: unknown } | undefined
         if (exported) {
           const exportedKeys = Object.keys(exported)
           for (let j = 0; j < exportedKeys.length; j += 1) {
@@ -702,6 +718,9 @@ export class Component<
                 comp._$methodMap = Object.create(comp._$methodMap) as MethodList
               }
               comp._$methodMap[exportedKey] = exportItem
+              if (options.writeFieldsToNode) {
+                ;(comp as { [key: string]: GeneralFuncType })[exportedKey] = exportItem
+              }
             }
           }
         }
@@ -943,7 +962,15 @@ export class Component<
     TProperty extends PropertyList,
     TMethod extends MethodList,
   >(comp: Component<TData, TProperty, TMethod>, methodName: string): GeneralFuncType | undefined {
-    return comp._$behavior._$methodMap[methodName]
+    return comp._$methodMap[methodName]
+  }
+
+  /** Call a method */
+  callMethod<T extends string>(
+    methodName: T,
+    ...args: Parameters<MethodList[T]>
+  ): ReturnType<MethodList[T]> | undefined {
+    return this._$methodMap[methodName]?.call(this, ...args)
   }
 
   /**

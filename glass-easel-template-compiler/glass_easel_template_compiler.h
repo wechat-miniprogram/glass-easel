@@ -31,6 +31,11 @@ struct TmplGroup {
   void *inner;
 };
 
+struct TmplResult {
+  bool success;
+  StrRef message;
+};
+
 
 extern "C" {
 
@@ -50,13 +55,29 @@ TmplParseResult tmpl_group_add_tmpl(TmplGroup *self,
                                     const uint8_t *content_buf,
                                     size_t content_len);
 
+StrRef tmpl_group_export_all_scripts(const TmplGroup *self);
+
+StrRef tmpl_group_export_globals(const TmplGroup *self);
+
 void tmpl_group_free(TmplGroup self);
 
 StrRefArray tmpl_group_get_direct_dependencies(const TmplGroup *self,
                                                const uint8_t *path_buf,
                                                size_t path_len);
 
+StrRef tmpl_group_get_inline_script(const TmplGroup *self,
+                                    const uint8_t *path_buf,
+                                    size_t path_len,
+                                    const uint8_t *module_name_buf,
+                                    size_t module_name_len);
+
+StrRefArray tmpl_group_get_inline_script_module_names(const TmplGroup *self,
+                                                      const uint8_t *path_buf,
+                                                      size_t path_len);
+
 StrRef tmpl_group_get_runtime_string(const TmplGroup *self);
+
+StrRef tmpl_group_get_runtime_var_list();
 
 StrRef tmpl_group_get_tmpl_gen_object(const TmplGroup *self,
                                       const uint8_t *path_buf,
@@ -64,13 +85,25 @@ StrRef tmpl_group_get_tmpl_gen_object(const TmplGroup *self,
 
 StrRef tmpl_group_get_tmpl_gen_object_groups(const TmplGroup *self);
 
+StrRef tmpl_group_get_wx_gen_object_groups(const TmplGroup *self);
+
 TmplGroup tmpl_group_new();
 
 void tmpl_group_set_extra_runtime_script(TmplGroup *self,
                                          const uint8_t *content_buf,
                                          size_t content_len);
 
+TmplResult tmpl_group_set_inline_script(TmplGroup *self,
+                                        const uint8_t *path_buf,
+                                        size_t path_len,
+                                        const uint8_t *module_name_buf,
+                                        size_t module_name_len,
+                                        const uint8_t *content_buf,
+                                        size_t content_len);
+
 void tmpl_parser_result_free(TmplParseResult self);
+
+void tmpl_result_free(TmplResult self);
 
 } // extern "C"
 

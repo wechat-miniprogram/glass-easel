@@ -106,6 +106,35 @@ impl From<parser::TmplParseError> for TmplParseResult {
 }
 
 #[repr(C)]
+struct TmplResult {
+    success: bool,
+    message: StrRef,
+}
+
+impl TmplResult {
+    fn ok() -> Self {
+        TmplResult {
+            success: true,
+            message: "".into(),
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn tmpl_result_free(self) {
+        // empty
+    }
+}
+
+impl From<group::TmplError> for TmplResult {
+    fn from(e: group::TmplError) -> Self {
+        Self {
+            success: false,
+            message: e.message.into(),
+        }
+    }
+}
+
+#[repr(C)]
 struct TmplGroup {
     inner: *mut (),
 }
@@ -180,6 +209,64 @@ impl TmplGroup {
     }
 
     #[no_mangle]
+    pub unsafe extern "C" fn tmpl_group_get_inline_script_module_names(
+        &self,
+        path_buf: &u8,
+        path_len: usize,
+    ) -> StrRefArray {
+        let path = String::from_utf8_lossy(slice::from_raw_parts(path_buf, path_len)).to_string();
+        self.inner()
+            .get_inline_script_module_names(&path)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|x| x.into())
+            .collect::<Box<_>>()
+            .into()
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn tmpl_group_get_inline_script(
+        &self,
+        path_buf: &u8,
+        path_len: usize,
+        module_name_buf: &u8,
+        module_name_len: usize,
+    ) -> StrRef {
+        let path = String::from_utf8_lossy(slice::from_raw_parts(path_buf, path_len)).to_string();
+        let module_name =
+            String::from_utf8_lossy(slice::from_raw_parts(module_name_buf, module_name_len))
+                .to_string();
+        self.inner()
+            .get_inline_script(&path, &module_name)
+            .unwrap_or_default()
+            .into()
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn tmpl_group_set_inline_script(
+        &mut self,
+        path_buf: &u8,
+        path_len: usize,
+        module_name_buf: &u8,
+        module_name_len: usize,
+        content_buf: &u8,
+        content_len: usize,
+    ) -> TmplResult {
+        let path = String::from_utf8_lossy(slice::from_raw_parts(path_buf, path_len));
+        let module_name =
+            String::from_utf8_lossy(slice::from_raw_parts(module_name_buf, module_name_len))
+                .to_string();
+        let content = String::from_utf8_lossy(slice::from_raw_parts(content_buf, content_len));
+        match self
+            .inner_mut()
+            .set_inline_script(&path, &module_name, &content)
+        {
+            Ok(_) => TmplResult::ok(),
+            Err(e) => TmplResult::from(e),
+        }
+    }
+
+    #[no_mangle]
     pub unsafe extern "C" fn tmpl_group_get_runtime_string(&self) -> StrRef {
         self.inner().get_runtime_string().into()
     }
@@ -192,6 +279,11 @@ impl TmplGroup {
     ) {
         let content = String::from_utf8_lossy(slice::from_raw_parts(content_buf, content_len));
         self.inner_mut().set_extra_runtime_script(&content);
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn tmpl_group_get_runtime_var_list() -> StrRef {
+        crate::TmplGroup::get_runtime_var_list().join(",").into()
     }
 
     #[no_mangle]
@@ -213,6 +305,24 @@ impl TmplGroup {
             .get_tmpl_gen_object_groups()
             .unwrap_or_default()
             .into()
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn tmpl_group_get_wx_gen_object_groups(&self) -> StrRef {
+        self.inner()
+            .get_wx_gen_object_groups()
+            .unwrap_or_default()
+            .into()
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn tmpl_group_export_globals(&self) -> StrRef {
+        self.inner().export_globals().unwrap_or_default().into()
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn tmpl_group_export_all_scripts(&self) -> StrRef {
+        self.inner().export_all_scripts().unwrap_or_default().into()
     }
 }
 

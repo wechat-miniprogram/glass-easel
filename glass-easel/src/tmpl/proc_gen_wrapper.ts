@@ -887,7 +887,7 @@ export class ProcGenWrapper {
       const host = elem.ownerShadowRoot!.getHostNode()
       let ret: boolean | undefined
       const methodCaller = host.getMethodCaller() as { [key: string]: unknown }
-      const f = typeof handler === 'function' ? handler : host._$methodMap[handler]
+      const f = typeof handler === 'function' ? handler : Component.getMethod(host, handler)
       if (typeof f === 'function') {
         ret = (f as (ev: ShadowedEvent<unknown>) => boolean | undefined).call(methodCaller, ev)
       }
