@@ -8,9 +8,13 @@ import * as glassEasel from '../../src'
 glassEasel.registerElement({
   properties: {
     propStr: String,
+    propStrSf: glassEasel.NormalizedPropertyType.String,
     propNum: Number,
+    propNumSf: glassEasel.NormalizedPropertyType.Number,
     propBool: Boolean,
+    propBoolSf: glassEasel.NormalizedPropertyType.Boolean,
     propObj: Object,
+    propObjSf: glassEasel.NormalizedPropertyType.Object,
     propObjFoo: {
       value: { foo: 'foo' },
     },
@@ -18,11 +22,13 @@ glassEasel.registerElement({
       default: () => ({ bar: 'bar' }),
     },
     propFunc: Function,
+    propFuncSf: glassEasel.NormalizedPropertyType.Function,
     propFuncFoo: {
       type: Function,
       value: () => 'foo',
     },
     propArr: Array,
+    propArrSf: glassEasel.NormalizedPropertyType.Array,
     propArrBooks: {
       value: [] as { name: string }[],
     },
@@ -42,21 +48,29 @@ glassEasel.registerElement({
       value: 123,
     },
 
+    propAnySf: glassEasel.NormalizedPropertyType.Any,
     propNull: null,
   },
   created() {
     expectType<string>(this.data.propStr)
+    expectType<string>(this.data.propStrSf)
     expectType<number>(this.data.propNum)
+    expectType<number>(this.data.propNumSf)
     expectType<boolean>(this.data.propBool)
+    expectType<boolean>(this.data.propBoolSf)
     expectType<Readonly<Record<string, any>> | null>(this.data.propObj)
+    expectType<Readonly<Record<string, any>> | null>(this.data.propObjSf)
     expectType<{ readonly foo: string }>(this.data.propObjFoo)
     expectType<string>(this.data.propObjFoo.foo)
     expectType<{ readonly bar: string }>(this.data.propObjBar)
     expectType<string>(this.data.propObjBar.bar)
     expectType<(...args: any[]) => any>(this.data.propFunc)
+    expectType<(...args: any[]) => any>(this.data.propFuncSf)
     expectType<() => 'foo'>(this.data.propFuncFoo)
     expectType<readonly any[]>(this.data.propArr)
+    expectType<readonly any[]>(this.data.propArrSf)
     expectType<readonly { readonly name: string }[]>(this.data.propArrBooks)
+    expectType<any>(this.data.propAnySf)
     expectType<any>(this.data.propNull)
 
     expectType<string | number | boolean>(this.data.propOptional)

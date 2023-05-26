@@ -49,14 +49,14 @@ import { simpleDeepCopy } from './data_utils'
 import { EventListener } from './event'
 
 export const enum NormalizedPropertyType {
-  Invalid,
-  Any,
-  String,
-  Number,
-  Boolean,
-  Object,
-  Array,
-  Function,
+  Invalid = 'invalid',
+  Any = 'any',
+  String = 'string',
+  Number = 'number',
+  Boolean = 'boolean',
+  Object = 'object',
+  Array = 'array',
+  Function = 'function',
 }
 
 export type PropertyDefinition = {
@@ -129,7 +129,7 @@ const shallowMerge = (dest: { [key: string]: unknown }, src: { [key: string]: un
 }
 
 const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefinition | null => {
-  if (propDef === String) {
+  if (propDef === NormalizedPropertyType.String || propDef === String) {
     return {
       type: NormalizedPropertyType.String,
       optionalTypes: null,
@@ -140,7 +140,7 @@ const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefinition | 
       reflectIdPrefix: false,
     }
   }
-  if (propDef === Number) {
+  if (propDef === NormalizedPropertyType.Number || propDef === Number) {
     return {
       type: NormalizedPropertyType.Number,
       optionalTypes: null,
@@ -151,7 +151,7 @@ const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefinition | 
       reflectIdPrefix: false,
     }
   }
-  if (propDef === Boolean) {
+  if (propDef === NormalizedPropertyType.Boolean || propDef === Boolean) {
     return {
       type: NormalizedPropertyType.Boolean,
       optionalTypes: null,
@@ -162,7 +162,7 @@ const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefinition | 
       reflectIdPrefix: false,
     }
   }
-  if (propDef === Object) {
+  if (propDef === NormalizedPropertyType.Object || propDef === Object) {
     return {
       type: NormalizedPropertyType.Object,
       optionalTypes: null,
@@ -173,7 +173,7 @@ const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefinition | 
       reflectIdPrefix: false,
     }
   }
-  if (propDef === Array) {
+  if (propDef === NormalizedPropertyType.Array || propDef === Array) {
     return {
       type: NormalizedPropertyType.Array,
       optionalTypes: null,
@@ -184,7 +184,7 @@ const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefinition | 
       reflectIdPrefix: false,
     }
   }
-  if (propDef === Function) {
+  if (propDef === NormalizedPropertyType.Function || propDef === Function) {
     return {
       type: NormalizedPropertyType.Function,
       optionalTypes: null,
@@ -197,7 +197,7 @@ const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefinition | 
       reflectIdPrefix: false,
     }
   }
-  if (propDef === null || propDef === undefined) {
+  if (propDef === NormalizedPropertyType.Any || propDef === null || propDef === undefined) {
     return {
       type: NormalizedPropertyType.Any,
       optionalTypes: null,
@@ -212,25 +212,25 @@ const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefinition | 
 }
 
 const normalizePropertyType = (t: unknown): NormalizedPropertyType => {
-  if (t === String) {
+  if (t === NormalizedPropertyType.String || t === String) {
     return NormalizedPropertyType.String
   }
-  if (t === Number) {
+  if (t === NormalizedPropertyType.Number || t === Number) {
     return NormalizedPropertyType.Number
   }
-  if (t === Boolean) {
+  if (t === NormalizedPropertyType.Boolean || t === Boolean) {
     return NormalizedPropertyType.Boolean
   }
-  if (t === Object) {
+  if (t === NormalizedPropertyType.Object || t === Object) {
     return NormalizedPropertyType.Object
   }
-  if (t === Array) {
+  if (t === NormalizedPropertyType.Array || t === Array) {
     return NormalizedPropertyType.Array
   }
-  if (t === Function) {
+  if (t === NormalizedPropertyType.Function || t === Function) {
     return NormalizedPropertyType.Function
   }
-  if (t === null || t === undefined) {
+  if (t === NormalizedPropertyType.Any || t === null || t === undefined) {
     return NormalizedPropertyType.Any
   }
   return NormalizedPropertyType.Invalid

@@ -102,6 +102,132 @@ describe('Component', function () {
       expect(elem2.data.g).toStrictEqual({ h: 1 })
     })
 
+    it('should construct string-typed properties and JSON-compatible data', function () {
+      regElem({
+        is: 'component-b-string',
+        options: {
+          writeFieldsToNode: true,
+          lazyRegistration: false,
+        },
+        properties: {
+          a: 'string',
+          b: 'number',
+          c: 'boolean',
+          d: 'object',
+          e: 'array',
+          f: 'function',
+          y: 'date',
+          z: null,
+        },
+        data: {
+          g: {
+            h: 1,
+          },
+        },
+      })
+      var elem = createElem('component-b')
+      var elem2 = createElem('component-b')
+      expect(elem.a).toBe('')
+      expect(elem.b).toBe(0)
+      expect(elem.c).toBe(false)
+      expect(elem.d).toBe(null)
+      expect(elem.e).toStrictEqual([])
+      expect(typeof elem.f).toBe('function')
+      expect(elem.y).toBe(null)
+      expect(elem.z).toBe(null)
+      elem.a = 123
+      elem.b = '4.5'
+      elem.c = {}
+      elem.d = []
+      elem.e = ['bbb']
+      elem.f = function () {}
+      expect(elem.a).toBe('123')
+      expect(elem.b).toBe(4.5)
+      expect(elem.c).toBe(true)
+      expect(elem.d).toStrictEqual([])
+      expect(elem.e).toStrictEqual(['bbb'])
+      expect(typeof elem.f).toBe('function')
+      elem.y = 12
+      expect(elem.y).toBe(12)
+      elem.y = '4.0'
+      expect(elem.y).toBe('4.0')
+      elem.y = undefined
+      expect(elem.y).toBe(null)
+      elem.z = 12
+      expect(elem.z).toBe(12)
+      elem.z = '4.0'
+      expect(elem.z).toBe('4.0')
+      elem.z = undefined
+      expect(elem.z).toBe(null)
+      expect(elem.data.g).toStrictEqual({ h: 1 })
+      elem.data = { g: { h: 2 } }
+      expect(elem.data.g).toStrictEqual({ h: 2 })
+      expect(elem2.data.g).toStrictEqual({ h: 1 })
+    })
+
+    it('should construct string-sub-typed properties and JSON-compatible data', function () {
+      regElem({
+        is: 'component-b-string',
+        options: {
+          writeFieldsToNode: true,
+          lazyRegistration: false,
+        },
+        properties: {
+          a: { type: 'string' },
+          b: { type: 'number' },
+          c: { type: 'boolean' },
+          d: { type: 'object' },
+          e: { type: 'array' },
+          f: { type: 'function' },
+          y: { type: 'date' },
+          z: { type: null },
+        },
+        data: {
+          g: {
+            h: 1,
+          },
+        },
+      })
+      var elem = createElem('component-b')
+      var elem2 = createElem('component-b')
+      expect(elem.a).toBe('')
+      expect(elem.b).toBe(0)
+      expect(elem.c).toBe(false)
+      expect(elem.d).toBe(null)
+      expect(elem.e).toStrictEqual([])
+      expect(typeof elem.f).toBe('function')
+      expect(elem.y).toBe(null)
+      expect(elem.z).toBe(null)
+      elem.a = 123
+      elem.b = '4.5'
+      elem.c = {}
+      elem.d = []
+      elem.e = ['bbb']
+      elem.f = function () {}
+      expect(elem.a).toBe('123')
+      expect(elem.b).toBe(4.5)
+      expect(elem.c).toBe(true)
+      expect(elem.d).toStrictEqual([])
+      expect(elem.e).toStrictEqual(['bbb'])
+      expect(typeof elem.f).toBe('function')
+      elem.y = 12
+      expect(elem.y).toBe(12)
+      elem.y = '4.0'
+      expect(elem.y).toBe('4.0')
+      elem.y = undefined
+      expect(elem.y).toBe(null)
+      elem.z = 12
+      expect(elem.z).toBe(12)
+      elem.z = '4.0'
+      expect(elem.z).toBe('4.0')
+      elem.z = undefined
+      expect(elem.z).toBe(null)
+      expect(elem.data.g).toStrictEqual({ h: 1 })
+      elem.data = { g: { h: 2 } }
+      expect(elem.data.g).toStrictEqual({ h: 2 })
+      expect(elem2.data.g).toStrictEqual({ h: 1 })
+    })
+
     it('should support default value generator', function () {
       const f = function () {}
       regElem({
@@ -209,7 +335,7 @@ describe('Component', function () {
             value: false,
           },
           b: {
-            optionalTypes: [Boolean, Number],
+            optionalTypes: ['boolean', 'number'],
           },
         },
       })

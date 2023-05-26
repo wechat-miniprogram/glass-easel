@@ -33,6 +33,7 @@ export {
   BehaviorBuilder,
   GeneralBehaviorBuilder,
   BuilderContext,
+  NormalizedPropertyType,
 } from './behavior'
 export {
   Component,
