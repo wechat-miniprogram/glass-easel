@@ -6,6 +6,7 @@ import {
   GeneralComponent,
   GeneralBehaviorBuilder,
 } from '.'
+import { NormalizedPropertyType } from './behavior'
 import { TraitBehavior } from './trait_behaviors'
 
 export type Empty = Record<never, never>
@@ -224,7 +225,7 @@ export type UnTag<
 export type HasTag<B, T extends symbol> = T extends GetTags<B>[number] ? true : false
 
 export type DataList = Record<string, unknown>
-export type PropertyList = Record<string, PropertyListItem<any, unknown>>
+export type PropertyList = Record<string, PropertyListItem<PropertyType, any>>
 
 export type PropertyType =
   | null
@@ -234,27 +235,29 @@ export type PropertyType =
   | ArrayConstructor
   | ObjectConstructor
   | FunctionConstructor
+  | NormalizedPropertyType
 
 /**
  * PropertyTypeToValueType<null> = any
  * PropertyTypeToValueType<typeof String> = string
  * PropertyTypeToValueType<typeof Number> = number
  */
-export type PropertyTypeToValueType<T extends PropertyType> = T extends null
-  ? any
-  : T extends StringConstructor
-  ? string
-  : T extends NumberConstructor
-  ? number
-  : T extends BooleanConstructor
-  ? boolean
-  : T extends ArrayConstructor
-  ? any[]
-  : T extends ObjectConstructor
-  ? Record<string, any> | null
-  : T extends FunctionConstructor
-  ? (...args: any[]) => any
-  : never
+export type PropertyTypeToValueType<T extends PropertyType> =
+  T extends null | NormalizedPropertyType.Any
+    ? any
+    : T extends StringConstructor | NormalizedPropertyType.String
+    ? string
+    : T extends NumberConstructor | NormalizedPropertyType.Number
+    ? number
+    : T extends BooleanConstructor | NormalizedPropertyType.Boolean
+    ? boolean
+    : T extends ArrayConstructor | NormalizedPropertyType.Array
+    ? any[]
+    : T extends ObjectConstructor | NormalizedPropertyType.Object
+    ? Record<string, any> | null
+    : T extends FunctionConstructor | NormalizedPropertyType.Function
+    ? (...args: any[]) => any
+    : never
 
 type Satisfy<T, V> = V extends T ? V : T
 
@@ -262,17 +265,19 @@ type Satisfy<T, V> = V extends T ? V : T
  * PropertyTypeToSimpleValueType<typeof String, 'foo'> = 'foo'
  * PropertyTypeToSimpleValueType<typeof String, 123> = string
  */
-type PropertyTypeToSimpleValueType<T extends PropertyType, V> = T extends StringConstructor
+type PropertyTypeToSimpleValueType<T extends PropertyType, V> = T extends
+  | StringConstructor
+  | NormalizedPropertyType.String
   ? Satisfy<string, V>
-  : T extends NumberConstructor
+  : T extends NumberConstructor | NormalizedPropertyType.Number
   ? Satisfy<number, V>
-  : T extends BooleanConstructor
+  : T extends BooleanConstructor | NormalizedPropertyType.Boolean
   ? Satisfy<boolean, V>
-  : T extends ArrayConstructor
+  : T extends ArrayConstructor | NormalizedPropertyType.Array
   ? Satisfy<any[], V>
-  : T extends ObjectConstructor
+  : T extends ObjectConstructor | NormalizedPropertyType.Object
   ? Satisfy<Record<string, any> | null, V>
-  : T extends FunctionConstructor
+  : T extends FunctionConstructor | NormalizedPropertyType.Function
   ? Satisfy<(...args: any[]) => any, V>
   : never
 

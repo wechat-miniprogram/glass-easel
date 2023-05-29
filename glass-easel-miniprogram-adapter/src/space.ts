@@ -846,7 +846,8 @@ export class BaseBehaviorBuilder<
       const keys = Object.keys(rawProperties)
       for (let i = 0; i < keys.length; i += 1) {
         const name = keys[i]!
-        inner.property(name, rawProperties[name]!)
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+        inner.property(name, rawProperties[name] as any)
       }
     }
     if (rawObservers !== undefined) {
