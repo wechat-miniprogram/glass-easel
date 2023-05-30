@@ -51,7 +51,7 @@ export interface Element {
   spliceAppend(list: Element): void
   spliceRemove(before: Element, deleteCount: number): void
   setId(id: string): void
-  setStyleScope(styleScope: number): void
+  setStyleScope(styleScope: number, hostStyleScope?: number): void
   setStyle(styleText: string): void
   addClass(elementClass: string, styleScope?: number): void
   removeClass(elementClass: string, styleScope?: number): void
