@@ -528,14 +528,19 @@ export class Component<
       }
     }
     comp.classList = new ClassList(comp, externalClassAlias)
-    if (owner && backendElement) {
-      const styleScope = owner.getHostNode()._$definition._$options.styleScope
+    if (backendElement) {
+      const styleScope = owner
+        ? owner.getHostNode()._$definition._$options.styleScope
+        : options.styleScope
       if (styleScope) {
         if (!(BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike))) {
-          ;(backendElement as backend.Element | composedBackend.Element).setStyleScope(styleScope)
+          ;(backendElement as backend.Element | composedBackend.Element).setStyleScope(
+            styleScope,
+            options.styleScope,
+          )
         }
       }
-      if (writeExtraInfoToAttr) {
+      if (owner && writeExtraInfoToAttr) {
         const prefix = owner
           .getHostNode()
           ._$behavior.ownerSpace?.styleScopeManager.queryName(styleScope)
