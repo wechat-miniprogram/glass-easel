@@ -18,6 +18,6 @@ fn inline_script() {
     group.add_tmpl("tmpl/a".into(), SRC_A).unwrap();
     assert_eq!(group.get_script_dependencies("tmpl/a").unwrap().len(), 0);
     assert_eq!(group.get_inline_script_module_names("tmpl/a").unwrap(), vec!["modA".to_string(), "modB".to_string()]);
-    assert_eq!(group.get_inline_script("tmpl/a", "modA").unwrap().unwrap(), " exports.hi = 1 < 2 ");
-    assert_eq!(group.get_inline_script("tmpl/a", "modB").unwrap().unwrap(), "");
+    assert_eq!(group.get_inline_script("tmpl/a", "modA").unwrap(), " exports.hi = 1 < 2 ");
+    assert_eq!(group.get_inline_script("tmpl/a", "modB").unwrap(), "");
 }
