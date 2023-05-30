@@ -991,17 +991,71 @@ export class ProcGenWrapper {
         }
       }
     } else if (elem instanceof NativeNode) {
-      elem.callAttributeFilter(name, v, (newPropValue) => {
-        elem.updateAttribute(name, newPropValue)
-        if (lvaluePath) {
-          elem.setModelBindingListener(name, (value) => {
-            const host = elem.ownerShadowRoot!.getHostNode()
-            const nodeDataProxy = Component.getDataProxy(host)
-            nodeDataProxy.replaceDataOnPath(lvaluePath, value)
-            nodeDataProxy.applyDataUpdates(false)
-          })
-        }
-      })
+      const camelName = dashToCamelCase(name)
+      // compatibilities for legacy event binding syntax
+      if (camelName.startsWith('bind')) {
+        ProcGenWrapper.prototype.v(
+          elem,
+          camelName.slice('bind'.length),
+          dataValueToString(v),
+          false,
+          false,
+          false,
+          true,
+        )
+      } else if (camelName.startsWith('captureBind')) {
+        ProcGenWrapper.prototype.v(
+          elem,
+          camelName.slice('captureBind'.length),
+          dataValueToString(v),
+          false,
+          false,
+          true,
+          true,
+        )
+      } else if (camelName.startsWith('catch')) {
+        ProcGenWrapper.prototype.v(
+          elem,
+          camelName.slice('catch'.length),
+          dataValueToString(v),
+          true,
+          false,
+          false,
+          true,
+        )
+      } else if (camelName.startsWith('captureCatch')) {
+        ProcGenWrapper.prototype.v(
+          elem,
+          camelName.slice('captureCatch'.length),
+          dataValueToString(v),
+          true,
+          false,
+          true,
+          true,
+        )
+      } else if (camelName.startsWith('on')) {
+        ProcGenWrapper.prototype.v(
+          elem,
+          camelName.slice('on'.length),
+          dataValueToString(v),
+          false,
+          false,
+          false,
+          true,
+        )
+      } else {
+        elem.callAttributeFilter(name, v, (newPropValue) => {
+          elem.updateAttribute(name, newPropValue)
+          if (lvaluePath) {
+            elem.setModelBindingListener(name, (value) => {
+              const host = elem.ownerShadowRoot!.getHostNode()
+              const nodeDataProxy = Component.getDataProxy(host)
+              nodeDataProxy.replaceDataOnPath(lvaluePath, value)
+              nodeDataProxy.applyDataUpdates(false)
+            })
+          }
+        })
+      }
     }
   }
 
