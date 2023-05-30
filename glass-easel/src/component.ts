@@ -534,10 +534,12 @@ export class Component<
         : options.styleScope
       if (styleScope) {
         if (!(BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike))) {
-          ;(backendElement as backend.Element | composedBackend.Element).setStyleScope(
-            styleScope,
-            options.styleScope,
-          )
+          // FIXME: backend two param compat
+          ;(backendElement as backend.Element | composedBackend.Element).setStyleScope(styleScope)
+          // ;(backendElement as backend.Element | composedBackend.Element).setStyleScope(
+          //   styleScope,
+          //   options.styleScope,
+          // )
         }
       }
       if (owner && writeExtraInfoToAttr) {
