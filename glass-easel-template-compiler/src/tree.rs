@@ -989,9 +989,10 @@ impl TmplElement {
                 let var_scope_item_lvalue_path = w.gen_ident();
                 w.expr_stmt(|w| {
                     write!(w, "F(")?;
-                    match &list_expr {
+                    let has_lvalue_path = match &list_expr {
                         ListExpr::Static(v) => {
                             write!(w, r#"{},null,undefined,null,"#, gen_lit_str(&v))?;
+                            false
                         }
                         ListExpr::Dynamic(p) => {
                             p.value_expr(w)?;
@@ -1005,10 +1006,11 @@ impl TmplElement {
                             )?;
                             p.lvalue_state_expr(w, scopes)?;
                             write!(w, ":undefined,")?;
-                            p.lvalue_path(w, scopes)?;
+                            let has_lvalue_path = p.lvalue_path(w, scopes)?.is_some();
                             write!(w, ",")?;
+                            has_lvalue_path
                         }
-                    }
+                    };
                     let args = TmplNode::to_proc_gen_function_args(&self.children, false)
                         .trim_start_matches("C");
                     let children_args = format!(
@@ -1024,7 +1026,11 @@ impl TmplElement {
                         scopes.push(ScopeVar {
                             var: var_scope_item,
                             update_path_tree: Some(var_scope_item_update_path_tree),
-                            lvalue_path: Some(var_scope_item_lvalue_path),
+                            lvalue_path: if has_lvalue_path {
+                                Some(var_scope_item_lvalue_path)
+                            } else {
+                                None
+                            },
                         });
                         scopes.push(ScopeVar {
                             var: var_scope_index,
