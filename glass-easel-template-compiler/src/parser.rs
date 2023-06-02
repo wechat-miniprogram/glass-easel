@@ -993,7 +993,7 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
             false,
         );
         for tmpl in tree.sub_templates.values_mut() {
-            rec(tmpl, &mut BindingMapCollector::new(), &vec![], true);
+            rec(tmpl, &mut BindingMapCollector::new(), &scope_names, true);
         }
     }
 
