@@ -30,11 +30,12 @@ type AppliedSlotMeta = {
 const wrapPlaceholderCallback = (
   f: (c: GeneralComponentDefinition) => void,
   cwp: Exclude<ComponentDefinitionWithPlaceholder, string>,
+  owner: GeneralComponent,
 ) => {
   const waiting = cwp.waiting
   if (waiting) {
     waiting.add(f)
-    waiting.hintUsed()
+    waiting.hintUsed(owner)
     return () => {
       waiting.remove(f)
     }
@@ -174,7 +175,7 @@ export class ShadowRoot extends VirtualNode {
         usingTarget = target
       }
       const placeholderHandler = placeholderCallback
-        ? wrapPlaceholderCallback(placeholderCallback, using)
+        ? wrapPlaceholderCallback(placeholderCallback, using, host)
         : undefined
       if (usingTarget) {
         const comp = Component._$advancedCreate(
@@ -207,7 +208,7 @@ export class ShadowRoot extends VirtualNode {
         genImpl = target
       }
       const placeholderHandler = placeholderCallback
-        ? wrapPlaceholderCallback(placeholderCallback, g)
+        ? wrapPlaceholderCallback(placeholderCallback, g, host)
         : undefined
       if (genImpl) {
         return Component._$advancedCreate(

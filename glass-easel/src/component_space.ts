@@ -91,8 +91,8 @@ export class ComponentWaitingList {
     this._$callbacks.push(callback)
   }
 
-  hintUsed() {
-    this._$ownerSpace._$componentWaitingListener?.(this._$isPub, this._$alias)
+  hintUsed(owner: GeneralComponent) {
+    this._$ownerSpace._$componentWaitingListener?.(this._$isPub, this._$alias, owner)
   }
 
   remove(callback: (c: GeneralComponentDefinition) => void) {
@@ -146,7 +146,9 @@ export class ComponentSpace {
     [path: string]: ComponentWaitingList
   }
   /** @internal */
-  _$componentWaitingListener: ((isPub: boolean, alias: string) => void) | null = null
+  _$componentWaitingListener:
+    | ((isPub: boolean, alias: string, owner: GeneralComponent) => void)
+    | null = null
 
   /**
    * Create a new component space
@@ -464,7 +466,9 @@ export class ComponentSpace {
    * If `isPub` is false, the `alias` is the path of the component, a.k.a. `is` .
    * Otherwise, it is the exported `alias` instead.
    */
-  setComponentWaitingListener(listener: ((isPub: boolean, alias: string) => void) | null) {
+  setComponentWaitingListener(
+    listener: ((isPub: boolean, alias: string, owner: GeneralComponent) => void) | null,
+  ) {
     this._$componentWaitingListener = listener
   }
 
