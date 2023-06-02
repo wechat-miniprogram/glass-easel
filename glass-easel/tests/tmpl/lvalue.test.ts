@@ -65,7 +65,7 @@ describe('model value binding', () => {
     expect(elem.data.a).toEqual({ b: [30, 300] })
   })
 
-  test('model value binding on for items', () => {
+  test('model value binding for items', () => {
     const subComp = glassEasel.registerElement({
       template: tmpl('{{propB}}:{{propA}}'),
       properties: {
@@ -113,6 +113,34 @@ describe('model value binding', () => {
     ])
     elem.setData({ list: [{ a: 'Z', b: 789 }] })
     expect(domHtml(elem)).toBe('<comp>789:Z</comp>')
+  })
+
+  test('invalidate model value binding for non-lvalue', () => {
+    const subComp = glassEasel.registerElement({
+      template: tmpl('{{propA}}'),
+      properties: {
+        propA: Number,
+      },
+    })
+    const def = glassEasel.registerElement({
+      using: {
+        comp: subComp.general(),
+      },
+      template: tmpl(`
+        <block wx:for="{{ [123, 456] }}">
+          <comp id="comp{{index}}" model:prop-a="{{ item }}" />
+        </block>
+      `),
+      data: {},
+    })
+    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const comp0 = elem.getShadowRoot()!.getElementById('comp0')! as glassEasel.GeneralComponent
+    const comp1 = elem.getShadowRoot()!.getElementById('comp1')! as glassEasel.GeneralComponent
+    expect(domHtml(elem)).toBe('<comp>123</comp><comp>456</comp>')
+    comp0.setData({ propA: 321 })
+    expect(domHtml(elem)).toBe('<comp>321</comp><comp>456</comp>')
+    comp1.setData({ propA: 654 })
+    expect(domHtml(elem)).toBe('<comp>321</comp><comp>654</comp>')
   })
 
   test('nested model value bindings', () => {
