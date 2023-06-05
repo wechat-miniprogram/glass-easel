@@ -939,20 +939,48 @@ describe('node tree structure', () => {
       .registerElement({
         template: multiTmpl({
           '': `
-          <wxs module="a"> exports.test = require("./scripts/def").test </wxs>
-          <div>{{ a.test(1, 3) + 2 }}</div>
-        `,
+            <wxs module="a"> exports.test = require("./scripts/def").test </wxs>
+            <div>{{ a.test(1, 3) + 2 }}</div>
+          `,
           'scripts/def.wxs': `
-          exports.test = function (a, b) {
-            return a + b
-          }
-        `,
+            exports.test = function (a, b) {
+              return a + b
+            }
+          `,
         }),
         data: {},
       })
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, domBackend).asInstanceOf(def)!
     expect(domHtml(elem)).toBe('<div>6</div>')
+  })
+
+  test('custom scripts across files', () => {
+    const def = glassEasel
+      .registerElement({
+        template: multiTmpl({
+          '': `
+            <import src="./a" />
+            <template is="child" />
+          `,
+          a: `
+            <wxs module="a"> exports.test = function (a, b) { return a - b } </wxs>
+            <wxs module="b" src="./scripts/def.wxs"></wxs>
+            <template name="child">
+              <div>{{ a.test(1, 2) }} {{ b.test(1, 2) }}</div>
+            </template>
+          `,
+          'scripts/def.wxs': `
+            exports.test = function (a, b) {
+              return a + b
+            }
+          `,
+        }),
+        data: {},
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, domBackend).asInstanceOf(def)!
+    expect(domHtml(elem)).toBe('<div>-1 3</div>')
   })
 
   test('block slot', () => {

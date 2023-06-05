@@ -419,13 +419,13 @@ impl PathSliceList {
         Ok(())
     }
 
-    fn is_legal_lvalue_path(&self) -> bool {
+    fn is_legal_lvalue_path(&self, scopes: &Vec<ScopeVar>) -> bool {
         let s = self.0.get(0);
         if let Some(PathSlice::Ident(_)) = s {
             return true;
         }
-        if let Some(PathSlice::ScopeIndex(_)) = s {
-            return true;
+        if let Some(PathSlice::ScopeIndex(i)) = s {
+            return scopes[*i].lvalue_path.is_some();
         }
         false
     }
@@ -1217,7 +1217,7 @@ impl TmplExprProcGen {
         scopes: &Vec<ScopeVar>,
     ) -> Result<Option<()>, TmplError> {
         let ret = if let PathAnalysisState::InPath(psl) = &self.pas {
-            if psl.is_legal_lvalue_path() {
+            if psl.is_legal_lvalue_path(scopes) {
                 psl.to_lvalue_path_arr(w, scopes)?;
                 Some(())
             } else {

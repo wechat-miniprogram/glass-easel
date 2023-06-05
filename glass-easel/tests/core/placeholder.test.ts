@@ -27,11 +27,11 @@ describe('placeholder', () => {
       is: '',
     })
 
-    let listenerTriggered = false
-    componentSpace.setComponentWaitingListener((isPub, alias) => {
+    let setComponentWaitingListenerOwner: glassEasel.GeneralComponent | null = null
+    componentSpace.setComponentWaitingListener((isPub, alias, owner) => {
       expect(isPub).toBe(false)
       expect(alias).toBe('placeholder/simple/child')
-      listenerTriggered = true
+      setComponentWaitingListenerOwner = owner
     })
 
     const def = componentSpace
@@ -55,7 +55,7 @@ describe('placeholder', () => {
       })
       .registerComponent()
     const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
-    expect(listenerTriggered).toBe(true)
+    expect(setComponentWaitingListenerOwner).toBe(elem)
     expect(domHtml(elem)).toBe('<div><child><span></span></child></div>')
     matchElementWithDom(elem)
 
@@ -105,7 +105,7 @@ describe('placeholder', () => {
     mainCs.importSpace('space-private://extra', extraCs, true)
 
     const listenerTriggered = [] as boolean[]
-    extraCs.setComponentWaitingListener((isPub, alias) => {
+    extraCs.setComponentWaitingListener((isPub, alias, _owner) => {
       if (isPub) {
         expect(alias).toBe('child-pub')
       } else {
