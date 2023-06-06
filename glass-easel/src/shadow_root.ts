@@ -132,10 +132,11 @@ export class ShadowRoot extends VirtualNode {
   createNativeNodeWithInit(
     tagName: string,
     stylingName: string,
+    placeholderHandler: (() => void) | undefined,
     initPropValues?: (comp: NativeNode) => void,
   ): NativeNode {
     const extendedDef = this._$host._$behavior.ownerSpace.getExtendedNativeNode(tagName)
-    const ret = NativeNode.create(tagName, this, stylingName, extendedDef)
+    const ret = NativeNode.create(tagName, this, stylingName, extendedDef, placeholderHandler)
     initPropValues?.(ret)
     return ret
   }
@@ -162,24 +163,28 @@ export class ShadowRoot extends VirtualNode {
     // if the target is in using list, then use the one in using list
     const using = beh._$using[compName]
     if (typeof using === 'string') {
-      return this.createNativeNodeWithInit(using, tagName, initPropValues)
+      return this.createNativeNodeWithInit(using, tagName, undefined, initPropValues)
     }
     if (using) {
-      let usingTarget: GeneralComponentDefinition | undefined
+      let usingTarget: GeneralComponentDefinition | string | undefined
       if (using.final) {
         usingTarget = using.final
       } else if (using.placeholder !== null) {
-        const target = resolvePlaceholder(using.placeholder, space, using.source, hostGenericImpls)
-        if (typeof target === 'string') {
-          return this.createNativeNodeWithInit(target, tagName, initPropValues)
-        }
-        usingTarget = target
+        usingTarget = resolvePlaceholder(using.placeholder, space, using.source, hostGenericImpls)
       }
       const placeholderHandler = placeholderCallback
         ? wrapPlaceholderCallback(placeholderCallback, using, host)
         : undefined
+      if (typeof usingTarget === 'string') {
+        return this.createNativeNodeWithInit(
+          usingTarget,
+          tagName,
+          placeholderHandler,
+          initPropValues,
+        )
+      }
       if (usingTarget) {
-        const comp = Component._$advancedCreate(
+        return Component._$advancedCreate(
           tagName,
           usingTarget,
           this,
@@ -188,29 +193,27 @@ export class ShadowRoot extends VirtualNode {
           placeholderHandler,
           initPropValues,
         )
-        return comp
       }
     }
 
     // if the target is in generics list, then use the one
     const g = hostGenericImpls && hostGenericImpls[compName]
     if (typeof g === 'string') {
-      return this.createNativeNodeWithInit(g, tagName, initPropValues)
+      return this.createNativeNodeWithInit(g, tagName, undefined, initPropValues)
     }
     if (g) {
-      let genImpl: GeneralComponentDefinition | undefined
+      let genImpl: GeneralComponentDefinition | string | undefined
       if (g.final) {
         genImpl = g.final
       } else if (g.placeholder !== null) {
-        const target = resolvePlaceholder(g.placeholder, space, g.source, hostGenericImpls)
-        if (typeof target === 'string') {
-          return this.createNativeNodeWithInit(target, tagName, initPropValues)
-        }
-        genImpl = target
+        genImpl = resolvePlaceholder(g.placeholder, space, g.source, hostGenericImpls)
       }
       const placeholderHandler = placeholderCallback
         ? wrapPlaceholderCallback(placeholderCallback, g, host)
         : undefined
+      if (typeof genImpl === 'string') {
+        return this.createNativeNodeWithInit(genImpl, tagName, placeholderHandler, initPropValues)
+      }
       if (genImpl) {
         return Component._$advancedCreate(
           tagName,
@@ -230,7 +233,7 @@ export class ShadowRoot extends VirtualNode {
       throw new Error(`Cannot find component "${compName}"`)
     }
     if (typeof comp === 'string') {
-      return this.createNativeNodeWithInit(comp, tagName, initPropValues)
+      return this.createNativeNodeWithInit(comp, tagName, undefined, initPropValues)
     }
     return Component._$advancedCreate(
       tagName,
@@ -261,7 +264,7 @@ export class ShadowRoot extends VirtualNode {
     // find in the space otherwise
     const comp = space.getGlobalUsingComponent(tagName)
     if (typeof comp === 'string') {
-      return this.createNativeNodeWithInit(comp, tagName, initPropValues)
+      return this.createNativeNodeWithInit(comp, tagName, undefined, initPropValues)
     }
     if (comp) {
       return Component._$advancedCreate(

@@ -780,7 +780,7 @@ export class ProcGenWrapper {
             initPropValues,
           )
           replacer.destroyBackendElementOnDetach()
-          const replacerShadowRoot = (elem as GeneralComponent).getShadowRoot()
+          const replacerShadowRoot = (replacer as GeneralComponent).getShadowRoot()
           const elemShadowRoot = elem instanceof Component ? elem.getShadowRoot() : null
           if (replacerShadowRoot?.isDynamicSlots()) {
             if (!elemShadowRoot?.isDynamicSlots()) {
