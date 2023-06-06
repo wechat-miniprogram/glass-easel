@@ -369,7 +369,7 @@ class GlassEaselMiniprogramWebpackPlugin {
       const entries = Object.values(params.compInfoMap).map((compInfo) => compInfo.main)
       if (params.appEntry) entries.unshift(params.appEntry)
       virtualModules.writeModule(
-        `${codeRoot}/index.js`,
+        path.join(codeRoot, 'index.js'),
         entryHeader +
           entries.map((p) => `require('./${escapeJsString(p)}')\n`).join('') +
           entryFooter,
