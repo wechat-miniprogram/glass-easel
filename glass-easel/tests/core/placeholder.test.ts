@@ -16,6 +16,12 @@ const domHtml = (elem: glassEasel.Element): string => {
   return domElem.innerHTML
 }
 
+type FirstArgument<T> = T extends (...args: infer R) => any ? R[0] : never
+type ComponentWaitingListener = Exclude<
+  FirstArgument<glassEasel.ComponentSpace['setComponentWaitingListener']>,
+  null
+>
+
 describe('placeholder', () => {
   test('using simple placeholder and waiting', () => {
     const componentSpace = new glassEasel.ComponentSpace()
@@ -27,12 +33,9 @@ describe('placeholder', () => {
       is: '',
     })
 
-    let setComponentWaitingListenerOwner: glassEasel.GeneralComponent | null = null
-    componentSpace.setComponentWaitingListener((isPub, alias, owner) => {
-      expect(isPub).toBe(false)
-      expect(alias).toBe('placeholder/simple/child')
-      setComponentWaitingListenerOwner = owner
-    })
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    const listener = jest.fn((() => {}) as ComponentWaitingListener)
+    componentSpace.setComponentWaitingListener(listener)
 
     const def = componentSpace
       .define()
@@ -55,7 +58,8 @@ describe('placeholder', () => {
       })
       .registerComponent()
     const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
-    expect(setComponentWaitingListenerOwner).toBe(elem)
+    expect(listener).toHaveBeenCalledTimes(1)
+    expect(listener).toHaveBeenNthCalledWith(1, false, 'placeholder/simple/child', elem)
     expect(domHtml(elem)).toBe('<div><child><span></span></child></div>')
     matchElementWithDom(elem)
 
@@ -104,15 +108,9 @@ describe('placeholder', () => {
     mainCs.importSpace('space://extra', extraCs, false)
     mainCs.importSpace('space-private://extra', extraCs, true)
 
-    const listenerTriggered = [] as boolean[]
-    extraCs.setComponentWaitingListener((isPub, alias, _owner) => {
-      if (isPub) {
-        expect(alias).toBe('child-pub')
-      } else {
-        expect(alias).toBe('child')
-      }
-      listenerTriggered.push(isPub)
-    })
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    const listener = jest.fn((() => {}) as ComponentWaitingListener)
+    extraCs.setComponentWaitingListener(listener)
 
     const def = mainCs.defineComponent({
       using: {
@@ -129,7 +127,9 @@ describe('placeholder', () => {
       `),
     })
     const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
-    expect(listenerTriggered).toStrictEqual([true, false])
+    expect(listener).toHaveBeenCalledTimes(2)
+    expect(listener).toHaveBeenNthCalledWith(1, true, 'child-pub', elem)
+    expect(listener).toHaveBeenNthCalledWith(2, false, 'child', elem)
     expect(domHtml(elem)).toBe('<child></child><child-private></child-private>')
     matchElementWithDom(elem)
 
@@ -142,6 +142,145 @@ describe('placeholder', () => {
 
     extraCs.exportComponent('child-pub', 'child')
     expect(domHtml(elem)).toBe('<child>A</child><child-private>A</child-private>')
+    matchElementWithDom(elem)
+  })
+
+  test('using native node as placeholder', () => {
+    const componentSpace = new glassEasel.ComponentSpace()
+    componentSpace.updateComponentOptions({
+      writeFieldsToNode: true,
+      writeIdToDOM: true,
+    })
+    componentSpace.defineComponent({
+      is: '',
+    })
+    componentSpace.setGlobalUsingComponent('span', 'span')
+
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    const listener = jest.fn((() => {}) as ComponentWaitingListener)
+    componentSpace.setComponentWaitingListener(listener)
+
+    const def = componentSpace
+      .define()
+      .placeholders({
+        child: 'span',
+      })
+      .definition({
+        using: {
+          child: 'placeholder/simple/child',
+        },
+        template: tmpl(`
+          <child>A</child>
+        `),
+      })
+      .registerComponent()
+    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    expect(listener).toHaveBeenCalledTimes(1)
+    expect(listener).toHaveBeenNthCalledWith(1, false, 'placeholder/simple/child', elem)
+    expect(domHtml(elem)).toBe('<span>A</span>')
+    matchElementWithDom(elem)
+
+    componentSpace.defineComponent({
+      is: 'placeholder/simple/child',
+      template: tmpl('<slot />B'),
+    })
+    expect(domHtml(elem)).toBe('<child>AB</child>')
+    matchElementWithDom(elem)
+  })
+
+  test('using component with placeholder as generic', () => {
+    const componentSpace = new glassEasel.ComponentSpace()
+    componentSpace.updateComponentOptions({
+      writeFieldsToNode: true,
+      writeIdToDOM: true,
+    })
+    componentSpace.defineComponent({
+      is: '',
+    })
+    componentSpace.setGlobalUsingComponent('span', 'span')
+
+    const def = componentSpace
+      .define()
+      .placeholders({
+        child: 'span',
+        'child-of-child': 'span',
+      })
+      .definition({
+        using: {
+          child: 'placeholder/simple/child',
+          'child-of-child': 'placeholder/simple/child-of-child',
+        },
+        template: tmpl(`
+          <child generic:g="child-of-child">A</child>
+        `),
+      })
+      .registerComponent()
+    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    expect(domHtml(elem)).toBe('<span>A</span>')
+    matchElementWithDom(elem)
+
+    componentSpace.defineComponent({
+      is: 'placeholder/simple/child',
+      generics: {
+        g: true,
+      },
+      template: tmpl('<slot /><g>B</g>'),
+    })
+    expect(domHtml(elem)).toBe('<child>A<span>B</span></child>')
+    matchElementWithDom(elem)
+
+    componentSpace.defineComponent({
+      is: 'placeholder/simple/child-of-child',
+      template: tmpl('<slot />C'),
+    })
+    expect(domHtml(elem)).toBe('<child>A<g>BC</g></child>')
+    matchElementWithDom(elem)
+  })
+
+  test('component property should update when replaced', () => {
+    const componentSpace = new glassEasel.ComponentSpace()
+    componentSpace.updateComponentOptions({
+      writeFieldsToNode: true,
+      writeIdToDOM: true,
+    })
+    componentSpace.defineComponent({
+      is: '',
+    })
+    componentSpace.setGlobalUsingComponent('span', 'span')
+
+    const def = componentSpace
+      .define()
+      .placeholders({
+        child: 'span',
+      })
+      .definition({
+        using: {
+          child: 'placeholder/simple/child',
+        },
+        data: {
+          prop: 'old',
+        },
+        template: tmpl(`
+          <child prop="{{ prop }}">A</child>
+        `),
+      })
+      .registerComponent()
+    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    expect(domHtml(elem)).toBe('<span prop="old">A</span>')
+    matchElementWithDom(elem)
+
+    elem.setData({
+      prop: 'new',
+    })
+
+    componentSpace.defineComponent({
+      is: 'placeholder/simple/child',
+      properties: {
+        prop: glassEasel.NormalizedPropertyType.String,
+      },
+      template: tmpl('{{ prop }}'),
+    })
+    expect(domHtml(elem)).toBe('<child>new</child>')
     matchElementWithDom(elem)
   })
 

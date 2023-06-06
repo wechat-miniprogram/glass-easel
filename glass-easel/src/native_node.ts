@@ -19,9 +19,15 @@ export class NativeNode extends Element {
     super()
   }
 
-  static create(tagName: string, owner: ShadowRoot, stylingName?: string): NativeNode {
+  static create(
+    tagName: string,
+    owner: ShadowRoot,
+    stylingName?: string,
+    placeholderHandler?: () => void,
+  ): NativeNode {
     const node = Object.create(NativeNode.prototype) as NativeNode
     node.is = tagName
+    node._$placeholderHandler = placeholderHandler
     let backendElement: GeneralBackendElement | null
     if (BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike)) {
       backendElement = (owner._$nodeTreeContext as domlikeBackend.Context).document.createElement(
