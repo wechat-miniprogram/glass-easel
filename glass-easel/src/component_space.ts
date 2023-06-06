@@ -404,6 +404,16 @@ export class ComponentSpace {
     }
   }
 
+  /** Get a component by its exported alias */
+  getExportedComponent(alias: string): GeneralComponentDefinition | undefined {
+    return this._$pubList[alias]
+  }
+
+  /** Get a behavior by its exported alias */
+  getExportedBehavior(alias: string): GeneralBehavior | undefined {
+    return this._$pubBehaviorList[alias]
+  }
+
   /**
    * Assign a public alias to a behavior
    *
