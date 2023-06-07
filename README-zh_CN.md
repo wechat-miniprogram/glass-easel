@@ -1,6 +1,10 @@
-![logo](./logo_256.png)
+<p align="center">
+  <img src="https://github.com/wechat-miniprogram/glass-easel/blob/master/logo_256.png" style="width: 128px" />
+</p>
 
 # glass-easel ：新版微信小程序组件框架
+
+[![test](https://img.shields.io/github/actions/workflow/status/wechat-miniprogram/glass-easel/build.yml?style=flat-square)](https://github.com/wechat-miniprogram/glass-easel/actions/workflows/build.yml)
 
 glass-easel 是小程序组件框架的核心实现。它实质上是一个 JavaScript 的组件化界面框架，用来进行组件化、定义式的界面开发。
 
@@ -30,13 +34,13 @@ glass-easel 采用单组件节点树更新算法（大体上沿用了旧版小�
 
 需要注意的是，上述两个 compiler 是使用 rust 语言编写的。若尝试自行编译这两个模块，需要安装 [rust](https://www.rust-lang.org/) 和 [wasm-pack](https://rustwasm.github.io/wasm-pack/) 。
 
-| 子模块名                               | 编程语言   | 说明                                                             |
-| -------------------------------------- | ---------- | ---------------------------------------------------------------- |
-| glass-easel                            | TypeScript | 组件框架核心模块                                                 |
-| glass-easel-miniprogram-adapter        | TypeScript | 在非小程序环境下模仿小程序的接口适配器                           |
-| glass-easel-miniprogram-webpack-plugin | JavaScript | 简易的 Webpack 插件（配合 glass-easel-miniprogram-adapter 使用） |
-| glass-easel-template-compiler          | rust       | 模板编译器                                                       |
-| glass-easel-stylesheet-compiler        | rust       | 样式表编译器                                                     |
+| 子模块名                               | 编程语言   | 说明                                                             | 包                   |
+| -------------------------------------- | ---------- | ---------------------------------------------------------------- | ------------------------- |
+| glass-easel                            | TypeScript | 组件框架核心模块                                                 | [![npm](https://img.shields.io/npm/v/glass-easel?style=flat-square)](https://www.npmjs.com/package/glass-easel)                                                                                                                                                                                                     |
+| glass-easel-miniprogram-adapter        | TypeScript | 在非小程序环境下模仿小程序的接口适配器                           | [![npm](https://img.shields.io/npm/v/glass-easel-miniprogram-adapter?style=flat-square)](https://www.npmjs.com/package/glass-easel-miniprogram-adapter)                                                                                                                                                             |
+| glass-easel-miniprogram-webpack-plugin | JavaScript | 简易的 Webpack 插件（配合 glass-easel-miniprogram-adapter 使用） | [![npm](https://img.shields.io/npm/v/glass-easel-miniprogram-webpack-plugin?style=flat-square)](https://www.npmjs.com/package/glass-easel-miniprogram-webpack-plugin)                                                                                                                                               |
+| glass-easel-template-compiler          | rust       | 模板编译器                                                       | [![crates.io](https://img.shields.io/crates/v/glass-easel-template-compiler?style=flat-square)](https://crates.io/crates/glass-easel-template-compiler) [![npm](https://img.shields.io/npm/v/glass-easel-template-compiler?style=flat-square)](https://www.npmjs.com/package/glass-easel-template-compiler)         |
+| glass-easel-stylesheet-compiler        | rust       | 样式表编译器                                                     | [![crates.io](https://img.shields.io/crates/v/glass-easel-stylesheet-compiler?style=flat-square)](https://crates.io/crates/glass-easel-stylesheet-compiler) [![npm](https://img.shields.io/npm/v/glass-easel-stylesheet-compiler?style=flat-square)](https://www.npmjs.com/package/glass-easel-stylesheet-compiler) |
 
 ## 入门指引
 
