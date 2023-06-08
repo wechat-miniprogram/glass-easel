@@ -1,0 +1,65 @@
+name: build-and-test
+on:
+  push:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build-and-test:
+    strategy:
+      matrix:
+        node-version: [lts/*, latest]
+        os: ['windows-latest', 'ubuntu-latest']
+      fail-fast: false
+    name: Build and Test
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v3
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+      - name: Setup node ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+      - name: Install
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+          run_install: |
+            - recursive: true
+              args: [--frozen-lockfile, --strict-peer-dependencies]
+      - name: Setup Rust and Cargo
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+      - name: Setup wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: 'latest'
+      - name: Build
+        run: |
+          pnpm -r run build
+      - name: Test glass-easel
+        working-directory: glass-easel
+        run: |
+          pnpm run lint
+          pnpm run test
+      - name: Test glass-easel-miniprogram-adapter
+        working-directory: glass-easel-miniprogram-adapter
+        run: |
+          pnpm run lint
+          pnpm run test
+      - name: Test glass-easel-stylesheet-compiler
+        working-directory: glass-easel-stylesheet-compiler
+        run: |
+          cargo test
+      - name: Test glass-easel-template-compiler
+        working-directory: glass-easel-template-compiler
+        run: |
+          cargo test

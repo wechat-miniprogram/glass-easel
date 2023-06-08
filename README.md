@@ -6,7 +6,7 @@
 
 the new component-based framework for WeChat MiniProgram
 
-![npm](https://img.shields.io/npm/v/glass-easel?style=flat-square) ![crates.io](https://img.shields.io/crates/v/glass-easel-template-compiler?style=flat-square)
+[![test](https://img.shields.io/github/actions/workflow/status/wechat-miniprogram/glass-easel/build.yml?style=flat-square)](https://github.com/wechat-miniprogram/glass-easel/actions/workflows/build.yml)
 
 [中文版 README](./README-zh_CN.md)
 
@@ -53,13 +53,13 @@ If your code requires some style-related features, this module is needed.
 Note that the two compilers are implemented in rust.
 If you try to compile them, [rust](https://www.rust-lang.org/) and [wasm-pack](https://rustwasm.github.io/wasm-pack/) should be installed in your machine.
 
-| Submodule Name                         | Language   | Description                                |
-| -------------------------------------- | ---------- | ------------------------------------------ |
-| glass-easel                            | TypeScript | The core module                            |
-| glass-easel-miniprogram-adapter        | TypeScript | The MiniProgram interface adapter          |
-| glass-easel-miniprogram-webpack-plugin | JavaScript | The Webpack plugin (work with the adapter) |
-| glass-easel-template-compiler          | rust       | The template compiler                      |
-| glass-easel-stylesheet-compiler        | rust       | The stylesheet compiler                    |
+| Submodule Name                         | Language   | Description                                | Package                   |
+| -------------------------------------- | ---------- | ------------------------------------------ | ------------------------- |
+| glass-easel                            | TypeScript | The core module                            | [![npm](https://img.shields.io/npm/v/glass-easel?style=flat-square)](https://www.npmjs.com/package/glass-easel)                                                                                                                                                                                                     |
+| glass-easel-miniprogram-adapter        | TypeScript | The MiniProgram interface adapter          | [![npm](https://img.shields.io/npm/v/glass-easel-miniprogram-adapter?style=flat-square)](https://www.npmjs.com/package/glass-easel-miniprogram-adapter)                                                                                                                                                             |
+| glass-easel-miniprogram-webpack-plugin | JavaScript | The Webpack plugin (work with the adapter) | [![npm](https://img.shields.io/npm/v/glass-easel-miniprogram-webpack-plugin?style=flat-square)](https://www.npmjs.com/package/glass-easel-miniprogram-webpack-plugin)                                                                                                                                               |
+| glass-easel-template-compiler          | rust       | The template compiler                      | [![crates.io](https://img.shields.io/crates/v/glass-easel-template-compiler?style=flat-square)](https://crates.io/crates/glass-easel-template-compiler) [![npm](https://img.shields.io/npm/v/glass-easel-template-compiler?style=flat-square)](https://www.npmjs.com/package/glass-easel-template-compiler)         |
+| glass-easel-stylesheet-compiler        | rust       | The stylesheet compiler                    | [![crates.io](https://img.shields.io/crates/v/glass-easel-stylesheet-compiler?style=flat-square)](https://crates.io/crates/glass-easel-stylesheet-compiler) [![npm](https://img.shields.io/npm/v/glass-easel-stylesheet-compiler?style=flat-square)](https://www.npmjs.com/package/glass-easel-stylesheet-compiler) |
 
 ## Guides for Users
 
