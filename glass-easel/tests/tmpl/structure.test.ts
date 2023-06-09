@@ -77,6 +77,90 @@ describe('node tree structure', () => {
     expect(domHtml(elem)).toBe('<div>b</div><div>e</div>')
   })
 
+  test('if blocks in template-is', () => {
+    const def = glassEasel
+      .registerElement({
+        template: tmpl(`
+          <template name="sub1">
+            <div>{{ aa }}</div>
+          </template>
+          <template name="sub2">
+            <div>{{ aa }}</div>
+          </template>
+          <template wx:if="{{ cond }}" is="sub1" data="{{ aa: b }}" />
+          <template wx:else is="sub2" data="{{ aa: c }}"></template>
+        `),
+        data: {
+          cond: false,
+          b: 123,
+          c: 456,
+        },
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    expect(domHtml(elem)).toBe('<div>456</div>')
+    elem.setData({
+      cond: true,
+    })
+    expect(domHtml(elem)).toBe('<div>123</div>')
+    elem.setData({
+      cond: false,
+      c: 789,
+    })
+    expect(domHtml(elem)).toBe('<div>789</div>')
+  })
+
+  test('if blocks in slot', () => {
+    const childComp = glassEasel
+      .registerElement({
+        options: {
+          multipleSlots: true,
+        },
+        template: tmpl(`
+          <slot wx:if="{{ cond1 }}" name="a" />
+          <slot wx:elif="{{ cond2 }}" name="c" />
+          <slot wx:else name="b"></slot>
+        `),
+        data: {
+          cond1: true,
+          cond2: false,
+        },
+      })
+      .general()
+    const def = glassEasel
+      .registerElement({
+        using: {
+          child: childComp.general(),
+        },
+        template: tmpl(`
+          <child id="c">
+            <span slot="b"></span>
+            <div slot="a">A</div>
+            <div slot="c">C</div>
+          </child>
+        `),
+        data: {
+          cond: false,
+          b: 123,
+          c: 456,
+        },
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const child = elem.getShadowRoot()!.getElementById('c')!.asInstanceOf(childComp)!
+    expect(domHtml(elem)).toBe('<child><div>A</div></child>')
+    child.setData({
+      cond1: false,
+      cond2: true,
+    })
+    expect(domHtml(elem)).toBe('<child><div>C</div></child>')
+    child.setData({
+      cond1: false,
+      cond2: false,
+    })
+    expect(domHtml(elem)).toBe('<child><span></span></child>')
+  })
+
   test('for blocks without key', () => {
     const ops: Array<[number, string]> = []
     const itemComp = glassEasel
