@@ -18,7 +18,7 @@
     "doc": "typedoc src/index.ts --excludePrivate --excludeProtected --excludeInternal",
     "build": "webpack --config webpack.config.js",
     "dev": "webpack --config webpack.config.js --watch",
-    "lint": "eslint src/**/*.ts",
+    "lint": "eslint --ext .ts src",
     "test": "jest -c jest.config.js",
     "coverage": "jest -c jest.config.js --collect-coverage"
   },

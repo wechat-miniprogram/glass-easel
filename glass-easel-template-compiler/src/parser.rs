@@ -775,11 +775,11 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                             }
                             IfType::Elif(attr_if) => {
                                 let virtual_type = TmplVirtualType::Elif { cond: attr_if };
-                                elem = wrap_virtual_elem(elem, virtual_type);
                                 if let Some(last) = parent.children.last_mut() {
                                     if let TmplNode::Element(last) = last {
                                         if let TmplVirtualType::IfGroup = last.virtual_type {
                                             rec(&mut elem, imports, includes, sub_templates, scripts);
+                                            elem = wrap_virtual_elem(elem, virtual_type);
                                             last.append_element(elem);
                                             // FIXME here should display a warning if <for> is found
                                             continue;
@@ -787,15 +787,16 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                                     }
                                 }
                                 // FIXME here should display a warning if no matching <if> found
+                                elem = wrap_virtual_elem(elem, virtual_type);
                                 elem = wrap_virtual_elem(elem, TmplVirtualType::IfGroup);
                             }
                             IfType::Else => {
                                 let virtual_type = TmplVirtualType::Else;
-                                elem = wrap_virtual_elem(elem, virtual_type);
                                 if let Some(last) = parent.children.last_mut() {
                                     if let TmplNode::Element(last) = last {
                                         if let TmplVirtualType::IfGroup = last.virtual_type {
                                             rec(&mut elem, imports, includes, sub_templates, scripts);
+                                            elem = wrap_virtual_elem(elem, virtual_type);
                                             last.append_element(elem);
                                             // FIXME here should display a warning if <for> is found
                                             continue;
@@ -803,6 +804,7 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                                     }
                                 }
                                 // FIXME here should display a warning if no matching <if> found
+                                elem = wrap_virtual_elem(elem, virtual_type);
                                 elem = wrap_virtual_elem(elem, TmplVirtualType::IfGroup);
                             }
                         }
