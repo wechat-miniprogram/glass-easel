@@ -897,6 +897,7 @@ export class ProcGenWrapper {
       final,
       mutated,
       capture,
+      extraFields: { handler },
     }
     if (isDynamic) {
       const tmplArgs = getTmplArgs(elem)
