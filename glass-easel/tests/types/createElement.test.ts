@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable no-param-reassign */
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-import { expectType } from 'tsd'
+import { expectType } from 'tsd-lite'
 import * as glassEasel from '../../src'
 
 const componentSpace = glassEasel.getDefaultComponentSpace()
