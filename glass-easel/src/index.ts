@@ -25,7 +25,14 @@ export {
   PropertyChange,
   DataUpdateCallback,
 } from './data_proxy'
-export { Event, ShadowedEvent, EventBubbleStatus, EventOptions } from './event'
+export {
+  Event,
+  ShadowedEvent,
+  EventBubbleStatus,
+  EventOptions,
+  EventListener,
+  EventListenerOptions,
+} from './event'
 export * as typeUtils from './component_params'
 export {
   Behavior,

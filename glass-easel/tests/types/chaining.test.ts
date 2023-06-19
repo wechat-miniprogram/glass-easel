@@ -559,6 +559,19 @@ componentSpace
   })
   .registerComponent()
 
+/**
+ * Lifetimes
+ */
+componentSpace
+  .define()
+  .lifetime('listenerChange', (isAdd, name, func, options) => {
+    expectType<boolean>(isAdd)
+    expectType<string>(name)
+    expectType<glassEasel.EventListener<unknown>>(func)
+    expectType<glassEasel.EventListenerOptions | undefined>(options)
+  })
+  .registerComponent()
+
 componentSpace
   .define()
   // @ts-expect-error

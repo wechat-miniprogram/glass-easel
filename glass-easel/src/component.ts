@@ -55,7 +55,7 @@ import { GeneralBackendContext, GeneralBackendElement } from './node'
 import { DataPath, parseSinglePath, parseMultiPaths } from './data_path'
 import { ExternalShadowRoot } from './external_shadow_tree'
 import { BM, BackendMode } from './backend/mode'
-import { EventListener } from './event'
+import { EventListener, EventListenerOptions } from './event'
 import { TraitBehavior, TraitGroup } from './trait_behaviors'
 
 export const convertGenerics = (
