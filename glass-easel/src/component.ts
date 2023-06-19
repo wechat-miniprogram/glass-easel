@@ -55,7 +55,7 @@ import { GeneralBackendContext, GeneralBackendElement } from './node'
 import { DataPath, parseSinglePath, parseMultiPaths } from './data_path'
 import { ExternalShadowRoot } from './external_shadow_tree'
 import { BM, BackendMode } from './backend/mode'
-import { EventListener, EventOptions, ShadowedEvent } from './event'
+import { EventListener } from './event'
 import { TraitBehavior, TraitGroup } from './trait_behaviors'
 
 export const convertGenerics = (
@@ -178,8 +178,8 @@ export type Lifetimes = {
   listenerChange: (
     isAdd: boolean,
     name: string,
-    func: (ev: ShadowedEvent<unknown>) => void,
-    options: EventOptions,
+    func: EventListener<unknown>,
+    options: EventListenerOptions | undefined,
   ) => void
   workletChange: (name: string, value: unknown) => void
 }
