@@ -1045,8 +1045,8 @@ export class ProcGenWrapper {
           true,
         )
       } else {
-        elem.callAttributeFilter(name, v, (newPropValue) => {
-          elem.updateAttribute(name, newPropValue)
+        elem.callAttributeFilter(camelName, v, (newPropValue) => {
+          elem.updateAttribute(camelName, newPropValue)
           if (lvaluePath) {
             elem.setModelBindingListener(name, (value) => {
               const host = elem.ownerShadowRoot!.getHostNode()
