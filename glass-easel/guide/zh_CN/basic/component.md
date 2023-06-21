@@ -133,7 +133,7 @@ export const helloWorld = componentSpace.defineComponent({
 })
 ```
 
-使用组件时可能会更新组件的属性值。组件可以使用 `comparison` 来决定该属性是否需要更新，这样做有时可以提升性能。
+使用组件时可能会更新组件的属性值。组件可以使用 `comparer` 来决定该属性是否需要更新，这样做有时可以提升性能。
 
 ```js
 export const addComponent = componentSpace.defineComponent({
