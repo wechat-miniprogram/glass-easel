@@ -19,7 +19,7 @@
     "prettier": "^2.8.3",
     "ts-jest": "^26.4.4",
     "ts-loader": "^9.4.2",
-    "tsd": "^0.24.1",
+    "tsd-lite": "^0.7.0",
     "typedoc": "^0.23.17",
     "typescript": "^4.9.4",
     "webpack": "^5.11.1",

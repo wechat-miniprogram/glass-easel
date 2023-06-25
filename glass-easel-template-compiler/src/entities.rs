@@ -16,7 +16,6 @@ fn make_mapping() -> HashMap<&'static str, &'static str> {
 }
 
 pub(crate) fn decode<'a>(entity: &'a str) -> Cow<'a, str> {
-    dbg!(&entity);
     let len = entity.len();
     if &entity[(len - 1)..] != ";" {
         return Cow::Borrowed(entity);

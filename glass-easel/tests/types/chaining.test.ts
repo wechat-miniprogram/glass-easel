@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable no-param-reassign */
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-import { expectType } from 'tsd'
+import { expectType } from 'tsd-lite'
 import * as glassEasel from '../../src'
 
 const componentSpace = glassEasel.getDefaultComponentSpace()
@@ -556,6 +556,19 @@ componentSpace
   })
   .lifetime('created', function () {
     expectType<number>(this.foo())
+  })
+  .registerComponent()
+
+/**
+ * Lifetimes
+ */
+componentSpace
+  .define()
+  .lifetime('listenerChange', (isAdd, name, func, options) => {
+    expectType<boolean>(isAdd)
+    expectType<string>(name)
+    expectType<glassEasel.EventListener<unknown>>(func)
+    expectType<glassEasel.EventListenerOptions | undefined>(options)
   })
   .registerComponent()
 
