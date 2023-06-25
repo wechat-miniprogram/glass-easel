@@ -144,13 +144,22 @@ export class ProcGenWrapper {
   procGen: ProcGen
   disallowNativeNode: boolean
   bindingMapDisabled = false
+  eventObjectFilter: (x: ShadowedEvent<unknown>) => ShadowedEvent<unknown> = emptyFilter
   changePropFilter = emptyFilter
   eventListenerFilter = emptyFilter
 
-  constructor(shadowRoot: ShadowRoot, procGen: ProcGen, disallowNativeNode: boolean) {
+  constructor(
+    shadowRoot: ShadowRoot,
+    procGen: ProcGen,
+    disallowNativeNode: boolean,
+    eventObjectFilter?: (x: ShadowedEvent<unknown>) => ShadowedEvent<unknown>,
+  ) {
     this.shadowRoot = shadowRoot
     this.procGen = procGen
     this.disallowNativeNode = disallowNativeNode
+    if (eventObjectFilter) {
+      this.eventObjectFilter = eventObjectFilter
+    }
   }
 
   create(data: DataValue): { [field: string]: BindingMapGen[] } | undefined {
@@ -889,7 +898,11 @@ export class ProcGenWrapper {
       const methodCaller = host.getMethodCaller() as { [key: string]: unknown }
       const f = typeof handler === 'function' ? handler : Component.getMethod(host, handler)
       if (typeof f === 'function') {
-        ret = (f as (ev: ShadowedEvent<unknown>) => boolean | undefined).call(methodCaller, ev)
+        const filteredEv = this.eventObjectFilter(ev)
+        ret = (f as (ev: ShadowedEvent<unknown>) => boolean | undefined).call(
+          methodCaller,
+          filteredEv,
+        )
       }
       return ret
     }
@@ -939,7 +952,7 @@ export class ProcGenWrapper {
       } else {
         // compatibilities for legacy event binding syntax
         if (camelName.startsWith('bind')) {
-          ProcGenWrapper.prototype.v(
+          this.v(
             elem,
             camelName.slice('bind'.length),
             dataValueToString(v),
@@ -949,7 +962,7 @@ export class ProcGenWrapper {
             true,
           )
         } else if (camelName.startsWith('captureBind')) {
-          ProcGenWrapper.prototype.v(
+          this.v(
             elem,
             camelName.slice('captureBind'.length),
             dataValueToString(v),
@@ -959,7 +972,7 @@ export class ProcGenWrapper {
             true,
           )
         } else if (camelName.startsWith('catch')) {
-          ProcGenWrapper.prototype.v(
+          this.v(
             elem,
             camelName.slice('catch'.length),
             dataValueToString(v),
@@ -969,7 +982,7 @@ export class ProcGenWrapper {
             true,
           )
         } else if (camelName.startsWith('captureCatch')) {
-          ProcGenWrapper.prototype.v(
+          this.v(
             elem,
             camelName.slice('captureCatch'.length),
             dataValueToString(v),
@@ -979,7 +992,7 @@ export class ProcGenWrapper {
             true,
           )
         } else if (camelName.startsWith('on')) {
-          ProcGenWrapper.prototype.v(
+          this.v(
             elem,
             camelName.slice('on'.length),
             dataValueToString(v),

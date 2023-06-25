@@ -2,6 +2,33 @@ import { tmpl, domBackend } from '../base/env'
 import * as glassEasel from '../../src'
 
 describe('event bindings', () => {
+  test('event object', () => {
+    const template = Object.assign(
+      tmpl(`
+        <div id="a" bind:customEv="f"></div>
+      `),
+      {
+        eventObjectFilter: (x: glassEasel.ShadowedEvent<unknown>) => {
+          x.target = Object.assign(x.target, { id: 'b' })
+          return x
+        },
+      },
+    )
+    const eventOrder: number[] = []
+    const def = glassEasel.registerElement({
+      template,
+      methods: {
+        f(ev: glassEasel.ShadowedEvent<unknown>) {
+          expect(ev.target.id).toBe('b')
+          eventOrder.push(1)
+        },
+      },
+    })
+    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    elem.getShadowRoot()!.getElementById('a')!.triggerEvent('customEv')
+    expect(eventOrder).toStrictEqual([1])
+  })
+
   test('catch bindings', () => {
     const eventOrder: number[] = []
     const def = glassEasel.registerElement({

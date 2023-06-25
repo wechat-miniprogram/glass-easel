@@ -8,6 +8,7 @@ import {
   GeneralBehavior,
   NormalizedComponentOptions,
   GeneralComponent,
+  ShadowedEvent,
 } from '..'
 import { DataChange } from '../data_proxy'
 import { GlassEaselTemplateDOM } from './native_rendering'
@@ -36,6 +37,7 @@ export type ComponentTemplate = {
   content: (name: string) => ProcGen
   updateMode?: string
   disallowNativeNode?: boolean
+  eventObjectFilter?: (x: ShadowedEvent<unknown>) => ShadowedEvent<unknown>
   procGenWrapperType?: typeof ProcGenWrapper
 }
 
@@ -61,6 +63,7 @@ class GlassEaselTemplate implements templateEngine.Template {
   genObjectGroupEnv: ProcGenEnv
   updateMode: string
   disallowNativeNode: boolean
+  eventObjectFilter?: (x: ShadowedEvent<unknown>) => ShadowedEvent<unknown>
 
   constructor(behavior: GeneralBehavior) {
     if (typeof behavior._$template !== 'object' && behavior._$template !== undefined) {
@@ -77,6 +80,7 @@ class GlassEaselTemplate implements templateEngine.Template {
     }
     this.updateMode = c.updateMode || ''
     this.disallowNativeNode = c.disallowNativeNode || false
+    this.eventObjectFilter = c.eventObjectFilter
   }
 
   createInstance(comp: GeneralComponent): templateEngine.TemplateInstance {
@@ -105,7 +109,12 @@ class GlassEaselTemplateInstance implements templateEngine.TemplateInstance {
     this.comp = comp
     this.shadowRoot = ShadowRoot.createShadowRoot(comp)
     this.shadowRoot.destroyBackendElementOnDetach()
-    this.procGenWrapper = new ProcGenWrapper(this.shadowRoot, procGen, template.disallowNativeNode)
+    this.procGenWrapper = new ProcGenWrapper(
+      this.shadowRoot,
+      procGen,
+      template.disallowNativeNode,
+      template.eventObjectFilter,
+    )
   }
 
   initValues(data: DataValue): ShadowRoot | ExternalShadowRoot {
