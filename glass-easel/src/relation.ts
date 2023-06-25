@@ -162,22 +162,22 @@ export class Relation {
       const oldLink = links[i]!
       let newLink: { target: GeneralComponent; def: RelationDefinition } | null = null
       const def = selfDefs[i]!
-      let parentBeheviorTest:
+      let parentBehaviorTest:
         | GeneralBehavior
         | TraitBehavior<{ [x: string]: unknown }, { [x: string]: unknown }>
         | null
       if (def.target instanceof Behavior || def.target instanceof TraitBehavior) {
-        parentBeheviorTest = def.target
+        parentBehaviorTest = def.target
       } else {
         const space = comp.getRootBehavior().ownerSpace
         if (space) {
-          parentBeheviorTest = space._$getBehavior(def.target, def.domain) || null
+          parentBehaviorTest = space._$getBehavior(def.target, def.domain) || null
         } else {
-          parentBeheviorTest = null
+          parentBehaviorTest = null
         }
       }
-      if (parentBeheviorTest) {
-        const parentBehevior = parentBeheviorTest
+      if (parentBehaviorTest) {
+        const parentBehavior = parentBehaviorTest
         if (!isDetach) {
           let cur: Element = comp
           for (;;) {
@@ -188,7 +188,7 @@ export class Relation {
               continue
             }
             if (cur instanceof Component) {
-              if (cur.hasBehavior(parentBehevior)) {
+              if (cur.hasBehavior(parentBehavior)) {
                 const parentRelation = cur._$relation
                 if (parentRelation) {
                   let rt

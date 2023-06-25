@@ -22,7 +22,7 @@ export const enum ElementIteratorType {
 /**
  * An iterator for node tree traversal
  *
- * This iterator is convinient but seems a little slower.
+ * This iterator is convenient but seems a little slower.
  */
 export class ElementIterator {
   private _$node: Node

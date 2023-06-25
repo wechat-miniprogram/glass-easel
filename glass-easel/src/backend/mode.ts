@@ -41,12 +41,12 @@ export type CSSRule = {
   weightLowBits: number
 }
 
-export type GetMatchedRulesResponese = {
+export type GetMatchedRulesResponses = {
   inline: CSSProperty[]
   rules: CSSRule[]
 }
 
-export type GetAllComputedStylesResponese = {
+export type GetAllComputedStylesResponses = {
   properties: CSSProperty[]
 }
 
