@@ -17,7 +17,7 @@ fn dash_to_camel(s: &str) -> String {
             next_upper = true;
         } else if next_upper {
             next_upper = false;
-            camel_name.push_str(&c.to_uppercase().to_string());
+            camel_name.push(c.to_ascii_uppercase());
         } else {
             camel_name.push(c);
         }

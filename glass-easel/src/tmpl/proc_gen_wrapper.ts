@@ -64,7 +64,7 @@ export const dataValueToString = (v: DataValue): string => {
 }
 
 const dashToCamelCase = (dash: string): string => {
-  const ret = dash.indexOf('-') <= 0 ? dash : dash.replace(/-[a-z]/g, (s) => s[1]!.toUpperCase())
+  const ret = dash.replace(/-(.|$)/g, (s) => (s[1] ? s[1].toUpperCase() : ''))
   return ret
 }
 
