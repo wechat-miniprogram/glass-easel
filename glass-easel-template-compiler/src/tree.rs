@@ -1439,10 +1439,20 @@ impl TmplAttr {
             TmplAttrKind::ModelProperty { name }
             | TmplAttrKind::PropertyOrExternalClass { name } => {
                 let attr_name = gen_lit_str(&name);
+                let method = if name.starts_with("bind")
+                    || name.starts_with("capture-bind")
+                    || name.starts_with("catch")
+                    || name.starts_with("capture-catch")
+                    || name.starts_with("on")
+                {
+                    "R.r"
+                } else {
+                    "O"
+                };
                 match &self.value {
                     TmplAttrValue::Static(v) => {
                         w.expr_stmt(|w| {
-                            write!(w, "if(C)O(N,{},{})", attr_name, gen_lit_str(v))?;
+                            write!(w, "if(C){}(N,{},{})", method, attr_name, gen_lit_str(v))?;
                             Ok(())
                         })?;
                     }
@@ -1454,7 +1464,7 @@ impl TmplAttr {
                         w.expr_stmt(|w| {
                             write!(w, "if(C||K||")?;
                             p.lvalue_state_expr(w, scopes)?;
-                            write!(w, ")O(N,{},", attr_name)?;
+                            write!(w, "){}(N,{},", method, attr_name)?;
                             p.value_expr(w)?;
                             if let TmplAttrKind::ModelProperty { .. } = &self.kind {
                                 write!(w, ",")?;
@@ -1468,7 +1478,7 @@ impl TmplAttr {
                                 binding_map_keys.to_proc_gen_write_map(w, bmc, |w| {
                                     let p = expr.to_proc_gen_prepare(w, scopes)?;
                                     w.expr_stmt(|w| {
-                                        write!(w, "O(N,{},", attr_name)?;
+                                        write!(w, "{}(N,{},", method, attr_name)?;
                                         p.value_expr(w)?;
                                         if let TmplAttrKind::ModelProperty { .. } = &self.kind {
                                             write!(w, ",")?;
