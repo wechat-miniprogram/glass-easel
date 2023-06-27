@@ -139,6 +139,13 @@ type DefineSlot = (name: string | undefined, slotValueInit?: (elem: Element) => 
 
 type DefinePureVirtualNode = (children: DefineChildren, slot: string | undefined) => void
 
+type EventObjectFilter = (x: ShadowedEvent<unknown>) => ShadowedEvent<unknown>
+
+let _globalEventObjectFilter: EventObjectFilter = emptyFilter
+export const setGlobalEventObjectFilter = (eventObjectFilter: EventObjectFilter) => {
+  _globalEventObjectFilter = eventObjectFilter
+}
+
 export class ProcGenWrapper {
   shadowRoot: ShadowRoot
   procGen: ProcGen
@@ -891,14 +898,20 @@ export class ProcGenWrapper {
     capture: boolean,
     isDynamic: boolean,
   ) {
-    const handler = typeof v === 'function' ? this.eventListenerFilter(v) : dataValueToString(v)
+    const handler =
+      typeof v === 'function' && typeof this.eventListenerFilter === 'function'
+        ? this.eventListenerFilter(v)
+        : dataValueToString(v)
     const listener = (ev: ShadowedEvent<unknown>) => {
       const host = elem.ownerShadowRoot!.getHostNode()
       let ret: boolean | undefined
       const methodCaller = host.getMethodCaller() as { [key: string]: unknown }
       const f = typeof handler === 'function' ? handler : Component.getMethod(host, handler)
       if (typeof f === 'function') {
-        const filteredEv = this.eventObjectFilter(ev)
+        const filteredEv =
+          typeof this.eventListenerFilter === 'function'
+            ? this.eventObjectFilter(ev)
+            : _globalEventObjectFilter(ev)
         ret = (f as (ev: ShadowedEvent<unknown>) => boolean | undefined).call(
           methodCaller,
           filteredEv,
@@ -953,7 +966,8 @@ export class ProcGenWrapper {
       } else {
         // compatibilities for legacy event binding syntax
         if (camelName.startsWith('bind')) {
-          this.v(
+          ProcGenWrapper.prototype.v.call(
+            typeof this !== 'undefined' ? this : ProcGenWrapper.prototype,
             elem,
             camelName.slice('bind'.length),
             dataValueToString(v),
@@ -963,7 +977,8 @@ export class ProcGenWrapper {
             true,
           )
         } else if (camelName.startsWith('captureBind')) {
-          this.v(
+          ProcGenWrapper.prototype.v.call(
+            typeof this !== 'undefined' ? this : ProcGenWrapper.prototype,
             elem,
             camelName.slice('captureBind'.length),
             dataValueToString(v),
@@ -973,7 +988,8 @@ export class ProcGenWrapper {
             true,
           )
         } else if (camelName.startsWith('catch')) {
-          this.v(
+          ProcGenWrapper.prototype.v.call(
+            typeof this !== 'undefined' ? this : ProcGenWrapper.prototype,
             elem,
             camelName.slice('catch'.length),
             dataValueToString(v),
@@ -983,7 +999,8 @@ export class ProcGenWrapper {
             true,
           )
         } else if (camelName.startsWith('captureCatch')) {
-          this.v(
+          ProcGenWrapper.prototype.v.call(
+            typeof this !== 'undefined' ? this : ProcGenWrapper.prototype,
             elem,
             camelName.slice('captureCatch'.length),
             dataValueToString(v),
@@ -993,7 +1010,8 @@ export class ProcGenWrapper {
             true,
           )
         } else if (camelName.startsWith('on')) {
-          this.v(
+          ProcGenWrapper.prototype.v.call(
+            typeof this !== 'undefined' ? this : ProcGenWrapper.prototype,
             elem,
             camelName.slice('on'.length),
             dataValueToString(v),
