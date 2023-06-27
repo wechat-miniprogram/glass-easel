@@ -329,13 +329,44 @@ describe('component utils', () => {
   test('disallowNativeNode', () => {
     const template = Object.assign(
       tmpl(`
-      <div />
-    `),
+        <div />
+      `),
       { disallowNativeNode: true },
     )
     const compDef = componentSpace.defineComponent({ template })
     const elem = glassEasel.createElement('root', compDef.general())
     expect(elem.getShadowRoot()!.childNodes[0]).toBeInstanceOf(glassEasel.Component)
+  })
+
+  test('property dash name conversion', () => {
+    const childComp = componentSpace
+      .define()
+      .property('a1b', String)
+      .template(
+        tmpl(`
+          <div>{{a1b}}</div>
+        `),
+      )
+      .registerComponent()
+    const compDef = componentSpace
+      .define()
+      .usingComponents({
+        'child-comp': childComp.general(),
+      })
+      .template(
+        tmpl(`
+          <child-comp a-1b="1" />
+          <child-comp a-1b-="2" />
+          <child-comp a1b="3" />
+        `),
+      )
+      .registerComponent()
+    const elem = glassEasel.createElement('root', compDef.general())
+    glassEasel.Element.pretendAttached(elem)
+    const shadowRoot = elem.getShadowRoot()!
+    expect(shadowRoot.childNodes[0]!.asInstanceOf(childComp)!.data.a1b).toBe('1')
+    expect(shadowRoot.childNodes[1]!.asInstanceOf(childComp)!.data.a1b).toBe('2')
+    expect(shadowRoot.childNodes[2]!.asInstanceOf(childComp)!.data.a1b).toBe('3')
   })
 
   test('propertyEarlyInit', () => {
