@@ -91,6 +91,8 @@ export class RangeListManager {
           }
           sharedKeyMap[rawKey] = [keyMap[rawKey]!, i]
           delete keyMap[rawKey]
+        } else if (sharedKeyMap?.[rawKey]) {
+          sharedKeyMap[rawKey]!.push(i)
         } else {
           keyMap[rawKey] = i
         }
