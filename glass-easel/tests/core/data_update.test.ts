@@ -479,6 +479,53 @@ describe('partial update', () => {
     expect(execArr).toStrictEqual(['1:C'])
   })
 
+  test('should be able to update list with invalid key', () => {
+    const compDef = componentSpace
+      .define()
+      .template(
+        tmpl(`
+          <block wx:for="{{ list }}" wx:key="index">{{ item.content }}</block>
+        `),
+      )
+      .data(() => ({
+        list: [{ content: 'A' }, { content: 'B' }, { content: 'C' }],
+      }))
+      .registerComponent()
+    const comp = execWithWarn(1, () =>
+      glassEasel.Component.createWithContext('root', compDef, domBackend),
+    )
+    glassEasel.Element.pretendAttached(comp)
+    const getP = () => {
+      const ret = [] as string[]
+      comp
+        .getShadowRoot()!
+        .childNodes[0]!.asElement()!
+        .childNodes.forEach((child) => {
+          ret.push(child.asElement()!.childNodes[0]!.asTextNode()!.textContent)
+        })
+      return ret
+    }
+    expect(getP()).toStrictEqual(['A', 'B', 'C'])
+    execWithWarn(1, () =>
+      comp.setData({
+        list: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }],
+      }),
+    )
+    expect(getP()).toStrictEqual(['A', 'B', 'C', 'D'])
+    execWithWarn(1, () =>
+      comp.setData({
+        list: [{ content: 'A' }, { content: 'B' }],
+      }),
+    )
+    expect(getP()).toStrictEqual(['A', 'B'])
+    execWithWarn(1, () =>
+      comp.setData({
+        list: [{ content: 'B' }, { content: 'A' }, { content: 'C' }],
+      }),
+    )
+    expect(getP()).toStrictEqual(['B', 'A', 'C'])
+  })
+
   test('should support custom property value comparer', () => {
     let execArr = [] as string[]
     const childCompDef = componentSpace
