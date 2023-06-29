@@ -118,6 +118,8 @@ export class Element implements NodeCast {
   /** @internal */
   _$eventTarget: EventTarget<{ [name: string]: unknown }>
 
+  private _$extraClasses: Record<string, boolean> | null = null
+
   constructor() {
     throw new Error('Element cannot be constructed directly')
   }
@@ -271,8 +273,21 @@ export class Element implements NodeCast {
 
   set class(classNames) {
     if (this.classList) {
-      this.classList.setClassNames(classNames)
+      if (this._$extraClasses === null) {
+        this.classList.setClassNames(classNames)
+        return
+      }
+      const newClassNames = [classNames]
+      Object.entries(this._$extraClasses).forEach(([name, enabled]) => {
+        if (enabled) newClassNames.push(name)
+      })
+      this.classList.setClassNames(newClassNames.join(' '))
     }
+  }
+
+  setExtraClass(className: string, value: boolean) {
+    if (this._$extraClasses === null) this._$extraClasses = {}
+    this._$extraClasses[className] = value
   }
 
   get style(): string {
