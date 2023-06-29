@@ -118,7 +118,7 @@ export class Element implements NodeCast {
   /** @internal */
   _$eventTarget: EventTarget<{ [name: string]: unknown }>
 
-  private _$extraClasses: Record<string, boolean> | null = null
+  private _$extraClasses: Record<string, boolean> | null
 
   constructor() {
     throw new Error('Element cannot be constructed directly')
@@ -156,6 +156,7 @@ export class Element implements NodeCast {
     this.ownerShadowRoot = owner
     this._$mutationObserverTarget = null
     this._$eventTarget = new EventTarget()
+    this._$extraClasses = null
   }
 
   get $$(): GeneralBackendElement | null {
