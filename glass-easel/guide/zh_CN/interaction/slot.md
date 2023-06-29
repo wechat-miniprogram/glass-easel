@@ -75,7 +75,7 @@ export const childComponent = componentSpace.defineComponent({
   template: compileTemplate(`
     <block wx:for="{{ list }}">
       <slot />
-    </div>
+    </block>
   `),
   data: {
     list: ['A', 'B', 'C'],
@@ -130,7 +130,7 @@ export const myComponent = componentSpace.defineComponent({
 ```xml
 <child>
   <div class="a" slot:listIndex="index">{{ index }}</div>
-  <block slot:item>{{ item }}</div>
+  <block slot:item>{{ item }}</block>
 </child>
 ```
 
