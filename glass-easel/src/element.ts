@@ -118,6 +118,7 @@ export class Element implements NodeCast {
   /** @internal */
   _$eventTarget: EventTarget<{ [name: string]: unknown }>
 
+  private _$originalClasses: string
   private _$extraClasses: Record<string, boolean> | null
 
   constructor() {
@@ -157,6 +158,7 @@ export class Element implements NodeCast {
     this._$mutationObserverTarget = null
     this._$eventTarget = new EventTarget()
     this._$extraClasses = null
+    this._$originalClasses = ''
   }
 
   get $$(): GeneralBackendElement | null {
@@ -278,7 +280,8 @@ export class Element implements NodeCast {
         this.classList.setClassNames(classNames)
         return
       }
-      const newClassNames = [classNames]
+      this._$originalClasses = classNames
+      const newClassNames = [this._$originalClasses]
       Object.entries(this._$extraClasses).forEach(([name, enabled]) => {
         if (enabled) newClassNames.push(name)
       })
@@ -289,8 +292,7 @@ export class Element implements NodeCast {
   setExtraClass(className: string, value: boolean) {
     if (this._$extraClasses === null) this._$extraClasses = {}
     this._$extraClasses[className] = Boolean(value)
-    // eslint-disable-next-line no-self-assign
-    this.class = this.class
+    this.class = this._$originalClasses
   }
 
   get style(): string {
