@@ -127,7 +127,7 @@ export class EventTarget<TEvents extends { [type: string]: unknown }> {
         ? FinalChanged.Added
         : FinalChanged.NotChanged
     }
-    return MutLevel.Final ? FinalChanged.Added : FinalChanged.Init
+    return mutLevel === MutLevel.Final ? FinalChanged.Added : FinalChanged.Init
   }
 
   removeListener<T extends string>(
