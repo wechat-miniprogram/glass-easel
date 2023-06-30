@@ -288,7 +288,9 @@ export class Element implements NodeCast {
 
   setExtraClass(className: string, value: boolean) {
     if (this._$extraClasses === null) this._$extraClasses = {}
-    this._$extraClasses[className] = value
+    this._$extraClasses[className] = Boolean(value)
+    // eslint-disable-next-line no-self-assign
+    this.class = this.class
   }
 
   get style(): string {
