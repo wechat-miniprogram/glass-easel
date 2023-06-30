@@ -290,7 +290,10 @@ export class Element implements NodeCast {
   }
 
   setExtraClass(className: string, value: boolean) {
-    if (this._$extraClasses === null) this._$extraClasses = {}
+    if (this._$extraClasses === null) {
+      this._$extraClasses = {}
+      this._$originalClasses = this.class
+    }
     this._$extraClasses[className] = Boolean(value)
     this.class = this._$originalClasses
   }
