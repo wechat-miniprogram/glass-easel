@@ -1040,12 +1040,12 @@ describe('Component', function () {
       expect(elem.$.c.class).toBe('c ^c ~c')
       expect(elem.$.c.$$.getAttribute('class')).toBe('c--c c')
       expect(elem.$.c.shadowRoot.querySelector('.bb').$$.getAttribute('class')).toBe(
-        'b b--b c--b bbb bb',
+        'b b--b c--b c--bbb c--bb',
       )
       expect(elem.$.c.$.b.shadowRoot.querySelector('.aa').$$.getAttribute('class')).toBe(
-        'a--a b--a c--aa a',
+        'a--a b--a c--aa c--a',
       )
-      expect(elem.$.c.$.b.$.a.$$.getAttribute('class')).toBe('a--a b--a c--aa a')
+      expect(elem.$.c.$.b.$.a.$$.getAttribute('class')).toBe('a--a b--a c--aa c--a')
     })
 
     it('should adding write ID and class prefix info to DOM when required', function () {
@@ -1212,13 +1212,13 @@ describe('Component', function () {
       )
       expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('component-external-classes-d--BBB')
       expect(elem.$.c1.$.b1.$.a2.$.child.$$.getAttribute('class')).toBe(
-        'component-external-classes-a--static CCC component-external-classes-c--CCCC component-external-classes-b--BBB',
+        'component-external-classes-a--static component-external-classes-d--CCC component-external-classes-c--CCCC component-external-classes-b--BBB',
       )
       expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
-        'CCC component-external-classes-c--CCCC component-external-classes-b--static',
+        'component-external-classes-d--CCC component-external-classes-c--CCCC component-external-classes-b--static',
       )
       expect(elem.$.c1.$.b1.$.a3.$$.getAttribute('class')).toBe(
-        'component-external-classes-d--BBB CCC component-external-classes-c--CCCC',
+        'component-external-classes-d--BBB component-external-classes-d--CCC component-external-classes-c--CCCC',
       )
       expect(elem.$.c1.$.b1.$$.getAttribute('class')).toBe('component-external-classes-d--BBB')
 
