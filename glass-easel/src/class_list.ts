@@ -57,6 +57,8 @@ export class ClassList {
   /** @internal */
   private _$extraScope: StyleScopeId | undefined
   /** @internal */
+  private _$rootScope: StyleScopeId | undefined
+  /** @internal */
   private _$alias: { [externalName: string]: string[] | null } | null
   /** @internal */
   private _$resolvedAlias: { [externalName: string]: AliasTarget[] | null } | null
@@ -81,10 +83,12 @@ export class ClassList {
       this._$defaultScope = compOptions.styleScope
       this._$extraScope =
         compOptions.extraStyleScope === null ? undefined : compOptions.extraStyleScope
+      this._$rootScope = ownerComp.classList!._$rootScope ?? this._$defaultScope
     } else {
       this._$owner = null
       this._$defaultScope = StyleScopeManager.globalScope()
       this._$extraScope = undefined
+      this._$rootScope = undefined
     }
     this._$alias = externalNameAlias
     if (externalNameAlias) {
@@ -119,7 +123,7 @@ export class ClassList {
         }
       }
     } else if (name[0] === '~') {
-      cb(this._$extraScope, name.slice(1))
+      cb(this._$rootScope, name.slice(1))
     } else if (name[0] === '^') {
       let n = name.slice(1)
       let owner = this._$owner
@@ -127,7 +131,7 @@ export class ClassList {
         n = n.slice(1)
         owner = owner._$owner
       }
-      const scopeId = owner ? owner._$defaultScope : this._$extraScope
+      const scopeId = owner ? owner._$defaultScope : this._$rootScope
       cb(scopeId, n)
     } else {
       if (this._$extraScope !== undefined) {
