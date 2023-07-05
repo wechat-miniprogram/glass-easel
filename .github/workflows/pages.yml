@@ -54,9 +54,6 @@ jobs:
       - name: Build
         run: |
           pnpm -r run build
-      - name: Generate docs for rust modules
-        run: |
-          cargo doc
       - name: Generate docs for glass-easel
         working-directory: glass-easel
         run: |
@@ -69,7 +66,6 @@ jobs:
         run: |
           mkdir github-pages
           mkdir github-pages/docs
-          mv target/doc github-pages/cargo-doc
           mv glass-easel/docs github-pages/docs/glass-easel
           mv glass-easel-miniprogram-adapter/docs github-pages/docs/glass-easel-miniprogram-adapter
       - name: Upload artifact
