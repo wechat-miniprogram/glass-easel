@@ -65,8 +65,9 @@ jobs:
       - name: Collect artifacts
         run: |
           mkdir github-pages
-          mv glass-easel/docs github-pages/glass-easel
-          mv glass-easel-miniprogram-adapter/docs github-pages/glass-easel-miniprogram-adapter
+          mkdir github-pages/docs
+          mv glass-easel/docs github-pages/docs/glass-easel
+          mv glass-easel-miniprogram-adapter/docs github-pages/docs/glass-easel-miniprogram-adapter
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
