@@ -9,21 +9,21 @@ import {
 } from './component'
 import { TextNode } from './text_node'
 import { NativeNode } from './native_node'
-import { Element } from './element'
+import { DoubleLinkedList, Element } from './element'
 import { Node } from './node'
 import { ComponentDefinitionWithPlaceholder } from './behavior'
 import { BM, BackendMode } from './backend/mode'
 import { DeepCopyStrategy, getDeepCopyStrategy } from './data_proxy'
 import { deepCopy, simpleDeepCopy } from './data_utils'
 
-const enum SlotMode {
+export const enum SlotMode {
+  Direct = 0,
   Single,
   Multiple,
   Dynamic,
 }
 
 type AppliedSlotMeta = {
-  slotName: string
   updatePathTree: { [key: string]: true } | undefined
 }
 
@@ -47,23 +47,23 @@ export class ShadowRoot extends VirtualNode {
   private _$host: GeneralComponent
   /** @internal */
   _$backendShadowRoot: backend.ShadowRootContext | null
+  private _$slotMode: SlotMode
   private _$idMap: { [id: string]: Element } | null
-  private _$slotCacheDirty: boolean
-  private _$appliedSlotCacheDirty: boolean
   private _$singleSlot?: Element | null
-  private _$appliedSingleSlot?: Element | null
-  private _$slots?: { [name: string]: Element }
-  private _$appliedSlots?: { [name: string]: Element }
-  private _$dynamicSlotSet?: Set<Element>
-  private _$appliedDynamicSlots?: Map<Element, AppliedSlotMeta>
+  private _$slots?: Record<string, Element>
+  private _$slotsList?: Record<string, DoubleLinkedList<Element>>
+  private _$dynamicSlotsInserted?: boolean
+  private _$dynamicSlots?: Map<Element, AppliedSlotMeta>
   private _$requiredSlotValueNames?: string[]
   private _$propertyPassingDeepCopy?: DeepCopyStrategy
   private _$insertDynamicSlotHandler?: (
-    slot: Element,
-    name: string,
-    slotValues: { [name: string]: unknown },
+    slots: {
+      slot: Element
+      name: string
+      slotValues: { [name: string]: unknown }
+    }[],
   ) => void
-  private _$removeDynamicSlotHandler?: (slot: Element) => void
+  private _$removeDynamicSlotHandler?: (slots: Element[]) => void
   private _$updateDynamicSlotHandler?: (
     slot: Element,
     slotValues: { [name: string]: unknown },
@@ -78,36 +78,36 @@ export class ShadowRoot extends VirtualNode {
 
   static createShadowRoot(host: GeneralComponent): ShadowRoot {
     const node = Object.create(ShadowRoot.prototype) as ShadowRoot
-    node._$initializeVirtual('shadow', null, host._$nodeTreeContext)
+    const sr =
+      BM.SHADOW || (BM.DYNAMIC && host.getBackendMode() === BackendMode.Shadow)
+        ? (host.getBackendElement() as backend.Element | null)?.getShadowRoot() || null
+        : null
+    node._$initializeVirtual('shadow', node, host._$nodeTreeContext, sr)
     node._$idMap = null
     let slotMode = SlotMode.Single
-    if (host._$definition._$options.multipleSlots) slotMode = SlotMode.Multiple
-    else if (host._$definition._$options.dynamicSlots) slotMode = SlotMode.Dynamic
-    node._$slotCacheDirty = false
-    node._$appliedSlotCacheDirty = false
+    const hostComponentOptions = host.getComponentOptions()
+    if (hostComponentOptions.multipleSlots) slotMode = SlotMode.Multiple
+    else if (hostComponentOptions.dynamicSlots) slotMode = SlotMode.Dynamic
+    else if (hostComponentOptions.directSlots) slotMode = SlotMode.Direct
+    node._$slotMode = slotMode
     if (slotMode === SlotMode.Single) {
       node._$singleSlot = null
-      node._$appliedSingleSlot = null
     } else if (slotMode === SlotMode.Multiple) {
-      node._$slots = node._$appliedSlots = Object.create(null) as { [name: string]: Element }
+      node._$slots = Object.create(null) as Record<string, Element>
+      node._$slotsList = Object.create(null) as Record<string, DoubleLinkedList<Element>>
     } else if (slotMode === SlotMode.Dynamic) {
-      node._$dynamicSlotSet = new Set()
-      node._$appliedDynamicSlots = undefined
+      node._$dynamicSlotsInserted = false
+      node._$dynamicSlots = new Map()
       node._$requiredSlotValueNames = []
       node._$propertyPassingDeepCopy = getDeepCopyStrategy(
-        host.getComponentOptions().propertyPassingDeepCopy,
+        hostComponentOptions.propertyPassingDeepCopy,
       )
       node._$insertDynamicSlotHandler = undefined
       node._$removeDynamicSlotHandler = undefined
       node._$updateDynamicSlotHandler = undefined
     }
-    const sr =
-      BM.SHADOW || (BM.DYNAMIC && host.getBackendMode() === BackendMode.Shadow)
-        ? (host.getBackendElement() as backend.Element | null)?.getShadowRoot() || null
-        : null
     node._$backendShadowRoot = sr
-    const backendElement = node._$backendShadowRoot?.getRootNode() || null
-    node._$initialize(true, backendElement, node, host._$nodeTreeContext)
+    node._$initialize(true, sr, node, host._$nodeTreeContext)
     node._$host = host
     host.shadowRoot = node
     return node
@@ -324,21 +324,17 @@ export class ShadowRoot extends VirtualNode {
     return idMap
   }
 
-  /** Get the slot element if the component is in single-slot mode, or `undefined` if not */
-  getSingleSlotElement(): Element | null | undefined {
-    return this._$singleSlot
-  }
-
   /** Get the slot element with the specified name */
   getSlotElementFromName(name: string): Element | Element[] | null {
-    if (this._$singleSlot !== undefined) return this._$singleSlot
-    if (this._$slots) {
-      return this._$slots[name] || null
+    const slotMode = this._$slotMode
+    if (slotMode === SlotMode.Direct) throw new Error('cannot get slot element in directSlots')
+    if (slotMode === SlotMode.Single) return this._$singleSlot!
+    if (slotMode === SlotMode.Multiple) {
+      return this._$slots![name] || null
     }
-    if (this._$dynamicSlotSet) {
+    if (slotMode === SlotMode.Dynamic) {
       const slots: Element[] = []
-      const iterator = this._$dynamicSlotSet.values()
-      for (let it = iterator.next(); !it.done; it = iterator.next()) {
+      for (let it = this._$subtreeSlotStart; it; it = it.next) {
         const slot = it.value
         const slotName = slot._$slotName || ''
         if (slotName === name) slots.push(slot)
@@ -354,27 +350,30 @@ export class ShadowRoot extends VirtualNode {
    * The provided node must be a valid child node of the host of this shadow root.
    * Otherwise the behavior is undefined.
    */
-  getContainingSlot(elem: Node | null): Element | null {
-    if (this._$singleSlot !== undefined) return this._$singleSlot
-    if (this._$dynamicSlotSet) {
+  calcContainingSlot(elem: Node | null): Element | null {
+    const slotMode = this._$slotMode
+    if (slotMode === SlotMode.Direct) return elem?.containingSlot || null
+    if (slotMode === SlotMode.Single) return this._$singleSlot as Element | null
+    if (slotMode === SlotMode.Dynamic) {
       if (!elem) return null
       let subTreeRoot = elem
       while (subTreeRoot.parentNode?._$inheritSlots) {
         subTreeRoot = subTreeRoot.parentNode
       }
-      const slotElement = subTreeRoot._$nodeSlotElement
+      const slotElement = subTreeRoot._$slotElement
+      // FIXME is ownerShadowRoot check necessary?
       if (slotElement?.ownerShadowRoot === this) {
         return slotElement
       }
     }
-    if (this._$slots) {
+    if (slotMode === SlotMode.Multiple) {
       let name: string
       if (elem instanceof Element) {
         name = elem._$nodeSlot
       } else {
         name = ''
       }
-      return this._$slots[name] || null
+      return this._$slots![name] || null
     }
     return null
   }
@@ -399,307 +398,333 @@ export class ShadowRoot extends VirtualNode {
    * Iterate slots
    */
   forEachSlot(f: (slot: Element) => boolean | void) {
-    if (this._$singleSlot) {
-      f(this._$singleSlot)
-    } else if (this._$slots) {
-      const slots = Object.values(this._$slots)
+    const slotMode = this._$slotMode
+    if (slotMode === SlotMode.Direct) {
+      throw new Error('Cannot iterate slots in directSlots')
+    }
+    if (slotMode === SlotMode.Single) {
+      if (this._$singleSlot) f(this._$singleSlot)
+    } else if (slotMode === SlotMode.Multiple) {
+      const slots = Object.values(this._$slots!)
       for (let i = 0; i < slots.length; i += 1) {
         if (f(slots[i]!) === false) break
       }
-    } else if (this._$dynamicSlotSet) {
-      const iterator = this._$dynamicSlotSet.values()
-      for (let next = iterator.next(); !next.done; next = iterator.next()) {
-        if (f(next.value) === false) break
+    } else if (slotMode === SlotMode.Dynamic) {
+      for (let it = this._$subtreeSlotStart; it; it = it.next) {
+        if (f(it.value) === false) break
       }
     }
   }
 
   /**
-   * Iterate elements with their slots
+   * Iterate elements with their slots (slots-inherited nodes included)
    */
-  forEachNodeInSlot(f: (node: Node, slot: Element | undefined) => boolean | void) {
-    if (this._$singleSlot) {
-      const slot = this._$singleSlot
-      const rec = (child: Node): boolean => {
-        if (f(child, slot) === false) {
-          return false
-        }
-        if (child instanceof Element) {
-          if (child._$inheritSlots) {
-            if (child.childNodes.every(rec) === false) {
-              return false
-            }
-          }
-        }
-        return true
-      }
-      this._$host.childNodes.every(rec)
-    } else if (this._$dynamicSlotSet) {
-      const rec = (child: Node) => {
-        if (f(child, this.getContainingSlot(child) || undefined) === false) {
-          return false
-        }
-        if (child instanceof Element && child._$inheritSlots) {
-          if (child.childNodes.every((child) => rec(child)) === false) {
-            return false
-          }
-        }
-        return true
-      }
-      this._$host.childNodes.every(rec)
-    } else if (this._$slots) {
-      const slots = this._$slots
-      const rec = (child: Node) => {
-        if (child instanceof Element) {
-          if (f(child, slots[child._$nodeSlot]) === false) {
-            return false
-          }
-          if (child._$inheritSlots) {
-            if (child.childNodes.every(rec) === false) {
-              return false
-            }
-          }
-        } else {
-          if (f(child, slots['']) === false) {
-            return false
-          }
-        }
-        return true
-      }
-      this._$host.childNodes.every(rec)
+  forEachNodeInSlot(f: (node: Node, slot: Element | null | undefined) => boolean | void) {
+    const childNodes = this._$host.childNodes
+    for (let i = 0; i < childNodes.length; i += 1) {
+      if (!Element.forEachNodeInSlot(childNodes[i]!, f)) return false
     }
+    return true
   }
 
   /**
-   * Iterate elements in specified slot
+   * Iterate elements in specified slot (slots-inherited nodes included)
    */
-  forEachNodeInSpecifiedSlot(slot: Element | string, f: (node: Node, posIndex: number) => void) {
-    if (this._$singleSlot) {
-      if (slot !== '' && this._$singleSlot !== slot) return
-      const rec = (child: Node, index: number) => {
-        f(child, index)
-        if (child instanceof Element) {
-          if (child._$inheritSlots) {
-            child.childNodes.forEach(rec)
-          }
+  forEachNodeInSpecifiedSlot(slot: Element | null, f: (node: Node) => boolean | void): boolean {
+    if (slot) {
+      const childNodes = slot.slotNodes!
+      for (let i = 0; i < childNodes.length; i += 1) {
+        const node = childNodes[i]!
+        if (f(node) === false) return false
+      }
+      return true
+    }
+    return this.forEachNodeInSlot((node, slot) => (slot === null ? f(node) : true))
+  }
+
+  /**
+   * Iterate elements with their slots (slots-inherited nodes not included)
+   */
+  forEachSlotContentInSlot(f: (node: Node, slot: Element | null | undefined) => boolean | void) {
+    const childNodes = this._$host.childNodes
+    for (let i = 0; i < childNodes.length; i += 1) {
+      if (!Element.forEachSlotContentInSlot(childNodes[i]!, f)) return false
+    }
+    return true
+  }
+
+  /**
+   * Iterate elements in specified slot (slots-inherited nodes not included)
+   */
+  forEachSlotContentInSpecifiedSlot(
+    slot: Element | null,
+    f: (node: Node) => boolean | void,
+  ): boolean {
+    if (slot) {
+      const childNodes = slot.slotNodes!
+      for (let i = 0; i < childNodes.length; i += 1) {
+        const node = childNodes[i]!
+        if (!node._$inheritSlots && f(node) === false) return false
+      }
+      return true
+    }
+    return this.forEachSlotContentInSlot((node, slot) => (slot === null ? f(node) : true))
+  }
+
+  /**
+   * Check whether a node is attached to this shadow root
+   */
+  isAttached(node: Node): boolean {
+    if (node.ownerShadowRoot !== this) return false
+    for (let p: Node | null = node; p; p = p.parentNode) {
+      if (p === this) return true
+    }
+    return false
+  }
+
+  /** @internal */
+  private _$applyMultipleSlotInsertion(slot: Element, slotName: string, _move: boolean): void {
+    const slotsList = this._$slotsList!
+    const slots = this._$slots!
+
+    // assume that slot name duplication is very rare in practice,
+    // so the complexity without name duplication is priority guaranteed.
+    if (slotsList[slotName]) {
+      const firstSlot = slotsList[slotName]!
+      let insertPos = { next: firstSlot } as DoubleLinkedList<Element> // this is a pointer to pointer
+      let insertBeforeFirst = true
+      for (let jt = this._$subtreeSlotStart; jt && insertPos.next; jt = jt.next) {
+        if (jt.value === slot) break
+        if (jt.value === insertPos.next.value) {
+          insertBeforeFirst = false
+          insertPos = insertPos.next
         }
       }
-      this._$host.childNodes.forEach(rec)
-    } else if (this._$dynamicSlotSet) {
-      if (typeof slot === 'string') return
-      const recInheritedSlot = (child: Node, index: number) => {
-        f(child, index)
-        if (child instanceof Element && child._$inheritSlots) {
-          child.childNodes.forEach(recInheritedSlot)
-        }
+      if (insertBeforeFirst) {
+        slotsList[slotName] = firstSlot.prev = { value: slot, next: firstSlot }
+      } else {
+        const next = insertPos.next
+        insertPos.next = { value: slot, prev: insertPos, next }
+        if (next) next.prev = insertPos.next
       }
-      const rec = (child: Node, index: number) => {
-        if (this.getContainingSlot(child) !== slot) return
-        f(child, index)
-        if (child instanceof Element && child._$inheritSlots) {
-          child.childNodes.forEach(recInheritedSlot)
-        }
+    } else {
+      slotsList[slotName] = { value: slot }
+    }
+    const oldSlot = slots[slotName]
+    const newSlot = slotsList[slotName]!.value
+    if (oldSlot === newSlot) return
+    slots[slotName] = newSlot
+    Element._$insertChildReassignSlot(this, slotName, oldSlot || null, newSlot)
+  }
+
+  /** @internal */
+  private _$applyMultipleSlotsRemoval(slot: Element, slotName: string, move: boolean): void {
+    const slotsList = this._$slotsList!
+    const slots = this._$slots!
+
+    let oldSlot = slotsList[slotName]
+    for (; oldSlot; oldSlot = oldSlot.next) {
+      if (oldSlot.value === slot) break
+    }
+    if (!oldSlot) return
+    const prev = oldSlot.prev
+    const next = oldSlot.next
+    if (prev) prev.next = next
+    if (next) next.prev = prev
+
+    const firstSlotRemoved = !prev
+    if (!firstSlotRemoved) return
+
+    const newFirstSlot = next
+    if (newFirstSlot) {
+      const oldNameNewSlot = newFirstSlot.value
+      slotsList[slotName] = newFirstSlot
+      // only update slotsList if slots were moved
+      if (!move) {
+        slots[slotName] = oldNameNewSlot
+        Element._$insertChildReassignSlot(this, slotName, slot, oldNameNewSlot)
       }
-      this._$host.childNodes.forEach(rec)
-    } else if (this._$slots) {
-      if (typeof slot !== 'string' && this._$slots[slot._$slotName!] !== slot) return
-      const name = typeof slot === 'string' ? slot : slot._$slotName
-      const rec = (child: Node, index: number) => {
-        if (child instanceof Element) {
-          if (child._$nodeSlot === name) f(child, index)
-          if (child._$inheritSlots) {
-            child.childNodes.forEach(rec)
-          }
-        } else if (name === '') {
-          f(child, index)
-        }
+    } else {
+      delete slotsList[slotName]
+      // only update slotsList if slots were moved
+      if (!move) {
+        delete slots[slotName]
+        Element._$insertChildReassignSlot(this, slotName, slot, null)
       }
-      this._$host.childNodes.forEach(rec)
     }
   }
 
-  /** @internal */
-  _$markSlotCacheDirty() {
-    this._$slotCacheDirty = true
-    this._$appliedSlotCacheDirty = true
-  }
+  applySlotRename(slot: Element, newName: string, oldName: string): void {
+    const slotMode = this._$slotMode
 
-  /** @internal */
-  _$checkSlotChanges(): void {
-    if (!this._$appliedSlotCacheDirty) return
-    this._$appliedSlotCacheDirty = false
-    if (this._$slotCacheDirty) this._$updateSlotCache()
-    if (BM.SHADOW || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Shadow)) return
+    // single slot does not care slot name
+    if (slotMode === SlotMode.Single || slotMode === SlotMode.Direct) return
 
-    // for dynamic slotting, invoke slot handlers
-    if (this._$dynamicSlotSet) {
-      const appliedDynamicSlots = this._$appliedDynamicSlots
-      if (!appliedDynamicSlots) return
-      const dynamicSlotSet = this._$dynamicSlotSet
+    // for multiple slots, reassign slot contents
+    if (slotMode === SlotMode.Multiple) {
+      this._$applyMultipleSlotsRemoval(slot, oldName, false)
+      this._$applyMultipleSlotInsertion(slot, newName, false)
+      return
+    }
+
+    // for dynamic slotting, destroy and re-insert slot
+    if (slotMode === SlotMode.Dynamic) {
+      // wait until applySlotUpdates
+      if (!this._$dynamicSlotsInserted) return
       const insertDynamicSlot = this._$insertDynamicSlotHandler
       const removeDynamicSlot = this._$removeDynamicSlotHandler
-      const removeIter = appliedDynamicSlots.keys()
-      for (let it = removeIter.next(); !it.done; it = removeIter.next()) {
+      this._$dynamicSlots!.set(slot, { updatePathTree: undefined })
+      removeDynamicSlot?.([slot])
+      insertDynamicSlot?.([{ slot, name: newName, slotValues: slot._$slotValues! }])
+    }
+  }
+
+  applySlotsInsertion(
+    slotStart: DoubleLinkedList<Element>,
+    slotEnd: DoubleLinkedList<Element>,
+    move: boolean,
+  ): void {
+    const slotMode = this._$slotMode
+
+    // for direct slotting, do nothing
+    if (slotMode === SlotMode.Direct) return
+
+    if (slotMode === SlotMode.Single) {
+      const oldSlot = this._$singleSlot
+      const newSlot = this._$subtreeSlotStart!.value
+      if (oldSlot === newSlot) return
+
+      this._$singleSlot = newSlot
+      Element._$insertChildReassignSlot(this, null, oldSlot || null, newSlot)
+      return
+    }
+
+    if (slotMode === SlotMode.Multiple) {
+      for (
+        let it: DoubleLinkedList<Element> | undefined = slotStart;
+        it && it !== slotEnd.next;
+        it = it.next
+      ) {
         const slot = it.value
-        if (!dynamicSlotSet.has(slot)) {
-          removeDynamicSlot?.(slot)
-          appliedDynamicSlots.delete(slot)
-        }
+        const slotName = slot._$slotName!
+        this._$applyMultipleSlotInsertion(slot, slotName, move)
       }
-      const iter = dynamicSlotSet.values()
-      for (let it = iter.next(); !it.done; it = iter.next()) {
+      return
+    }
+
+    if (slotMode === SlotMode.Dynamic) {
+      // dynamic-slotting should do nothing about slot movement
+      if (move) return
+      // wait until applySlotUpdates
+      if (!this._$dynamicSlotsInserted) return
+      const insertDynamicSlot = this._$insertDynamicSlotHandler
+      const slots: { slot: Element; name: string; slotValues: { [name: string]: unknown } }[] = []
+      for (
+        let it: DoubleLinkedList<Element> | undefined = slotStart;
+        it && it !== slotEnd.next;
+        it = it.next
+      ) {
         const slot = it.value
-        const slotName = slot._$slotName || ''
-        const appliedSlot = appliedDynamicSlots.get(slot)
-        if (appliedSlot !== undefined) {
-          if (appliedSlot.slotName !== slotName) {
-            removeDynamicSlot?.(slot)
-            insertDynamicSlot?.(slot, slotName, slot._$slotValues!)
-            appliedDynamicSlots.set(slot, { slotName, updatePathTree: undefined })
-          }
-        } else {
-          insertDynamicSlot?.(slot, slotName, slot._$slotValues!)
-          appliedDynamicSlots.set(slot, { slotName, updatePathTree: undefined })
-        }
+        const slotName = slot._$slotName!
+        this._$dynamicSlots!.set(slot, { updatePathTree: undefined })
+        slots.push({ slot, name: slotName, slotValues: slot._$slotValues! })
       }
-      return
-    }
-
-    // in single slot mode, simply check changes
-    if (this._$singleSlot !== undefined) {
-      const oldSingleSlot = this._$appliedSingleSlot
-      if (oldSingleSlot !== this._$singleSlot) {
-        this._$appliedSingleSlot = this._$singleSlot
-        Element._$insertChildReassignSlot(this, '', oldSingleSlot!, this._$singleSlot)
-      }
-      return
-    }
-
-    // for multiple slots, compare and find slot changes
-    const oldSlots = this._$appliedSlots!
-    const newSlots = this._$slots!
-    this._$appliedSlots = newSlots
-    const oldKeys = Object.keys(oldSlots)
-    for (let i = 0; i < oldKeys.length; i += 1) {
-      const key = oldKeys[i]!
-      const oldSlot = oldSlots[key]!
-      const newSlot = newSlots[key]
-      if (oldSlot !== newSlot) {
-        Element._$insertChildReassignSlot(this, key, oldSlot, newSlot || null)
-      }
-    }
-    const newKeys = Object.keys(newSlots)
-    for (let i = 0; i < newKeys.length; i += 1) {
-      const key = newKeys[i]!
-      const oldSlot = oldSlots[key]
-      const newSlot = newSlots[key]!
-      if (oldSlot === undefined) {
-        Element._$insertChildReassignSlot(this, key, null, newSlot || null)
-      }
+      insertDynamicSlot?.(slots)
     }
   }
 
-  private _$updateSlotCache() {
-    this._$slotCacheDirty = false
+  applySlotsRemoval(
+    slotStart: DoubleLinkedList<Element>,
+    slotEnd: DoubleLinkedList<Element>,
+    move: boolean,
+  ): void {
+    const slotMode = this._$slotMode
 
-    // in single slot mode, find the slot
-    if (this._$singleSlot !== undefined) {
-      let slot: Element | undefined
-      const rec = (child: Node): boolean => {
-        if (child instanceof Element) {
-          if (child._$slotName !== null) {
-            slot = child
-            return false
-          }
-          if (child.childNodes.every(rec) === false) {
-            return false
-          }
-        }
-        return true
-      }
-      this.childNodes.every(rec)
-      this._$singleSlot = slot || null
+    // for direct slotting, do nothing
+    if (slotMode === SlotMode.Direct) return
+
+    if (slotMode === SlotMode.Single) {
+      // will call applySLotsInsertion after if slots were moved
+      // no need to do anything here
+      if (move) return
+      const oldSlot = this._$singleSlot
+      const newSlot = this._$subtreeSlotStart?.value
+      if (oldSlot === newSlot) return
+
+      this._$singleSlot = newSlot
+      Element._$insertChildReassignSlot(this, null, oldSlot || null, newSlot || null)
       return
     }
 
-    // for dynamic slotting, collect the slots
-    if (this._$dynamicSlotSet) {
-      const dynamicSlotSet = new Set<Element>()
-      const rec = (child: Node): void => {
-        if (child instanceof Element) {
-          if (child._$slotName !== null) {
-            dynamicSlotSet.add(child)
-          }
-          child.childNodes.forEach(rec)
-        }
+    if (slotMode === SlotMode.Multiple) {
+      for (
+        let it: DoubleLinkedList<Element> | undefined = slotStart;
+        it && it !== slotEnd.next;
+        it = it.next
+      ) {
+        const slot = it.value
+        const slotName = slot._$slotName!
+        this._$applyMultipleSlotsRemoval(slot, slotName, move)
       }
-      this.childNodes.forEach(rec)
-      this._$dynamicSlotSet = dynamicSlotSet
       return
     }
 
-    // for multiple slots, collect the slots
-    const slots = Object.create(null) as { [name: string]: Element }
-    const rec = (child: Node): void => {
-      if (child instanceof Element) {
-        if (child._$slotName !== null) {
-          if (!slots[child._$slotName]) {
-            slots[child._$slotName] = child
-          }
-        }
-        child.childNodes.forEach(rec)
+    if (slotMode === SlotMode.Dynamic) {
+      // dynamic-slotting should do nothing about slot movement
+      if (move) return
+      // wait until applySlotUpdates
+      if (!this._$dynamicSlotsInserted) return
+      const removeDynamicSlot = this._$removeDynamicSlotHandler
+      const slots: Element[] = []
+      for (
+        let it: DoubleLinkedList<Element> | undefined = slotStart;
+        it && it !== slotEnd.next;
+        it = it.next
+      ) {
+        const slot = it.value
+        this._$dynamicSlots!.delete(slot)
+        slots.push(slot)
       }
+      removeDynamicSlot?.(slots)
     }
-    this.childNodes.forEach(rec)
-    this._$slots = slots
-  }
-
-  /**
-   * Returns `true` if the component is in multiple-slot mode
-   */
-  isMultipleSlots(): boolean {
-    return this._$slots !== undefined
-  }
-
-  /**
-   * Returns `true` if the component is in dynamic-slot mode
-   */
-  isDynamicSlots(): boolean {
-    return this._$dynamicSlotSet !== undefined
   }
 
   /**
    * Set the dynamic slot handlers
    *
-   * The updated value should be applied with `applySlotUpdates` call.
    * If the handlers have not been set yet,
-   * the `insertSlotHandler` will be called for each slot that has been added to the shadow tree.
+   * the `insertSlotHandler` will be called for each slot that has been added to the shadow tree,
+   * otherwise call `updateSlotHandler` for each slots.
    */
   setDynamicSlotHandler(
     requiredSlotValueNames: string[],
     insertSlotHandler: (
-      slot: Element,
-      name: string,
-      slotValues: { [name: string]: unknown },
+      slots: {
+        slot: Element
+        name: string
+        slotValues: { [name: string]: unknown }
+      }[],
     ) => void,
-    removeSlotHandler: (slot: Element) => void,
+    removeSlotHandler: (slots: Element[]) => void,
     updateSlotHandler: (
       slot: Element,
       slotValues: { [name: string]: unknown },
       updatePathTree: { [name: string]: true },
     ) => void,
   ) {
+    if (this._$slotMode !== SlotMode.Dynamic) return
+
     this._$requiredSlotValueNames = requiredSlotValueNames
     this._$insertDynamicSlotHandler = insertSlotHandler
     this._$removeDynamicSlotHandler = removeSlotHandler
     this._$updateDynamicSlotHandler = updateSlotHandler
-    if (this._$appliedDynamicSlots) {
-      const iter = this._$appliedDynamicSlots.values()
+
+    if (this._$dynamicSlotsInserted) {
+      const iter = this._$dynamicSlots!.values()
       for (let it = iter.next(); !it.done; it = iter.next()) {
         const slotMeta = it.value
-        if (!slotMeta.updatePathTree) {
-          slotMeta.updatePathTree = Object.create(null) as { [key: string]: true }
-        }
+        slotMeta.updatePathTree =
+          slotMeta.updatePathTree || (Object.create(null) as Record<string, true>)
       }
     }
   }
@@ -725,63 +750,216 @@ export class ShadowRoot extends VirtualNode {
    */
   replaceSlotValue(slot: Element, name: string, value: unknown): void {
     const slotValues = slot._$slotValues
-    if (slotValues) {
-      const oldValue = slotValues[name]
-      let newValue = value
-      if (this._$propertyPassingDeepCopy !== DeepCopyStrategy.None) {
-        if (this._$propertyPassingDeepCopy === DeepCopyStrategy.SimpleWithRecursion) {
-          newValue = deepCopy(value, true)
-        } else {
-          newValue = simpleDeepCopy(value)
-        }
-      }
-      if (oldValue !== newValue) {
-        slotValues[name] = newValue
-        if (this._$requiredSlotValueNames!.indexOf(name) >= 0) {
-          const slotMeta = this._$appliedDynamicSlots?.get(slot)
-          if (slotMeta) {
-            if (!slotMeta.updatePathTree) {
-              slotMeta.updatePathTree = Object.create(null) as { [key: string]: true }
-            }
-            slotMeta.updatePathTree[name] = true
-          }
-        }
+    if (!slotValues) return
+    const oldValue = slotValues[name]
+    let newValue = value
+    if (this._$propertyPassingDeepCopy !== DeepCopyStrategy.None) {
+      if (this._$propertyPassingDeepCopy === DeepCopyStrategy.SimpleWithRecursion) {
+        newValue = deepCopy(value, true)
+      } else {
+        newValue = simpleDeepCopy(value)
       }
     }
+    if (oldValue === newValue) return
+    slotValues[name] = newValue
+    if (this._$requiredSlotValueNames!.indexOf(name) < 0) return
+    const slotMeta = this._$dynamicSlots?.get(slot)
+    if (!slotMeta) return
+    if (!slotMeta.updatePathTree) {
+      slotMeta.updatePathTree = Object.create(null) as { [key: string]: true }
+    }
+    slotMeta.updatePathTree[name] = true
   }
 
   /**
    * Apply slot value updates
    */
   applySlotValueUpdates(slot: Element) {
-    const slotMeta = this._$appliedDynamicSlots?.get(slot)
+    const slotMeta = this._$dynamicSlots?.get(slot)
     const slotValueUpdatePathTree = slotMeta?.updatePathTree
-    if (slotValueUpdatePathTree) {
-      slotMeta.updatePathTree = undefined
-      this._$updateDynamicSlotHandler?.(slot, slot._$slotValues!, slotValueUpdatePathTree)
-    }
+    if (!slotValueUpdatePathTree) return
+    slotMeta.updatePathTree = undefined
+    this._$updateDynamicSlotHandler?.(slot, slot._$slotValues!, slotValueUpdatePathTree)
   }
 
-  /**
-   * Apply all pending slot updates
-   */
   applySlotUpdates(): void {
-    if (this._$appliedDynamicSlots) {
-      // if slots has been initialized, mark all of them dirty
-      const iter = this._$appliedDynamicSlots.entries()
+    if (!this._$dynamicSlotsInserted) {
+      this._$dynamicSlotsInserted = true
+      const insertDynamicSlot = this._$insertDynamicSlotHandler
+      const slots: { slot: Element; name: string; slotValues: { [name: string]: unknown } }[] = []
+      for (let it = this._$subtreeSlotStart; it; it = it.next) {
+        const slot = it.value
+        const slotName = slot._$slotName!
+        this._$dynamicSlots!.set(slot, { updatePathTree: undefined })
+        slots.push({ slot, name: slotName, slotValues: slot._$slotValues! })
+      }
+      insertDynamicSlot?.(slots)
+    } else {
+      const iter = this._$dynamicSlots!.entries()
       for (let it = iter.next(); !it.done; it = iter.next()) {
         const [slot, slotMeta] = it.value
-        const slotValueUpdatePathTree = slotMeta?.updatePathTree
+        const slotValueUpdatePathTree = slotMeta.updatePathTree
         if (slotValueUpdatePathTree) {
           slotMeta.updatePathTree = undefined
           this._$updateDynamicSlotHandler?.(slot, slot._$slotValues!, slotValueUpdatePathTree)
         }
       }
-    } else {
-      // if slots is not initialized, try initialize them
-      this._$appliedDynamicSlots = new Map()
-      this._$appliedSlotCacheDirty = true
-      this._$checkSlotChanges()
+    }
+  }
+
+  /**
+   * Get slot mode
+   */
+  getSlotMode(): SlotMode {
+    return this._$slotMode
+  }
+
+  static _$updateSubtreeSlotNodes(
+    parentNode: Element,
+    elements: Node[],
+    shadowRoot: ShadowRoot | null,
+    oldShadowRoot: ShadowRoot | null,
+    posIndex: number,
+  ):
+    | { updateContainingSlot: () => void; removeSlotNodes: () => void; insertSlotNodes: () => void }
+    | undefined {
+    if (!shadowRoot && !oldShadowRoot) return undefined
+
+    const slotMode = shadowRoot?.getSlotMode()
+    const oldSlotMode = oldShadowRoot?.getSlotMode()
+
+    if (
+      (slotMode === undefined || slotMode === SlotMode.Direct) &&
+      (oldSlotMode === undefined || oldSlotMode === SlotMode.Direct)
+    ) {
+      return undefined
+    }
+
+    if (
+      (slotMode === undefined || slotMode === SlotMode.Single) &&
+      (oldSlotMode === undefined || oldSlotMode === SlotMode.Single)
+    ) {
+      let removeStart = -1
+      let removeCount = 0
+      let insertPos = -1
+      const slotNodesToUpdate: Node[] = []
+      const oldContainingSlot = elements[0]!.containingSlot
+      const containingSlot = shadowRoot?.calcContainingSlot(elements[0]!)
+
+      for (let i = 0; i < elements.length; i += 1) {
+        const elem = elements[i]!
+        // eslint-disable-next-line no-loop-func
+        Element.forEachNodeInSlot(elem, (node) => {
+          if (oldContainingSlot) {
+            if (removeCount) {
+              removeCount += 1
+            } else {
+              removeStart = node.slotIndex!
+              removeCount = 1
+            }
+          }
+
+          slotNodesToUpdate.push(node)
+        })
+      }
+
+      if (containingSlot && slotNodesToUpdate.length) {
+        const firstSlotNode = slotNodesToUpdate[0]!
+        insertPos = Element.findSlotNodeInsertPosition(containingSlot, firstSlotNode, posIndex)
+      }
+
+      return {
+        updateContainingSlot: () => {
+          for (let i = slotNodesToUpdate.length - 1; i >= 0; i -= 1) {
+            const node = slotNodesToUpdate[i]!
+            Element.updateContainingSlot(node, containingSlot)
+          }
+        },
+        removeSlotNodes: () => {
+          if (oldShadowRoot && oldContainingSlot && removeCount) {
+            Element.spliceSlotNodes(oldContainingSlot, removeStart, removeCount, undefined)
+          }
+        },
+        insertSlotNodes: () => {
+          if (shadowRoot && containingSlot && slotNodesToUpdate.length) {
+            Element.spliceSlotNodes(containingSlot, insertPos, 0, slotNodesToUpdate)
+          }
+        },
+      }
+    }
+    const slotNodesToInsertMap = new Map<Element, { nodes: Node[]; insertPos: number }>()
+    const slotNodesToRemoveMap = new Map<Element, { start: number; count: number }>()
+
+    const slotNodesWithContainingSlot: [Node, Element | undefined | null][] = []
+
+    for (let i = 0; i < elements.length; i += 1) {
+      const elem = elements[i]!
+      Element.forEachNodeInSlot(elem, (node, oldContainingSlot) => {
+        const containingSlot =
+          slotMode !== SlotMode.Direct ? shadowRoot?.calcContainingSlot(node) : undefined
+
+        if (oldContainingSlot) {
+          const slotNodesToRemove = slotNodesToRemoveMap.get(oldContainingSlot)
+          if (slotNodesToRemove) {
+            slotNodesToRemove.count += 1
+          } else {
+            slotNodesToRemoveMap.set(oldContainingSlot, { start: node.slotIndex!, count: 1 })
+          }
+        }
+
+        if (containingSlot) {
+          const slotNodesToInsert = slotNodesToInsertMap.get(containingSlot)
+          if (slotNodesToInsert) {
+            slotNodesToInsert.nodes.push(node)
+          } else {
+            slotNodesToInsertMap.set(containingSlot, { nodes: [node], insertPos: -1 })
+          }
+        }
+
+        slotNodesWithContainingSlot.push([node, containingSlot])
+      })
+    }
+
+    if (shadowRoot && slotNodesToInsertMap.size) {
+      const iter = slotNodesToInsertMap.entries()
+
+      for (let it = iter.next(); !it.done; it = iter.next()) {
+        const [slot, { nodes: slotNodesToInsert }] = it.value
+        const firstSlotNodeToInsert = slotNodesToInsert[0]!
+        it.value[1].insertPos = Element.findSlotNodeInsertPosition(
+          slot,
+          firstSlotNodeToInsert,
+          posIndex,
+        )
+      }
+    }
+
+    return {
+      updateContainingSlot: () => {
+        for (let i = slotNodesWithContainingSlot.length - 1; i >= 0; i -= 1) {
+          const [node, containingSlot] = slotNodesWithContainingSlot[i]!
+          Element.updateContainingSlot(node, containingSlot)
+        }
+      },
+      removeSlotNodes: () => {
+        if (oldShadowRoot && slotNodesToRemoveMap.size) {
+          const iter = slotNodesToRemoveMap.entries()
+          for (let it = iter.next(); !it.done; it = iter.next()) {
+            const [slot, { start, count }] = it.value
+            Element.spliceSlotNodes(slot, start, count, undefined)
+          }
+        }
+      },
+      insertSlotNodes: () => {
+        if (shadowRoot && slotNodesToInsertMap.size) {
+          const iter = slotNodesToInsertMap.entries()
+
+          for (let it = iter.next(); !it.done; it = iter.next()) {
+            const [slot, { nodes: slotNodesToInsert, insertPos }] = it.value
+            Element.spliceSlotNodes(slot, insertPos, 0, slotNodesToInsert)
+          }
+        }
+      },
     }
   }
 }

@@ -465,6 +465,7 @@ export class Component<
     const external = options.externalComponent
     const propEarlyInit = options.propertyEarlyInit
     const writeExtraInfoToAttr = globalOptions.writeExtraInfoToAttr
+    const virtualHost = options.virtualHost
 
     // initialize component instance object
     const comp = Object.create(proto) as ComponentInstance<TData, TProperty, TMethod>
@@ -475,49 +476,47 @@ export class Component<
     comp._$methodCaller = comp
 
     // create backend element
-    let backendElement: GeneralBackendElement | null
-    if (options.virtualHost) {
-      backendElement = null
-      comp._$initialize(true, null, owner, nodeTreeContext)
-      if (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Shadow)) {
-        if (owner) {
-          const backend = owner._$backendShadowRoot
-          backendElement = backend?.createComponent(tagName, true) || null
-        } else {
-          const sr = (nodeTreeContext as backend.Context).getRootNode().getShadowRoot()
-          if (!sr) throw new Error('Failed getting backend shadow tree')
-          backendElement = sr.createComponent(tagName, false) || null
-        }
-      }
-    } else if (owner) {
-      if (BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike)) {
+    let backendElement: GeneralBackendElement | null = null
+    if (owner) {
+      if (
+        !virtualHost &&
+        (BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike))
+      ) {
         backendElement = (owner._$nodeTreeContext as domlikeBackend.Context).document.createElement(
           tagName,
         )
-      } else if (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Shadow)) {
-        const backend = owner._$backendShadowRoot
-        backendElement = backend?.createComponent(tagName, false) || null
-      } else {
+      } else if (
+        !virtualHost &&
+        (BM.COMPOSED || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Composed))
+      ) {
         const backend = owner._$nodeTreeContext as composedBackend.Context
         backendElement = backend.createElement(options.hostNodeTagName, tagName)
-      }
-      comp._$initialize(false, backendElement, owner, nodeTreeContext)
-    } else {
-      if (BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike)) {
-        backendElement = (nodeTreeContext as domlikeBackend.Context).document.createElement(tagName)
       } else if (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Shadow)) {
-        const sr = (nodeTreeContext as backend.Context).getRootNode().getShadowRoot()
-        if (!sr) throw new Error('Failed getting backend shadow tree')
-        backendElement = sr.createComponent(tagName, false) || null
-      } else {
+        const backend = owner._$backendShadowRoot
+        backendElement = backend?.createComponent(tagName) || null
+      }
+    } else {
+      if (
+        !virtualHost &&
+        (BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike))
+      ) {
+        backendElement = (nodeTreeContext as domlikeBackend.Context).document.createElement(tagName)
+      } else if (
+        !virtualHost &&
+        (BM.COMPOSED || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Composed))
+      ) {
         backendElement =
           (nodeTreeContext as composedBackend.Context).createElement(
             options.hostNodeTagName,
             tagName,
           ) || null
+      } else if (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Shadow)) {
+        const sr = (nodeTreeContext as backend.Context).getRootNode()
+        if (!sr) throw new Error('Failed getting backend shadow tree')
+        backendElement = sr.createComponent(tagName) || null
       }
-      comp._$initialize(false, backendElement, owner, nodeTreeContext)
     }
+    comp._$initialize(virtualHost, backendElement, owner, nodeTreeContext)
 
     // init class list
     const externalClassAlias = {} as { [externalName: string]: string[] | null }
@@ -551,9 +550,14 @@ export class Component<
     }
 
     // associate in backend
-    if (!(BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike))) {
-      if (backendElement) {
+    if (backendElement) {
+      if (!(BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike))) {
         ;(backendElement as backend.Element | composedBackend.Element).associateValue(comp)
+      } else {
+        ;(nodeTreeContext as domlikeBackend.Context).associateValue(
+          backendElement as domlikeBackend.Element,
+          comp,
+        )
       }
     }
 

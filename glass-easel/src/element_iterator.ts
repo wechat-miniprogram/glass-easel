@@ -1,6 +1,5 @@
 import { Element } from './element'
 import { TextNode } from './text_node'
-import { Component } from './component'
 import { Node } from './node'
 
 /** The iterator direction and order */
@@ -90,25 +89,14 @@ export class ElementIterator {
     const composed = this._$composed
     if (this._$isAncestor) {
       const rec = (node: Node): boolean => {
-        let prev: Node | null = null
         let cur = node
         for (;;) {
-          if (composed && prev) {
-            if (cur instanceof Component && !cur._$external) {
-              const slot = cur.getShadowRoot()!.getContainingSlot(prev)
-              if (slot) {
-                if (rec(slot) === false) break
-              } else {
-                return false
-              }
-            }
-          }
           if (cur instanceof nodeTypeLimit) {
             if (f(cur) === false) return false
           }
-          if (!cur.parentNode) break
-          prev = cur
-          cur = cur.parentNode
+          const next = composed ? cur.getComposedParent() : cur.parentNode
+          if (!next) break
+          cur = next
         }
         return true
       }

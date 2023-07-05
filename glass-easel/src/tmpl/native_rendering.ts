@@ -10,12 +10,12 @@ import {
   ShadowedEvent,
   GeneralBackendElement,
   BackendMode,
-  GeneralComponent,
 } from '..'
 import { DataChange } from '../data_proxy'
 import { ProcGenEnv, ProcGen, BindingMapGen } from './proc_gen_wrapper'
 import { ProcGenWrapperDom } from './proc_gen_wrapper_dom'
 import { ComponentTemplate, ProcGenGroupList } from './index'
+import type { GeneralComponentInstance } from '../component_params'
 
 type ElementWithEvent = Element & {
   _$wxTmplEv: { [ev: string]: (event: ShadowedEvent<unknown>) => unknown }
@@ -55,7 +55,7 @@ export class GlassEaselTemplateDOM implements templateEngine.Template {
     this.methods = behavior._$methodMap
   }
 
-  createInstance(comp: GeneralComponent): templateEngine.TemplateInstance {
+  createInstance(comp: GeneralComponentInstance): templateEngine.TemplateInstance {
     return new GlassEaselTemplateDOMInstance(this, comp)
   }
 }
@@ -64,7 +64,7 @@ export class GlassEaselTemplateDOMInstance
   implements templateEngine.TemplateInstance, ExternalShadowRoot
 {
   template: GlassEaselTemplateDOM
-  comp: GeneralComponent
+  comp: GeneralComponentInstance
   shadowRoot: ExternalShadowRoot
   shadowRootElement: Element
   root: GeneralBackendElement
@@ -74,7 +74,7 @@ export class GlassEaselTemplateDOMInstance
   procGenWrapper: ProcGenWrapperDom
   bindingMapGen: { [field: string]: BindingMapGen[] } | undefined
 
-  constructor(template: GlassEaselTemplateDOM, comp: GeneralComponent) {
+  constructor(template: GlassEaselTemplateDOM, comp: GeneralComponentInstance) {
     if (comp.getBackendMode() !== BackendMode.Domlike) {
       throw new Error(
         `Component template of ${comp.is} cannot be initialized since external rendering is only supported in Domlike backend currently.`,

@@ -1,7 +1,6 @@
 import * as backend from './backend/backend_protocol'
 import * as composedBackend from './backend/composed_backend_protocol'
 import * as domlikeBackend from './backend/domlike_backend_protocol'
-import * as suggestedBackend from './backend/suggested_backend_protocol'
 import { TextNode } from './text_node'
 import { Element } from './element'
 import { VirtualNode } from './virtual_node'
@@ -9,18 +8,15 @@ import { Component, ComponentDefinition } from './component'
 import { NativeNode } from './native_node'
 import { DataList, PropertyList, MethodList, ComponentInstance } from './component_params'
 
-export type GeneralBackendContext = (
+export type GeneralBackendContext =
   | backend.Context
   | composedBackend.Context
   | domlikeBackend.Context
-) &
-  Partial<suggestedBackend.Context>
-export type GeneralBackendElement = (
+
+export type GeneralBackendElement =
   | backend.Element
   | composedBackend.Element
   | domlikeBackend.Element
-) &
-  Partial<suggestedBackend.Element>
 
 export type Node = TextNode | Element
 
@@ -125,12 +121,12 @@ export const dumpElementToString = (elem: any, composed: boolean, tabDepth = 0) 
 
   if (elem instanceof Element) {
     if (elem instanceof Component) {
-      isExternal = elem.getComponentOptions().externalComponent
+      isExternal = elem._$external
     }
     if (composed) {
       if (isExternal) {
         ret += `\n${linePrefix}  <(external)>`
-        elem.childNodes.forEach((node) => {
+        elem.forEachComposedChild((node) => {
           ret += `\n${dumpElementToString(node, composed, tabDepth + 2)}`
         })
       } else {

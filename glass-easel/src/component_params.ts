@@ -1,7 +1,7 @@
 import {
   GeneralBehavior,
   Component,
-  GeneralComponentDefinition,
+  ComponentDefinition,
   ComponentOptions,
   GeneralComponent,
   GeneralBehaviorBuilder,
@@ -335,7 +335,7 @@ export type TaggedMethod<Fn extends ComponentMethod> = Tag<Fn, typeof METHOD_TAG
 export type UnTaggedMethod<M extends TaggedMethod<any>> = UnTag<M, typeof METHOD_TAG>
 
 export type RelationParams = {
-  target?: string | GeneralComponentDefinition | GeneralBehavior | TraitBehavior<any>
+  target?: string | ComponentDefinition<any, any, any> | GeneralBehavior | TraitBehavior<any>
   type: 'ancestor' | 'descendant' | 'parent' | 'child' | 'parent-common-node' | 'child-common-node'
   linked?: (target: GeneralComponent) => void
   linkChanged?: (target: GeneralComponent) => void
@@ -382,9 +382,9 @@ export type ComponentParams<
 > = {
   is?: string
   behaviors?: (string | GeneralBehavior)[]
-  using?: { [name: string]: string | GeneralComponentDefinition }
+  using?: { [name: string]: string | ComponentDefinition<any, any, any> }
   generics?: {
-    [name: string]: { default: string | GeneralComponentDefinition } | true
+    [name: string]: { default: string | ComponentDefinition<any, any, any> } | true
   }
   placeholders?: { [name: string]: string }
   template?: { [key: string]: any } | null

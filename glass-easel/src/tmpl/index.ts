@@ -7,9 +7,9 @@ import {
   templateEngine,
   GeneralBehavior,
   NormalizedComponentOptions,
-  GeneralComponent,
   ShadowedEvent,
 } from '..'
+import type { GeneralComponentInstance } from '../component_params'
 import { DataChange } from '../data_proxy'
 import { GlassEaselTemplateDOM } from './native_rendering'
 import {
@@ -83,20 +83,20 @@ class GlassEaselTemplate implements templateEngine.Template {
     this.eventObjectFilter = c.eventObjectFilter
   }
 
-  createInstance(comp: GeneralComponent): templateEngine.TemplateInstance {
+  createInstance(comp: GeneralComponentInstance): templateEngine.TemplateInstance {
     return new GlassEaselTemplateInstance(this, comp)
   }
 }
 
 class GlassEaselTemplateInstance implements templateEngine.TemplateInstance {
   template: GlassEaselTemplate
-  comp: GeneralComponent
+  comp: GeneralComponentInstance
   shadowRoot: ShadowRoot
   procGenWrapper: ProcGenWrapper
   bindingMapGen: { [field: string]: BindingMapGen[] } | undefined
   forceBindingMapUpdate: BindingMapUpdateEnabled
 
-  constructor(template: GlassEaselTemplate, comp: GeneralComponent) {
+  constructor(template: GlassEaselTemplate, comp: GeneralComponentInstance) {
     this.template = template
     const procGen = template.genObjectGroupEnv.group('') || DEFAULT_PROC_GEN_GROUP('')
     if (template.updateMode === 'bindingMap') {

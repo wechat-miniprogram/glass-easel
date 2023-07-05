@@ -85,6 +85,8 @@ export type ComponentOptions = {
   multipleSlots?: boolean
   /** Enable dynamic slots or not */
   dynamicSlots?: boolean
+  /** Enable direct slots or not */
+  directSlots?: boolean
   /** Write property values of components to backend with `setAttribute` */
   reflectToAttributes?: boolean
   /** Allow properties and methods to be able to visit directly in component instance */
@@ -115,6 +117,7 @@ export type NormalizedComponentOptions = {
   extraStyleScope: StyleScopeId | null
   multipleSlots: boolean
   dynamicSlots: boolean
+  directSlots: boolean
   reflectToAttributes: boolean
   writeFieldsToNode: boolean
   writeIdToDOM: boolean
@@ -153,6 +156,7 @@ export const globalOptions: NormalizedComponentOptions & EnvironmentOptions = {
   hostNodeTagName: 'wx-x',
   multipleSlots: false,
   dynamicSlots: false,
+  directSlots: false,
   reflectToAttributes: false,
   writeFieldsToNode: true,
   writeIdToDOM: false,
@@ -186,6 +190,7 @@ export const normalizeComponentOptions = (
     extraStyleScope: p.extraStyleScope !== undefined ? p.extraStyleScope : b.extraStyleScope,
     multipleSlots: p.multipleSlots !== undefined ? p.multipleSlots : b.multipleSlots,
     dynamicSlots: p.dynamicSlots !== undefined ? p.dynamicSlots : b.dynamicSlots,
+    directSlots: p.directSlots !== undefined ? p.directSlots : b.directSlots,
     reflectToAttributes:
       p.reflectToAttributes !== undefined ? p.reflectToAttributes : b.reflectToAttributes,
     writeFieldsToNode:

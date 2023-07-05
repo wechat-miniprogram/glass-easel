@@ -6,17 +6,28 @@ import { Element } from './element'
 import { MutationObserverTarget } from './mutation_observer'
 import { GeneralBackendElement, NodeCast } from './node'
 import { BM, BackendMode } from './backend/mode'
-import { Component } from './component'
 
 export class TextNode implements NodeCast {
-  private _$backendElement: GeneralBackendElement | null
+  _$backendElement: GeneralBackendElement | null
   private _$text: string
   ownerShadowRoot: ShadowRoot
   parentNode: Element | null
+  parentIndex: number
+  containingSlot: Element | null | undefined
+  slotNodes: Node[] | undefined
+  slotIndex: number | undefined
+  /** @internal */
+  _$slotElement: Element | null = null
   /** @internal */
   _$destroyOnDetach = false
   /** @internal */
-  _$nodeSlotElement: Element | null
+  _$subtreeSlotStart: undefined
+  /** @internal */
+  _$subtreeSlotEnd: undefined
+  /** @internal */
+  _$inheritSlots: undefined
+  /** @internal */
+  _$virtual: undefined
 
   constructor(text: string, owner: ShadowRoot) {
     this._$text = String(text)
@@ -33,12 +44,10 @@ export class TextNode implements NodeCast {
       backendElement = backend.createTextNode(text)
     }
     this._$backendElement = backendElement
-    if (backendElement) {
-      backendElement.__wxElement = this
-    }
     this.ownerShadowRoot = owner
     this.parentNode = null
-    this._$nodeSlotElement = null
+    this.parentIndex = -1
+    this.containingSlot = undefined
   }
 
   static create(text: string, ownerShadowRoot: ShadowRoot): TextNode {
@@ -96,13 +105,10 @@ export class TextNode implements NodeCast {
 
   /** Get composed parent (including virtual nodes) */
   getComposedParent(): Element | null {
+    if (this.containingSlot !== undefined) return this.containingSlot
     let parent = this.parentNode
     while (parent?._$inheritSlots) {
       parent = parent.parentNode
-    }
-    if (parent instanceof Component && !parent._$external) {
-      const slot = (parent.shadowRoot as ShadowRoot).getContainingSlot(this)
-      return slot
     }
     return parent
   }

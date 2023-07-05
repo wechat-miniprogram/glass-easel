@@ -11,15 +11,6 @@ import {
   BackendMode,
 } from '../../src'
 
-const getSingleSlotElement = (comp: GeneralComponent) => {
-  if (comp._$external) {
-    const sr = comp.shadowRoot as ExternalShadowRoot
-    return sr.slot as unknown as HTMLElement
-  }
-  const sr = comp.shadowRoot as ShadowRoot
-  return sr.getSingleSlotElement()
-}
-
 // check internal structure of an external component (with its child nodes given)
 export const native = (structure: {
   element: GeneralComponent
@@ -27,17 +18,16 @@ export const native = (structure: {
 }) => {
   const elem = structure.element
   const expectChildNodes = structure.childNodes || []
+  const slot = (elem.shadowRoot as ExternalShadowRoot).slot as unknown as HTMLElement
   expectChildNodes.forEach((expectItem, i) => {
     expect(elem.childNodes[i]).toBe(expectItem.element)
     expect(expectItem.element.parentNode).toBe(elem)
-    expect((getSingleSlotElement(elem) as HTMLElement).childNodes[i]).toBe(expectItem.element.$$)
+    expect(slot.childNodes[i]).toBe(expectItem.element.$$)
     expect(elem.getComposedChildren()[i]).toBe(expectItem.element)
     native(expectItem)
   })
   expect(elem.childNodes[expectChildNodes.length]).toBe(undefined)
-  expect((getSingleSlotElement(elem) as Element).childNodes[expectChildNodes.length]).toBe(
-    undefined,
-  )
+  expect(slot.childNodes[expectChildNodes.length]).toBe(undefined)
 }
 
 // check the structure of a backend element
@@ -78,23 +68,22 @@ export const virtual = (elem: Element, defDomElem?: HTMLElement, defIndex?: numb
   // for a component, check its shadow children and its shadow root
   if (elem instanceof Component) {
     const slotIndex = new Map<Element | HTMLElement, number>()
-    const dfsInherited = (parent: Element) => {
-      parent.childNodes.forEach((child) => {
-        let slot = getSingleSlotElement(elem as GeneralComponent)
-        if (slot !== undefined) {
-          // empty
-        } else {
-          slot = (elem.shadowRoot as ShadowRoot).getContainingSlot(child)
-        }
+    const dfsInherited = (parent: Element, depth: number) => {
+      parent.childNodes.forEach((child, i) => {
+        const slot = child.containingSlot
+        expect(child.parentNode).toBe(parent)
+        expect(child.parentIndex).toBe(i)
         if (slot) {
           if (!slotIndex.has(slot)) slotIndex.set(slot, 0)
           const slotContent = elem._$external
             ? elem.getComposedChildren()
-            : (elem.shadowRoot as ShadowRoot).getSlotContentArray(slot as Element)!
+            : (elem.shadowRoot as ShadowRoot).getSlotContentArray(slot)!
           const index = slotIndex.get(slot)!
           expect(child).toBe(slotContent[index])
+          expect(child.slotIndex).toBe(index)
           slotIndex.set(slot, index + 1)
-        } else if (child instanceof Element) {
+        }
+        if (child instanceof Element) {
           virtual(child)
         } else if (child instanceof TextNode) {
           if (elem.getBackendContext().mode === BackendMode.Domlike) {
@@ -106,13 +95,13 @@ export const virtual = (elem: Element, defDomElem?: HTMLElement, defIndex?: numb
           throw new Error()
         }
         if (child instanceof Element && Element.getInheritSlots(child)) {
-          dfsInherited(child)
+          dfsInherited(child, depth + 1)
         }
       })
     }
-    dfsInherited(elem)
+    dfsInherited(elem, 1)
     if (elem._$external) {
-      const sr = (elem.shadowRoot as ExternalShadowRoot).root
+      const sr = (elem.shadowRoot as ExternalShadowRoot).root as domlikeBackend.Element
       expect(sr.__wxElement).toBe(elem)
       testBackend(elem)
     } else {
@@ -124,23 +113,18 @@ export const virtual = (elem: Element, defDomElem?: HTMLElement, defIndex?: numb
 
   // get the backend element if it is domlike backend
   let domElem: HTMLElement | undefined
-  if (elem.getBackendContext().mode !== BackendMode.Domlike) {
-    domElem = undefined
-  } else if (elem instanceof Component && elem._$external) {
-    domElem = (elem.shadowRoot as ExternalShadowRoot).slot as unknown as HTMLElement
-  } else {
-    domElem =
-      defDomElem || ((elem.getBackendElement() || undefined) as unknown as HTMLElement | undefined)
+  if (elem.getBackendContext().mode === BackendMode.Domlike) {
+    if (elem instanceof Component && elem._$external) {
+      domElem = (elem.shadowRoot as ExternalShadowRoot).slot as unknown as HTMLElement
+    } else {
+      domElem =
+        defDomElem ||
+        ((elem.getBackendElement() || undefined) as unknown as HTMLElement | undefined)
+    }
   }
 
   // check the composed children recursively
   let index = defIndex || 0
-  const isVirtualHost = (elem: Node) => {
-    if (elem instanceof Component) {
-      return elem.getComponentOptions().virtualHost
-    }
-    return false
-  }
   const expectParentNode =
     Element.getSlotName(elem) === undefined ? elem : elem.ownerShadowRoot!.getHostNode()
   elem.forEachComposedChild((child) => {
@@ -152,8 +136,17 @@ export const virtual = (elem: Element, defDomElem?: HTMLElement, defIndex?: numb
       }
       expect(parentNode).toBe(expectParentNode)
     }
-    if (child instanceof VirtualNode || isVirtualHost(child)) {
-      index = virtual(child as Element, domElem, index)
+    if (elem.getBackendContext().mode === BackendMode.Shadow) {
+      expect(child.getBackendElement()).not.toBe(null)
+    } else {
+      if (child instanceof Element && child.isVirtual()) {
+        expect(child.getBackendElement()).toBe(null)
+      } else {
+        expect(child.getBackendElement()).not.toBe(null)
+      }
+    }
+    if (child instanceof Element && child.isVirtual()) {
+      index = virtual(child, domElem, index)
     } else if (child instanceof Element) {
       if (domElem) {
         expect(child.$$).toBe(domElem.childNodes[index])
@@ -169,7 +162,7 @@ export const virtual = (elem: Element, defDomElem?: HTMLElement, defIndex?: numb
       throw new Error()
     }
   })
-  if (domElem && !(elem instanceof VirtualNode) && !isVirtualHost(elem)) {
+  if (domElem && !(elem instanceof Element && elem.isVirtual())) {
     expect(domElem.childNodes[index]).toBe(undefined)
   }
   return index
