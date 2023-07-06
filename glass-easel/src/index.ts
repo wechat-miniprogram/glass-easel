@@ -13,7 +13,7 @@ export {
   NormalizedComponentOptions,
   getDefaultComponentSpace,
 } from './global_options'
-export { Element, StyleSegmentIndex } from './element'
+export { Element, StyleSegmentIndex, setRevertEventDefaultPrevented } from './element'
 export * as dataUtils from './data_utils'
 export * as dataPath from './data_path'
 export {

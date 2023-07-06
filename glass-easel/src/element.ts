@@ -66,6 +66,11 @@ export const enum StyleSegmentIndex {
 type composedContext = composedBackend.Context | domlikeBackend.Context
 type composedElement = composedBackend.Element | domlikeBackend.Element
 
+let revertEventDefaultPrevented = false
+export const setRevertEventDefaultPrevented = (value: boolean) => {
+  revertEventDefaultPrevented = value
+}
+
 /**
  * A general element
  *
@@ -1499,7 +1504,10 @@ export class Element implements NodeCast {
         enabled,
       )
     } else {
-      ;(this._$backendElement as backend.Element).setEventDefaultPrevented(name, enabled)
+      ;(this._$backendElement as backend.Element).setEventDefaultPrevented(
+        name,
+        revertEventDefaultPrevented ? !enabled : enabled,
+      )
     }
   }
 
