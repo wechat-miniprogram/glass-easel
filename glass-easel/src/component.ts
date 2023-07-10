@@ -963,21 +963,37 @@ export class Component<
     return compDef.behavior._$methodMap
   }
 
-  /** Get a method */
+  /**
+   * Get a method
+   *
+   * If `useMethodCallerListeners` option is set for this component,
+   * this method will use the corresponding fields in the `methodCaller` .
+   */
   static getMethod<
     TData extends DataList,
     TProperty extends PropertyList,
     TMethod extends MethodList,
   >(comp: Component<TData, TProperty, TMethod>, methodName: string): GeneralFuncType | undefined {
+    if (comp._$definition._$options.useMethodCallerListeners) {
+      const method = comp._$methodCaller[methodName]
+      return typeof method === 'function' ? method : undefined
+    }
     return comp._$methodMap[methodName]
   }
 
-  /** Call a method */
+  /**
+   * Call a method
+   *
+   * If `useMethodCallerListeners` option is set for this component,
+   * this method will use the corresponding fields in the `methodCaller` .
+   * Returns `undefined` if there is no such method.
+   */
   callMethod<T extends string>(
     methodName: T,
     ...args: Parameters<MethodList[T]>
   ): ReturnType<MethodList[T]> | undefined {
-    return this._$methodMap[methodName]?.call(this, ...args)
+    const func = Component.getMethod(this, methodName)
+    return func?.call(this, ...args)
   }
 
   /**
