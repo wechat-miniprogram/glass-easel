@@ -1313,7 +1313,7 @@ export class Element implements NodeCast {
     }
   }
 
-  private static insertChildPlaceholerReplace(
+  private static insertChildPlaceholderReplace(
     parent: Element,
     posIndex: number,
     replacer: Element,
@@ -1465,7 +1465,7 @@ export class Element implements NodeCast {
   selfReplaceWith(replaceWith: Element) {
     const parent = this.parentNode
     if (parent) {
-      Element.insertChildPlaceholerReplace(parent, parent.childNodes.indexOf(this), replaceWith)
+      Element.insertChildPlaceholderReplace(parent, parent.childNodes.indexOf(this), replaceWith)
     }
   }
 
@@ -1802,7 +1802,7 @@ export class Element implements NodeCast {
    * Get the composed children
    *
    * This method always returns a new array.
-   * It is convinient but less performant.
+   * It is convenient but less performant.
    * For better performance, consider using `forEachComposedChild` .
    */
   getComposedChildren(): Node[] {

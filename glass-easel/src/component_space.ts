@@ -98,7 +98,7 @@ export class ComponentWaitingList {
 
   remove(callback: (c: GeneralComponentDefinition) => void) {
     const index = this._$callbacks.indexOf(callback)
-    // must gurrantee order here (cannot swap-remove)
+    // must guarantee order here (cannot swap-remove)
     this._$callbacks.splice(index, 1)
   }
 
@@ -235,11 +235,11 @@ export class ComponentSpace {
    *
    * The component `is` is actually treated as the "path" of the component.
    * In other words, the component `is` field can be a string like `path/to/the/component` .
-   * Other components can be used by the component with "relative path" spacified.
+   * Other components can be used by the component with "relative path" specified.
    * In this method, if the `path` is given as a relative path (not started with `/` ),
    * it will be converted according to the `basePath` .
    * If the `path` is given as a URL-like format,
-   * the component will be searched in imported comopnent spaces ( `importSpace()` for details).
+   * the component will be searched in imported component spaces ( `importSpace()` for details).
    */
   getComponentByUrl(path: string, basePath: string): GeneralComponentDefinition {
     const { domain, absPath } = normalizeUrl(path, basePath)
@@ -256,7 +256,7 @@ export class ComponentSpace {
    * Get a component by the `path`
    *
    * Similar to `getComponentByUrl()` ,
-   * but returns `null` instead of the default component if no compnent was found.
+   * but returns `null` instead of the default component if no component was found.
    */
   getComponentByUrlWithoutDefault(
     path: string,

@@ -381,7 +381,7 @@ export class ShadowRoot extends VirtualNode {
    * Get the elements that should be composed in specified slot
    *
    * This method always returns a new array (or null if the specified slot is invalid).
-   * It is convinient but less performant.
+   * It is convenient but less performant.
    * For better performance, consider using `forEachNodeInSpecifiedSlot` .
    */
   getSlotContentArray(slot: Element): Node[] | null {
