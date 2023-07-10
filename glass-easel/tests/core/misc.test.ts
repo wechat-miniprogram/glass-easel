@@ -255,6 +255,27 @@ describe('component utils', () => {
     expect(comp.callMethod('abc')).toBe('abc')
   })
 
+  test('#getMethodsFromDef #getMethod #callMethod (when `useMethodCallerListeners` is set)', () => {
+    const compDef = glassEasel.Component.register(
+      {
+        options: {
+          useMethodCallerListeners: true,
+        },
+      },
+      componentSpace,
+    )
+    const comp = glassEasel.createElement('root', compDef.general())
+    const caller = {
+      abc() {
+        return 'abc'
+      },
+    }
+    comp.setMethodCaller(caller as any)
+    expect(glassEasel.Component.getMethodsFromDef(compDef.general()).abc).toBeUndefined()
+    expect(glassEasel.Component.getMethod(comp.general(), 'abc')!()).toBe('abc')
+    expect(comp.callMethod('abc')).toBe('abc')
+  })
+
   test('#isInnerDataExcluded', () => {
     const compDef = glassEasel.Component.register(
       {
