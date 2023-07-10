@@ -97,8 +97,20 @@ export class Root {
    *
    * This component, the `parent` and the `placeholder` MUST be in the same context.
    * The `parent` MUST be a parent node of the `placeholder` .
+   * This also triggers `attached` lifetimes for components.
    */
   attach(parent: glassEasel.GeneralBackendElement, placeholder: glassEasel.GeneralBackendElement) {
     glassEasel.Element.replaceDocumentElement(this._$comp, parent, placeholder)
+  }
+
+  /**
+   * Release the root component
+   *
+   * Some backends require this explicit call to avoid memory leaks.
+   * This also triggers `detached` lifetimes for components.
+   */
+  release() {
+    glassEasel.Element.pretendDetached(this._$comp)
+    this._$comp.destroyBackendElement()
   }
 }
