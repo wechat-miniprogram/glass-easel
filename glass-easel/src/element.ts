@@ -921,11 +921,16 @@ export class Element implements NodeCast {
         // for non-virtual children, use single child operation
         if (removal) {
           if (newChild) {
-            ;(sharedNonVirtualParent as composedBackend.Element).replaceChild(
+            // FIXME: skyline replaceChild is still exparser type
+            // revert back to replaceChild after skyline changes
+            const fragment = (context as composedBackend.Context).createFragment()
+            fragment.appendChild((newChild as Element)._$backendElement as composedBackend.Element)
+            ;(sharedNonVirtualParent as composedBackend.Element).spliceBefore(
               // since `TextNode` also has `backendElement` private field, just make it as `Element`
               // domlike backend also
-              (newChild as Element)._$backendElement as composedBackend.Element,
               (relChild as Element)._$backendElement as composedBackend.Element,
+              1,
+              fragment,
             )
           } else {
             ;(sharedNonVirtualParent as composedBackend.Element).removeChild(
