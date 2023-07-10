@@ -909,7 +909,7 @@ export class ProcGenWrapper {
       const f = typeof handler === 'function' ? handler : Component.getMethod(host, handler)
       if (typeof f === 'function') {
         const filteredEv =
-          typeof this.eventListenerFilter === 'function'
+          typeof this.eventObjectFilter === 'function'
             ? this.eventObjectFilter(ev)
             : _globalEventObjectFilter(ev)
         ret = (f as (ev: ShadowedEvent<unknown>) => boolean | undefined).call(
