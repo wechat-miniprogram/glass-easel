@@ -268,7 +268,7 @@ describe('node tree structure', () => {
     const checkIndex = () => {
       for (let i = 0; i < listBlock.childNodes.length; i += 1) {
         const itemBlock = listBlock.childNodes[i] as glassEasel.Element
-        expect((itemBlock.childNodes[0] as glassEasel.Element).dataset!.i).toBe(i)
+        expect((itemBlock.childNodes[0] as glassEasel.Element).dataset.i).toBe(i)
       }
     }
     glassEasel.Element.pretendAttached(elem)
@@ -516,7 +516,7 @@ describe('node tree structure', () => {
       const keys = Object.keys(elem.data.list)
       for (let i = 0; i < listBlock.childNodes.length; i += 1) {
         const itemBlock = listBlock.childNodes[i] as glassEasel.Element
-        expect((itemBlock.childNodes[0] as glassEasel.Element).dataset!.i).toBe(keys[i])
+        expect((itemBlock.childNodes[0] as glassEasel.Element).dataset.i).toBe(keys[i])
       }
     }
     glassEasel.Element.pretendAttached(elem)
@@ -1126,7 +1126,7 @@ describe('node tree structure', () => {
     const elem = glassEasel.Component.createWithContext('root', def, domBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<div></div>')
-    expect(elem.getShadowRoot()!.childNodes[0]!.asElement()!.dataset!.camelcase).toBe(123)
+    expect(elem.getShadowRoot()!.childNodes[0]!.asElement()!.dataset.camelcase).toBe(123)
   })
 
   test('attribute name cases', () => {

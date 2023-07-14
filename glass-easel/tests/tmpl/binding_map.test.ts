@@ -21,10 +21,10 @@ describe('binding map update enabled', () => {
     const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
     const child = elem.getShadowRoot()!.getElementById('b')!
     expect(domHtml(elem)).toBe('<div class="class-a abc"><span>abc</span></div>')
-    expect(child.dataset!.a).toBe('abc')
+    expect(child.dataset.a).toBe('abc')
     elem.setData({ c: 'def' })
     expect(domHtml(elem)).toBe('<div class="class-a def"><span>def</span></div>')
-    expect(child.dataset!.a).toBe('def')
+    expect(child.dataset.a).toBe('def')
   })
 
   test('model data path update', () => {

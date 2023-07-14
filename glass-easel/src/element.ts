@@ -103,7 +103,7 @@ export class Element implements NodeCast {
   _$placeholderHandler: (() => void) | undefined
   /** @internal */
   private _$virtual: boolean
-  dataset: { [name: string]: unknown } | null
+  dataset: { [name: string]: unknown }
   /** @internal */
   private _$marks: { [name: string]: unknown } | null
   /** @internal */
@@ -152,7 +152,7 @@ export class Element implements NodeCast {
     this._$inheritSlots = false
     this._$placeholderHandler = undefined
     this._$virtual = virtual
-    this.dataset = null
+    this.dataset = {}
     this._$marks = null
     this._$attached = false
     this.classList = null
