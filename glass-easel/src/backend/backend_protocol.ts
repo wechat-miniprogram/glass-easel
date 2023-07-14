@@ -77,7 +77,7 @@ export interface Element {
     relativeElement: Element | null,
     relativeElementMargin: string,
     thresholds: number[],
-    listener: (res: IntersectionStatus) => void,
+    listener: ((res: IntersectionStatus) => void) | null,
   ): Observer
   __wxElement?: unknown
 }

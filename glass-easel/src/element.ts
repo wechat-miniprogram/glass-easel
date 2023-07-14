@@ -1963,7 +1963,7 @@ export class Element implements NodeCast {
     relativeElement: Element | null,
     relativeElementMargin: string,
     thresholds: number[],
-    listener: (res: IntersectionStatus) => void,
+    listener: ((res: IntersectionStatus) => void) | null,
   ): Observer | null {
     const backendElement = this._$backendElement
     if (backendElement) {
@@ -1976,7 +1976,7 @@ export class Element implements NodeCast {
           (relativeElement?._$backendElement as domlikeBackend.Element | undefined) || null,
           relativeElementMargin,
           thresholds,
-          listener,
+          listener!,
         )
       }
       return (backendElement as backend.Element).createIntersectionObserver(
