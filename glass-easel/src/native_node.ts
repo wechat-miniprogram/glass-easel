@@ -143,7 +143,7 @@ export class NativeNode extends Element {
             listener,
           )
         } else {
-          ;(backendElement as backend.Element | composedBackend.Element).setModelBindingStat(
+          ;(backendElement as backend.Element | composedBackend.Element).setModelBindingStat?.(
             propName,
             listener,
           )
