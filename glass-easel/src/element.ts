@@ -1486,7 +1486,7 @@ export class Element implements NodeCast {
     if (finalChanged === FinalChanged.Init) this._$updateEventDefaultPrevented(name, false)
     else if (finalChanged === FinalChanged.Added) this._$updateEventDefaultPrevented(name, true)
     if (this instanceof Component && this._$definition._$options.listenerChangeLifetimes) {
-      this.triggerLifetime('listenerChanged', [true, name, func, options])
+      this.triggerLifetime('listenerChange', [true, name, func, options])
     }
   }
 
@@ -1496,7 +1496,7 @@ export class Element implements NodeCast {
     if (finalChanged === FinalChanged.Failed) return
     if (finalChanged !== FinalChanged.NotChanged) this._$updateEventDefaultPrevented(name, false)
     if (this instanceof Component && this._$definition._$options.listenerChangeLifetimes) {
-      this.triggerLifetime('listenerChanged', [false, name, func, options])
+      this.triggerLifetime('listenerChange', [false, name, func, options])
     }
   }
 
