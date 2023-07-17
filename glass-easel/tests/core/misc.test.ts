@@ -175,7 +175,7 @@ describe('event', () => {
           listenerChangeLifetimes: true,
         },
         lifetimes: {
-          listenerChanged: (
+          listenerChange: (
             isAdd: boolean,
             eventName: string,
             listener: any,
