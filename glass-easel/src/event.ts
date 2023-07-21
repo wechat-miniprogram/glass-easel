@@ -269,7 +269,7 @@ export class Event<TDetail> {
       const curCaller = isComp ? cur.getMethodCaller() : cur
       const ev = this.wrapShadowedEvent(targetCaller, mark, curCaller)
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      ;(ev as any)._hasListeners = true
+      ;(this as any)._hasListeners = true
       const ret = efa.funcArr.call(
         curCaller,
         [ev],
