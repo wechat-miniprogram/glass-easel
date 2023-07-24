@@ -51,7 +51,7 @@ describe('node tree structure', () => {
         <div wx:if="{{cond1}}">a</div>
         <div wx:if="{{cond2}}">b</div>
         <div wx:else>c</div>
-        <div wx:if="{{cond1}}">d</div>
+        <div wx:if="{{cond1?2:0}}">d</div>
         <div wx:elif="{{cond2}}">e</div>
         <div wx:else>f</div>
       `),

@@ -1026,9 +1026,10 @@ impl TmplExpr {
         scopes: &Vec<ScopeVar>,
     ) -> Result<TmplExprProcGen, TmplError> {
         let mut value = String::new();
+        let level = self.level();
         let (pas, sub_p) =
             self.to_proc_gen_rec_and_combine_paths(w, scopes, TmplExprLevel::Cond, &mut value)?;
-        Ok(TmplExprProcGen { pas, sub_p, value })
+        Ok(TmplExprProcGen { pas, sub_p, value, level })
     }
 
     // this function finds which keys can be put into the binding map,
@@ -1208,6 +1209,7 @@ pub(crate) struct TmplExprProcGen {
     pas: PathAnalysisState,
     sub_p: Vec<PathSliceList>,
     value: String,
+    level: TmplExprLevel,
 }
 
 impl TmplExprProcGen {
@@ -1248,5 +1250,9 @@ impl TmplExprProcGen {
     pub(crate) fn value_expr<W: Write>(&self, w: &mut JsExprWriter<W>) -> Result<(), TmplError> {
         write!(w, "{}", self.value)?;
         Ok(())
+    }
+
+    pub(crate) fn above_cond_expr(&self) -> bool {
+        self.level >= TmplExprLevel::Cond
     }
 }
