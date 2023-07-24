@@ -225,6 +225,7 @@ export class Relation {
                         break
                       }
                     }
+                    if (newLink) break
                   }
                 }
               }
