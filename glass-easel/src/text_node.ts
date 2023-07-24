@@ -21,9 +21,9 @@ export class TextNode implements NodeCast {
   /** @internal */
   _$destroyOnDetach = false
   /** @internal */
-  _$subtreeSlotStart: undefined
+  _$subtreeSlotStart = null
   /** @internal */
-  _$subtreeSlotEnd: undefined
+  _$subtreeSlotEnd = null
   /** @internal */
   _$inheritSlots: undefined
   /** @internal */

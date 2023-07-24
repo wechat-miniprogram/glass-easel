@@ -409,9 +409,3 @@ export type ComponentParams<
     | { [fields: string]: ComponentMethod | string }
   options?: ComponentOptions
 }
-
-export type GeneralComponentInstance = ComponentInstance<
-  Record<string, any>,
-  Record<string, any>,
-  Record<string, any>
->

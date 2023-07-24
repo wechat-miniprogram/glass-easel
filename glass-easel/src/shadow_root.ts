@@ -73,6 +73,7 @@ export class ShadowRoot extends VirtualNode {
   constructor() {
     throw new Error('Element cannot be constructed directly')
     // eslint-disable-next-line no-unreachable
+    /* istanbul ignore next */
     super()
   }
 
@@ -228,6 +229,7 @@ export class ShadowRoot extends VirtualNode {
 
     // find in the space otherwise
     const comp = space.getGlobalUsingComponent(compName) ?? space.getDefaultComponent()
+    /* istanbul ignore if */
     if (!comp) {
       throw new Error(`Cannot find component "${compName}"`)
     }
@@ -327,6 +329,7 @@ export class ShadowRoot extends VirtualNode {
   /** Get the slot element with the specified name */
   getSlotElementFromName(name: string): Element | Element[] | null {
     const slotMode = this._$slotMode
+    /* istanbul ignore if */
     if (slotMode === SlotMode.Direct) throw new Error('cannot get slot element in directSlots')
     if (slotMode === SlotMode.Single) return this._$singleSlot!
     if (slotMode === SlotMode.Multiple) {
@@ -350,7 +353,7 @@ export class ShadowRoot extends VirtualNode {
    * The provided node must be a valid child node of the host of this shadow root.
    * Otherwise the behavior is undefined.
    */
-  calcContainingSlot(elem: Node | null): Element | null {
+  getContainingSlot(elem: Node | null): Element | null {
     const slotMode = this._$slotMode
     if (slotMode === SlotMode.Direct) return elem?.containingSlot || null
     if (slotMode === SlotMode.Single) return this._$singleSlot as Element | null
@@ -399,6 +402,7 @@ export class ShadowRoot extends VirtualNode {
    */
   forEachSlot(f: (slot: Element) => boolean | void) {
     const slotMode = this._$slotMode
+    /* istanbul ignore if */
     if (slotMode === SlotMode.Direct) {
       throw new Error('Cannot iterate slots in directSlots')
     }
@@ -417,9 +421,11 @@ export class ShadowRoot extends VirtualNode {
   }
 
   /**
-   * Iterate elements with their slots (slots-inherited nodes included)
+   * Iterate through elements ahd their corresponding slots (including slots-inherited nodes)
+   * @param f A function to execute for each element. Return false to break the iteration.
+   * @returns A boolean indicating whether the iteration is complete.
    */
-  forEachNodeInSlot(f: (node: Node, slot: Element | null | undefined) => boolean | void) {
+  forEachNodeInSlot(f: (node: Node, slot: Element | null | undefined) => boolean | void): boolean {
     const childNodes = this._$host.childNodes
     for (let i = 0; i < childNodes.length; i += 1) {
       if (!Element.forEachNodeInSlot(childNodes[i]!, f)) return false
@@ -428,7 +434,9 @@ export class ShadowRoot extends VirtualNode {
   }
 
   /**
-   * Iterate elements in specified slot (slots-inherited nodes included)
+   * Iterate through elements of a specified slot (including slots-inherited nodes)
+   * @param f A function to execute for each element. Return false to break the iteration.
+   * @returns A boolean indicating whether the iteration is complete.
    */
   forEachNodeInSpecifiedSlot(slot: Element | null, f: (node: Node) => boolean | void): boolean {
     if (slot) {
@@ -443,9 +451,13 @@ export class ShadowRoot extends VirtualNode {
   }
 
   /**
-   * Iterate elements with their slots (slots-inherited nodes not included)
+   * Iterate through elements ahd their corresponding slots (NOT including slots-inherited nodes)
+   * @param f A function to execute for each element. Return false to break the iteration.
+   * @returns A boolean indicating whether the iteration is complete.
    */
-  forEachSlotContentInSlot(f: (node: Node, slot: Element | null | undefined) => boolean | void) {
+  forEachSlotContentInSlot(
+    f: (node: Node, slot: Element | null | undefined) => boolean | void,
+  ): boolean {
     const childNodes = this._$host.childNodes
     for (let i = 0; i < childNodes.length; i += 1) {
       if (!Element.forEachSlotContentInSlot(childNodes[i]!, f)) return false
@@ -454,7 +466,9 @@ export class ShadowRoot extends VirtualNode {
   }
 
   /**
-   * Iterate elements in specified slot (slots-inherited nodes not included)
+   * Iterate through elements of a specified slot (NOT including slots-inherited nodes)
+   * @param f A function to execute for each element. Return false to break the iteration.
+   * @returns A boolean indicating whether the iteration is complete.
    */
   forEachSlotContentInSpecifiedSlot(
     slot: Element | null,
@@ -472,9 +486,9 @@ export class ShadowRoot extends VirtualNode {
   }
 
   /**
-   * Check whether a node is attached to this shadow root
+   * Check whether a node is connected to this shadow root
    */
-  isAttached(node: Node): boolean {
+  isConnected(node: Node): boolean {
     if (node.ownerShadowRoot !== this) return false
     for (let p: Node | null = node; p; p = p.parentNode) {
       if (p === this) return true
@@ -487,8 +501,8 @@ export class ShadowRoot extends VirtualNode {
     const slotsList = this._$slotsList!
     const slots = this._$slots!
 
-    // assume that slot name duplication is very rare in practice,
-    // so the complexity without name duplication is priority guaranteed.
+    // assuming that slot name duplication is very rare in practice,
+    // the complexity without name duplication is priority guaranteed.
     if (slotsList[slotName]) {
       const firstSlot = slotsList[slotName]!
       let insertPos = { next: firstSlot } as DoubleLinkedList<Element> // this is a pointer to pointer
@@ -501,14 +515,14 @@ export class ShadowRoot extends VirtualNode {
         }
       }
       if (insertBeforeFirst) {
-        slotsList[slotName] = firstSlot.prev = { value: slot, next: firstSlot }
+        slotsList[slotName] = firstSlot.prev = { value: slot, prev: null, next: firstSlot }
       } else {
         const next = insertPos.next
         insertPos.next = { value: slot, prev: insertPos, next }
         if (next) next.prev = insertPos.next
       }
     } else {
-      slotsList[slotName] = { value: slot }
+      slotsList[slotName] = { value: slot, prev: null, next: null }
     }
     const oldSlot = slots[slotName]
     const newSlot = slotsList[slotName]!.value
@@ -522,7 +536,7 @@ export class ShadowRoot extends VirtualNode {
     const slotsList = this._$slotsList!
     const slots = this._$slots!
 
-    let oldSlot = slotsList[slotName]
+    let oldSlot = slotsList[slotName] || null
     for (; oldSlot; oldSlot = oldSlot.next) {
       if (oldSlot.value === slot) break
     }
@@ -554,7 +568,8 @@ export class ShadowRoot extends VirtualNode {
     }
   }
 
-  applySlotRename(slot: Element, newName: string, oldName: string): void {
+  /** @internal */
+  _$applySlotRename(slot: Element, newName: string, oldName: string): void {
     const slotMode = this._$slotMode
 
     // single slot does not care slot name
@@ -579,7 +594,8 @@ export class ShadowRoot extends VirtualNode {
     }
   }
 
-  applySlotsInsertion(
+  /** @internal */
+  _$applySlotsInsertion(
     slotStart: DoubleLinkedList<Element>,
     slotEnd: DoubleLinkedList<Element>,
     move: boolean,
@@ -601,7 +617,7 @@ export class ShadowRoot extends VirtualNode {
 
     if (slotMode === SlotMode.Multiple) {
       for (
-        let it: DoubleLinkedList<Element> | undefined = slotStart;
+        let it: DoubleLinkedList<Element> | null = slotStart;
         it && it !== slotEnd.next;
         it = it.next
       ) {
@@ -620,7 +636,7 @@ export class ShadowRoot extends VirtualNode {
       const insertDynamicSlot = this._$insertDynamicSlotHandler
       const slots: { slot: Element; name: string; slotValues: { [name: string]: unknown } }[] = []
       for (
-        let it: DoubleLinkedList<Element> | undefined = slotStart;
+        let it: DoubleLinkedList<Element> | null = slotStart;
         it && it !== slotEnd.next;
         it = it.next
       ) {
@@ -633,7 +649,8 @@ export class ShadowRoot extends VirtualNode {
     }
   }
 
-  applySlotsRemoval(
+  /** @internal */
+  _$applySlotsRemoval(
     slotStart: DoubleLinkedList<Element>,
     slotEnd: DoubleLinkedList<Element>,
     move: boolean,
@@ -658,7 +675,7 @@ export class ShadowRoot extends VirtualNode {
 
     if (slotMode === SlotMode.Multiple) {
       for (
-        let it: DoubleLinkedList<Element> | undefined = slotStart;
+        let it: DoubleLinkedList<Element> | null = slotStart;
         it && it !== slotEnd.next;
         it = it.next
       ) {
@@ -677,7 +694,7 @@ export class ShadowRoot extends VirtualNode {
       const removeDynamicSlot = this._$removeDynamicSlotHandler
       const slots: Element[] = []
       for (
-        let it: DoubleLinkedList<Element> | undefined = slotStart;
+        let it: DoubleLinkedList<Element> | null = slotStart;
         it && it !== slotEnd.next;
         it = it.next
       ) {
@@ -814,6 +831,7 @@ export class ShadowRoot extends VirtualNode {
     return this._$slotMode
   }
 
+  /** @internal */
   static _$updateSubtreeSlotNodes(
     parentNode: Element,
     elements: Node[],
@@ -844,7 +862,7 @@ export class ShadowRoot extends VirtualNode {
       let insertPos = -1
       const slotNodesToUpdate: Node[] = []
       const oldContainingSlot = elements[0]!.containingSlot
-      const containingSlot = shadowRoot?.calcContainingSlot(elements[0]!)
+      const containingSlot = shadowRoot?.getContainingSlot(elements[0]!)
 
       for (let i = 0; i < elements.length; i += 1) {
         const elem = elements[i]!
@@ -896,7 +914,7 @@ export class ShadowRoot extends VirtualNode {
       const elem = elements[i]!
       Element.forEachNodeInSlot(elem, (node, oldContainingSlot) => {
         const containingSlot =
-          slotMode !== SlotMode.Direct ? shadowRoot?.calcContainingSlot(node) : undefined
+          slotMode !== SlotMode.Direct ? shadowRoot?.getContainingSlot(node) : undefined
 
         if (oldContainingSlot) {
           const slotNodesToRemove = slotNodesToRemoveMap.get(oldContainingSlot)

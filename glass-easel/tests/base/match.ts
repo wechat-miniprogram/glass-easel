@@ -6,10 +6,9 @@ import {
   Element,
   domlikeBackend,
   TextNode,
-  VirtualNode,
-  Node,
   BackendMode,
 } from '../../src'
+import { DoubleLinkedList } from '../../src/element'
 
 // check internal structure of an external component (with its child nodes given)
 export const native = (structure: {
@@ -68,18 +67,17 @@ export const virtual = (elem: Element, defDomElem?: HTMLElement, defIndex?: numb
   // for a component, check its shadow children and its shadow root
   if (elem instanceof Component) {
     const slotIndex = new Map<Element | HTMLElement, number>()
-    const dfsInherited = (parent: Element, depth: number) => {
+    const dfsChildren = (parent: Element) => {
       parent.childNodes.forEach((child, i) => {
         const slot = child.containingSlot
         expect(child.parentNode).toBe(parent)
         expect(child.parentIndex).toBe(i)
         if (slot) {
           if (!slotIndex.has(slot)) slotIndex.set(slot, 0)
-          const slotContent = elem._$external
-            ? elem.getComposedChildren()
-            : (elem.shadowRoot as ShadowRoot).getSlotContentArray(slot)!
+          const slotContent = (elem.shadowRoot as ShadowRoot).getSlotContentArray(slot)!
           const index = slotIndex.get(slot)!
           expect(child).toBe(slotContent[index])
+          expect(child).toBe(slot.slotNodes![index])
           expect(child.slotIndex).toBe(index)
           slotIndex.set(slot, index + 1)
         }
@@ -95,19 +93,68 @@ export const virtual = (elem: Element, defDomElem?: HTMLElement, defIndex?: numb
           throw new Error()
         }
         if (child instanceof Element && Element.getInheritSlots(child)) {
-          dfsInherited(child, depth + 1)
+          dfsChildren(child)
         }
       })
     }
-    dfsInherited(elem, 1)
+    dfsChildren(elem)
     if (elem._$external) {
       const sr = (elem.shadowRoot as ExternalShadowRoot).root as domlikeBackend.Element
       expect(sr.__wxElement).toBe(elem)
       testBackend(elem)
     } else {
+      const shadowRoot = elem.shadowRoot as ShadowRoot
+      let subtreeSlotStart = null as DoubleLinkedList<Element> | null
+      let subtreeSlotEnd = null as DoubleLinkedList<Element> | null
+
+      // check subtree slot linked list in shadow tree
+      const dfsShadow = (elem: Element) => {
+        const prevSubtreeSlotStart = subtreeSlotStart
+        const prevSubtreeSlotEnd = subtreeSlotEnd
+
+        elem.childNodes.forEach((child) => {
+          if (child instanceof Element) {
+            dfsShadow(child)
+          }
+        })
+
+        if (prevSubtreeSlotStart) {
+          expect(prevSubtreeSlotStart).toBe(subtreeSlotStart)
+        }
+        if (subtreeSlotStart || subtreeSlotEnd) {
+          expect(subtreeSlotStart).not.toBe(null)
+          expect(subtreeSlotEnd).not.toBe(null)
+        }
+
+        if (elem._$slotName !== null) {
+          const currentSlot = subtreeSlotEnd ? subtreeSlotEnd.next : shadowRoot._$subtreeSlotStart
+          expect(currentSlot).not.toBe(null)
+          expect(currentSlot!.value).toBe(elem)
+          expect(currentSlot!.prev).toBe(subtreeSlotEnd)
+          if (!subtreeSlotStart) subtreeSlotStart = currentSlot
+          subtreeSlotEnd = currentSlot
+
+          expect(elem._$subtreeSlotStart).toBe(currentSlot)
+          expect(elem._$subtreeSlotEnd).toBe(currentSlot)
+        } else {
+          if (prevSubtreeSlotEnd !== subtreeSlotEnd) {
+            expect(elem._$subtreeSlotStart).toBe(
+              prevSubtreeSlotEnd ? prevSubtreeSlotEnd.next : subtreeSlotStart,
+            )
+            expect(elem._$subtreeSlotEnd).toBe(subtreeSlotEnd)
+          } else {
+            expect(elem._$subtreeSlotStart).toBe(null)
+            expect(elem._$subtreeSlotEnd).toBe(null)
+          }
+        }
+      }
+      dfsShadow(shadowRoot)
+      if (subtreeSlotEnd) expect(subtreeSlotEnd.next).toBe(null)
+      expect(shadowRoot._$subtreeSlotStart).toBe(subtreeSlotStart)
+      expect(shadowRoot._$subtreeSlotEnd).toBe(subtreeSlotEnd)
       expect(elem.getComposedChildren()).toStrictEqual([elem.shadowRoot])
-      expect((elem.shadowRoot as ShadowRoot).getHostNode()).toBe(elem)
-      expect((elem.shadowRoot as ShadowRoot).parentNode).toBe(null)
+      expect(shadowRoot.getHostNode()).toBe(elem)
+      expect(shadowRoot.parentNode).toBe(null)
     }
   }
 

@@ -21,12 +21,7 @@ import {
   Observer,
   IntersectionStatus,
 } from './backend/mode'
-import {
-  DataList,
-  PropertyList,
-  MethodList,
-  ComponentInstance,
-} from './component_params'
+import { DataList, PropertyList, MethodList, ComponentInstance } from './component_params'
 import {
   Node,
   GeneralBackendContext,
@@ -68,8 +63,8 @@ type composedElement = composedBackend.Element | domlikeBackend.Element
 
 export type DoubleLinkedList<T> = {
   value: T
-  prev?: DoubleLinkedList<T> | undefined
-  next?: DoubleLinkedList<T> | undefined
+  prev: DoubleLinkedList<T> | null
+  next: DoubleLinkedList<T> | null
 }
 
 /**
@@ -97,9 +92,9 @@ export class Element implements NodeCast {
   /** @internal */
   _$slotValues: { [name: string]: unknown } | null
   /** @internal */
-  _$subtreeSlotStart: DoubleLinkedList<Element> | undefined
+  _$subtreeSlotStart: DoubleLinkedList<Element> | null
   /** @internal */
-  _$subtreeSlotEnd: DoubleLinkedList<Element> | undefined
+  _$subtreeSlotEnd: DoubleLinkedList<Element> | null
   /** @internal */
   _$inheritSlots: boolean
   /** @internal */
@@ -153,8 +148,8 @@ export class Element implements NodeCast {
     this._$slotName = null
     this._$slotElement = null
     this._$slotValues = null
-    this._$subtreeSlotStart = undefined
-    this._$subtreeSlotEnd = undefined
+    this._$subtreeSlotStart = null
+    this._$subtreeSlotEnd = null
     this._$inheritSlots = false
     this._$placeholderHandler = undefined
     this._$virtual = virtual
@@ -218,6 +213,7 @@ export class Element implements NodeCast {
     const newSlot = String(x)
     const oldSlot = this._$nodeSlot
     if (oldSlot === newSlot) return
+    /* istanbul ignore if  */
     if (this._$inheritSlots) {
       triggerWarning('slots-inherited nodes do not support "slot" attribute.')
       return
@@ -227,6 +223,7 @@ export class Element implements NodeCast {
     if (slotParentShadowRoot) {
       const slotMode = slotParentShadowRoot.getSlotMode()
 
+      /* istanbul ignore if  */
       if (slotMode === SlotMode.Dynamic) {
         triggerWarning(
           'nodes inside dynamic slots should change binding slots through Element#setSlotElement.',
@@ -234,6 +231,7 @@ export class Element implements NodeCast {
         return
       }
 
+      /* istanbul ignore if  */
       if (slotMode === SlotMode.Direct) {
         triggerWarning('nodes inside direct slots should not change slot name.')
         return
@@ -1077,8 +1075,8 @@ export class Element implements NodeCast {
    */
   private static updateSubtreeSlotsInsertion(
     node: Node,
-    slotStart: DoubleLinkedList<Element> | undefined,
-    slotEnd: DoubleLinkedList<Element> | undefined,
+    slotStart: DoubleLinkedList<Element> | null,
+    slotEnd: DoubleLinkedList<Element> | null,
     posIndex: number,
     move: boolean,
   ): void {
@@ -1086,8 +1084,8 @@ export class Element implements NodeCast {
     let parent = node
 
     // find a correct position to insert slot into double-linked slot list
-    let insertSlotPrev: DoubleLinkedList<Element> | undefined
-    let insertSlotNext: DoubleLinkedList<Element> | undefined
+    let insertSlotPrev = null as DoubleLinkedList<Element> | null
+    let insertSlotNext = null as DoubleLinkedList<Element> | null
 
     const findFirstSlot = (parent: Node, posIndex: number): void => {
       if (parent._$subtreeSlotStart) {
@@ -1153,8 +1151,8 @@ export class Element implements NodeCast {
     }
 
     const ownerShadowRoot = parent.ownerShadowRoot
-    if (ownerShadowRoot?.isAttached(parent)) {
-      ownerShadowRoot.applySlotsInsertion(slotStart, slotEnd, move)
+    if (ownerShadowRoot?.isConnected(parent)) {
+      ownerShadowRoot._$applySlotsInsertion(slotStart, slotEnd, move)
     }
   }
 
@@ -1163,8 +1161,8 @@ export class Element implements NodeCast {
    */
   private static updateSubtreeSlotsRemoval(
     node: Node,
-    slotStart: DoubleLinkedList<Element> | undefined,
-    slotEnd: DoubleLinkedList<Element> | undefined,
+    slotStart: DoubleLinkedList<Element> | null,
+    slotEnd: DoubleLinkedList<Element> | null,
     move: boolean,
   ): void {
     if (!slotStart || !slotEnd) return
@@ -1175,11 +1173,11 @@ export class Element implements NodeCast {
     // remove from double linked list
     if (removeSlotBefore) {
       removeSlotBefore.next = removeSlotAfter
-      slotStart.prev = undefined
+      slotStart.prev = null
     }
     if (removeSlotAfter) {
       removeSlotAfter.prev = removeSlotBefore
-      slotEnd.next = undefined
+      slotEnd.next = null
     }
 
     // update parent subtree start/end
@@ -1187,7 +1185,7 @@ export class Element implements NodeCast {
       let changed = false
 
       if (parent._$subtreeSlotStart === slotStart && parent._$subtreeSlotEnd === slotEnd) {
-        parent._$subtreeSlotStart = parent._$subtreeSlotEnd = undefined
+        parent._$subtreeSlotStart = parent._$subtreeSlotEnd = null
         changed = true
       }
       if (parent._$subtreeSlotStart === slotStart) {
@@ -1204,8 +1202,8 @@ export class Element implements NodeCast {
     }
 
     const ownerShadowRoot = parent.ownerShadowRoot
-    if (ownerShadowRoot?.isAttached(parent)) {
-      ownerShadowRoot.applySlotsRemoval(slotStart, slotEnd, move)
+    if (ownerShadowRoot?.isConnected(parent)) {
+      ownerShadowRoot._$applySlotsRemoval(slotStart, slotEnd, move)
     }
   }
 
@@ -1214,10 +1212,10 @@ export class Element implements NodeCast {
    */
   private static updateSubtreeSlotsReplacement(
     node: Node,
-    slotStart: DoubleLinkedList<Element> | undefined,
-    slotEnd: DoubleLinkedList<Element> | undefined,
-    oldSlotStart: DoubleLinkedList<Element> | undefined,
-    oldSlotEnd: DoubleLinkedList<Element> | undefined,
+    slotStart: DoubleLinkedList<Element> | null,
+    slotEnd: DoubleLinkedList<Element> | null,
+    oldSlotStart: DoubleLinkedList<Element> | null,
+    oldSlotEnd: DoubleLinkedList<Element> | null,
     posIndex: number,
     move: boolean,
   ): void {
@@ -1238,12 +1236,12 @@ export class Element implements NodeCast {
     if (removeSlotBefore) {
       removeSlotBefore.next = slotStart
       slotStart.prev = removeSlotBefore
-      oldSlotStart.prev = undefined
+      oldSlotStart.prev = null
     }
     if (removeSlotAfter) {
       removeSlotAfter.prev = slotEnd
       slotEnd.next = removeSlotAfter
-      oldSlotEnd.next = undefined
+      oldSlotEnd.next = null
     }
 
     // update parent subtree start/end
@@ -1265,9 +1263,9 @@ export class Element implements NodeCast {
     }
 
     const ownerShadowRoot = parent.ownerShadowRoot
-    if (ownerShadowRoot?.isAttached(parent)) {
-      ownerShadowRoot.applySlotsRemoval(oldSlotStart, oldSlotEnd, false)
-      ownerShadowRoot.applySlotsInsertion(slotStart, slotEnd, move)
+    if (ownerShadowRoot?.isConnected(parent)) {
+      ownerShadowRoot._$applySlotsRemoval(oldSlotStart, oldSlotEnd, false)
+      ownerShadowRoot._$applySlotsInsertion(slotStart, slotEnd, move)
     }
   }
 
@@ -1285,6 +1283,7 @@ export class Element implements NodeCast {
     oriPosIndex: number,
     replace: boolean,
   ) {
+    /* istanbul ignore if  */
     if (newChild && parent.ownerShadowRoot !== newChild.ownerShadowRoot) {
       throw new Error('Cannot move the node from one shadow tree to another shadow tree.')
     }
@@ -1448,10 +1447,10 @@ export class Element implements NodeCast {
     }
 
     // update subtree slots
-    const newChildSubtreeSlotStart = newChild?._$subtreeSlotStart
-    const newChildSubtreeSlotEnd = newChild?._$subtreeSlotEnd
-    const relChildSubtreeSlotStart = relChild?._$subtreeSlotStart
-    const relChildSubtreeSlotEnd = relChild?._$subtreeSlotEnd
+    const newChildSubtreeSlotStart = newChild ? newChild._$subtreeSlotStart : null
+    const newChildSubtreeSlotEnd = newChild ? newChild._$subtreeSlotEnd : null
+    const relChildSubtreeSlotStart = relChild ? relChild._$subtreeSlotStart : null
+    const relChildSubtreeSlotEnd = relChild ? relChild._$subtreeSlotEnd : null
     if (newChild) {
       if (oldParent) {
         Element.updateSubtreeSlotsRemoval(
@@ -1571,8 +1570,8 @@ export class Element implements NodeCast {
     containingSlotUpdater?.updateContainingSlot()
 
     // update subtree slot
-    let subtreeSlotStart: DoubleLinkedList<Element> | undefined
-    let subtreeSlotEnd: DoubleLinkedList<Element> | undefined
+    let subtreeSlotStart: DoubleLinkedList<Element> | null = null
+    let subtreeSlotEnd: DoubleLinkedList<Element> | null = null
     for (let i = 0; i < count; i += 1) {
       const relChild = relChildren[i]!
       if (!subtreeSlotStart) subtreeSlotStart = relChild._$subtreeSlotStart
@@ -1619,10 +1618,12 @@ export class Element implements NodeCast {
     }
     for (let i = 0; i < newChildList.length; i += 1) {
       const newChild = newChildList[i]!
+      /* istanbul ignore if  */
       if (parent.ownerShadowRoot !== newChild.ownerShadowRoot) {
         throw new Error('Cannot move the node from one shadow tree to another shadow tree.')
       }
       const oldParent = newChild.parentNode
+      /* istanbul ignore if  */
       if (oldParent) {
         throw new Error('Cannot batch-insert the node which already has a parent.')
       }
@@ -1709,8 +1710,8 @@ export class Element implements NodeCast {
     }
 
     // update subtree slot
-    let subtreeSlotStart: DoubleLinkedList<Element> | undefined
-    let subtreeSlotEnd: DoubleLinkedList<Element> | undefined
+    let subtreeSlotStart: DoubleLinkedList<Element> | null = null
+    let subtreeSlotEnd: DoubleLinkedList<Element> | null = null
     for (let i = 0; i < newChildList.length; i += 1) {
       const newChild = newChildList[i]!
       const newChildSubtreeSlotStart = newChild._$subtreeSlotStart
@@ -1752,13 +1753,16 @@ export class Element implements NodeCast {
     posIndex: number,
     replacer: Element,
   ) {
+    /* istanbul ignore if  */
     if (replacer && parent.ownerShadowRoot !== replacer.ownerShadowRoot) {
       throw new Error('Cannot move the node from one shadow tree to another shadow tree.')
     }
+    /* istanbul ignore if  */
     if (replacer.parentNode) {
       throw new Error('Cannot replace with the node which already has a parent.')
     }
     const placeholder = parent.childNodes[posIndex]
+    /* istanbul ignore if  */
     if (!(placeholder instanceof Element)) {
       throw new Error('Cannot replace on text nodes.')
     }
@@ -2094,6 +2098,7 @@ export class Element implements NodeCast {
     targetParent: GeneralBackendElement,
     targetNode: GeneralBackendElement,
   ) {
+    /* istanbul ignore if  */
     if (element._$attached) {
       throw new Error('An attached element cannot be attached again')
     }
@@ -2143,11 +2148,9 @@ export class Element implements NodeCast {
    * otherwise the slot content will always be dangled.
    */
   static setSlotName(element: Element, name?: string) {
+    /* istanbul ignore if  */
     if (element._$inheritSlots) {
       throw new Error('Slot-inherit mode is not usable in slot element')
-    }
-    if (element._$inheritSlots) {
-      throw new Error('Component cannot be used as slot element')
     }
     const slotName = name ? String(name) : ''
     const oldSlotName = element._$slotName
@@ -2155,7 +2158,11 @@ export class Element implements NodeCast {
     const needInsertSlot = oldSlotName === null
     element._$slotName = slotName
     if (needInsertSlot) {
-      element._$subtreeSlotStart = element._$subtreeSlotEnd = { value: element }
+      element._$subtreeSlotStart = element._$subtreeSlotEnd = {
+        value: element,
+        prev: null,
+        next: null,
+      }
     }
     if (BM.SHADOW || (BM.DYNAMIC && element.getBackendMode() === BackendMode.Shadow)) {
       ;(element._$backendElement as backend.Element | null)?.setSlotName(slotName)
@@ -2177,7 +2184,7 @@ export class Element implements NodeCast {
           )
         }
       } else {
-        if (owner.isAttached(element)) owner.applySlotRename(element, slotName, oldSlotName)
+        if (owner.isConnected(element)) owner._$applySlotRename(element, slotName, oldSlotName)
       }
     }
   }
@@ -2197,9 +2204,11 @@ export class Element implements NodeCast {
    * the child nodes of the element will be treated as siblings and can have different target slot.
    */
   static setInheritSlots(element: Element) {
+    /* istanbul ignore if  */
     if (!element._$virtual) {
       throw new Error('Cannot set slot-inherit on non-virtual node')
     }
+    /* istanbul ignore if  */
     if (element._$slotName !== null || element.childNodes.length !== 0) {
       throw new Error('Slot-inherit mode cannot be set when the element has any child node')
     }

@@ -19,7 +19,6 @@ import {
   DataList,
   PropertyList,
   MethodList,
-  GeneralComponentInstance,
   DataWithPropertyValues,
   RelationParams,
   TraitRelationParams,
@@ -569,7 +568,7 @@ export class Component<
       backendElement.setAttribute('exparser:info-component-id', componentInstanceId)
     }
     comp._$idPrefix = options.idPrefixGenerator
-      ? options.idPrefixGenerator.call(comp as unknown as GeneralComponentInstance)
+      ? options.idPrefixGenerator.call(comp as unknown as GeneralComponent)
       : ''
 
     // combine initial data
@@ -597,7 +596,7 @@ export class Component<
 
     // init relations
     const relation = (comp._$relation = new Relation(
-      comp as unknown as GeneralComponentInstance,
+      comp as unknown as GeneralComponent,
       relationDefinitionGroup,
     ))
 
@@ -738,7 +737,7 @@ export class Component<
     initDone = true
 
     // init data
-    const tmplInst = template.createInstance(comp as unknown as GeneralComponentInstance)
+    const tmplInst = template.createInstance(comp as unknown as GeneralComponent)
     const shadowRoot = tmplInst.shadowRoot
     comp.shadowRoot = shadowRoot
     const dataGroup = new DataGroup(
