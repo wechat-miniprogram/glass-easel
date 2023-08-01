@@ -49,7 +49,7 @@ import {
   getDeepCopyStrategy,
 } from './data_proxy'
 import { Relation, generateRelationDefinitionGroup, RelationDefinitionGroup } from './relation'
-import { Template, TemplateEngine } from './template_engine'
+import { Template, TemplateEngine, TemplateInstance } from './template_engine'
 import { ClassList } from './class_list'
 import { GeneralBackendContext, GeneralBackendElement } from './node'
 import { DataPath, parseSinglePath, parseMultiPaths } from './data_path'
@@ -251,6 +251,22 @@ export class ComponentDefinition<
     return this.behavior.getComponentDependencies()
   }
 
+  /**
+   * Update the template field
+   *
+   * This method has no effect if the template engine does not support template update.
+   */
+  updateTemplate(template: { [key: string]: unknown }) {
+    this.behavior._$updateTemplate(template)
+    if (this._$detail?.template.updateTemplate) {
+      this._$detail.template.updateTemplate(this.behavior as unknown as GeneralBehavior)
+    } else {
+      triggerWarning(
+        `The template engine of component "${this.is}" does not support template update`,
+      )
+    }
+  }
+
   isPrepared(): boolean {
     return !!this._$detail
   }
@@ -375,6 +391,8 @@ export class Component<
   /** @internal */
   _$external: boolean
   shadowRoot: ShadowRoot | ExternalShadowRoot
+  /** @internal */
+  _$tmplInst: TemplateInstance | undefined
   /** @internal */
   _$relation: Relation | null
   /** @internal */
@@ -751,6 +769,7 @@ export class Component<
     // init template with init data
     if (propEarlyInit && initPropValues !== undefined) initPropValues(comp)
     tmplInst.initValues(dataGroup.innerData || dataGroup.data)
+    comp._$tmplInst = tmplInst
     dataGroup.setUpdateListener(tmplInst.updateValues.bind(tmplInst))
 
     // bind behavior listeners
@@ -934,6 +953,25 @@ export class Component<
       return null
     }
     return this.shadowRoot as ShadowRoot
+  }
+
+  /**
+   * Apply the template updates to this component instance
+   *
+   * This method has no effect if the template engine does not support template update.
+   */
+  applyTemplateUpdates(): void {
+    if (this._$tmplInst?.updateTemplate) {
+      const dataGroup = this._$dataGroup
+      this._$tmplInst.updateTemplate(
+        this._$definition._$detail!.template,
+        dataGroup.innerData || dataGroup.data,
+      )
+    } else {
+      triggerWarning(
+        `The template engine of component "${this.is}" does not support template update`,
+      )
+    }
   }
 
   static listProperties<

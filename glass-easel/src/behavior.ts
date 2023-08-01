@@ -1605,6 +1605,10 @@ export class Behavior<
     return this._$template
   }
 
+  _$updateTemplate(template: { [key: string]: unknown }) {
+    this._$template = template
+  }
+
   /** Check whether the `other` behavior is a dependent behavior of this behavior */
   hasBehavior(other: string | GeneralBehavior): boolean {
     if (this._$unprepared) this.prepare()

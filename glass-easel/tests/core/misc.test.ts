@@ -359,6 +359,36 @@ describe('component utils', () => {
     expect(elem.getShadowRoot()!.childNodes[0]).toBeInstanceOf(glassEasel.Component)
   })
 
+  test('template content update', () => {
+    const compDef = componentSpace
+      .define()
+      .template(tmpl('ABC-{{num}}'))
+      .data(() => ({
+        num: 123,
+      }))
+      .registerComponent()
+    const elem = glassEasel.createElement('root', compDef.general())
+    glassEasel.Element.pretendAttached(elem)
+    const shadowRoot = elem.getShadowRoot()!
+    expect(shadowRoot.childNodes[0]!.asTextNode()!.textContent).toBe('ABC-123')
+    elem.setData({ num: 456 })
+    expect(shadowRoot.childNodes[0]!.asTextNode()!.textContent).toBe('ABC-456')
+
+    compDef.updateTemplate(tmpl('DEF-{{num}}'))
+    expect(shadowRoot.childNodes[0]!.asTextNode()!.textContent).toBe('ABC-456')
+    const elem2 = glassEasel.createElement('root', compDef.general())
+    const shadowRoot2 = elem2.getShadowRoot()!
+    expect(shadowRoot2.childNodes[0]!.asTextNode()!.textContent).toBe('DEF-123')
+
+    elem.applyTemplateUpdates()
+    expect(shadowRoot.childNodes[0]!.asTextNode()!.textContent).toBe('DEF-456')
+    elem.setData({ num: 789 })
+    expect(shadowRoot.childNodes[0]!.asTextNode()!.textContent).toBe('DEF-789')
+
+    elem2.applyTemplateUpdates()
+    expect(shadowRoot2.childNodes[0]!.asTextNode()!.textContent).toBe('DEF-123')
+  })
+
   test('property dash name conversion', () => {
     const childComp = componentSpace
       .define()
