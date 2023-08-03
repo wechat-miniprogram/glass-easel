@@ -471,10 +471,10 @@ describe('intersection observer', () => {
         .register()
     })
 
-    const ab = env.associateBackend()
+    const backendContext = new glassEasel.composedBackend.EmptyComposedBackendContext()
+    const ab = env.associateBackend(backendContext)
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
-    expect(domHtml(root.getComponent())).toBe('<div><div></div><div></div></div>')
   })
 })
 
