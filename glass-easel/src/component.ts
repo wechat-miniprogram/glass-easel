@@ -677,7 +677,7 @@ export class Component<
       const builderContext: BuilderContext<any, any, any> = {
         self: methodCaller,
         data,
-        setData: comp.setData.bind(comp) as (newData: { [x: string]: unknown }) => void,
+        setData: comp.setData.bind(comp) as (newData?: { [x: string]: unknown }) => void,
         implement: <TIn extends { [x: string]: unknown }>(
           traitBehavior: TraitBehavior<TIn, { [x: string]: unknown }>,
           impl: TIn,
@@ -1310,18 +1310,20 @@ export class Component<
    * All data observers will not be triggered immediately before applied.
    * Reads of the data will get the unchanged value before applied.
    */
-  updateData(newData: Partial<SetDataSetter<DataWithPropertyValues<TData, TProperty>>>): void
-  updateData(newData: Record<string, any>): void {
+  updateData(newData?: Partial<SetDataSetter<DataWithPropertyValues<TData, TProperty>>>): void
+  updateData(newData?: Record<string, any>): void {
     const dataProxy = this._$dataGroup
     if (dataProxy === undefined) {
       throw new Error('Cannot update data before component created')
     }
-    const keys = Object.keys(newData)
-    for (let i = 0; i < keys.length; i += 1) {
-      const key = keys[i]!
-      const p = parseSinglePath(key)
-      if (p) {
-        dataProxy.replaceDataOnPath(p, newData[key])
+    if (typeof newData === 'object' && newData !== null) {
+      const keys = Object.keys(newData)
+      for (let i = 0; i < keys.length; i += 1) {
+        const key = keys[i]!
+        const p = parseSinglePath(key)
+        if (p) {
+          dataProxy.replaceDataOnPath(p, newData[key])
+        }
       }
     }
   }
@@ -1333,18 +1335,20 @@ export class Component<
    * When called inside observers, the data update will not be applied to templates.
    * Inside observers, it is recommended to use `updateData` instead.
    */
-  setData(newData: Partial<SetDataSetter<DataWithPropertyValues<TData, TProperty>>>): void
-  setData(newData: Record<string, any>): void {
+  setData(newData?: Partial<SetDataSetter<DataWithPropertyValues<TData, TProperty>>>): void
+  setData(newData?: Record<string, any> | undefined): void {
     const dataProxy = this._$dataGroup
     if (dataProxy === undefined) {
       throw new Error('Cannot update data before component created')
     }
-    const keys = Object.keys(newData)
-    for (let i = 0; i < keys.length; i += 1) {
-      const key = keys[i]!
-      const p = parseSinglePath(key)
-      if (p) {
-        dataProxy.replaceDataOnPath(p, newData[key])
+    if (typeof newData === 'object' && newData !== null) {
+      const keys = Object.keys(newData)
+      for (let i = 0; i < keys.length; i += 1) {
+        const key = keys[i]!
+        const p = parseSinglePath(key)
+        if (p) {
+          dataProxy.replaceDataOnPath(p, newData[key])
+        }
       }
     }
     dataProxy.applyDataUpdates()
