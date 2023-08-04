@@ -634,16 +634,21 @@ export class Component<
 
     // call init functions
     let initDone = false
-    function relationInit(def: RelationParams): RelationHandler<unknown, never>
+    function relationInit(relationDef: RelationParams): RelationHandler<unknown, never>
     function relationInit<TOut extends { [x: string]: unknown }>(
-      def: TraitRelationParams<TOut>,
+      relationDef: TraitRelationParams<TOut>,
     ): RelationHandler<unknown, TOut>
     function relationInit<TOut extends { [x: string]: unknown }>(
-      def: RelationParams | TraitRelationParams<TOut>,
+      relationDef: RelationParams | TraitRelationParams<TOut>,
     ): RelationHandler<unknown, unknown> {
       if (initDone) throw new Error('Cannot execute init-time functions after initialization')
-      const target = def.target
-      const normalizedRel = normalizeRelation(behavior.is, 'undefined', def)
+      const target = relationDef.target
+      const normalizedRel = normalizeRelation(
+        behavior.ownerSpace,
+        behavior.is,
+        'undefined',
+        relationDef,
+      )
       let key: symbol
       if (normalizedRel) {
         key = relation.add(normalizedRel)

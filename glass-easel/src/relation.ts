@@ -1,5 +1,5 @@
 import { VirtualNode } from './virtual_node'
-import { Behavior, GeneralBehavior } from './behavior'
+import { GeneralBehavior } from './behavior'
 import { Component, GeneralComponent } from './component'
 import { Element } from './element'
 import { safeCallback, triggerWarning } from './func_arr'
@@ -21,11 +21,7 @@ export type RelationListener = (target: unknown) => void
 export type RelationFailedListener = () => void
 
 export type RelationDefinition = {
-  target:
-    | string
-    | GeneralBehavior
-    | TraitBehavior<{ [x: string]: unknown }, { [x: string]: unknown }>
-  domain: string | null
+  target: GeneralBehavior | TraitBehavior<{ [x: string]: unknown }, { [x: string]: unknown }>
   type: RelationType
   linked: RelationListener | null
   linkChanged: RelationListener | null
@@ -162,77 +158,47 @@ export class Relation {
       const oldLink = links[i]!
       let newLink: { target: GeneralComponent; def: RelationDefinition } | null = null
       const def = selfDefs[i]!
-      let parentBehaviorTest:
-        | GeneralBehavior
-        | TraitBehavior<{ [x: string]: unknown }, { [x: string]: unknown }>
-        | null
-      if (def.target instanceof Behavior || def.target instanceof TraitBehavior) {
-        parentBehaviorTest = def.target
-      } else {
-        const space = comp.getRootBehavior().ownerSpace
-        if (space) {
-          parentBehaviorTest = space._$getBehavior(def.target, def.domain) || null
-        } else {
-          parentBehaviorTest = null
-        }
-      }
-      if (parentBehaviorTest) {
-        const parentBehavior = parentBehaviorTest
-        if (!isDetach) {
-          let cur: Element = comp
-          for (;;) {
-            const next = cur.parentNode
-            if (!next) break
-            cur = next
-            if (cur instanceof VirtualNode) {
-              continue
-            }
-            if (cur instanceof Component) {
-              if (cur.hasBehavior(parentBehavior)) {
-                const parentRelation = cur._$relation
-                if (parentRelation) {
-                  let rt
-                  if (parentType === RelationType.ParentComponent) {
-                    rt = RelationType.ChildComponent
-                  } else if (parentType === RelationType.Ancestor) {
-                    rt = RelationType.Descendant
-                  } else {
-                    rt = RelationType.ChildNonVirtualNode
-                  }
-                  const parentDefs = parentRelation._$group?.definitions[rt]
-                  if (parentDefs) {
-                    for (let j = 0; j < parentDefs.length; j += 1) {
-                      const def = parentDefs[j]!
-                      let requiredBehavior:
-                        | GeneralBehavior
-                        | TraitBehavior<{ [x: string]: unknown }, { [x: string]: unknown }>
-                        | null
-                      if (def.target instanceof Behavior || def.target instanceof TraitBehavior) {
-                        requiredBehavior = def.target
-                      } else {
-                        const space = cur.getRootBehavior().ownerSpace
-                        if (space) {
-                          requiredBehavior = space._$getBehavior(def.target, def.domain) || null
-                        } else {
-                          requiredBehavior = null
-                        }
+      const parentBehavior = def.target
+      if (!isDetach) {
+        let cur: Element = comp
+        for (;;) {
+          const next = cur.parentNode
+          if (!next) break
+          cur = next
+          if (cur instanceof VirtualNode) {
+            continue
+          }
+          if (cur instanceof Component) {
+            if (cur.hasBehavior(parentBehavior)) {
+              const parentRelation = cur._$relation
+              if (parentRelation) {
+                let rt
+                if (parentType === RelationType.ParentComponent) {
+                  rt = RelationType.ChildComponent
+                } else if (parentType === RelationType.Ancestor) {
+                  rt = RelationType.Descendant
+                } else {
+                  rt = RelationType.ChildNonVirtualNode
+                }
+                const parentDefs = parentRelation._$group?.definitions[rt]
+                if (parentDefs) {
+                  for (let j = 0; j < parentDefs.length; j += 1) {
+                    const def = parentDefs[j]!
+                    if (def.target && this._$comp.hasBehavior(def.target)) {
+                      newLink = {
+                        target: cur as GeneralComponent,
+                        def,
                       }
-                      if (requiredBehavior && this._$comp.hasBehavior(requiredBehavior)) {
-                        newLink = {
-                          target: cur as GeneralComponent,
-                          def,
-                        }
-                        break
-                      }
+                      break
                     }
-                    if (newLink) break
                   }
+                  if (newLink) break
                 }
               }
-              if (parentType === RelationType.ParentComponent) break
             }
-            if (parentType === RelationType.ParentNonVirtualNode) break
+            if (parentType === RelationType.ParentComponent) break
           }
+          if (parentType === RelationType.ParentNonVirtualNode) break
         }
       }
       links[i] = newLink

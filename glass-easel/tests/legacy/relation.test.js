@@ -570,5 +570,52 @@ describe('Component Relations', function () {
       expect(elem.$.a.getRelationNodes('relation-virtual-host-b')[0]).toBe(elem.$.b)
       expect(elem.$.b.getRelationNodes('relation-virtual-host-a')[0]).toBe(elem.$.a)
     })
+
+    it('should support relative paths', function () {
+      var expectOrder = [1, 2]
+      regElem({
+        is: 'relation/path/a',
+        options: {
+          lazyRegistration: true,
+        },
+        template: '<slot />',
+        relations: {
+          './b': {
+            type: 'descendant',
+            linked: function (target) {
+              expect(expectOrder.shift()).toBe(1)
+            },
+          },
+        },
+      })
+      regElem({
+        is: 'relation/path/b',
+        options: {
+          lazyRegistration: true,
+        },
+        relations: {
+          '../path/a': {
+            type: 'ancestor',
+            linked: function (target) {
+              expect(expectOrder.shift()).toBe(2)
+            },
+          },
+        },
+      })
+      var def = regElem({
+        is: 'relation/path',
+        using: {
+          'a': './path/a',
+          'b': 'path/b',
+        },
+        template:
+          '<a id="a"> <b id="b" /> </a>',
+      })
+      var elem = glassEasel.Component.createWithContext('test', def, domBackend)
+      glassEasel.Element.pretendAttached(elem)
+      expect(expectOrder.length).toBe(0)
+      expect(elem.$.a.getRelationNodes('./b')[0]).toBe(elem.$.b)
+      expect(elem.$.b.getRelationNodes('../path/a')[0]).toBe(elem.$.a)
+    })
   })
 })
