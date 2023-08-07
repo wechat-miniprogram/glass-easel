@@ -53,49 +53,28 @@ describe('env', () => {
     )
   })
 
-  test('add global components', () => {
+  test('using behaviors', () => {
     const env = new MiniProgramEnv()
-    const globalCodeSpace = env.getGlobalCodeSpace()
-    const def = globalCodeSpace
-      .getComponentSpace()
-      .define('external')
-      .options({
-        virtualHost: true,
-      })
-      .template(
-        tmpl(`
-        <span class="inner" />
-      `),
-      )
-      .registerComponent()
     const codeSpace = env.createCodeSpace('', true)
-    codeSpace.getComponentSpace().setGlobalUsingComponent('external', def)
 
-    codeSpace.addComponentStaticConfig('path/to/comp', {
-      usingComponents: {
-        external: 'external',
-      },
-    })
+    codeSpace.addComponentStaticConfig('path/to/comp', {})
 
     codeSpace.addCompiledTemplate(
       'path/to/comp',
       tmpl(`
-      <div class="outer">
-        <external />
-      </div>
-    `),
+        <div>{{ num }}</div>
+      `),
     )
 
-    codeSpace.componentEnv('path/to/comp', ({ Component }) => {
-      Component().register()
+    codeSpace.componentEnv('path/to/comp', ({ Behavior, Component }) => {
+      const beh = Behavior({ data: { num: 123 } })
+      Component().behavior(beh).register()
     })
 
     const backend = new glassEasel.domlikeBackend.CurrentWindowBackendContext()
     const ab = env.associateBackend(backend)
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
-    expect(domHtml(root.getComponent())).toBe(
-      '<div class="outer"><span class="inner"></span></div>',
-    )
+    expect(domHtml(root.getComponent())).toBe('<div>123</div>')
   })
 
   test('multiple code spaces', () => {

@@ -897,7 +897,13 @@ impl TmplElement {
                                 write!(w, "{}?{}:", gen_lit_str(&v), index + 1)?;
                             }
                             CondItem::Dynamic(p) => {
-                                p.value_expr(w)?;
+                                if p.above_cond_expr() {
+                                    w.paren(|w| {
+                                        p.value_expr(w)
+                                    })?;
+                                } else {
+                                    p.value_expr(w)?;
+                                }
                                 write!(w, "?{}:", index + 1)?;
                             }
                         }

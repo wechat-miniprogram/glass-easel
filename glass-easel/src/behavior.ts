@@ -43,7 +43,7 @@ import {
   RelationListener,
   RelationFailedListener,
 } from './relation'
-import { normalizeUrl, ComponentSpace, ComponentWaitingList } from './component_space'
+import { ComponentSpace, ComponentWaitingList } from './component_space'
 import { TraitBehavior } from './trait_behaviors'
 import { simpleDeepCopy } from './data_utils'
 import { EventListener } from './event'
@@ -340,6 +340,7 @@ export const matchTypeWithValue = (type: NormalizedPropertyType, value: any) => 
 }
 
 export const normalizeRelation = <TOut extends { [key: string]: any }>(
+  ownerSpace: ComponentSpace,
   is: string,
   key: string,
   relation: RelationParams | TraitRelationParams<TOut>,
@@ -376,18 +377,24 @@ export const normalizeRelation = <TOut extends { [key: string]: any }>(
     return null
   }
   let target:
-    | string
     | GeneralBehavior
     | TraitBehavior<{ [key: string]: unknown }, { [key: string]: unknown }>
-  let domain: string | null = null
+    | null = null
   if (relation.target instanceof ComponentDefinition) {
     target = relation.target.behavior as GeneralBehavior
   } else if (relation.target instanceof Behavior || relation.target instanceof TraitBehavior) {
     target = relation.target
   } else {
-    const { domain: d, absPath } = normalizeUrl(relation.target || key, is)
-    target = absPath
-    domain = d
+    const path = String(relation.target || key)
+    const usingTarget = ownerSpace.getComponentByUrlWithoutDefault(path, is)
+    if (usingTarget) {
+      target = usingTarget.behavior
+    } else {
+      const globalTarget = ownerSpace.getGlobalUsingComponent(path)
+      if (typeof globalTarget === 'object' && globalTarget !== null) {
+        target = globalTarget.behavior
+      }
+    }
   }
   if (!target) {
     triggerWarning(
@@ -397,7 +404,6 @@ export const normalizeRelation = <TOut extends { [key: string]: any }>(
   }
   return {
     target,
-    domain,
     type,
     linked: checkRelationFunc(relation.linked),
     linkChanged: checkRelationFunc(relation.linkChanged),
@@ -1585,7 +1591,7 @@ export class Behavior<
       for (let i = 0; i < relations.length; i += 1) {
         const { name: key, rel: relation } = relations[i]!
         if (relation === undefined || relation === null) continue
-        const rel = normalizeRelation(is, key, relation)
+        const rel = normalizeRelation(space, is, key, relation)
         if (rel) this._$relationMap[key] = rel
       }
     }
@@ -1603,6 +1609,10 @@ export class Behavior<
    */
   getTemplate() {
     return this._$template
+  }
+
+  _$updateTemplate(template: { [key: string]: unknown }) {
+    this._$template = template
   }
 
   /** Check whether the `other` behavior is a dependent behavior of this behavior */
