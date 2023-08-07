@@ -5,7 +5,7 @@ import { globalOptions } from './global_options'
 import { ClassList } from './class_list'
 import { Element } from './element'
 import { ShadowRoot } from './shadow_root'
-import { GeneralBackendElement } from '.'
+import type { EventListener, GeneralBackendElement } from '.'
 import { BM, BackendMode } from './backend/mode'
 import { DataValue, ModelBindingListener } from './data_proxy'
 
@@ -20,7 +20,13 @@ export type NativeNodeAttributeFilter = (
 export interface ExtendedNativeNodeDefinition {
   lifetimes?: {
     // eslint-disable-next-line no-use-before-define
-    created: (elem: NativeNode) => void
+    created?: (elem: NativeNode) => void
+    listenerChange?: (
+      isAdd: boolean,
+      name: string,
+      func: EventListener<unknown>,
+      options: EventListenerOptions | undefined,
+    ) => void
   }
   attributeFilters?: Record<string, NativeNodeAttributeFilter>
   eventListeners?: Record<
@@ -35,6 +41,12 @@ export interface ExtendedNativeNodeDefinition {
 
 export class NativeNode extends Element {
   is: string
+  public _$listenerChangeCb?: (
+    isAdd: boolean,
+    name: string,
+    func: EventListener<unknown>,
+    options: EventListenerOptions | undefined,
+  ) => void
   private _$attributeFilters: Record<string, NativeNodeAttributeFilter>
   private _$modelBindingListeners?: { [name: string]: ModelBindingListener }
 
@@ -95,6 +107,10 @@ export class NativeNode extends Element {
       if (extendedDefinition.attributeFilters !== undefined) {
         node._$attributeFilters = extendedDefinition.attributeFilters
       }
+      const lifetimes = extendedDefinition.lifetimes || {}
+      if (typeof lifetimes.listenerChange === 'function') {
+        node._$listenerChangeCb = lifetimes.listenerChange
+      }
       if (extendedDefinition.eventListeners !== undefined) {
         Object.keys(extendedDefinition.eventListeners).forEach((event) => {
           if (typeof extendedDefinition.eventListeners![event]!.handler === 'function') {
@@ -105,12 +121,9 @@ export class NativeNode extends Element {
           }
         })
       }
-    }
-    if (
-      typeof extendedDefinition?.lifetimes === 'object' &&
-      typeof extendedDefinition?.lifetimes.created === 'function'
-    ) {
-      extendedDefinition?.lifetimes.created.call(node, node)
+      if (typeof lifetimes.created === 'function') {
+        lifetimes.created.call(node, node)
+      }
     }
     return node
   }

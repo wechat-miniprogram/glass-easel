@@ -1523,6 +1523,8 @@ export class Element implements NodeCast {
     else if (finalChanged === FinalChanged.Added) this._$updateEventDefaultPrevented(name, true)
     if (this instanceof Component && this._$definition._$options.listenerChangeLifetimes) {
       this.triggerLifetime('listenerChange', [true, name, func, options])
+    } else if (this instanceof NativeNode && typeof this._$listenerChangeCb === 'function') {
+      this._$listenerChangeCb.apply(this, [true, name, func, options])
     }
   }
 
@@ -1533,6 +1535,8 @@ export class Element implements NodeCast {
     if (finalChanged !== FinalChanged.NotChanged) this._$updateEventDefaultPrevented(name, false)
     if (this instanceof Component && this._$definition._$options.listenerChangeLifetimes) {
       this.triggerLifetime('listenerChange', [false, name, func, options])
+    } else if (this instanceof NativeNode && typeof this._$listenerChangeCb === 'function') {
+      this._$listenerChangeCb.apply(this, [false, name, func, options])
     }
   }
 
