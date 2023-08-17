@@ -826,11 +826,17 @@ describe('node tree structure', () => {
             <template name="child">
               <span>{{ obj.a }}</span>
             </template>
+            <template name="child2">
+              <span>{{ a }}</span>
+            </template>
           `,
           '': `
-          <import src="./child" />
+            <import src="./child" />
             <div>
               <template is="child" data="{{ obj }}" />
+            </div>
+            <div>
+              <template is="child2" data="{{ ...obj }}" />
             </div>
           `,
         }),
@@ -840,7 +846,38 @@ describe('node tree structure', () => {
       })
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    expect(domHtml(elem)).toBe('<div><span>123</span></div><div><span>123</span></div>')
+    elem.setData({ obj: { a: 456 } })
+    expect(domHtml(elem)).toBe('<div><span>456</span></div><div><span>456</span></div>')
+    elem.setData({ 'obj.a': 789 })
+    expect(domHtml(elem)).toBe('<div><span>789</span></div><div><span>789</span></div>')
+  })
+
+  test('template-name data cascaded passing', () => {
+    const def = glassEasel
+      .registerElement({
+        template: tmpl(`
+          <template name="child">
+            <template is="child2" data="{{ a }}" />
+          </template>
+          <template name="child2">
+            <span>{{ a }}</span>
+          </template>
+          <div>
+            <template is="child" data="{{ ...obj }}" />
+          </div>
+        `),
+        data: {
+          obj: { a: 123 },
+        },
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
     expect(domHtml(elem)).toBe('<div><span>123</span></div>')
+    elem.setData({ obj: { a: 456 } })
+    expect(domHtml(elem)).toBe('<div><span>456</span></div>')
+    elem.setData({ 'obj.a': 789 })
+    expect(domHtml(elem)).toBe('<div><span>789</span></div>')
   })
 
   test('static template-is', () => {
