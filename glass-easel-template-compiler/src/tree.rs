@@ -1107,9 +1107,9 @@ impl TmplElement {
                                         var_key, var_target, var_target
                                     )?;
                                     p.value_expr(w)?;
-                                    write!(w, ",U?")?;
+                                    write!(w, ",K||(U?")?;
                                     p.lvalue_state_expr(w, scopes)?;
-                                    write!(w, ":undefined).C(C,T,E,B,F,S,J)")?;
+                                    write!(w, ":undefined)).C(C,T,E,B,F,S,J)")?;
                                     Ok(())
                                 })
                             }

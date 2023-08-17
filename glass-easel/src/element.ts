@@ -44,16 +44,16 @@ import {
 } from '.'
 
 /**
- * The "style" attributes segments
+ * The "style" attribute and class list segments
  *
- * This allows different modules set the "style" attribute of an element
+ * This allows different modules set the "style" attribute or the class list of an element
  * without overriding each other.
- * The final "style" attribute value is the concat of all segments.
- * When calling `setNodeStyle` on an element,
+ * The final value is the concat of all segments.
+ * When calling `setNodeStyle` or `setNodeClass` on an element,
  * a segment can be specified.
  */
 export const enum StyleSegmentIndex {
-  /** The main style segment, generally managed by the template engine */
+  /** The main style segment, generally managed by the template engine (or manually set) */
   MAIN = 0,
   /** The template style segment, preserved for template engine */
   TEMPLATE_EXTRA = 1,
@@ -376,6 +376,11 @@ export class Element implements NodeCast {
   /** Get whether the node is virtual or not */
   isVirtual(): boolean {
     return this._$virtual
+  }
+
+  /** Set the node class */
+  setNodeClass(classNames: string, index: StyleSegmentIndex = 0) {
+    this.classList?.setClassNames(classNames, index)
   }
 
   /** Set the node style */
