@@ -433,6 +433,9 @@ export class Element implements NodeCast {
 
   private static checkAndCallDetached(node: Node) {
     const callFunc = function callFunc(node: Node) {
+      if (node._$destroyOnDetach) {
+        node.destroyBackendElement()
+      }
       if (node instanceof Element && node._$attached) {
         node.childNodes.forEach(callFunc)
         if (node instanceof Component) {
@@ -457,9 +460,6 @@ export class Element implements NodeCast {
         } else {
           node._$attached = false
         }
-      }
-      if (node._$destroyOnDetach) {
-        node.destroyBackendElement()
       }
     }
     callFunc(node)
