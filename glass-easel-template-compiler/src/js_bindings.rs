@@ -14,8 +14,8 @@ pub struct TmplGroup {
 
 fn convert_str_arr(arr: &Vec<String>) -> js_sys::Array {
     let ret = js_sys::Array::new_with_length(arr.len() as u32);
-    for item in arr {
-        ret.push(&JsValue::from(item));
+    for (index, item) in arr.iter().enumerate() {
+        ret.set(index as u32, JsValue::from(item));
     }
     ret
 }

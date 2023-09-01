@@ -818,7 +818,7 @@ export class Element implements NodeCast {
           (BM.DOMLIKE || (BM.DYNAMIC && context.mode === BackendMode.Domlike)
             ? (context as domlikeBackend.Context).document.createDocumentFragment()
             : (context as backend.Context | composedBackend.Context).createFragment())
-        sharedFrag = frag
+        sharedFrag = f
         const recNewVirtual = (c: Node): boolean => {
           if (c instanceof Element && c._$virtual) {
             c.forEachComposedChild(recNewVirtual)
