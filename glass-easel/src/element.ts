@@ -1393,6 +1393,8 @@ export class Element implements NodeCast {
       ;(frag as backend.Element).release()
     } else {
       Element.insertChildComposed(parent, replacer, placeholder, true, posIndex)
+      placeholder.parentNode = null
+      replacer.parentNode = parent
       for (let i = 0; i < replacedChildren.length; i += 1) {
         const child = replacedChildren[i]!
         Element.insertChildComposed(replacer, child, undefined, false, i)
@@ -1401,10 +1403,8 @@ export class Element implements NodeCast {
 
     // change the parent of placeholder
     parent._$mutationObserverTarget?.detachChild(placeholder)
-    placeholder.parentNode = null
 
     // change the parent of replacer
-    replacer.parentNode = parent
     parent._$mutationObserverTarget?.attachChild(replacer)
 
     // handling child nodes list for parent
