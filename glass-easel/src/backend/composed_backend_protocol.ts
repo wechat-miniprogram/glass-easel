@@ -1,6 +1,6 @@
 /* eslint-disable class-methods-use-this */
 
-import { EventOptions, EventBubbleStatus } from '../event'
+import { EventOptions, EventBubbleStatus, MutLevel } from '../event'
 import { safeCallback } from '../func_arr'
 import {
   BackendMode,
@@ -63,14 +63,15 @@ export interface Element extends Partial<suggestedBackend.Element> {
   setText(content: string): void
   getBoundingClientRect(cb: (res: BoundingClientRect) => void): void
   getScrollOffset(cb: (res: ScrollOffset) => void): void
-  setEventDefaultPrevented(type: string, enabled: boolean): void
   setModelBindingStat(attributeName: string, listener: ((newValue: unknown) => void) | null): void
+  setListenerStats(type: string, capture: boolean, mutLevel: MutLevel): void
   createIntersectionObserver(
     relativeElement: Element | null,
     relativeElementMargin: string,
     thresholds: number[],
     listener: (res: IntersectionStatus) => void,
   ): Observer
+  getContext(cb: (res: unknown) => void): void
 }
 
 /** An empty backend implementation */
@@ -275,7 +276,7 @@ export class EmptyComposedBackendElement implements Element {
     }, 0)
   }
 
-  setEventDefaultPrevented(_type: string, _enabled: boolean): void {
+  setListenerStats(_type: string, _capture: boolean, _mutLevel: MutLevel): void {
     // empty
   }
 
@@ -297,5 +298,9 @@ export class EmptyComposedBackendElement implements Element {
         /* empty */
       },
     }
+  }
+
+  getContext(cb: (res: unknown) => void): void {
+    cb(null)
   }
 }

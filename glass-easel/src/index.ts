@@ -32,6 +32,7 @@ export {
   EventOptions,
   EventListener,
   EventListenerOptions,
+  MutLevel as EventMutLevel,
 } from './event'
 export * as typeUtils from './component_params'
 export {

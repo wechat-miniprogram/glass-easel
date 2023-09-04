@@ -55,7 +55,7 @@ const getCurrentTimeStamp = () => {
   return ts - relativeTimeStamp
 }
 
-const enum MutLevel {
+export const enum MutLevel {
   None = 0,
   Mut = 1,
   Final = 2,
@@ -70,9 +70,9 @@ type EventFuncArr<TDetail> = {
 export const enum FinalChanged {
   NotChanged = 0,
   Failed,
-  Init,
-  Added,
-  Removed,
+  None,
+  Final,
+  Mut,
 }
 
 /** The target of an event */
@@ -120,14 +120,17 @@ export class EventTarget<TEvents extends { [type: string]: unknown }> {
       }
     }
     efa.funcArr.add(func, mutLevel)
-    if (mutLevel === MutLevel.Final) efa.finalCount += 1
-    else if (mutLevel === MutLevel.Mut) efa.mutCount += 1
-    if (initialized) {
-      return mutLevel === MutLevel.Final && efa.finalCount === 1
-        ? FinalChanged.Added
-        : FinalChanged.NotChanged
+    if (mutLevel === MutLevel.Final) {
+      efa.finalCount += 1
+      return initialized && efa.finalCount !== 1 ? FinalChanged.NotChanged : FinalChanged.Final
     }
-    return mutLevel === MutLevel.Final ? FinalChanged.Added : FinalChanged.Init
+    if (mutLevel === MutLevel.Mut) {
+      efa.mutCount += 1
+      return initialized && !(efa.mutCount === 1 && efa.finalCount === 0)
+        ? FinalChanged.NotChanged
+        : FinalChanged.Mut
+    }
+    return initialized ? FinalChanged.NotChanged : FinalChanged.None
   }
 
   removeListener<T extends string>(
@@ -141,11 +144,23 @@ export class EventTarget<TEvents extends { [type: string]: unknown }> {
     if (!efa) return FinalChanged.Failed
     const mutLevel = efa.funcArr.remove(func)
     if (mutLevel === null) return FinalChanged.Failed
-    if (mutLevel === MutLevel.Final) efa.finalCount -= 1
-    else if (mutLevel === MutLevel.Mut) efa.mutCount -= 1
-    return mutLevel === MutLevel.Final && efa.finalCount === 0
-      ? FinalChanged.Removed
-      : FinalChanged.NotChanged
+
+    if (mutLevel === MutLevel.Final) {
+      efa.finalCount -= 1
+      // eslint-disable-next-line no-nested-ternary
+      return efa.finalCount !== 0
+        ? FinalChanged.NotChanged
+        : efa.mutCount > 0
+        ? FinalChanged.Mut
+        : FinalChanged.None
+    }
+    if (mutLevel === MutLevel.Mut) {
+      efa.mutCount -= 1
+      return efa.mutCount !== 0 || efa.finalCount !== 0
+        ? FinalChanged.NotChanged
+        : FinalChanged.None
+    }
+    return FinalChanged.NotChanged
   }
 }
 
