@@ -504,6 +504,7 @@ export class ShadowRoot extends VirtualNode {
     // assuming that slot name duplication is very rare in practice,
     // the complexity without name duplication is priority guaranteed.
     if (slotsList[slotName]) {
+      // with name duplication
       const firstSlot = slotsList[slotName]!
       let insertPos = { next: firstSlot } as DoubleLinkedList<Element> // this is a pointer to pointer
       let insertBeforeFirst = true
@@ -522,6 +523,7 @@ export class ShadowRoot extends VirtualNode {
         if (next) next.prev = insertPos.next
       }
     } else {
+      // without name duplication
       slotsList[slotName] = { value: slot, prev: null, next: null }
     }
     const oldSlot = slots[slotName]
@@ -883,24 +885,24 @@ export class ShadowRoot extends VirtualNode {
 
       if (containingSlot && slotNodesToUpdate.length) {
         const firstSlotNode = slotNodesToUpdate[0]!
-        insertPos = Element.findSlotNodeInsertPosition(containingSlot, firstSlotNode, posIndex)
+        insertPos = Element._$findSlotNodeInsertPosition(containingSlot, firstSlotNode, posIndex)
       }
 
       return {
         updateContainingSlot: () => {
           for (let i = slotNodesToUpdate.length - 1; i >= 0; i -= 1) {
             const node = slotNodesToUpdate[i]!
-            Element.updateContainingSlot(node, containingSlot)
+            Element._$updateContainingSlot(node, containingSlot)
           }
         },
         removeSlotNodes: () => {
           if (oldShadowRoot && oldContainingSlot && removeCount) {
-            Element.spliceSlotNodes(oldContainingSlot, removeStart, removeCount, undefined)
+            Element._$spliceSlotNodes(oldContainingSlot, removeStart, removeCount, undefined)
           }
         },
         insertSlotNodes: () => {
           if (shadowRoot && containingSlot && slotNodesToUpdate.length) {
-            Element.spliceSlotNodes(containingSlot, insertPos, 0, slotNodesToUpdate)
+            Element._$spliceSlotNodes(containingSlot, insertPos, 0, slotNodesToUpdate)
           }
         },
       }
@@ -944,7 +946,7 @@ export class ShadowRoot extends VirtualNode {
       for (let it = iter.next(); !it.done; it = iter.next()) {
         const [slot, { nodes: slotNodesToInsert }] = it.value
         const firstSlotNodeToInsert = slotNodesToInsert[0]!
-        it.value[1].insertPos = Element.findSlotNodeInsertPosition(
+        it.value[1].insertPos = Element._$findSlotNodeInsertPosition(
           slot,
           firstSlotNodeToInsert,
           posIndex,
@@ -956,7 +958,7 @@ export class ShadowRoot extends VirtualNode {
       updateContainingSlot: () => {
         for (let i = slotNodesWithContainingSlot.length - 1; i >= 0; i -= 1) {
           const [node, containingSlot] = slotNodesWithContainingSlot[i]!
-          Element.updateContainingSlot(node, containingSlot)
+          Element._$updateContainingSlot(node, containingSlot)
         }
       },
       removeSlotNodes: () => {
@@ -964,7 +966,7 @@ export class ShadowRoot extends VirtualNode {
           const iter = slotNodesToRemoveMap.entries()
           for (let it = iter.next(); !it.done; it = iter.next()) {
             const [slot, { start, count }] = it.value
-            Element.spliceSlotNodes(slot, start, count, undefined)
+            Element._$spliceSlotNodes(slot, start, count, undefined)
           }
         }
       },
@@ -974,7 +976,7 @@ export class ShadowRoot extends VirtualNode {
 
           for (let it = iter.next(); !it.done; it = iter.next()) {
             const [slot, { nodes: slotNodesToInsert, insertPos }] = it.value
-            Element.spliceSlotNodes(slot, insertPos, 0, slotNodesToInsert)
+            Element._$spliceSlotNodes(slot, insertPos, 0, slotNodesToInsert)
           }
         }
       },

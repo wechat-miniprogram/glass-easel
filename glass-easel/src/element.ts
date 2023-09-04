@@ -219,7 +219,7 @@ export class Element implements NodeCast {
       return
     }
     this._$nodeSlot = newSlot
-    const slotParentShadowRoot = Element.getParentHostShadowRoot(this.parentNode)
+    const slotParentShadowRoot = Element._$getParentHostShadowRoot(this.parentNode)
     if (slotParentShadowRoot) {
       const slotMode = slotParentShadowRoot.getSlotMode()
 
@@ -538,8 +538,8 @@ export class Element implements NodeCast {
 
       for (let i = 0; i < slotNodes.length; i += 1) {
         const node = slotNodes[i]!
-        Element.spliceSlotNodes(newSlot!, -1, 0, [node])
-        Element.updateContainingSlot(node, newSlot)
+        Element._$spliceSlotNodes(newSlot!, -1, 0, [node])
+        Element._$updateContainingSlot(node, newSlot)
         Element.insertChildReassign(node.parentNode!, node, null, newSlot, node.parentIndex)
       }
     } else if (!newSlot) {
@@ -547,8 +547,8 @@ export class Element implements NodeCast {
 
       for (let i = 0; i < slotNodes.length; i += 1) {
         const node = slotNodes[i]!
-        Element.spliceSlotNodes(oldSlot, 0, 1, undefined)
-        Element.updateContainingSlot(node, newSlot)
+        Element._$spliceSlotNodes(oldSlot, 0, 1, undefined)
+        Element._$updateContainingSlot(node, newSlot)
         Element.insertChildReassign(node.parentNode!, node, oldSlot, null, node.parentIndex)
       }
     } else {
@@ -556,9 +556,9 @@ export class Element implements NodeCast {
 
       for (let i = 0; i < slotNodes.length; i += 1) {
         const node = slotNodes[i]!
-        Element.spliceSlotNodes(oldSlot, 0, 1, undefined)
-        Element.spliceSlotNodes(newSlot, -1, 0, [node])
-        Element.updateContainingSlot(node, newSlot)
+        Element._$spliceSlotNodes(oldSlot, 0, 1, undefined)
+        Element._$spliceSlotNodes(newSlot, -1, 0, [node])
+        Element._$updateContainingSlot(node, newSlot)
         Element.insertChildReassign(node.parentNode!, node, oldSlot, newSlot, node.parentIndex)
       }
     }
@@ -746,10 +746,13 @@ export class Element implements NodeCast {
     return rec(node)
   }
 
-  // a helper for searching the first non-virtual node
-  private static _findFirstNonVirtual(element: Element, index: number): Node | null {
-    const inSlot = element._$slotName !== null
-    const children = inSlot ? element.slotNodes! : element.childNodes
+  /**
+   * @internal
+   * a helper for searching the first non-virtual node
+   */
+  private static _$findFirstNonVirtualChild(parent: Element, index: number): Node | null {
+    const inSlot = parent._$slotName !== null
+    const children = inSlot ? parent.slotNodes! : parent.childNodes
     if (index >= 0 && index < children.length) {
       for (let i = index; i < children.length; i += 1) {
         let ret: Node | null = null
@@ -775,34 +778,39 @@ export class Element implements NodeCast {
         if (ret) return ret
       }
     }
-    if (!element._$virtual) return null
-    const containingSlot = element.containingSlot
+    if (!parent._$virtual) return null
+    const containingSlot = parent.containingSlot
     if (containingSlot === null) return null
     if (containingSlot !== undefined) {
-      return Element._findFirstNonVirtual(containingSlot, element.slotIndex! + 1)
+      return Element._$findFirstNonVirtualChild(containingSlot, parent.slotIndex! + 1)
     }
-    let cur: Element = element
-    if (element instanceof ShadowRoot) {
-      cur = element.getHostNode()
+    let cur: Element = parent
+    if (parent instanceof ShadowRoot) {
+      cur = parent.getHostNode()
       if (!cur._$virtual) return null
     }
     const p = cur.parentNode
     if (p) {
-      return Element._findFirstNonVirtual(p, cur.parentIndex + 1)
+      return Element._$findFirstNonVirtualChild(p, cur.parentIndex + 1)
     }
     return null
   }
 
-  private static findFirstNonVirtual(element: Node, newPosIndex: number): Node | null {
+  /**
+   * @internal
+   * A helper to find first non-virtual next sibling node
+   * return null if no next sibling exists
+   */
+  private static _$findFirstNonVirtualSibling(element: Node, newPosIndex: number): Node | null {
     const containingSlot = element.containingSlot
     if (containingSlot === null) return null
     if (containingSlot !== undefined) {
       if (!containingSlot._$virtual) return null
       if (element.slotIndex !== undefined) {
-        return Element._findFirstNonVirtual(containingSlot, element.slotIndex + 1)
+        return Element._$findFirstNonVirtualChild(containingSlot, element.slotIndex + 1)
       }
-      const insertPos = Element.findSlotNodeInsertPosition(containingSlot, element, newPosIndex)
-      return Element._findFirstNonVirtual(containingSlot, insertPos)
+      const insertPos = Element._$findSlotNodeInsertPosition(containingSlot, element, newPosIndex)
+      return Element._$findFirstNonVirtualChild(containingSlot, insertPos)
     }
     let cur: Node = element
     if (element instanceof ShadowRoot) {
@@ -811,7 +819,7 @@ export class Element implements NodeCast {
     }
     const p = cur.parentNode
     if (p) {
-      return Element._findFirstNonVirtual(p, newPosIndex)
+      return Element._$findFirstNonVirtualChild(p, newPosIndex)
     }
     return null
   }
@@ -916,13 +924,13 @@ export class Element implements NodeCast {
             return true
           })
           if (removeCount === 0 && frag && firstSlotNode) {
-            before = Element.findFirstNonVirtual(
+            before = Element._$findFirstNonVirtualSibling(
               slot === undefined ? newChild! : firstSlotNode,
               newPosIndex + 1,
             )
           }
         } else if (frag && firstSlotNode) {
-          before = Element.findFirstNonVirtual(
+          before = Element._$findFirstNonVirtualSibling(
             slot === undefined ? newChild! : firstSlotNode,
             newPosIndex,
           )
@@ -1071,9 +1079,10 @@ export class Element implements NodeCast {
   }
 
   /**
+   * @internal
    * @param move whether this insertion is a slot movement
    */
-  private static updateSubtreeSlotsInsertion(
+  private static _$updateSubtreeSlotsInsertion(
     node: Node,
     slotStart: DoubleLinkedList<Element> | null,
     slotEnd: DoubleLinkedList<Element> | null,
@@ -1157,9 +1166,10 @@ export class Element implements NodeCast {
   }
 
   /**
+   * @internal
    * @param move whether this removal is a slot movement, will fire an insertion (with move=true) after
    */
-  private static updateSubtreeSlotsRemoval(
+  private static _$updateSubtreeSlotsRemoval(
     node: Node,
     slotStart: DoubleLinkedList<Element> | null,
     slotEnd: DoubleLinkedList<Element> | null,
@@ -1208,9 +1218,10 @@ export class Element implements NodeCast {
   }
 
   /**
+   * @internal
    * @param move whether this removal is a slot movement, will fire an insertion (with move=true) after
    */
-  private static updateSubtreeSlotsReplacement(
+  private static _$updateSubtreeSlotsReplacement(
     node: Node,
     slotStart: DoubleLinkedList<Element> | null,
     slotEnd: DoubleLinkedList<Element> | null,
@@ -1220,11 +1231,11 @@ export class Element implements NodeCast {
     move: boolean,
   ): void {
     if (!slotStart || !slotEnd) {
-      Element.updateSubtreeSlotsRemoval(node, oldSlotStart, oldSlotEnd, move)
+      Element._$updateSubtreeSlotsRemoval(node, oldSlotStart, oldSlotEnd, move)
       return
     }
     if (!oldSlotStart || !oldSlotEnd) {
-      Element.updateSubtreeSlotsInsertion(node, slotStart, slotEnd, posIndex, move)
+      Element._$updateSubtreeSlotsInsertion(node, slotStart, slotEnd, posIndex, move)
       return
     }
     let parent = node
@@ -1269,7 +1280,8 @@ export class Element implements NodeCast {
     }
   }
 
-  private static getParentHostShadowRoot = (parent: Element | null): ShadowRoot | null => {
+  /** @internal */
+  private static _$getParentHostShadowRoot = (parent: Element | null): ShadowRoot | null => {
     let parentSlotHost: Element | null = parent
     while (parentSlotHost?._$inheritSlots) parentSlotHost = parentSlotHost.parentNode
     return parentSlotHost instanceof Component && !parentSlotHost._$external
@@ -1321,7 +1333,7 @@ export class Element implements NodeCast {
           parent,
           [newChild],
           null,
-          Element.getParentHostShadowRoot(oldParent),
+          Element._$getParentHostShadowRoot(oldParent),
           posIndex,
         )
 
@@ -1352,7 +1364,7 @@ export class Element implements NodeCast {
     }
 
     // update containingSlot
-    const parentComponentShadowRoot = Element.getParentHostShadowRoot(parent)
+    const parentComponentShadowRoot = Element._$getParentHostShadowRoot(parent)
     const newChildContainingSlotUpdater = newChild
       ? ShadowRoot._$updateSubtreeSlotNodes(
           parent,
@@ -1453,7 +1465,7 @@ export class Element implements NodeCast {
     const relChildSubtreeSlotEnd = relChild ? relChild._$subtreeSlotEnd : null
     if (newChild) {
       if (oldParent) {
-        Element.updateSubtreeSlotsRemoval(
+        Element._$updateSubtreeSlotsRemoval(
           oldParent,
           newChildSubtreeSlotStart,
           newChildSubtreeSlotEnd,
@@ -1461,7 +1473,7 @@ export class Element implements NodeCast {
         )
       }
       if (removal) {
-        Element.updateSubtreeSlotsReplacement(
+        Element._$updateSubtreeSlotsReplacement(
           parent,
           newChildSubtreeSlotStart,
           newChildSubtreeSlotEnd,
@@ -1471,7 +1483,7 @@ export class Element implements NodeCast {
           !!oldParent,
         )
       } else {
-        Element.updateSubtreeSlotsInsertion(
+        Element._$updateSubtreeSlotsInsertion(
           parent,
           newChildSubtreeSlotStart,
           newChildSubtreeSlotEnd,
@@ -1480,7 +1492,7 @@ export class Element implements NodeCast {
         )
       }
     } else if (removal && relChild) {
-      Element.updateSubtreeSlotsRemoval(
+      Element._$updateSubtreeSlotsRemoval(
         parent,
         relChildSubtreeSlotStart,
         relChildSubtreeSlotEnd,
@@ -1577,7 +1589,7 @@ export class Element implements NodeCast {
       if (!subtreeSlotStart) subtreeSlotStart = relChild._$subtreeSlotStart
       if (relChild._$subtreeSlotEnd) subtreeSlotEnd = relChild._$subtreeSlotEnd
     }
-    Element.updateSubtreeSlotsRemoval(parent, subtreeSlotStart, subtreeSlotEnd, false)
+    Element._$updateSubtreeSlotsRemoval(parent, subtreeSlotStart, subtreeSlotEnd, false)
 
     // update id and slot cache if needed
     parent.ownerShadowRoot?._$markIdCacheDirty()
@@ -1727,7 +1739,7 @@ export class Element implements NodeCast {
         }
       }
     }
-    Element.updateSubtreeSlotsInsertion(
+    Element._$updateSubtreeSlotsInsertion(
       parent,
       subtreeSlotStart,
       subtreeSlotEnd,
@@ -1813,15 +1825,15 @@ export class Element implements NodeCast {
     // update containingSlot
     const placeholderContainingSlot = placeholder.containingSlot
     if (placeholderContainingSlot !== undefined) {
-      Element.updateContainingSlot(placeholder, undefined)
-      Element.updateContainingSlot(replacer, placeholderContainingSlot)
+      Element._$updateContainingSlot(placeholder, undefined)
+      Element._$updateContainingSlot(replacer, placeholderContainingSlot)
     }
     const containingSlotUpdater = replacedChildren.length
       ? ShadowRoot._$updateSubtreeSlotNodes(
           replacer,
           replacedChildren,
-          Element.getParentHostShadowRoot(replacer),
-          Element.getParentHostShadowRoot(placeholder),
+          Element._$getParentHostShadowRoot(replacer),
+          Element._$getParentHostShadowRoot(placeholder),
           0,
         )
       : null
@@ -2175,7 +2187,7 @@ export class Element implements NodeCast {
         element.slotNodes = []
         const parent = element.parentNode
         if (parent) {
-          Element.updateSubtreeSlotsInsertion(
+          Element._$updateSubtreeSlotsInsertion(
             parent,
             element._$subtreeSlotStart,
             element._$subtreeSlotEnd,
@@ -2233,7 +2245,7 @@ export class Element implements NodeCast {
     if (oldSlotElement === slot) return
     node._$slotElement = slot
 
-    const slotParentShadowRoot = Element.getParentHostShadowRoot(node.parentNode)
+    const slotParentShadowRoot = Element._$getParentHostShadowRoot(node.parentNode)
 
     if (slotParentShadowRoot) {
       const containingSlotUpdater = ShadowRoot._$updateSubtreeSlotNodes(
@@ -2257,7 +2269,8 @@ export class Element implements NodeCast {
     }
   }
 
-  static updateContainingSlot(node: Node, containingSlot: Element | null | undefined): void {
+  /** @internal */
+  static _$updateContainingSlot(node: Node, containingSlot: Element | null | undefined): void {
     node.containingSlot = containingSlot
 
     if (
@@ -2270,7 +2283,8 @@ export class Element implements NodeCast {
     }
   }
 
-  static spliceSlotNodes(
+  /** @internal */
+  static _$spliceSlotNodes(
     slot: Element,
     before: number,
     deleteCount: number,
@@ -2326,7 +2340,8 @@ export class Element implements NodeCast {
     }
   }
 
-  static findSlotNodeInsertPosition(slot: Element, target: Node, newPosIndex: number): number {
+  /** @internal */
+  static _$findSlotNodeInsertPosition(slot: Element, target: Node, newPosIndex: number): number {
     const host = slot.ownerShadowRoot!.getHostNode()
     const getNodeDepth = (node: Node): number => {
       let depth = 0
