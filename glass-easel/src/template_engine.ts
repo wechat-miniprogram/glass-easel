@@ -1,9 +1,9 @@
 import { GeneralBehavior } from './behavior'
-import { GeneralComponentInstance } from './component_params'
 import { ShadowRoot } from './shadow_root'
 import { DataChange, DataValue } from './data_proxy'
 import { NormalizedComponentOptions } from './global_options'
 import { ExternalShadowRoot } from './external_shadow_tree'
+import { GeneralComponent } from './component'
 
 /**
  * A template engine that handles the template part of a component
@@ -26,7 +26,7 @@ export interface Template {
   /**
    * Create a template instance for a component instance
    */
-  createInstance(elem: GeneralComponentInstance): TemplateInstance
+  createInstance(elem: GeneralComponent): TemplateInstance
 
   /**
    * Update the content of the template (optional)

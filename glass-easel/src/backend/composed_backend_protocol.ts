@@ -10,8 +10,10 @@ import {
   MediaQueryStatus,
   IntersectionStatus,
 } from './mode'
+import { Element as GlassEaselElement } from '../element'
+import * as suggestedBackend from './suggested_backend_protocol'
 
-export interface Context {
+export interface Context extends Partial<suggestedBackend.Context> {
   mode: BackendMode.Composed
   destroy(): void
   getWindowWidth(): number
@@ -40,7 +42,7 @@ export interface Context {
   ): Observer
 }
 
-export interface Element {
+export interface Element extends Partial<suggestedBackend.Element> {
   release(): void
   associateValue(v: unknown): void
   appendChild(child: Element): void
@@ -69,7 +71,6 @@ export interface Element {
     thresholds: number[],
     listener: ((res: IntersectionStatus) => void) | null,
   ): Observer
-  __wxElement?: unknown
 }
 
 /** An empty backend implementation */
@@ -127,25 +128,25 @@ export class EmptyComposedBackendContext implements Context {
     }
   }
 
-  getRootNode(): Element {
+  getRootNode(): EmptyComposedBackendElement {
     return this._$rootNode
   }
 
-  createElement(_tagName: string, _stylingName: string): Element {
+  createElement(_tagName: string, _stylingName: string): EmptyComposedBackendElement {
     return new EmptyComposedBackendElement()
   }
 
-  createTextNode(_tagName: string): Element {
+  createTextNode(_tagName: string): EmptyComposedBackendElement {
     return new EmptyComposedBackendElement()
   }
 
-  createFragment(): Element {
+  createFragment(): EmptyComposedBackendElement {
     return new EmptyComposedBackendElement()
   }
 
   onEvent(
     _listener: (
-      target: unknown,
+      target: GlassEaselElement,
       type: string,
       detail: unknown,
       options: EventOptions,
@@ -168,8 +169,6 @@ export class EmptyComposedBackendContext implements Context {
 
 /** An element for empty backend implementation */
 export class EmptyComposedBackendElement implements Element {
-  __wxElement: unknown = undefined
-
   release(): void {
     // empty
   }
@@ -178,31 +177,43 @@ export class EmptyComposedBackendElement implements Element {
     // empty
   }
 
-  appendChild(_child: Element): void {
+  appendChild(_child: EmptyComposedBackendElement): void {
     // empty
   }
 
-  removeChild(_child: Element, _index?: number): void {
+  removeChild(_child: EmptyComposedBackendElement, _index?: number): void {
     // empty
   }
 
-  insertBefore(_child: Element, _before?: Element, _index?: number): void {
+  insertBefore(
+    _child: EmptyComposedBackendElement,
+    _before: EmptyComposedBackendElement,
+    _index?: number,
+  ): void {
     // empty
   }
 
-  replaceChild(_child: Element, _oldChild?: Element, _index?: number): void {
+  replaceChild(
+    _child: EmptyComposedBackendElement,
+    _oldChild: EmptyComposedBackendElement,
+    _index?: number,
+  ): void {
     // empty
   }
 
-  spliceBefore(_before: Element, _deleteCount: number, _list: Element): void {
+  spliceBefore(
+    _before: EmptyComposedBackendElement,
+    _deleteCount: number,
+    _list: EmptyComposedBackendElement,
+  ): void {
     // empty
   }
 
-  spliceAppend(_list: Element): void {
+  spliceAppend(_list: EmptyComposedBackendElement): void {
     // empty
   }
 
-  spliceRemove(_before: Element, _deleteCount: number): void {
+  spliceRemove(_before: EmptyComposedBackendElement, _deleteCount: number): void {
     // empty
   }
 

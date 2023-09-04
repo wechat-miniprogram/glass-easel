@@ -7,8 +7,8 @@ import {
   templateEngine,
   GeneralBehavior,
   NormalizedComponentOptions,
-  GeneralComponent,
   ShadowedEvent,
+  GeneralComponent,
 } from '..'
 import { DataChange } from '../data_proxy'
 import { GlassEaselTemplateDOM } from './native_rendering'

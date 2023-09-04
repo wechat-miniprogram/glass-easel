@@ -1,4 +1,5 @@
 import { tmpl, multiTmpl, domBackend, execWithWarn } from '../base/env'
+import { virtual as matchElementWithDom } from '../base/match'
 import * as glassEasel from '../../src'
 
 const domHtml = (elem: glassEasel.Element): string => {
@@ -149,16 +150,19 @@ describe('node tree structure', () => {
     const elem = glassEasel.Component.createWithContext('root', def, domBackend)
     const child = elem.getShadowRoot()!.getElementById('c')!.asInstanceOf(childComp)!
     expect(domHtml(elem)).toBe('<child><div>A</div></child>')
+    matchElementWithDom(elem)
     child.setData({
       cond1: false,
       cond2: true,
     })
     expect(domHtml(elem)).toBe('<child><div>C</div></child>')
+    matchElementWithDom(elem)
     child.setData({
       cond1: false,
       cond2: false,
     })
     expect(domHtml(elem)).toBe('<child><span></span></child>')
+    matchElementWithDom(elem)
   })
 
   test('for blocks without key', () => {
@@ -1133,10 +1137,12 @@ describe('node tree structure', () => {
     const elem = glassEasel.Component.createWithContext('root', def, domBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<child-comp><div>123</div></child-comp>')
+    matchElementWithDom(elem)
     elem.setData({
       d: '',
     })
     expect(domHtml(elem)).toBe('<child-comp><div></div></child-comp>')
+    matchElementWithDom(elem)
   })
 
   test('tag name cases', () => {
@@ -1269,14 +1275,17 @@ describe('node tree structure', () => {
     const elem = glassEasel.Component.createWithContext('root', def, domBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<sub-comp><div></div><span></span></sub-comp>')
+    matchElementWithDom(elem)
     elem.setData({
       s: 'a',
     })
     expect(domHtml(elem)).toBe('<sub-comp><div><a></a></div><span></span></sub-comp>')
+    matchElementWithDom(elem)
     elem.setData({
       s: 'b',
     })
     expect(domHtml(elem)).toBe('<sub-comp><div></div><span><a></a></span></sub-comp>')
+    matchElementWithDom(elem)
   })
 
   test('setting slot name', () => {
@@ -1285,12 +1294,14 @@ describe('node tree structure', () => {
         multipleSlots: true,
       },
       template: tmpl(`
-        <div><slot name="{{a}}" /></div>
-        <span><slot name="{{b}}" /></span>
+        <a><slot name="{{a}}" /></a>
+        <b><slot name="{{b}}" /></b>
+        <c><slot name="{{c}}" /></c>
       `),
       data: {
-        a: 's',
-        b: undefined as string | undefined,
+        a: '',
+        b: '',
+        c: 's',
       },
     })
     const def = glassEasel
@@ -1300,7 +1311,7 @@ describe('node tree structure', () => {
         },
         template: tmpl(`
         <sub-comp id="sub">
-          <a slot="s"></a>
+          <s slot="s"></s>
         </sub-comp>
       `),
       })
@@ -1308,19 +1319,45 @@ describe('node tree structure', () => {
     const elem = glassEasel.Component.createWithContext('root', def, domBackend)
     const subElem = (elem.$.sub as glassEasel.GeneralComponent).asInstanceOf(subComp)!
     glassEasel.Element.pretendAttached(elem)
-    expect(domHtml(elem)).toBe('<sub-comp><div><a></a></div><span></span></sub-comp>')
-    subElem.setData({
-      a: '',
-    })
-    expect(domHtml(elem)).toBe('<sub-comp><div></div><span></span></sub-comp>')
+    expect(domHtml(elem)).toBe('<sub-comp><a></a><b></b><c><s></s></c></sub-comp>')
+    matchElementWithDom(elem)
     subElem.setData({
       b: 's',
     })
-    expect(domHtml(elem)).toBe('<sub-comp><div></div><span><a></a></span></sub-comp>')
+    expect(domHtml(elem)).toBe('<sub-comp><a></a><b><s></s></b><c></c></sub-comp>')
+    matchElementWithDom(elem)
     subElem.setData({
       a: 's',
     })
-    expect(domHtml(elem)).toBe('<sub-comp><div><a></a></div><span></span></sub-comp>')
+    expect(domHtml(elem)).toBe('<sub-comp><a><s></s></a><b></b><c></c></sub-comp>')
+    matchElementWithDom(elem)
+    subElem.setData({
+      b: '',
+      c: '',
+    })
+    expect(domHtml(elem)).toBe('<sub-comp><a><s></s></a><b></b><c></c></sub-comp>')
+    matchElementWithDom(elem)
+    subElem.setData({
+      c: 's',
+    })
+    expect(domHtml(elem)).toBe('<sub-comp><a><s></s></a><b></b><c></c></sub-comp>')
+    matchElementWithDom(elem)
+    subElem.setData({
+      b: 's',
+    })
+    expect(domHtml(elem)).toBe('<sub-comp><a><s></s></a><b></b><c></c></sub-comp>')
+    matchElementWithDom(elem)
+    subElem.setData({
+      a: 'a',
+      b: 'b',
+    })
+    expect(domHtml(elem)).toBe('<sub-comp><a></a><b></b><c><s></s></c></sub-comp>')
+    matchElementWithDom(elem)
+    subElem.setData({
+      c: '',
+    })
+    expect(domHtml(elem)).toBe('<sub-comp><a></a><b></b><c></c></sub-comp>')
+    matchElementWithDom(elem)
   })
 
   test('binding event listeners', () => {

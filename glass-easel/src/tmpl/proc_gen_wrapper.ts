@@ -15,6 +15,7 @@ import {
   NativeNode,
 } from '..'
 import { DataPath } from '../data_path'
+import { SlotMode } from '../shadow_root'
 import { RangeListManager } from './range_list_diff'
 
 export type UpdatePathTreeNode = true | { [key: string]: UpdatePathTreeNode } | UpdatePathTreeNode[]
@@ -37,10 +38,7 @@ type TmplArgs = {
   dynEvListeners?: {
     [name: string]: (ev: ShadowedEvent<unknown>) => boolean | undefined
   }
-  index?: number
   dynamicSlotNameMatched?: boolean
-  slotProps?: Record<string, [DataValue, DataPath | null, boolean]>
-  slotPropsUpdatePathTree?: Record<string, UpdatePathTreeRoot>
   changeProp?: {
     [name: string]: {
       listener: ChangePropListener
@@ -172,7 +170,7 @@ export class ProcGenWrapper {
   create(data: DataValue): { [field: string]: BindingMapGen[] } | undefined {
     const { shadowRoot, procGen } = this
     const children = procGen(this, true, data, undefined)
-    this.handleChildrenCreation(children.C, shadowRoot, undefined, undefined)
+    this.handleChildrenCreationAndInsert(children.C, shadowRoot, undefined, undefined)
     return children.B
   }
 
@@ -226,10 +224,10 @@ export class ProcGenWrapper {
 
   handleChildrenCreation(
     children: DefineChildren,
-    parentNode: Element,
     slotElement: Element | undefined,
     dynamicSlotName: string | undefined,
-  ): void {
+  ): Node[] {
+    const childNodes: Node[] = []
     children(
       true,
 
@@ -237,14 +235,14 @@ export class ProcGenWrapper {
       (textContent: string | undefined, textInit?: (elem: TextNode) => void) => {
         if (slotElement && dynamicSlotName !== '') {
           const elem = this.createDynamicPlaceholder(slotElement)
-          parentNode.appendChild(elem)
+          childNodes.push(elem)
           return
         }
         const elem = this.shadowRoot.createTextNode(textContent)
         elem.destroyBackendElementOnDetach()
         if (slotElement) Element.setSlotElement(elem, slotElement)
         if (textInit) textInit(elem)
-        parentNode.appendChild(elem)
+        childNodes.push(elem)
       },
 
       // component or native node
@@ -258,7 +256,7 @@ export class ProcGenWrapper {
       ) => {
         if (slotElement && dynamicSlotName !== (slot || '')) {
           const elem = this.createDynamicPlaceholder(slotElement)
-          parentNode.appendChild(elem)
+          childNodes.push(elem)
           return
         }
         const elem = this.createCommonElement(
@@ -275,7 +273,7 @@ export class ProcGenWrapper {
         } else if (slot !== undefined) {
           elem.slot = slot
         }
-        parentNode.appendChild(elem)
+        childNodes.push(elem)
       },
 
       // wx:if node or template-is node
@@ -286,8 +284,8 @@ export class ProcGenWrapper {
         if (slotElement) Element.setSlotElement(elem, slotElement)
         const tmplArgs = getTmplArgs(elem)
         tmplArgs.key = branchKey
-        this.handleChildrenCreation(branchFunc, elem, slotElement, dynamicSlotName)
-        parentNode.appendChild(elem)
+        this.handleChildrenCreationAndInsert(branchFunc, elem, slotElement, dynamicSlotName)
+        childNodes.push(elem)
       },
 
       // wx:for node
@@ -326,7 +324,7 @@ export class ProcGenWrapper {
             childNode.destroyBackendElementOnDetach()
             Element.setInheritSlots(childNode)
             if (slotElement) Element.setSlotElement(elem, slotElement)
-            this.handleChildrenCreation(
+            this.handleChildrenCreationAndInsert(
               (
                 isCreation,
                 defineTextNode,
@@ -358,7 +356,7 @@ export class ProcGenWrapper {
             return childNode
           },
         )
-        parentNode.appendChild(elem)
+        childNodes.push(elem)
       },
 
       // slot node
@@ -368,7 +366,7 @@ export class ProcGenWrapper {
         Element.setSlotName(elem, dataValueToString(slotName))
         if (slotElement) Element.setSlotElement(elem, slotElement)
         if (slotValueInit) slotValueInit(elem)
-        parentNode.appendChild(elem)
+        childNodes.push(elem)
       },
 
       // other virtual node
@@ -381,31 +379,42 @@ export class ProcGenWrapper {
               Element.setSlotElement(elem, slotElement)
               const tmplArgs = getTmplArgs(elem)
               tmplArgs.dynamicSlotNameMatched = true
-              this.handleChildrenCreation(children, elem, undefined, undefined)
-              parentNode.appendChild(elem)
+              this.handleChildrenCreationAndInsert(children, elem, undefined, undefined)
+              childNodes.push(elem)
             } else {
               const elem = this.createDynamicPlaceholder(slotElement)
-              parentNode.appendChild(elem)
+              childNodes.push(elem)
             }
           } else {
             const elem = this.shadowRoot.createVirtualNode('virtual')
             elem.destroyBackendElementOnDetach()
             elem.slot = slot
-            this.handleChildrenCreation(children, elem, undefined, undefined)
-            parentNode.appendChild(elem)
+            this.handleChildrenCreationAndInsert(children, elem, undefined, undefined)
+            childNodes.push(elem)
           }
         } else {
           const elem = this.shadowRoot.createVirtualNode('virtual')
           elem.destroyBackendElementOnDetach()
           Element.setInheritSlots(elem)
           if (slotElement) Element.setSlotElement(elem, slotElement)
-          this.handleChildrenCreation(children, elem, slotElement, dynamicSlotName)
-          parentNode.appendChild(elem)
+          this.handleChildrenCreationAndInsert(children, elem, slotElement, dynamicSlotName)
+          childNodes.push(elem)
         }
       },
       undefined,
       undefined,
     )
+    return childNodes
+  }
+
+  handleChildrenCreationAndInsert(
+    children: DefineChildren,
+    parentNode: Element,
+    slotElement: Element | undefined,
+    dynamicSlotName: string | undefined,
+  ): void {
+    const childNodes = this.handleChildrenCreation(children, slotElement, dynamicSlotName)
+    if (childNodes.length) parentNode.insertChildren(childNodes, -1)
   }
 
   handleChildrenUpdate(
@@ -416,7 +425,7 @@ export class ProcGenWrapper {
   ): void {
     let index = 0
     const childNodes = slotElement
-      ? parentNode.childNodes.filter((node) => node._$nodeSlotElement === slotElement)
+      ? slotElement.slotNodes!.filter((node) => node.parentNode === parentNode)
       : parentNode.childNodes
     children(
       false,
@@ -505,7 +514,7 @@ export class ProcGenWrapper {
           if (slotElement) Element.setSlotElement(newElem, slotElement)
           const tmplArgs = getTmplArgs(newElem)
           tmplArgs.key = branchKey
-          this.handleChildrenCreation(branchFunc, newElem, slotElement, dynamicSlotName)
+          this.handleChildrenCreationAndInsert(branchFunc, newElem, slotElement, dynamicSlotName)
           if (slotElement) parentNode.replaceChild(newElem, elem)
           else parentNode.replaceChildAt(newElem, index - 1)
         }
@@ -545,7 +554,7 @@ export class ProcGenWrapper {
             childNode.destroyBackendElementOnDetach()
             Element.setInheritSlots(childNode)
             if (slotElement) Element.setSlotElement(elem, slotElement)
-            this.handleChildrenCreation(
+            this.handleChildrenCreationAndInsert(
               (
                 isCreation,
                 defineTextNode,
@@ -643,7 +652,7 @@ export class ProcGenWrapper {
                 Element.setSlotElement(newElem, slotElement)
                 const newTmplArgs = getTmplArgs(newElem)
                 newTmplArgs.dynamicSlotNameMatched = true
-                this.handleChildrenCreation(children, newElem, undefined, undefined)
+                this.handleChildrenCreationAndInsert(children, newElem, undefined, undefined)
                 parentNode.replaceChild(newElem, elem)
               }
             } else {
@@ -671,49 +680,63 @@ export class ProcGenWrapper {
     children: DefineChildren,
   ): ShadowRoot | null {
     const sr = elem.getShadowRoot()
-    if (sr?.isDynamicSlots()) {
+    if (sr?.getSlotMode() === SlotMode.Dynamic) {
       sr.setDynamicSlotHandler(
         dynamicSlotValueNames || [],
-        (slot, slotName, slotValues) => {
-          this.handleChildrenCreation(
-            (
-              isCreation,
-              defineTextNode,
-              defineElement,
-              defineIfGroup,
-              defineForLoop,
-              defineSlot,
-              definePureVirtualNode,
-            ) => {
-              children(
-                true,
+        (slots) => {
+          const childNodes: Node[] = []
+          for (let i = 0; i < slots.length; i += 1) {
+            const { slot, name: slotName, slotValues } = slots[i]!
+            const slotChildNodes = this.handleChildrenCreation(
+              (
+                isCreation,
                 defineTextNode,
                 defineElement,
                 defineIfGroup,
                 defineForLoop,
                 defineSlot,
                 definePureVirtualNode,
-                slotValues,
-                undefined,
-              )
-            },
-            elem,
-            slot,
-            slotName,
-          )
+              ) => {
+                children(
+                  true,
+                  defineTextNode,
+                  defineElement,
+                  defineIfGroup,
+                  defineForLoop,
+                  defineSlot,
+                  definePureVirtualNode,
+                  slotValues,
+                  undefined,
+                )
+              },
+              slot,
+              slotName,
+            )
+            childNodes.push(...slotChildNodes)
+          }
+          if (childNodes.length) elem.insertChildren(childNodes, -1)
         },
-        (slot) => {
-          const childIndexes = []
-          for (let i = 0; i < elem.childNodes.length; i += 1) {
-            const child = elem.childNodes[i]!
-            if (sr.getContainingSlot(child) === slot) {
-              childIndexes.push(i)
+        (slots) => {
+          if (!slots.length || !slots[0]!.slotNodes!.length) return
+          slots.sort(
+            (slot1, slot2) => slot1.slotNodes![0]!.parentIndex - slot2.slotNodes![0]!.parentIndex,
+          )
+          let l = -Infinity
+          let r = -Infinity
+          for (let i = 0; i < slots.length; i += 1) {
+            const slotNodes = slots[i]!.slotNodes!
+            const firstIndex = slotNodes[0]!.parentIndex
+            if (r === firstIndex) {
+              r = firstIndex + slotNodes.length
+            } else {
+              if (l >= 0) {
+                elem.removeChildren(l, r - l)
+              }
+              l = firstIndex
+              r = firstIndex + slotNodes.length
             }
           }
-          for (let i = 0; i < childIndexes.length; i += 1) {
-            const childIndex = childIndexes[i]!
-            elem.removeChildAt(childIndex - i)
-          }
+          if (l >= 0) elem.removeChildren(l, r - l)
         },
         (slot, slotValues, slotValueUpdatePathTrees) => {
           const slotName = slot._$slotName || ''
@@ -798,16 +821,17 @@ export class ProcGenWrapper {
           replacer.destroyBackendElementOnDetach()
           const replacerShadowRoot = (replacer as GeneralComponent).getShadowRoot()
           const elemShadowRoot = elem instanceof Component ? elem.getShadowRoot() : null
-          if (replacerShadowRoot?.isDynamicSlots()) {
-            if (!elemShadowRoot?.isDynamicSlots()) {
+          const isElemDynamicSlots = elemShadowRoot?.getSlotMode() === SlotMode.Dynamic
+          const isReplacerDynamicSlots = replacerShadowRoot?.getSlotMode() === SlotMode.Dynamic
+          if (isReplacerDynamicSlots) {
+            if (!isElemDynamicSlots) {
               throw new Error(
                 'The "dynamicSlots" option of the component and its placeholder should be the same.',
               )
             }
-            elemShadowRoot.useDynamicSlotHandlerFrom(replacerShadowRoot)
             elem.parentNode?.replaceChild(replacer, elem)
           } else {
-            if (elemShadowRoot?.isDynamicSlots()) {
+            if (isElemDynamicSlots) {
               throw new Error(
                 'The "dynamicSlots" option of the component and its placeholder should be the same.',
               )
@@ -835,7 +859,7 @@ export class ProcGenWrapper {
     if (dynSlot) {
       this.bindingMapDisabled = true // IDEA better binding map disable detection
     } else {
-      this.handleChildrenCreation(children, elem, undefined, undefined)
+      this.handleChildrenCreationAndInsert(children, elem, undefined, undefined)
     }
     return elem
   }

@@ -21,13 +21,7 @@ import {
   Observer,
   IntersectionStatus,
 } from './backend/mode'
-import {
-  GeneralComponentInstance,
-  DataList,
-  PropertyList,
-  MethodList,
-  ComponentInstance,
-} from './component_params'
+import { DataList, PropertyList, MethodList, ComponentInstance } from './component_params'
 import {
   Node,
   GeneralBackendContext,
@@ -42,6 +36,7 @@ import {
   ComponentDefinition,
   NodeCast,
 } from '.'
+import { SlotMode } from './shadow_root'
 
 /**
  * The "style" attribute and class list segments
@@ -71,6 +66,12 @@ export const setRevertEventDefaultPrevented = (value: boolean) => {
   revertEventDefaultPrevented = value
 }
 
+export type DoubleLinkedList<T> = {
+  value: T
+  prev: DoubleLinkedList<T> | null
+  next: DoubleLinkedList<T> | null
+}
+
 /**
  * A general element
  *
@@ -78,7 +79,7 @@ export const setRevertEventDefaultPrevented = (value: boolean) => {
  */
 export class Element implements NodeCast {
   /** @internal */
-  private _$backendElement: GeneralBackendElement | null
+  _$backendElement: GeneralBackendElement | null
   /** @internal */
   _$destroyOnDetach: boolean
   /** @internal */
@@ -92,17 +93,19 @@ export class Element implements NodeCast {
   /** @internal */
   _$slotName: string | null
   /** @internal */
+  _$slotElement: Element | null
+  /** @internal */
   _$slotValues: { [name: string]: unknown } | null
   /** @internal */
-  _$nodeSlotElement: Element | null
+  _$subtreeSlotStart: DoubleLinkedList<Element> | null
   /** @internal */
-  private _$subtreeSlotCount: number
+  _$subtreeSlotEnd: DoubleLinkedList<Element> | null
   /** @internal */
   _$inheritSlots: boolean
   /** @internal */
   _$placeholderHandler: (() => void) | undefined
   /** @internal */
-  private _$virtual: boolean
+  _$virtual: boolean
   dataset: { [name: string]: unknown }
   /** @internal */
   private _$marks: { [name: string]: unknown } | null
@@ -116,6 +119,14 @@ export class Element implements NodeCast {
   parentNode: Element | null
   /** The child nodes (must not be modified directly!) */
   childNodes: Node[]
+  /** The index in parentNode.childNodes (-1 if no parentNode) (must not be modified directly!) */
+  parentIndex: number
+  /** The parent slot element in composed tree (must not be modified directly!) */
+  containingSlot: Element | null | undefined
+  /** The slot content nodes composed tree (must not be modified directly!) */
+  slotNodes: Node[] | undefined
+  /** The index in containingSlot.slotNodes (must not be modified directly!) */
+  slotIndex: number | undefined
   /** The shadow-root which owns the element (will never change and must not be modified!) */
   ownerShadowRoot: ShadowRoot | null
   /** @internal */
@@ -134,21 +145,19 @@ export class Element implements NodeCast {
     virtual: boolean,
     backendElement: GeneralBackendElement | null,
     owner: ShadowRoot | null,
-    nodeTreeContext?: GeneralBackendContext,
+    nodeTreeContext: GeneralBackendContext,
   ) {
     this._$backendElement = backendElement
-    if (backendElement) {
-      backendElement.__wxElement = this
-    }
     this._$destroyOnDetach = false
-    this._$nodeTreeContext = nodeTreeContext || owner!._$nodeTreeContext
+    this._$nodeTreeContext = nodeTreeContext
     this._$nodeId = ''
     this._$nodeAttributes = null
     this._$nodeSlot = ''
     this._$slotName = null
+    this._$slotElement = null
     this._$slotValues = null
-    this._$nodeSlotElement = null
-    this._$subtreeSlotCount = 0
+    this._$subtreeSlotStart = null
+    this._$subtreeSlotEnd = null
     this._$inheritSlots = false
     this._$placeholderHandler = undefined
     this._$virtual = virtual
@@ -158,7 +167,9 @@ export class Element implements NodeCast {
     this.classList = null
     this._$styleSegments = [] as string[]
     this.parentNode = null
+    this.parentIndex = -1
     this.childNodes = []
+    this.slotNodes = undefined
     this.ownerShadowRoot = owner
     this._$mutationObserverTarget = null
     this._$eventTarget = new EventTarget()
@@ -181,7 +192,7 @@ export class Element implements NodeCast {
     if (this.ownerShadowRoot) {
       const host = this.ownerShadowRoot.getHostNode()
       this.ownerShadowRoot._$markIdCacheDirty()
-      if (!this._$virtual && host.getComponentOptions().writeIdToDOM) {
+      if (host.getComponentOptions().writeIdToDOM) {
         const idPrefix = host._$idPrefix
         const val = idPrefix ? `${idPrefix}--${newId}` : newId
         if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
@@ -212,43 +223,48 @@ export class Element implements NodeCast {
     const newSlot = String(x)
     const oldSlot = this._$nodeSlot
     if (oldSlot === newSlot) return
+    /* istanbul ignore if  */
     if (this._$inheritSlots) {
       triggerWarning('slots-inherited nodes do not support "slot" attribute.')
       return
     }
     this._$nodeSlot = newSlot
-    if (BM.SHADOW || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Shadow)) {
-      ;(this._$backendElement as backend.Element).setSlot(newSlot, this._$inheritSlots)
-    } else {
-      const parent = this.parentNode
-      if (parent) {
-        let slotParent: Element | null = parent
-        while (slotParent?._$inheritSlots) {
-          slotParent = slotParent.parentNode
-        }
-        if (slotParent instanceof Component && !slotParent._$external) {
-          const slotParentShadowRoot = slotParent.shadowRoot as ShadowRoot
-          if (slotParentShadowRoot.isDynamicSlots()) {
-            triggerWarning(
-              'nodes inside dynamic slots should change binding slots through Element#setSlotElement.',
-            )
-            return
-          }
-          const oldSlotElement = slotParentShadowRoot.getSlotElementFromName(
-            oldSlot,
-          ) as Element | null
-          const newSlotElement = slotParentShadowRoot.getSlotElementFromName(
-            newSlot,
-          ) as Element | null
-          Element.insertChildReassignComposed(
-            parent,
-            this,
-            oldSlotElement,
-            newSlotElement,
-            parent.childNodes.indexOf(this) + 1,
-          )
-        }
+    const slotParentShadowRoot = Element._$getParentHostShadowRoot(this.parentNode)
+    if (slotParentShadowRoot) {
+      const slotMode = slotParentShadowRoot.getSlotMode()
+
+      /* istanbul ignore if  */
+      if (slotMode === SlotMode.Dynamic) {
+        triggerWarning(
+          'nodes inside dynamic slots should change binding slots through Element#setSlotElement.',
+        )
+        return
       }
+
+      /* istanbul ignore if  */
+      if (slotMode === SlotMode.Direct) {
+        triggerWarning('nodes inside direct slots should not change slot name.')
+        return
+      }
+
+      const slotUpdater = ShadowRoot._$updateSubtreeSlotNodes(
+        this.parentNode!,
+        [this],
+        slotParentShadowRoot,
+        slotParentShadowRoot,
+        this.parentIndex,
+      )
+      slotUpdater?.removeSlotNodes()
+
+      const oldSlot = this.containingSlot as Element | null
+
+      slotUpdater?.updateContainingSlot()
+
+      const newSlot = this.containingSlot as Element | null
+
+      Element.insertChildReassign(this.parentNode!, this, oldSlot, newSlot, this.parentIndex + 1)
+
+      slotUpdater?.insertSlotNodes()
     }
     if (this._$mutationObserverTarget) {
       MutationObserverTarget.callAttrObservers(this, {
@@ -373,6 +389,11 @@ export class Element implements NodeCast {
     this._$destroyOnDetach = true
   }
 
+  /** Cancel destroying backend element on detach */
+  cancelDestroyBackendElementOnDetach() {
+    this._$destroyOnDetach = false
+  }
+
   /** Get whether the node is virtual or not */
   isVirtual(): boolean {
     return this._$virtual
@@ -409,7 +430,7 @@ export class Element implements NodeCast {
       if (node instanceof Element && !node._$attached) {
         node._$attached = true
         if (node instanceof Component) {
-          node._$lifetimeFuncs.attached?.call(node.getMethodCaller(), [])
+          node.triggerLifetime('attached', [])
           if (node._$relation) {
             node._$relation.triggerLinkEvent(RelationType.ParentNonVirtualNode, false)
             node._$relation.triggerLinkEvent(RelationType.ParentComponent, false)
@@ -425,7 +446,10 @@ export class Element implements NodeCast {
           const shadowRoot = node.getShadowRoot()
           if (shadowRoot) callFunc(shadowRoot)
         }
-        node.childNodes.forEach(callFunc)
+        const childNodes = node.childNodes
+        for (let i = 0; i < childNodes.length; i += 1) {
+          callFunc(childNodes[i]!)
+        }
       }
     }
     callFunc(node)
@@ -437,6 +461,9 @@ export class Element implements NodeCast {
         node.destroyBackendElement()
       }
       if (node instanceof Element && node._$attached) {
+        if (node instanceof Component) {
+          node.triggerLifetime('beforeDetach', [])
+        }
         node.childNodes.forEach(callFunc)
         if (node instanceof Component) {
           const f = node._$placeholderHandler
@@ -444,7 +471,7 @@ export class Element implements NodeCast {
           const shadowRoot = node.getShadowRoot()
           if (shadowRoot) callFunc(shadowRoot)
           node._$attached = false
-          node._$lifetimeFuncs.detached?.call(node.getMethodCaller(), [])
+          node.triggerLifetime('detached', [])
           if (node._$relation) {
             node._$relation.triggerLinkEvent(RelationType.ParentNonVirtualNode, true)
             node._$relation.triggerLinkEvent(RelationType.ParentComponent, true)
@@ -472,7 +499,7 @@ export class Element implements NodeCast {
         if (node instanceof Component) {
           const shadowRoot = node.getShadowRoot()
           if (shadowRoot) callFunc(shadowRoot)
-          node._$lifetimeFuncs.moved?.call(node.getMethodCaller(), [])
+          node.triggerLifetime('moved', [])
           if (node._$relation) {
             node._$relation.triggerLinkEvent(RelationType.ParentNonVirtualNode, false)
             node._$relation.triggerLinkEvent(RelationType.ParentComponent, false)
@@ -522,47 +549,69 @@ export class Element implements NodeCast {
     return node._$mutationObserverTarget?.hasSubtreeListeners() || false
   }
 
-  private static updateSlotCount(element: Element, diff: number) {
-    let cur = element
-    for (;;) {
-      cur._$subtreeSlotCount += diff
-      const next = cur.parentNode
-      if (next) {
-        cur = next
-      } else {
-        if (cur instanceof ShadowRoot) {
-          cur._$markSlotCacheDirty()
+  /** @internal */
+  static _$insertChildReassignSlot(
+    shadowRoot: ShadowRoot,
+    name: string | null,
+    oldSlot: Element | null,
+    newSlot: Element | null,
+  ) {
+    if (!oldSlot) {
+      const slotNodes: Node[] = []
+
+      shadowRoot.forEachNodeInSpecifiedSlot(null, (node) => {
+        if (name !== null) {
+          const slotName = node instanceof Element ? node._$nodeSlot : ''
+          if (slotName !== name) {
+            return
+          }
         }
-        break
+        slotNodes.push(node)
+      })
+
+      for (let i = 0; i < slotNodes.length; i += 1) {
+        const node = slotNodes[i]!
+        Element._$spliceSlotNodes(newSlot!, -1, 0, [node])
+        Element._$updateContainingSlot(node, newSlot)
+        Element.insertChildReassign(node.parentNode!, node, null, newSlot, node.parentIndex)
+      }
+    } else if (!newSlot) {
+      const slotNodes = [...oldSlot.slotNodes!]
+
+      for (let i = 0; i < slotNodes.length; i += 1) {
+        const node = slotNodes[i]!
+        Element._$spliceSlotNodes(oldSlot, 0, 1, undefined)
+        Element._$updateContainingSlot(node, newSlot)
+        Element.insertChildReassign(node.parentNode!, node, oldSlot, null, node.parentIndex)
+      }
+    } else {
+      const slotNodes = [...oldSlot.slotNodes!]
+
+      for (let i = 0; i < slotNodes.length; i += 1) {
+        const node = slotNodes[i]!
+        Element._$spliceSlotNodes(oldSlot, 0, 1, undefined)
+        Element._$spliceSlotNodes(newSlot, -1, 0, [node])
+        Element._$updateContainingSlot(node, newSlot)
+        Element.insertChildReassign(node.parentNode!, node, oldSlot, newSlot, node.parentIndex)
       }
     }
   }
 
   /** @internal */
-  static _$insertChildReassignSlot(
-    shadowRoot: ShadowRoot,
-    name: string,
-    oldSlot: Element | null,
-    newSlot: Element | null,
-  ) {
-    const host = shadowRoot.getHostNode()
-    const ideaPosIndex = host.childNodes.length
-    shadowRoot.forEachNodeInSpecifiedSlot(name, (node, _posIndex) => {
-      if (node instanceof Element && node._$inheritSlots) return
-      // a special use of composing process:
-      // the child node might not be the direct child of the host;
-      // there may be slot-inherit nodes between them.
-      Element.insertChildReassignComposed(host, node, oldSlot, newSlot, ideaPosIndex)
-    })
-  }
-
-  private static insertChildReassignComposed(
+  static insertChildReassign(
     shadowParent: Element,
     child: Node,
     oldSlot: Element | null,
     newSlot: Element | null,
     ideaPosIndex: number,
   ) {
+    if (BM.SHADOW || (BM.DYNAMIC && shadowParent.getBackendMode() === BackendMode.Shadow)) {
+      ;(child._$backendElement as backend.Element).reassignContainingSlot(
+        oldSlot ? (oldSlot._$backendElement as backend.Element) : null,
+        newSlot ? (newSlot._$backendElement as backend.Element) : null,
+      )
+      return
+    }
     if (oldSlot) {
       if (
         newSlot &&
@@ -603,42 +652,209 @@ export class Element implements NodeCast {
 
   // a helper for searching the nearest non-virtual ancestor
   private static findNearestNonVirtual(p: Element): composedElement | null {
-    let cur = p
-    for (;;) {
-      if (!cur._$virtual) return cur._$backendElement as composedElement | null
+    let cur: Element | null = p
+    for (; cur?._$virtual; ) {
       if (cur instanceof ShadowRoot) {
         cur = cur.getHostNode()
         continue
       }
-      const next = cur.parentNode
-      if (!next) return null
-      if (next instanceof Component && !next._$external) {
-        const slot = (next.shadowRoot as ShadowRoot).getContainingSlot(cur)
-        if (!slot) return null
-        cur = slot
-      } else {
-        cur = next
+      if (cur.containingSlot !== undefined) {
+        cur = cur.containingSlot
+        continue
       }
+      cur = cur.parentNode
     }
+    return cur ? cur._$backendElement : null
   }
 
   private static countNonVirtual(target: Node): [Node, number] | null {
     let firstNode = null
     let removeCount = 0
-    const recRelVirtual = (c: Node) => {
-      if (c instanceof Element) {
-        if (c._$virtual) {
-          c.forEachComposedChild(recRelVirtual)
-          return
-        }
-      }
-      if (removeCount === 0) {
-        firstNode = c
-      }
+
+    const recNonVirtual = (c: Node) => {
+      if (removeCount === 0) firstNode = c
       removeCount += 1
     }
-    recRelVirtual(target)
+
+    const rec = (c: Node) => {
+      if (c instanceof Element && c._$virtual) {
+        c.forEachNonVirtualComposedChild(recNonVirtual)
+        return
+      }
+      recNonVirtual(c)
+    }
+    rec(target)
     return firstNode ? [firstNode, removeCount] : null
+  }
+
+  /**
+   * Iterate elements with their slots (slots-inherited nodes included)
+   */
+  static forEachNodeInSlot(
+    node: Node,
+    f: (node: Node, slot: Element | null | undefined) => boolean | void,
+  ): boolean {
+    const rec = (child: Node): boolean => {
+      if (f(child, child.containingSlot) === false) return false
+      if (child._$inheritSlots) {
+        const childNodes = child.childNodes
+        for (let i = 0; i < childNodes.length; i += 1) {
+          if (!rec(childNodes[i]!)) return false
+        }
+        return true
+      }
+      return true
+    }
+
+    return rec(node)
+  }
+
+  /**
+   * Iterate elements in specified slot (slots-inherited nodes included)
+   */
+  static forEachNodeInSpecificSlot(
+    node: Node,
+    slot: Element | undefined | null,
+    f: (node: Node) => boolean | void,
+  ): boolean {
+    const rec = (child: Node): boolean => {
+      if (child.containingSlot === slot) {
+        if (f(child) === false) return false
+      }
+      if (child._$inheritSlots) {
+        const childNodes = child.childNodes
+        for (let i = 0; i < childNodes.length; i += 1) {
+          if (!rec(childNodes[i]!)) return false
+        }
+        return true
+      }
+      return true
+    }
+
+    return rec(node)
+  }
+
+  /**
+   * Iterate elements with their slots (slots-inherited nodes NOT included)
+   */
+  static forEachSlotContentInSlot(
+    node: Node,
+    f: (node: Node, slot: Element | null | undefined) => boolean | void,
+  ): boolean {
+    const rec = (child: Node): boolean => {
+      if (child._$inheritSlots) {
+        const childNodes = child.childNodes
+        for (let i = 0; i < childNodes.length; i += 1) {
+          if (!rec(childNodes[i]!)) return false
+        }
+        return true
+      }
+      if (f(child, child.containingSlot) === false) return false
+      return true
+    }
+
+    return rec(node)
+  }
+
+  /**
+   * Iterate elements in specified slot (slots-inherited nodes NOT included)
+   */
+  static forEachSlotContentInSpecificSlot(
+    node: Node,
+    slot: Element | undefined | null,
+    f: (node: Node) => boolean | void,
+  ): boolean {
+    const rec = (child: Node): boolean => {
+      if (child._$inheritSlots) {
+        const childNodes = child.childNodes
+        for (let i = 0; i < childNodes.length; i += 1) {
+          if (!rec(childNodes[i]!)) return false
+        }
+        return true
+      }
+      if (child.containingSlot !== slot) return true
+      return f(child) !== false
+    }
+
+    return rec(node)
+  }
+
+  /**
+   * @internal
+   * a helper for searching the first non-virtual node
+   */
+  private static _$findFirstNonVirtualChild(parent: Element, index: number): Node | null {
+    const inSlot = parent._$slotName !== null
+    const children = inSlot ? parent.slotNodes! : parent.childNodes
+    if (index >= 0 && index < children.length) {
+      for (let i = index; i < children.length; i += 1) {
+        let ret: Node | null = null
+
+        const recNonVirtual = (c: Node): boolean => {
+          ret = c
+          return false
+        }
+
+        const rec = (c: Node): boolean => {
+          if (!inSlot && c._$inheritSlots) {
+            const childNodes = c.childNodes
+            for (let i = 0; i < childNodes.length; i += 1) {
+              if (rec(childNodes[i]!) === false) return false
+            }
+          }
+          if (c._$virtual) {
+            return c.forEachNonVirtualComposedChild(recNonVirtual)
+          }
+          return recNonVirtual(c)
+        }
+        rec(children[i]!)
+        if (ret) return ret
+      }
+    }
+    if (!parent._$virtual) return null
+    const containingSlot = parent.containingSlot
+    if (containingSlot === null) return null
+    if (containingSlot !== undefined) {
+      return Element._$findFirstNonVirtualChild(containingSlot, parent.slotIndex! + 1)
+    }
+    let cur: Element = parent
+    if (parent instanceof ShadowRoot) {
+      cur = parent.getHostNode()
+      if (!cur._$virtual) return null
+    }
+    const p = cur.parentNode
+    if (p) {
+      return Element._$findFirstNonVirtualChild(p, cur.parentIndex + 1)
+    }
+    return null
+  }
+
+  /**
+   * @internal
+   * A helper to find first non-virtual next sibling node
+   * return null if no next sibling exists
+   */
+  private static _$findFirstNonVirtualSibling(element: Node, newPosIndex: number): Node | null {
+    const containingSlot = element.containingSlot
+    if (containingSlot === null) return null
+    if (containingSlot !== undefined) {
+      if (!containingSlot._$virtual) return null
+      if (element.slotIndex !== undefined) {
+        return Element._$findFirstNonVirtualChild(containingSlot, element.slotIndex + 1)
+      }
+      const insertPos = Element._$findSlotNodeInsertPosition(containingSlot, element, newPosIndex)
+      return Element._$findFirstNonVirtualChild(containingSlot, insertPos)
+    }
+    let cur: Node = element
+    if (element instanceof ShadowRoot) {
+      cur = element.getHostNode()
+      if (!cur._$virtual) return null
+    }
+    const p = cur.parentNode
+    if (p) {
+      return Element._$findFirstNonVirtualChild(p, newPosIndex)
+    }
+    return null
   }
 
   private static insertChildComposed(
@@ -660,158 +876,37 @@ export class Element implements NodeCast {
 
     // detect whether it is in single-slot mode
     let sharedNonVirtualParent: composedElement | null | undefined
-    let dynamicSlotting = false
     if (slotParent instanceof Component) {
       if (slotParent._$external) {
-        const singleSlot = (slotParent.shadowRoot as ExternalShadowRoot).slot
-        sharedNonVirtualParent = singleSlot
+        sharedNonVirtualParent = (slotParent.shadowRoot as ExternalShadowRoot).slot
       } else {
         parentConverted = true
-        const singleSlot = (slotParent.shadowRoot as ShadowRoot).getSingleSlotElement()
-        if (singleSlot !== undefined) {
-          sharedNonVirtualParent = singleSlot
-            ? Element.findNearestNonVirtual(singleSlot)
-            : undefined
-        } else {
-          if ((slotParent.shadowRoot as ShadowRoot).isDynamicSlots()) dynamicSlotting = true
-          sharedNonVirtualParent = undefined
-        }
       }
     } else {
       if (slotParent._$virtual) parentConverted = true
       sharedNonVirtualParent = Element.findNearestNonVirtual(slotParent)
     }
 
-    // a helper for listing children in specified slot
-    const forEachChildInSlot = (
-      node: Node,
-      slot: Element | null,
-      slotName: string,
-      f: (node: Node) => boolean,
-    ): void => {
-      const recInheritedSlot = (c: Node): boolean => {
-        if (c instanceof Element && c._$inheritSlots) {
-          return c.childNodes.every(recInheritedSlot)
-        }
-        return f(c)
-      }
-      const recv = (c: Node): boolean => {
-        if (sharedNonVirtualParent) {
-          // single slot
-          if (c instanceof Element && c._$inheritSlots) {
-            return c.childNodes.every(recInheritedSlot)
-          }
-        } else if (!dynamicSlotting) {
-          // multiple slots
-          if (c instanceof Element && c._$inheritSlots) {
-            return c.childNodes.every(recv)
-          }
-          if (slotName !== (c instanceof Element ? c._$nodeSlot : '')) return true
-        } else {
-          // dynamic slots
-          if (slot !== c._$nodeSlotElement) return true
-          if (c instanceof Element && c._$inheritSlots) {
-            return c.childNodes.every(recInheritedSlot)
-          }
-        }
-        return f(c)
-      }
-      recv(node)
-    }
-
-    // a helper for searching the first non-virtual node
-    const findFirstNonVirtual = (
-      shadowParent: Element,
-      index: number,
-      slot: Element | null,
-      slotName: string,
-    ): Node | null => {
-      const children = shadowParent.childNodes
-      if (index >= 0) {
-        for (let i = index; i < children.length; i += 1) {
-          let ret: Node | null = null
-          const recVirtual = (c: Node): boolean => {
-            if (c instanceof Element && c._$virtual) {
-              return c.forEachComposedChild(recVirtual)
-            }
-            ret = c
-            return ret === null
-          }
-          forEachChildInSlot(children[i]!, slot, slotName, recVirtual)
-          if (ret) return ret
-        }
-      }
-      let cur: Element
-      if (shadowParent instanceof ShadowRoot) {
-        const host = shadowParent.getHostNode()
-        cur = host
-      } else if (shadowParent instanceof Component && !shadowParent._$external) {
-        const slotElem =
-          slot === null
-            ? (shadowParent.shadowRoot as ShadowRoot).getSlotElementFromName(slotName)
-            : slot
-        if (!slotElem) return null
-        cur = slotElem as Element
-      } else {
-        cur = shadowParent
-      }
-      if (!cur._$virtual) return null
-      const p = cur.parentNode
-      if (p) {
-        const i = p.childNodes.lastIndexOf(cur)
-        let nextSlot: Element | null
-        let nextSlotName: string
-        if (cur._$inheritSlots) {
-          nextSlot = slot
-          nextSlotName = slotName
-        } else if (p instanceof Component && !p._$external) {
-          const singleSlot = (p.shadowRoot as ShadowRoot).getSingleSlotElement()
-          if (singleSlot !== undefined) {
-            nextSlot = null
-            nextSlotName = ''
-          } else {
-            nextSlot = (p.shadowRoot as ShadowRoot).getContainingSlot(cur)
-            nextSlotName = cur._$slotName || ''
-          }
-        } else {
-          nextSlot = null
-          nextSlotName = ''
-        }
-        const ret = findFirstNonVirtual(p, i + 1, nextSlot, nextSlotName)
-        if (ret) return ret
-      }
-      return null
-    }
-
     // a helper for grouping and slicing update
     let sharedFrag: composedElement | null = null
-    const groupUpdate = (slot: Element | null, slotName?: string) => {
-      // find the proper element of the backend
-      let backendParent: composedElement | null
-      if (slotName === undefined) {
-        // `sharedNonVirtualParent` must be valid if `null`
-        backendParent = sharedNonVirtualParent as composedElement | null
-      } else {
-        // `slotParent` must be `Component` if slot not `null`
-        const p = slotParent as GeneralComponentInstance
-        if (p._$external) {
-          const s = (p.shadowRoot as ExternalShadowRoot).slot
-          backendParent = s as composedBackend.Element | domlikeBackend.Element
-        } else {
-          backendParent = slot ? Element.findNearestNonVirtual(slot) : null
-        }
-      }
+    const groupUpdate = (
+      sharedBackendParent: composedElement | null,
+      slot: Element | null | undefined,
+    ) => {
+      const backendParent =
+        sharedBackendParent || (slot ? Element.findNearestNonVirtual(slot) : null)
+
       if (!(BM.DOMLIKE || (BM.DYNAMIC && shadowParent.getBackendMode() === BackendMode.Domlike))) {
         if (!backendParent) {
           return
         }
       }
-      const slotNameLimit = slotName || ''
       let removeCount = 0
       let before: Node | null = null
 
       // get the new child nodes of the backend
       let frag: composedElement | null = null
+      let firstSlotNode: Node | null = null
       if (newChild) {
         const f =
           sharedFrag ||
@@ -819,20 +914,24 @@ export class Element implements NodeCast {
             ? (context as domlikeBackend.Context).document.createDocumentFragment()
             : (context as backend.Context | composedBackend.Context).createFragment())
         sharedFrag = f
-        const recNewVirtual = (c: Node): boolean => {
-          if (c instanceof Element && c._$virtual) {
-            c.forEachComposedChild(recNewVirtual)
-          } else {
-            // since `TextNode` also has `backendElement` private field, just make it as `Element`
-            // domlike backend also
-            ;(f as composedBackend.Element).appendChild(
-              (c as Element)._$backendElement as composedBackend.Element,
-            )
-            frag = f
-          }
-          return true
+
+        const recNonVirtual = (c: Node) => {
+          // since `TextNode` also has `backendElement` private field, just make it as `Element`
+          // domlike backend also
+          ;(f as composedBackend.Element).appendChild(
+            (c as Element)._$backendElement as composedBackend.Element,
+          )
+          frag = f
         }
-        forEachChildInSlot(newChild, slot, slotNameLimit, recNewVirtual)
+
+        Element.forEachNodeInSpecificSlot(newChild, slot, (node) => {
+          if (!firstSlotNode) firstSlotNode = node
+          if (!node._$virtual) {
+            recNonVirtual(node)
+            return
+          }
+          node.forEachNonVirtualComposedChild(recNonVirtual)
+        })
       }
       if (BM.DOMLIKE || (BM.DYNAMIC && shadowParent.getBackendMode() === BackendMode.Domlike)) {
         if (!backendParent) {
@@ -844,7 +943,7 @@ export class Element implements NodeCast {
       // get the proper relative node of the backend
       if (relChild || parentConverted) {
         if (removal && relChild) {
-          forEachChildInSlot(relChild, slot, slotNameLimit, (c) => {
+          Element.forEachSlotContentInSpecificSlot(relChild, slot, (c) => {
             if (c instanceof Element) {
               const d = Element.countNonVirtual(c)
               if (d) {
@@ -857,11 +956,17 @@ export class Element implements NodeCast {
             }
             return true
           })
-          if (removeCount === 0 && frag) {
-            before = findFirstNonVirtual(shadowParent, newPosIndex + 1, slot, slotNameLimit)
+          if (removeCount === 0 && frag && firstSlotNode) {
+            before = Element._$findFirstNonVirtualSibling(
+              slot === undefined ? newChild! : firstSlotNode,
+              newPosIndex + 1,
+            )
           }
-        } else if (frag) {
-          before = findFirstNonVirtual(shadowParent, newPosIndex, slot, slotNameLimit)
+        } else if (frag && firstSlotNode) {
+          before = Element._$findFirstNonVirtualSibling(
+            slot === undefined ? newChild! : firstSlotNode,
+            newPosIndex,
+          )
         }
       }
 
@@ -959,40 +1064,35 @@ export class Element implements NodeCast {
           )
         }
       } else {
-        // for virtual children in a single slot, group the children and use splice
-        groupUpdate(null)
+        // for node isn't a slot content, simply update
+        groupUpdate(sharedNonVirtualParent, undefined)
+      }
+    } else if (
+      !((newChild && newChild._$inheritSlots) || (removal && relChild && relChild._$inheritSlots))
+    ) {
+      // faster update if none inherited slots
+      if (newChild) groupUpdate(null, newChild.containingSlot)
+      if (
+        removal &&
+        relChild &&
+        (!newChild || relChild.containingSlot !== newChild.containingSlot)
+      ) {
+        groupUpdate(null, relChild.containingSlot)
       }
     } else {
       // for multi-slots, find out each slot that needs update, and update them one by one
-      const slots: (Element | string)[] = []
-      const recInheritedSlots = (c: Node) => {
-        let slot: Element | string
-        if (c._$nodeSlotElement) {
-          slot = c._$nodeSlotElement
-        } else if (c instanceof Element) {
-          if (c._$inheritSlots) {
-            c.childNodes.forEach(recInheritedSlots)
-            return
-          }
-          slot = c._$nodeSlot
-        } else {
-          slot = ''
-        }
-        if (slots.indexOf(slot) < 0) slots.push(slot)
+      const slotNodesSet = new Set<Element | null>()
+      if (removal && relChild) {
+        Element.forEachSlotContentInSlot(relChild, (node, slot) => {
+          slotNodesSet.add(slot!)
+        })
       }
-      if (removal && relChild) recInheritedSlots(relChild)
-      if (newChild) recInheritedSlots(newChild)
-      for (let i = 0; i < slots.length; i += 1) {
-        const slot = slots[i]!
-        if (typeof slot === 'string') {
-          const s = (
-            (slotParent as GeneralComponentInstance).shadowRoot as ShadowRoot
-          ).getSlotElementFromName(slot)
-          groupUpdate(s as Element | null, slot)
-        } else {
-          groupUpdate(slot, '')
-        }
+      if (newChild) {
+        Element.forEachSlotContentInSlot(newChild, (node, slot) => {
+          slotNodesSet.add(slot!)
+        })
       }
+      slotNodesSet.forEach((slot) => groupUpdate(null, slot))
     }
     if (!(BM.DOMLIKE || (BM.DYNAMIC && context.mode === BackendMode.Domlike))) {
       if (sharedFrag) (sharedFrag as composedBackend.Element).release()
@@ -1016,12 +1116,224 @@ export class Element implements NodeCast {
     }
   }
 
+  /**
+   * @internal
+   * @param move whether this insertion is a slot movement
+   */
+  private static _$updateSubtreeSlotsInsertion(
+    node: Node,
+    slotStart: DoubleLinkedList<Element> | null,
+    slotEnd: DoubleLinkedList<Element> | null,
+    posIndex: number,
+    move: boolean,
+  ): void {
+    if (!slotStart || !slotEnd) return
+    let parent = node
+
+    // find a correct position to insert slot into double-linked slot list
+    let insertSlotPrev = null as DoubleLinkedList<Element> | null
+    let insertSlotNext = null as DoubleLinkedList<Element> | null
+
+    const findFirstSlot = (parent: Node, posIndex: number): void => {
+      if (parent._$subtreeSlotStart) {
+        const childNodes = parent.childNodes
+        let index = posIndex + 1
+        let nextSiblingWithSlot = childNodes[index]
+        while (nextSiblingWithSlot && !nextSiblingWithSlot._$subtreeSlotStart) {
+          index += 1
+          nextSiblingWithSlot = childNodes[index]
+        }
+
+        if (nextSiblingWithSlot) {
+          insertSlotNext = nextSiblingWithSlot._$subtreeSlotStart!
+          insertSlotPrev = insertSlotNext.prev
+        } else {
+          insertSlotPrev = parent._$subtreeSlotEnd
+          if (insertSlotPrev) insertSlotNext = insertSlotPrev.next
+        }
+        return
+      }
+      let cur = parent
+      let parentWithSubtreeSlot = parent.parentNode
+      while (parentWithSubtreeSlot && !parentWithSubtreeSlot._$subtreeSlotStart) {
+        cur = parentWithSubtreeSlot
+        parentWithSubtreeSlot = parentWithSubtreeSlot.parentNode
+      }
+      if (parentWithSubtreeSlot) {
+        findFirstSlot(parentWithSubtreeSlot, cur.parentIndex)
+      }
+    }
+
+    findFirstSlot(parent, posIndex)
+
+    // insert into double linked list
+    if (insertSlotPrev) {
+      insertSlotPrev.next = slotStart
+      slotStart.prev = insertSlotPrev
+    }
+    if (insertSlotNext) {
+      insertSlotNext.prev = slotEnd
+      slotEnd.next = insertSlotNext
+    }
+
+    // update ancestor's subtree slot start/end
+    while (parent) {
+      let changed = false
+
+      if (!parent._$subtreeSlotStart) {
+        parent._$subtreeSlotStart = slotStart
+        parent._$subtreeSlotEnd = slotEnd
+        changed = true
+      } else if (parent._$subtreeSlotStart === insertSlotNext) {
+        parent._$subtreeSlotStart = slotStart
+        changed = true
+      } else if (parent._$subtreeSlotEnd === insertSlotPrev) {
+        parent._$subtreeSlotEnd = slotEnd
+        changed = true
+      }
+
+      if (!changed || !parent.parentNode) break
+
+      parent = parent.parentNode
+    }
+
+    const ownerShadowRoot = parent.ownerShadowRoot
+    if (ownerShadowRoot?.isConnected(parent)) {
+      ownerShadowRoot._$applySlotsInsertion(slotStart, slotEnd, move)
+    }
+  }
+
+  /**
+   * @internal
+   * @param move whether this removal is a slot movement, will fire an insertion (with move=true) after
+   */
+  private static _$updateSubtreeSlotsRemoval(
+    node: Node,
+    slotStart: DoubleLinkedList<Element> | null,
+    slotEnd: DoubleLinkedList<Element> | null,
+    move: boolean,
+  ): void {
+    if (!slotStart || !slotEnd) return
+    let parent = node
+    const removeSlotBefore = slotStart.prev
+    const removeSlotAfter = slotEnd.next
+
+    // remove from double linked list
+    if (removeSlotBefore) {
+      removeSlotBefore.next = removeSlotAfter
+      slotStart.prev = null
+    }
+    if (removeSlotAfter) {
+      removeSlotAfter.prev = removeSlotBefore
+      slotEnd.next = null
+    }
+
+    // update parent subtree start/end
+    while (parent) {
+      let changed = false
+
+      if (parent._$subtreeSlotStart === slotStart && parent._$subtreeSlotEnd === slotEnd) {
+        parent._$subtreeSlotStart = parent._$subtreeSlotEnd = null
+        changed = true
+      }
+      if (parent._$subtreeSlotStart === slotStart) {
+        parent._$subtreeSlotStart = removeSlotAfter
+        changed = true
+      } else if (parent._$subtreeSlotEnd === slotEnd) {
+        parent._$subtreeSlotEnd = removeSlotBefore
+        changed = true
+      }
+
+      if (!changed || !parent.parentNode) break
+
+      parent = parent.parentNode
+    }
+
+    const ownerShadowRoot = parent.ownerShadowRoot
+    if (ownerShadowRoot?.isConnected(parent)) {
+      ownerShadowRoot._$applySlotsRemoval(slotStart, slotEnd, move)
+    }
+  }
+
+  /**
+   * @internal
+   * @param move whether this removal is a slot movement, will fire an insertion (with move=true) after
+   */
+  private static _$updateSubtreeSlotsReplacement(
+    node: Node,
+    slotStart: DoubleLinkedList<Element> | null,
+    slotEnd: DoubleLinkedList<Element> | null,
+    oldSlotStart: DoubleLinkedList<Element> | null,
+    oldSlotEnd: DoubleLinkedList<Element> | null,
+    posIndex: number,
+    move: boolean,
+  ): void {
+    if (!slotStart || !slotEnd) {
+      Element._$updateSubtreeSlotsRemoval(node, oldSlotStart, oldSlotEnd, move)
+      return
+    }
+    if (!oldSlotStart || !oldSlotEnd) {
+      Element._$updateSubtreeSlotsInsertion(node, slotStart, slotEnd, posIndex, move)
+      return
+    }
+    let parent = node
+
+    const removeSlotBefore = oldSlotStart.prev
+    const removeSlotAfter = oldSlotEnd.next
+
+    // replace in double linked list
+    if (removeSlotBefore) {
+      removeSlotBefore.next = slotStart
+      slotStart.prev = removeSlotBefore
+      oldSlotStart.prev = null
+    }
+    if (removeSlotAfter) {
+      removeSlotAfter.prev = slotEnd
+      slotEnd.next = removeSlotAfter
+      oldSlotEnd.next = null
+    }
+
+    // update parent subtree start/end
+    while (parent) {
+      let changed = false
+
+      if (parent._$subtreeSlotStart === oldSlotStart) {
+        parent._$subtreeSlotStart = slotStart
+        changed = true
+      }
+      if (parent._$subtreeSlotEnd === oldSlotEnd) {
+        parent._$subtreeSlotEnd = slotEnd
+        changed = true
+      }
+
+      if (!changed || !parent.parentNode) break
+
+      parent = parent.parentNode
+    }
+
+    const ownerShadowRoot = parent.ownerShadowRoot
+    if (ownerShadowRoot?.isConnected(parent)) {
+      ownerShadowRoot._$applySlotsRemoval(oldSlotStart, oldSlotEnd, false)
+      ownerShadowRoot._$applySlotsInsertion(slotStart, slotEnd, move)
+    }
+  }
+
+  /** @internal */
+  private static _$getParentHostShadowRoot = (parent: Element | null): ShadowRoot | null => {
+    let parentSlotHost: Element | null = parent
+    while (parentSlotHost?._$inheritSlots) parentSlotHost = parentSlotHost.parentNode
+    return parentSlotHost instanceof Component && !parentSlotHost._$external
+      ? (parentSlotHost.shadowRoot as ShadowRoot)
+      : null
+  }
+
   private static insertChildSingleOperation(
     parent: Element,
     newChild: Node | null,
     oriPosIndex: number,
     replace: boolean,
   ) {
+    /* istanbul ignore if  */
     if (newChild && parent.ownerShadowRoot !== newChild.ownerShadowRoot) {
       throw new Error('Cannot move the node from one shadow tree to another shadow tree.')
     }
@@ -1040,17 +1352,31 @@ export class Element implements NodeCast {
       removal = false
     }
     if (!removal && !newChild) return
-    let needUpdateSlotCount = false
-    let slotCountDiff = 0
 
     // change the parent of newChild
     let oldParent: Element | null
     if (newChild) {
       oldParent = newChild.parentNode
       if (oldParent) {
-        const oldPosIndex = oldParent.childNodes.indexOf(newChild)
-        oldParent.childNodes.splice(oldPosIndex, 1)
+        const childNodes = oldParent.childNodes
+        const oldPosIndex = newChild.parentIndex
+        childNodes.splice(oldPosIndex, 1)
+        for (let i = oldPosIndex; i < childNodes.length; i += 1) {
+          childNodes[i]!.parentIndex = i
+        }
+        newChild.parentIndex = -1
         if (oldParent === parent && oldPosIndex < posIndex) posIndex -= 1
+
+        const containingSlotUpdater = ShadowRoot._$updateSubtreeSlotNodes(
+          parent,
+          [newChild],
+          null,
+          Element._$getParentHostShadowRoot(oldParent),
+          posIndex,
+        )
+
+        containingSlotUpdater?.removeSlotNodes()
+
         if (BM.DOMLIKE || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Domlike)) {
           // removal of in-tree elements are not needed for DOM backend
           // do nothing
@@ -1063,28 +1389,42 @@ export class Element implements NodeCast {
         } else {
           Element.insertChildComposed(parent, null, newChild, true, oldPosIndex)
         }
+
+        containingSlotUpdater?.updateContainingSlot()
       }
       newChild.parentNode = parent
-      if (newChild instanceof Element) {
-        if (oldParent !== parent) {
-          if (oldParent) {
-            oldParent._$mutationObserverTarget?.detachChild(newChild)
-            if (newChild._$subtreeSlotCount > 0) {
-              Element.updateSlotCount(oldParent, -newChild._$subtreeSlotCount)
-            }
-          }
-          parent._$mutationObserverTarget?.attachChild(newChild)
-          if (newChild._$subtreeSlotCount > 0) {
-            needUpdateSlotCount = true
-            slotCountDiff += newChild._$subtreeSlotCount
-          }
-        } else if (newChild._$subtreeSlotCount > 0) {
-          needUpdateSlotCount = true
-        }
+      if (newChild instanceof Element && oldParent !== parent) {
+        if (oldParent) oldParent._$mutationObserverTarget?.detachChild(newChild)
+        parent._$mutationObserverTarget?.attachChild(newChild)
       }
     } else {
       oldParent = null
     }
+
+    // update containingSlot
+    const parentComponentShadowRoot = Element._$getParentHostShadowRoot(parent)
+    const newChildContainingSlotUpdater = newChild
+      ? ShadowRoot._$updateSubtreeSlotNodes(
+          parent,
+          [newChild],
+          parentComponentShadowRoot,
+          null,
+          posIndex,
+        )
+      : null
+    const relChildContainingSlotUpdater =
+      relChild && removal
+        ? ShadowRoot._$updateSubtreeSlotNodes(
+            parent,
+            [relChild],
+            null,
+            parentComponentShadowRoot,
+            posIndex,
+          )
+        : null
+
+    newChildContainingSlotUpdater?.updateContainingSlot()
+    relChildContainingSlotUpdater?.removeSlotNodes()
 
     // spread in composed tree
     if (BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) {
@@ -1122,31 +1462,84 @@ export class Element implements NodeCast {
       Element.insertChildComposed(parent, newChild, relChild, removal, posIndex)
     }
 
+    newChildContainingSlotUpdater?.insertSlotNodes()
+    relChildContainingSlotUpdater?.updateContainingSlot()
+
     // remove parent of relChild if needed
-    if (removal && relChild instanceof Element) {
-      parent._$mutationObserverTarget?.detachChild(relChild)
-      relChild.parentNode = null
-      if (relChild._$subtreeSlotCount > 0) {
-        needUpdateSlotCount = true
-        slotCountDiff -= relChild._$subtreeSlotCount
+    if (removal && relChild) {
+      if (relChild instanceof Element) {
+        parent._$mutationObserverTarget?.detachChild(relChild)
       }
+      relChild.parentNode = null
+      relChild.parentIndex = -1
     }
 
     // handling child nodes list
+    const childNodes = parent.childNodes
     if (newChild) {
-      if (posIndex < 0) parent.childNodes.push(newChild)
-      else if (removal) parent.childNodes[posIndex] = newChild
-      else parent.childNodes.splice(posIndex, 0, newChild)
+      if (posIndex < 0) {
+        childNodes.push(newChild)
+        newChild.parentIndex = childNodes.length - 1
+      } else if (removal) {
+        childNodes[posIndex] = newChild
+        newChild.parentIndex = posIndex
+      } else {
+        childNodes.splice(posIndex, 0, newChild)
+        for (let i = posIndex; i < childNodes.length; i += 1) {
+          childNodes[i]!.parentIndex = i
+        }
+      }
     } else if (removal) {
-      parent.childNodes.splice(posIndex, 1)
+      childNodes.splice(posIndex, 1)
+      for (let i = posIndex; i < childNodes.length; i += 1) {
+        childNodes[i]!.parentIndex = i
+      }
+    }
+
+    // update subtree slots
+    const newChildSubtreeSlotStart = newChild ? newChild._$subtreeSlotStart : null
+    const newChildSubtreeSlotEnd = newChild ? newChild._$subtreeSlotEnd : null
+    const relChildSubtreeSlotStart = relChild ? relChild._$subtreeSlotStart : null
+    const relChildSubtreeSlotEnd = relChild ? relChild._$subtreeSlotEnd : null
+    if (newChild) {
+      if (oldParent) {
+        Element._$updateSubtreeSlotsRemoval(
+          oldParent,
+          newChildSubtreeSlotStart,
+          newChildSubtreeSlotEnd,
+          true,
+        )
+      }
+      if (removal) {
+        Element._$updateSubtreeSlotsReplacement(
+          parent,
+          newChildSubtreeSlotStart,
+          newChildSubtreeSlotEnd,
+          relChildSubtreeSlotStart,
+          relChildSubtreeSlotEnd,
+          posIndex,
+          !!oldParent,
+        )
+      } else {
+        Element._$updateSubtreeSlotsInsertion(
+          parent,
+          newChildSubtreeSlotStart,
+          newChildSubtreeSlotEnd,
+          posIndex,
+          !!oldParent,
+        )
+      }
+    } else if (removal && relChild) {
+      Element._$updateSubtreeSlotsRemoval(
+        parent,
+        relChildSubtreeSlotStart,
+        relChildSubtreeSlotEnd,
+        false,
+      )
     }
 
     // update id and slot cache if needed
     parent.ownerShadowRoot?._$markIdCacheDirty()
-    if (needUpdateSlotCount) {
-      Element.updateSlotCount(parent, slotCountDiff)
-      parent.ownerShadowRoot?._$checkSlotChanges()
-    }
 
     // call life-times
     if (removal) {
@@ -1176,8 +1569,30 @@ export class Element implements NodeCast {
 
   private static insertChildBatchRemoval(parent: Element, posIndex: number, count: number) {
     const relChild = parent.childNodes[posIndex]
-    let needUpdateSlotCount = false
-    let slotCountDiff = 0
+
+    let parentComponent: Element | null = parent
+    while (parentComponent?._$inheritSlots) parentComponent = parentComponent.parentNode
+    const parentComponentShadowRoot =
+      parentComponent instanceof Component && !parentComponent._$external
+        ? (parentComponent.shadowRoot as ShadowRoot)
+        : null
+
+    // handling child nodes list
+    const childNodes = parent.childNodes
+    const relChildren = childNodes.splice(posIndex, count)
+    for (let i = posIndex; i < childNodes.length; i += 1) {
+      childNodes[i]!.parentIndex = i
+    }
+
+    const containingSlotUpdater = ShadowRoot._$updateSubtreeSlotNodes(
+      parent,
+      relChildren,
+      null,
+      parentComponentShadowRoot,
+      posIndex,
+    )
+
+    containingSlotUpdater?.removeSlotNodes()
 
     // spread in composed tree
     if (BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) {
@@ -1188,39 +1603,34 @@ export class Element implements NodeCast {
         )
       }
     } else {
-      for (let i = 0; i < count; i += 1) {
-        Element.insertChildComposed(
-          parent,
-          null,
-          parent.childNodes[posIndex + i],
-          true,
-          posIndex + i,
-        )
+      for (let i = count - 1; i >= 0; i -= 1) {
+        Element.insertChildComposed(parent, null, relChildren[i], true, i)
       }
     }
 
     // remove parent
     for (let i = 0; i < count; i += 1) {
-      const relChild = parent.childNodes[posIndex + i]!
+      const relChild = relChildren[i]!
       relChild.parentNode = null
+      relChild.parentIndex = -1
       if (relChild instanceof Element) {
         parent._$mutationObserverTarget?.detachChild(relChild)
-        if (relChild._$subtreeSlotCount > 0) {
-          needUpdateSlotCount = true
-          slotCountDiff -= relChild._$subtreeSlotCount
-        }
       }
     }
+    containingSlotUpdater?.updateContainingSlot()
 
-    // handling child nodes list
-    const relChildren = parent.childNodes.splice(posIndex, count)
+    // update subtree slot
+    let subtreeSlotStart: DoubleLinkedList<Element> | null = null
+    let subtreeSlotEnd: DoubleLinkedList<Element> | null = null
+    for (let i = 0; i < count; i += 1) {
+      const relChild = relChildren[i]!
+      if (!subtreeSlotStart) subtreeSlotStart = relChild._$subtreeSlotStart
+      if (relChild._$subtreeSlotEnd) subtreeSlotEnd = relChild._$subtreeSlotEnd
+    }
+    Element._$updateSubtreeSlotsRemoval(parent, subtreeSlotStart, subtreeSlotEnd, false)
 
     // update id and slot cache if needed
     parent.ownerShadowRoot?._$markIdCacheDirty()
-    if (needUpdateSlotCount) {
-      Element.updateSlotCount(parent, slotCountDiff)
-      parent.ownerShadowRoot?._$checkSlotChanges()
-    }
 
     // call life-times
     for (let i = 0; i < count; i += 1) {
@@ -1236,12 +1646,21 @@ export class Element implements NodeCast {
     posIndex: number,
   ) {
     const relChild: Node | undefined = posIndex >= 0 ? parent.childNodes[posIndex] : undefined
-    let needUpdateSlotCount = false
-    let slotCountDiff = 0
+
+    // update containingSlot
+    let parentComponent: Element | null = parent
+    while (parentComponent?._$inheritSlots) parentComponent = parentComponent.parentNode
+    const parentComponentShadowRoot =
+      parentComponent instanceof Component && !parentComponent._$external
+        ? (parentComponent.shadowRoot as ShadowRoot)
+        : null
 
     // change the parent of newChild
     let frag: backend.Element | null
-    if (BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) {
+    if (
+      (BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) &&
+      newChildList.length >= 5
+    ) {
       const backendContext = parent.getBackendContext() as backend.Context
       frag = backendContext.createFragment()
     } else {
@@ -1249,69 +1668,125 @@ export class Element implements NodeCast {
     }
     for (let i = 0; i < newChildList.length; i += 1) {
       const newChild = newChildList[i]!
+      /* istanbul ignore if  */
       if (parent.ownerShadowRoot !== newChild.ownerShadowRoot) {
         throw new Error('Cannot move the node from one shadow tree to another shadow tree.')
       }
       const oldParent = newChild.parentNode
+      /* istanbul ignore if  */
       if (oldParent) {
         throw new Error('Cannot batch-insert the node which already has a parent.')
       }
       newChild.parentNode = parent
       if (newChild instanceof Element) {
         parent._$mutationObserverTarget?.attachChild(newChild)
-        if (newChild._$subtreeSlotCount > 0) {
-          needUpdateSlotCount = true
-          slotCountDiff += newChild._$subtreeSlotCount
-        }
       }
-      if (BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) {
+      if ((BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) && frag) {
         // since `TextNode` also has `backendElement` private field, just make it as `Element`
         const be = (newChild as Element)._$backendElement as backend.Element
-        ;(frag as backend.Element).appendChild(be)
+        frag.appendChild(be)
       }
     }
+
+    // update containingSlot
+    const containingSlotUpdater = ShadowRoot._$updateSubtreeSlotNodes(
+      parent,
+      newChildList,
+      parentComponentShadowRoot,
+      null,
+      posIndex,
+    )
+
+    containingSlotUpdater?.updateContainingSlot()
 
     // spread in composed tree
     if (BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) {
       if (parent._$backendElement) {
-        if (relChild) {
-          ;(parent._$backendElement as backend.Element).spliceBefore(
-            // since `TextNode` also has `backendElement` private field, just make it as `Element`
-            (relChild as Element)._$backendElement as backend.Element,
-            0,
-            frag as backend.Element,
-          )
+        if (frag) {
+          if (relChild) {
+            ;(parent._$backendElement as backend.Element).spliceBefore(
+              // since `TextNode` also has `backendElement` private field, just make it as `Element`
+              (relChild as Element)._$backendElement as backend.Element,
+              0,
+              frag,
+            )
+          } else {
+            ;(parent._$backendElement as backend.Element).spliceAppend(frag)
+          }
+          frag.release()
         } else {
-          ;(parent._$backendElement as backend.Element).spliceAppend(frag as backend.Element)
+          if (relChild) {
+            for (let i = 0; i < newChildList.length; i += 1) {
+              const newChild = newChildList[i]!
+              ;(parent._$backendElement as backend.Element).insertBefore(
+                // since `TextNode` also has `backendElement` private field, just make it as `Element`
+                (newChild as Element)._$backendElement as backend.Element,
+                (relChild as Element)._$backendElement as backend.Element,
+              )
+            }
+          } else {
+            for (let i = 0; i < newChildList.length; i += 1) {
+              const newChild = newChildList[i]!
+              ;(parent._$backendElement as backend.Element).appendChild(
+                // since `TextNode` also has `backendElement` private field, just make it as `Element`
+                (newChild as Element)._$backendElement as backend.Element,
+              )
+            }
+          }
         }
       }
-      ;(frag as backend.Element).release()
     } else {
+      const pos = posIndex >= 0 ? posIndex : parent.childNodes.length
       for (let i = 0; i < newChildList.length; i += 1) {
         const newChild = newChildList[i]!
-        Element.insertChildComposed(
-          parent,
-          newChild,
-          relChild,
-          false,
-          posIndex >= 0 ? posIndex : parent.childNodes.length,
-        )
+        Element.insertChildComposed(parent, newChild, relChild, false, pos)
       }
     }
 
+    containingSlotUpdater?.insertSlotNodes()
+
     // handling child nodes list
+    const childNodes = parent.childNodes
     if (relChild) {
-      parent.childNodes.splice(posIndex, 0, ...newChildList)
+      childNodes.splice(posIndex, 0, ...newChildList)
+      for (let i = posIndex; i < childNodes.length; i += 1) {
+        childNodes[i]!.parentIndex = i
+      }
     } else {
-      parent.childNodes.push(...newChildList)
+      childNodes.push(...newChildList)
+      for (let i = childNodes.length - newChildList.length; i < childNodes.length; i += 1) {
+        childNodes[i]!.parentIndex = i
+      }
     }
+
+    // update subtree slot
+    let subtreeSlotStart: DoubleLinkedList<Element> | null = null
+    let subtreeSlotEnd: DoubleLinkedList<Element> | null = null
+    for (let i = 0; i < newChildList.length; i += 1) {
+      const newChild = newChildList[i]!
+      const newChildSubtreeSlotStart = newChild._$subtreeSlotStart
+      const newChildSubtreeSlotEnd = newChild._$subtreeSlotEnd
+      if (newChildSubtreeSlotStart) {
+        if (subtreeSlotEnd) {
+          newChildSubtreeSlotStart.prev = subtreeSlotEnd
+          subtreeSlotEnd.next = newChildSubtreeSlotStart
+          subtreeSlotEnd = newChildSubtreeSlotEnd
+        } else {
+          subtreeSlotStart = newChildSubtreeSlotStart
+          subtreeSlotEnd = newChildSubtreeSlotEnd
+        }
+      }
+    }
+    Element._$updateSubtreeSlotsInsertion(
+      parent,
+      subtreeSlotStart,
+      subtreeSlotEnd,
+      posIndex + newChildList.length - 1,
+      false,
+    )
 
     // update id and slot cache if needed
     parent.ownerShadowRoot?._$markIdCacheDirty()
-    if (needUpdateSlotCount) {
-      Element.updateSlotCount(parent, slotCountDiff)
-      parent.ownerShadowRoot?._$checkSlotChanges()
-    }
 
     // call life-times
     for (let i = 0; i < newChildList.length; i += 1) {
@@ -1328,13 +1803,16 @@ export class Element implements NodeCast {
     posIndex: number,
     replacer: Element,
   ) {
+    /* istanbul ignore if  */
     if (replacer && parent.ownerShadowRoot !== replacer.ownerShadowRoot) {
       throw new Error('Cannot move the node from one shadow tree to another shadow tree.')
     }
+    /* istanbul ignore if  */
     if (replacer.parentNode) {
       throw new Error('Cannot replace with the node which already has a parent.')
     }
     const placeholder = parent.childNodes[posIndex]
+    /* istanbul ignore if  */
     if (!(placeholder instanceof Element)) {
       throw new Error('Cannot replace on text nodes.')
     }
@@ -1377,6 +1855,30 @@ export class Element implements NodeCast {
       }
     }
 
+    // change the parent
+    placeholder.parentNode = null
+    placeholder.parentIndex = -1
+    replacer.parentNode = parent
+
+    // update containingSlot
+    const placeholderContainingSlot = placeholder.containingSlot
+    if (placeholderContainingSlot !== undefined) {
+      Element._$updateContainingSlot(placeholder, undefined)
+      Element._$updateContainingSlot(replacer, placeholderContainingSlot)
+    }
+    const containingSlotUpdater = replacedChildren.length
+      ? ShadowRoot._$updateSubtreeSlotNodes(
+          replacer,
+          replacedChildren,
+          Element._$getParentHostShadowRoot(replacer),
+          Element._$getParentHostShadowRoot(placeholder),
+          0,
+        )
+      : null
+
+    containingSlotUpdater?.updateContainingSlot()
+    containingSlotUpdater?.removeSlotNodes()
+
     // spread in composed tree
     if (BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) {
       if (parent._$backendElement) {
@@ -1401,17 +1903,29 @@ export class Element implements NodeCast {
       }
     }
 
-    // change the parent of placeholder
-    parent._$mutationObserverTarget?.detachChild(placeholder)
+    containingSlotUpdater?.insertSlotNodes()
 
-    // change the parent of replacer
+    // update subtree slots
+    // (assume that placeholder and replacer will never be slot node)
+    replacer._$subtreeSlotStart = placeholder._$subtreeSlotStart
+    replacer._$subtreeSlotEnd = placeholder._$subtreeSlotEnd
+
+    parent._$mutationObserverTarget?.detachChild(placeholder)
     parent._$mutationObserverTarget?.attachChild(replacer)
 
     // handling child nodes list for parent
     parent.childNodes[posIndex] = replacer
+    replacer.parentIndex = posIndex
 
     // handling child nodes list for replacer
     replacer.childNodes.push(...placeholder.childNodes)
+    for (
+      let i = replacer.childNodes.length - placeholder.childNodes.length;
+      i < replacer.childNodes.length;
+      i += 1
+    ) {
+      replacer.childNodes[i]!.parentIndex = i
+    }
 
     // handling child nodes list for placeholder
     placeholder.childNodes = []
@@ -1441,8 +1955,8 @@ export class Element implements NodeCast {
     Element.insertChildSingleOperation(this, child, index, false)
   }
 
-  insertBefore(child: Node, before: Node) {
-    const index = this.childNodes.indexOf(before)
+  insertBefore(child: Node, before?: Node) {
+    const index = before ? before.parentIndex : -1
     Element.insertChildSingleOperation(this, child, index, false)
   }
 
@@ -1451,7 +1965,7 @@ export class Element implements NodeCast {
   }
 
   removeChild(child: Node) {
-    const index = this.childNodes.indexOf(child)
+    const index = child.parentIndex
     Element.insertChildSingleOperation(this, null, index, true)
   }
 
@@ -1460,7 +1974,7 @@ export class Element implements NodeCast {
   }
 
   replaceChild(child: Node, relChild: Node) {
-    const index = this.childNodes.indexOf(relChild)
+    const index = relChild.parentIndex
     Element.insertChildSingleOperation(this, child, index, true)
   }
 
@@ -1475,7 +1989,7 @@ export class Element implements NodeCast {
   selfReplaceWith(replaceWith: Element) {
     const parent = this.parentNode
     if (parent) {
-      Element.insertChildPlaceholderReplace(parent, parent.childNodes.indexOf(this), replaceWith)
+      Element.insertChildPlaceholderReplace(parent, this.parentIndex, replaceWith)
     }
   }
 
@@ -1643,21 +2157,15 @@ export class Element implements NodeCast {
     targetParent: GeneralBackendElement,
     targetNode: GeneralBackendElement,
   ) {
+    /* istanbul ignore if  */
     if (element._$attached) {
       throw new Error('An attached element cannot be attached again')
     }
     if (element._$backendElement) {
-      if (BM.DOMLIKE || (BM.DYNAMIC && element.getBackendMode() === BackendMode.Domlike)) {
-        ;(targetParent as domlikeBackend.Element).replaceChild(
-          element._$backendElement as domlikeBackend.Element,
-          targetNode as domlikeBackend.Element,
-        )
-      } else {
-        ;(targetParent as backend.Element | composedBackend.Element).replaceChild(
-          element._$backendElement as backend.Element,
-          targetNode as backend.Element,
-        )
-      }
+      ;(targetParent as backend.Element).replaceChild(
+        element._$backendElement as backend.Element,
+        targetNode as backend.Element,
+      )
     }
     Element.checkAndCallAttached(element)
   }
@@ -1699,26 +2207,44 @@ export class Element implements NodeCast {
    * otherwise the slot content will always be dangled.
    */
   static setSlotName(element: Element, name?: string) {
+    /* istanbul ignore if  */
     if (element._$inheritSlots) {
       throw new Error('Slot-inherit mode is not usable in slot element')
     }
-    if (element._$inheritSlots) {
-      throw new Error('Component cannot be used as slot element')
-    }
     const slotName = name ? String(name) : ''
-    if (element._$slotName === slotName) return
-    const needIncSlotCount = element._$slotName === null
+    const oldSlotName = element._$slotName
+    if (oldSlotName === slotName) return
+    const needInsertSlot = oldSlotName === null
     element._$slotName = slotName
+    if (needInsertSlot) {
+      element._$subtreeSlotStart = element._$subtreeSlotEnd = {
+        value: element,
+        prev: null,
+        next: null,
+      }
+    }
     if (BM.SHADOW || (BM.DYNAMIC && element.getBackendMode() === BackendMode.Shadow)) {
       ;(element._$backendElement as backend.Element | null)?.setSlotName(slotName)
     }
     const owner = element.ownerShadowRoot
     if (owner) {
-      if (needIncSlotCount && owner.isDynamicSlots()) {
-        element._$slotValues = Object.create(null) as DataList
+      if (needInsertSlot) {
+        if (owner.getSlotMode() === SlotMode.Dynamic)
+          element._$slotValues = Object.create(null) as DataList
+        element.slotNodes = []
+        const parent = element.parentNode
+        if (parent) {
+          Element._$updateSubtreeSlotsInsertion(
+            parent,
+            element._$subtreeSlotStart,
+            element._$subtreeSlotEnd,
+            element.parentIndex,
+            false,
+          )
+        }
+      } else {
+        if (owner.isConnected(element)) owner._$applySlotRename(element, slotName, oldSlotName)
       }
-      Element.updateSlotCount(element, needIncSlotCount ? 1 : 0)
-      owner._$checkSlotChanges()
     }
   }
 
@@ -1736,15 +2262,17 @@ export class Element implements NodeCast {
    * In slot-inherit mode of an element,
    * the child nodes of the element will be treated as siblings and can have different target slot.
    */
-  static setInheritSlots(element: VirtualNode) {
+  static setInheritSlots(element: Element) {
+    /* istanbul ignore if  */
+    if (!element._$virtual) {
+      throw new Error('Cannot set slot-inherit on non-virtual node')
+    }
+    /* istanbul ignore if  */
     if (element._$slotName !== null || element.childNodes.length !== 0) {
       throw new Error('Slot-inherit mode cannot be set when the element has any child node')
     }
     if (BM.SHADOW || (BM.DYNAMIC && element.getBackendMode() === BackendMode.Shadow)) {
-      ;(element._$backendElement as backend.Element | null)?.setSlot(
-        element._$nodeSlot,
-        element._$inheritSlots,
-      )
+      ;(element._$backendElement as backend.Element | null)?.setInheritSlots()
     }
     element._$inheritSlots = true
   }
@@ -1759,55 +2287,192 @@ export class Element implements NodeCast {
    *
    * Necessary if node belongs to a dynamic slot, which cannot be identified by slot name.
    */
-  static setSlotElement(node: Node, slot: Element) {
-    const oldSlotElement = node._$nodeSlotElement
+  static setSlotElement(node: Node, slot: Element | null) {
+    const oldSlotElement = node._$slotElement
     if (oldSlotElement === slot) return
-    node._$nodeSlotElement = slot
-    if (node instanceof Element) {
-      node._$nodeSlot = slot._$slotName || ''
-    }
+    node._$slotElement = slot
 
-    // TODO shadow mode
-    const parent = node.parentNode
-    let slotParent = parent
-    while (slotParent?._$inheritSlots) {
-      slotParent = slotParent.parentNode
+    const slotParentShadowRoot = Element._$getParentHostShadowRoot(node.parentNode)
+
+    if (slotParentShadowRoot) {
+      const containingSlotUpdater = ShadowRoot._$updateSubtreeSlotNodes(
+        node.parentNode!,
+        [node],
+        slotParentShadowRoot,
+        slotParentShadowRoot,
+        node.parentIndex,
+      )
+
+      const oldSlot = node.containingSlot as Element | null
+
+      containingSlotUpdater?.updateContainingSlot()
+      containingSlotUpdater?.removeSlotNodes()
+
+      const newSlot = node.containingSlot as Element | null
+
+      Element.insertChildReassign(node.parentNode!, node, oldSlot, newSlot, node.parentIndex)
+
+      containingSlotUpdater?.insertSlotNodes()
     }
-    if (slotParent instanceof Component && !slotParent._$external) {
-      Element.insertChildReassignComposed(
-        parent!,
-        node,
-        oldSlotElement,
-        slot,
-        parent!.childNodes.indexOf(node) + 1,
+  }
+
+  /** @internal */
+  static _$updateContainingSlot(node: Node, containingSlot: Element | null | undefined): void {
+    node.containingSlot = containingSlot
+
+    if (
+      BM.SHADOW ||
+      (BM.DYNAMIC && node.ownerShadowRoot?.getBackendMode() === BackendMode.Shadow)
+    ) {
+      ;(node.getBackendElement() as backend.Element).setContainingSlot(
+        containingSlot ? (containingSlot.getBackendElement() as backend.Element) : containingSlot,
       )
     }
   }
 
-  static getSlotElement(node: Node) {
-    if (node._$nodeSlotElement) return node._$nodeSlotElement
-    let parent = node.parentNode
-    while (parent?._$inheritSlots) {
-      parent = parent.parentNode
+  /** @internal */
+  static _$spliceSlotNodes(
+    slot: Element,
+    before: number,
+    deleteCount: number,
+    insertion: Node[] | undefined,
+  ): void {
+    const slotNodes = (slot.slotNodes = slot.slotNodes || [])
+    const spliceBefore = before >= 0 && before < slotNodes.length
+    if (insertion?.length) {
+      if (spliceBefore) {
+        for (let i = before; i < before + deleteCount; i += 1) {
+          slotNodes[i]!.slotIndex = undefined
+        }
+        slotNodes.splice(before, deleteCount, ...insertion)
+        for (let i = before; i < slotNodes.length; i += 1) {
+          slotNodes[i]!.slotIndex = i
+        }
+      } else {
+        const start = slotNodes.length
+        slotNodes.push(...insertion)
+        for (let i = start; i < slotNodes.length; i += 1) {
+          slotNodes[i]!.slotIndex = i
+        }
+      }
+    } else if (deleteCount) {
+      for (let i = before; i < before + deleteCount; i += 1) {
+        slotNodes[i]!.slotIndex = undefined
+      }
+      slotNodes.splice(before, deleteCount)
+      for (let i = before; i < slotNodes.length; i += 1) {
+        slotNodes[i]!.slotIndex = i
+      }
     }
-    if (parent instanceof Component && !parent._$external) {
-      const slot = (parent.shadowRoot as ShadowRoot).getContainingSlot(node)
-      return slot
+
+    if (BM.SHADOW || (BM.DYNAMIC && slot._$nodeTreeContext.mode === BackendMode.Shadow)) {
+      if (insertion?.length) {
+        const frag = (slot._$nodeTreeContext as backend.Context).createFragment()
+        for (let i = 0; i < insertion.length; i += 1) {
+          frag.appendChild(insertion[i]!._$backendElement as backend.Element)
+        }
+        if (spliceBefore) {
+          ;(slot._$backendElement as backend.Element).spliceBeforeSlotNodes(
+            before,
+            deleteCount,
+            frag,
+          )
+        } else {
+          ;(slot._$backendElement as backend.Element).spliceAppendSlotNodes(frag)
+        }
+        frag.release()
+      } else if (deleteCount) {
+        ;(slot._$backendElement as backend.Element).spliceRemoveSlotNodes(before, deleteCount)
+      }
     }
-    return undefined
+  }
+
+  /** @internal */
+  static _$findSlotNodeInsertPosition(slot: Element, target: Node, newPosIndex: number): number {
+    const host = slot.ownerShadowRoot!.getHostNode()
+    const getNodeDepth = (node: Node): number => {
+      let depth = 0
+      let cur: Node | null = node
+      while (cur && cur !== host) {
+        depth += 1
+        cur = cur.parentNode
+      }
+      return depth
+    }
+
+    const targetDepth = getNodeDepth(target)
+
+    const comparePos = (
+      slotNode1: Node,
+      parentIndex1: number,
+      slotDepth1: number,
+      slotNode2: Node,
+      parentIndex2: number,
+      slotDepth2: number,
+      posIndex: number,
+    ): number => {
+      if (slotNode1 === slotNode2) return 0
+      if (slotNode1.parentNode === slotNode2.parentNode) {
+        return parentIndex1 - (parentIndex2 === -1 ? posIndex : parentIndex2)
+      }
+      if (slotDepth2 < slotDepth1) {
+        const nextSlotNode1 = slotNode1.parentNode!
+        return comparePos(
+          nextSlotNode1,
+          nextSlotNode1.parentIndex,
+          slotDepth1 - 1,
+          slotNode2,
+          parentIndex2,
+          slotDepth2,
+          posIndex,
+        )
+      }
+      const left = slotDepth1 < slotDepth2 ? slotNode1 : slotNode1.parentNode!
+      const leftDepth = slotDepth1 < slotDepth2 ? slotDepth1 : slotDepth1 - 1
+      const right = slotNode2.parentNode!
+      const rightDepth = slotDepth2 - 1
+      const rst = comparePos(
+        left,
+        left.parentIndex,
+        leftDepth,
+        right,
+        right.parentIndex,
+        rightDepth,
+        posIndex,
+      )
+      if (rst === 0) return -1
+      return rst
+    }
+
+    const slotNodes = slot.slotNodes!
+
+    let i = slotNodes.length - 1
+    for (; i >= 0; i -= 1) {
+      const slotNode = slotNodes[i]!
+      if (
+        comparePos(
+          slotNode,
+          slotNode.parentIndex,
+          getNodeDepth(slotNode),
+          target,
+          target.parentIndex,
+          targetDepth,
+          newPosIndex - 0.5,
+        ) < 0
+      )
+        break
+    }
+    const insertPos = i + 1
+    return insertPos
   }
 
   /** Get composed parent (including virtual nodes) */
   getComposedParent(): Element | null {
-    if (this instanceof ShadowRoot) {
-      return this.getHostNode()
-    }
+    if (this instanceof ShadowRoot) return this.getHostNode()
+    if (this.containingSlot !== undefined) return this.containingSlot
     let parent = this.parentNode
     while (parent?._$inheritSlots) {
       parent = parent.parentNode
-    }
-    if (parent instanceof Component && !parent._$external) {
-      return (parent.shadowRoot as ShadowRoot).getContainingSlot(this)
     }
     return parent
   }
@@ -1839,27 +2504,56 @@ export class Element implements NodeCast {
       return f(this.shadowRoot as ShadowRoot) !== false
     }
     if (this._$slotName !== null) {
-      let notEnded = true
-      if (this.ownerShadowRoot) {
-        this.ownerShadowRoot.forEachNodeInSpecifiedSlot(this, (node) => {
-          if (f(node) === false) notEnded = false
-          return notEnded
-        })
-      }
-      return notEnded
+      const ownerShadowRoot = this.ownerShadowRoot
+      if (!ownerShadowRoot) return true
+      return ownerShadowRoot.forEachNodeInSpecifiedSlot(this, f)
     }
-    const recInheritSlots = (children: Node[]) => {
+    const recInheritSlots = (children: Node[]): boolean => {
       for (let i = 0; i < children.length; i += 1) {
         const child = children[i]!
         if (f(child) === false) return false
-        if (child instanceof Element && child._$inheritSlots) {
+        if (child._$inheritSlots) {
           if (!recInheritSlots(child.childNodes)) return false
         }
       }
       return true
     }
-    if (!recInheritSlots(this.childNodes)) return false
-    return true
+    return recInheritSlots(this.childNodes)
+  }
+
+  /**
+   * Iterate non-virtual composed child nodes
+   *
+   * if `f` returns `false` then the iteration is interrupted.
+   * Returns `true` if that happens.
+   */
+  forEachNonVirtualComposedChild(f: (node: Node) => boolean | void): boolean {
+    if (this._$inheritSlots) return true
+    const recNonVirtual = (child: Node): boolean => {
+      if (child._$virtual) {
+        return child.forEachNonVirtualComposedChild(f)
+      }
+      return f(child) !== false
+    }
+    if (this instanceof Component && !this._$external) {
+      return recNonVirtual(this.shadowRoot as ShadowRoot)
+    }
+    if (this._$slotName !== null) {
+      const ownerShadowRoot = this.ownerShadowRoot
+      if (!ownerShadowRoot) return true
+      return ownerShadowRoot.forEachSlotContentInSpecifiedSlot(this, recNonVirtual)
+    }
+    const recInheritSlots = (children: Node[]) => {
+      for (let i = 0; i < children.length; i += 1) {
+        const child = children[i]!
+        if (!recNonVirtual(child)) return false
+        if (child._$inheritSlots) {
+          if (!recInheritSlots(child.childNodes)) return false
+        }
+      }
+      return true
+    }
+    return recInheritSlots(this.childNodes)
   }
 
   /** Parse a selector string so that it can be used multiple queries */

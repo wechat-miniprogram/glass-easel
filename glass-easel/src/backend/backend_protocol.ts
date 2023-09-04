@@ -1,26 +1,27 @@
 /* eslint-disable class-methods-use-this */
 
+import { EventBubbleStatus, EventOptions } from '../event'
 import { safeCallback } from '../func_arr'
-import { EventOptions, EventBubbleStatus } from '../event'
 import {
   BackendMode,
   BoundingClientRect,
-  ScrollOffset,
-  Observer,
-  MediaQueryStatus,
   IntersectionStatus,
+  MediaQueryStatus,
+  Observer,
+  ScrollOffset,
 } from './mode'
+import * as suggestedBackend from './suggested_backend_protocol'
 
 export {
   BackendMode,
   BoundingClientRect,
-  ScrollOffset,
-  Observer,
-  MediaQueryStatus,
   IntersectionStatus,
+  MediaQueryStatus,
+  Observer,
+  ScrollOffset,
 } from './mode'
 
-export interface Context {
+export interface Context extends Partial<suggestedBackend.Context> {
   mode: BackendMode.Shadow
   destroy(): void
   getWindowWidth(): number
@@ -31,7 +32,7 @@ export interface Context {
   appendStyleSheetPath(path: string, styleScope?: number): number
   disableStyleSheet(index: number): void
   render(cb: (err: Error | null) => void): void
-  getRootNode(): Element
+  getRootNode(): ShadowRootContext
   createFragment(): Element
   onEvent(
     listener: (
@@ -47,7 +48,7 @@ export interface Context {
   ): Observer
 }
 
-export interface Element {
+export interface Element extends Partial<suggestedBackend.Element> {
   release(): void
   associateValue(v: unknown): void
   getShadowRoot(): ShadowRootContext | undefined
@@ -60,7 +61,13 @@ export interface Element {
   spliceRemove(before: Element, deleteCount: number): void
   setId(id: string): void
   setSlotName(slot: string): void
-  setSlot(name: string, inherit: boolean): void
+  setContainingSlot(slot: Element | undefined | null): void
+  reassignContainingSlot(oldSlot: Element | null, newSlot: Element | null): void
+  spliceBeforeSlotNodes(before: number, deleteCount: number, list: Element): void
+  spliceAppendSlotNodes(list: Element): void
+  spliceRemoveSlotNodes(before: number, deleteCount: number): void
+  setInheritSlots(): void
+  setVirtualHost(): void
   setStyleScope(styleScope: number, hostStyleScope?: number): void
   setStyle(styleText: string): void
   addClass(elementClass: string, styleScope?: number): void
@@ -79,18 +86,16 @@ export interface Element {
     thresholds: number[],
     listener: ((res: IntersectionStatus) => void) | null,
   ): Observer
-  __wxElement?: unknown
 }
 
-export interface ShadowRootContext {
-  getRootNode(): Element
+export interface ShadowRootContext extends Element {
   createElement(logicalName: string, stylingName: string): Element
   createTextNode(content: string): Element
-  createComponent(stylingName: string, isVirtual: boolean): Element
-  createVirtualNode(): Element
+  createComponent(tagName: string): Element
+  createVirtualNode(virtualName: string): Element
 }
 
-const enum EmptyBackendElementType {
+export const enum EmptyBackendElementType {
   Fragment,
   Element,
   TextNode,
@@ -103,9 +108,7 @@ export class EmptyBackendContext implements Context {
   mode: BackendMode.Shadow = BackendMode.Shadow
   private _$styleSheetIdInc = 1
   private _$renderCallbacks: ((err: Error) => void)[] | null = null
-  private _$rootNode: EmptyBackendElement = new EmptyBackendElement(
-    EmptyBackendElementType.Component,
-  )
+  private _$shadowRoot: EmptyBackendShadowRootContext = new EmptyBackendShadowRootContext()
 
   destroy(): void {
     // empty
@@ -155,8 +158,8 @@ export class EmptyBackendContext implements Context {
     }
   }
 
-  getRootNode(): EmptyBackendElement {
-    return this._$rootNode
+  getRootNode(): EmptyBackendShadowRootContext {
+    return this._$shadowRoot
   }
 
   createFragment(): EmptyBackendElement {
@@ -188,7 +191,6 @@ export class EmptyBackendContext implements Context {
 
 /** An element for empty backend implementation */
 export class EmptyBackendElement implements Element {
-  __wxElement: unknown = undefined
   private _$shadowRoot: EmptyBackendShadowRootContext | null
 
   constructor(type: EmptyBackendElementType) {
@@ -211,31 +213,35 @@ export class EmptyBackendElement implements Element {
     return this._$shadowRoot || undefined
   }
 
-  appendChild(_child: Element): void {
+  appendChild(_child: EmptyBackendElement): void {
     // empty
   }
 
-  removeChild(_child: Element, _index?: number): void {
+  removeChild(_child: EmptyBackendElement, _index: number): void {
     // empty
   }
 
-  insertBefore(_child: Element, _before?: Element, _index?: number): void {
+  insertBefore(_child: EmptyBackendElement, _before: EmptyBackendElement, _index: number): void {
     // empty
   }
 
-  replaceChild(_child: Element, _oldChild?: Element, _index?: number): void {
+  replaceChild(_child: EmptyBackendElement, _oldChild: EmptyBackendElement, _index?: number): void {
     // empty
   }
 
-  spliceBefore(_before: Element, _deleteCount: number, _list: Element): void {
+  spliceBefore(
+    _before: EmptyBackendElement,
+    _deleteCount: number,
+    _list: EmptyBackendElement,
+  ): void {
     // empty
   }
 
-  spliceAppend(_list: Element): void {
+  spliceAppend(_list: EmptyBackendElement): void {
     // empty
   }
 
-  spliceRemove(_before: Element, _deleteCount: number): void {
+  spliceRemove(_before: EmptyBackendElement, _deleteCount: number): void {
     // empty
   }
 
@@ -247,11 +253,31 @@ export class EmptyBackendElement implements Element {
     // empty
   }
 
-  setSlot(_name: string, _$inheritSlots: boolean): void {
+  setContainingSlot(_slot: EmptyBackendElement): void {
+    // empty
+  }
+
+  reassignContainingSlot(_oldSlot: Element | null, _newSlot: Element | null): void {
+    // empty
+  }
+
+  spliceBeforeSlotNodes(_before: number, _deleteCount: number, _list: Element): void {
+    // empty
+  }
+
+  spliceRemoveSlotNodes(_before: number, _deleteCount: number): void {
+    // empty
+  }
+
+  spliceAppendSlotNodes(_list: Element): void {
     // empty
   }
 
   setInheritSlots(): void {
+    // empty
+  }
+
+  setVirtualHost(): void {
     // empty
   }
 
@@ -335,28 +361,28 @@ export class EmptyBackendElement implements Element {
 }
 
 /** A shadow root for empty backend implementation */
-export class EmptyBackendShadowRootContext implements ShadowRootContext {
-  private _$rootNode: EmptyBackendElement = new EmptyBackendElement(
-    EmptyBackendElementType.VirtualNode,
-  )
-
-  getRootNode(): Element {
-    return this._$rootNode
+export class EmptyBackendShadowRootContext
+  extends EmptyBackendElement
+  implements ShadowRootContext
+{
+  // eslint-disable-next-line no-useless-constructor
+  constructor() {
+    super(EmptyBackendElementType.VirtualNode)
   }
 
-  createElement(_tagName: string, _stylingName: string): Element {
+  createElement(_tagName: string, _stylingName: string): EmptyBackendElement {
     return new EmptyBackendElement(EmptyBackendElementType.Element)
   }
 
-  createTextNode(_content: string): Element {
+  createTextNode(_content: string): EmptyBackendElement {
     return new EmptyBackendElement(EmptyBackendElementType.TextNode)
   }
 
-  createComponent(_stylingName: string, _isVirtual: boolean): Element {
+  createComponent(_tagName: string): EmptyBackendElement {
     return new EmptyBackendElement(EmptyBackendElementType.Component)
   }
 
-  createVirtualNode(): Element {
+  createVirtualNode(_virtualName: string): EmptyBackendElement {
     return new EmptyBackendElement(EmptyBackendElementType.VirtualNode)
   }
 }

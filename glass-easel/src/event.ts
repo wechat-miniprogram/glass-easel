@@ -239,79 +239,81 @@ export class Event<TDetail> {
     return this._$eventBubblingControl.mutated
   }
 
+  callListener(
+    currentTarget: Element,
+    mark: Record<string, unknown> | null,
+    target: Element,
+    isCapture: boolean,
+  ) {
+    const evName = this.type
+
+    const eventTarget = currentTarget._$eventTarget
+    if (!eventTarget) return
+    const listeners = isCapture ? eventTarget.captureListeners : eventTarget.listeners
+    if (!listeners) return
+    const efa = listeners[evName]
+    if (!efa) return
+    const skipMut = this.mutatedMarked()
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const targetCaller = target instanceof Component ? target.getMethodCaller() || target : target
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const currentTargetCaller =
+      currentTarget instanceof Component
+        ? currentTarget.getMethodCaller() || currentTarget
+        : currentTarget
+    const ev = this.wrapShadowedEvent(targetCaller, mark, currentTargetCaller)
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    ;(this as any)._hasListeners = true
+    const ret = efa.funcArr.call(
+      currentTargetCaller,
+      [ev],
+      (mulLevel) => !skipMut || mulLevel !== MutLevel.Mut,
+      target instanceof Component ? (target as GeneralComponent) : undefined,
+    )
+    if (ret === false || efa.finalCount > 0) {
+      ev.stopPropagation()
+      ev.preventDefault()
+    } else if (efa.mutCount > 0) {
+      ev.markMutated()
+    }
+  }
+
   dispatch(target: Element, externalTarget?: GeneralBackendElement) {
     if (this._$dispatched) {
       throw new Error('Event cannot be dispatched twice')
     }
     this._$dispatched = true
-    const evName = this.type
     const crossShadow = this.composed
     const bubbles = this.bubbles
     const inExternalOnly = externalTarget && !crossShadow
     const eventBubblingControl = this._$eventBubblingControl
 
-    // calls listeners on a single element
-    const callEventFuncArr = (
-      targetCaller: Element,
-      mark: Record<string, unknown> | null,
-      cur: Element,
-      isCapture: boolean,
-    ) => {
-      const eventTarget = cur._$eventTarget
-      if (!eventTarget) return
-      const listeners = isCapture ? eventTarget.captureListeners : eventTarget.listeners
-      if (!listeners) return
-      const efa = listeners[evName]
-      if (!efa) return
-      const skipMut = this.mutatedMarked()
-      const isComp = cur instanceof Component
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const curCaller = isComp ? cur.getMethodCaller() : cur
-      const ev = this.wrapShadowedEvent(targetCaller, mark, curCaller)
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      ;(this as any)._hasListeners = true
-      const ret = efa.funcArr.call(
-        curCaller,
-        [ev],
-        (mulLevel) => !skipMut || mulLevel !== MutLevel.Mut,
-        isComp ? (cur as GeneralComponent) : undefined,
-      )
-      if (ret === false || efa.finalCount > 0) {
-        ev.stopPropagation()
-        ev.preventDefault()
-      } else if (efa.mutCount > 0) {
-        ev.markMutated()
-      }
-    }
-
     const forEachBubblePath = (
       target: Element,
-      f: (target: Element, targetCaller: Element, mark: Record<string, unknown>) => boolean | void,
+      f: (currentTarget: Element, target: Element, mark: Record<string, unknown>) => boolean | void,
     ) => {
       const recShadow = (target: Element): Element | null => {
-        let cur = target
-        const targetCaller =
-          target instanceof Component ? (target.getMethodCaller() as Element) : target
+        let currentTarget = target
         const mark = target.collectMarks()
         for (;;) {
-          if (f(cur, targetCaller, mark) === false) return null
+          if (f(currentTarget, target, mark) === false) return null
           let next
           if (crossShadow) {
-            if (cur instanceof ShadowRoot) return cur.getHostNode()
-            next = cur.parentNode
-            while (next?._$inheritSlots) {
-              next = next.parentNode
-            }
-            if (next instanceof Component && !next._$external) {
-              const slot = (next.shadowRoot as ShadowRoot).getContainingSlot(cur)
-              if (!slot) return null
-              next = recShadow(slot)
+            if (currentTarget instanceof ShadowRoot) return currentTarget.getHostNode()
+            if (currentTarget.containingSlot === null) return null
+            if (currentTarget.containingSlot) {
+              next = recShadow(currentTarget.containingSlot)
+            } else {
+              next = currentTarget.parentNode
+              while (next?._$inheritSlots) {
+                next = next.parentNode
+              }
             }
           } else {
-            next = cur.parentNode
+            next = currentTarget.parentNode
           }
           if (!next) return null
-          cur = next
+          currentTarget = next
         }
       }
       let cur = target
@@ -325,13 +327,13 @@ export class Event<TDetail> {
     // capture phase
     if (this._$capturePhase && !eventBubblingControl.stopped && !inExternalOnly) {
       const bubblingPath: [Element, Element, Record<string, unknown>][] = []
-      forEachBubblePath(target, (target, targetCaller, mark) => {
-        bubblingPath.push([target, targetCaller, mark])
+      forEachBubblePath(target, (currentTarget, target, mark) => {
+        bubblingPath.push([currentTarget, target, mark])
       })
       for (let i = bubblingPath.length - 1; i >= 0; i -= 1) {
-        const [cur, targetCaller, mark] = bubblingPath[i]!
-        if (cur._$eventTarget) {
-          callEventFuncArr(targetCaller, mark, cur, true)
+        const [currentTarget, target, mark] = bubblingPath[i]!
+        if (currentTarget._$eventTarget) {
+          this.callListener(currentTarget, mark, target, true)
           if (eventBubblingControl.stopped) break
         }
       }
@@ -347,14 +349,14 @@ export class Event<TDetail> {
     // bubble phase
     if (!eventBubblingControl.stopped && !inExternalOnly) {
       let atTarget = true
-      forEachBubblePath(target, (target, targetCaller, mark) => {
-        if (!atTarget && target instanceof Component && target._$external) {
-          const sr = target.shadowRoot as ExternalShadowRoot
+      forEachBubblePath(target, (currentTarget, target, mark) => {
+        if (!atTarget && currentTarget instanceof Component && currentTarget._$external) {
+          const sr = currentTarget.shadowRoot as ExternalShadowRoot
           sr.handleEvent(sr.slot, this)
         }
         atTarget = false
-        if (target._$eventTarget) {
-          callEventFuncArr(targetCaller, mark, target, false)
+        if (currentTarget._$eventTarget) {
+          this.callListener(currentTarget, mark, target, false)
         }
         return bubbles && !eventBubblingControl.stopped
       })

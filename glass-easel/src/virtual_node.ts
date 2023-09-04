@@ -1,7 +1,8 @@
 import { Element } from './element'
 import { ShadowRoot } from './shadow_root'
 import { BM, BackendMode } from './backend/mode'
-import { GeneralBackendContext, GeneralBackendElement } from '.'
+import { GeneralBackendContext, GeneralBackendElement } from './node'
+import * as backend from './backend/backend_protocol'
 
 export class VirtualNode extends Element {
   is: string
@@ -14,26 +15,25 @@ export class VirtualNode extends Element {
 
   protected _$initializeVirtual(
     virtualName: string,
-    owner: ShadowRoot | null,
+    owner: ShadowRoot,
     nodeTreeContext: GeneralBackendContext,
+    backendElement: GeneralBackendElement | null,
   ) {
     this.is = String(virtualName)
-    let backendElement: GeneralBackendElement | null = null
-    if (owner) {
-      if (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Shadow)) {
-        const shadowRoot = owner._$backendShadowRoot
-        backendElement = shadowRoot?.createVirtualNode() || null
-        this._$initialize(true, backendElement, owner)
-        backendElement?.associateValue?.(this)
-      } else {
-        this._$initialize(true, null, owner)
-      }
+    if (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Shadow)) {
+      const shadowRoot = owner._$backendShadowRoot
+      const be =
+        (backendElement as backend.Element) || shadowRoot?.createVirtualNode(virtualName) || null
+      this._$initialize(true, be, owner, nodeTreeContext)
+      be?.associateValue(this)
+    } else {
+      this._$initialize(true, backendElement, owner, nodeTreeContext)
     }
   }
 
   static create(virtualName: string, owner: ShadowRoot): VirtualNode {
     const node = Object.create(VirtualNode.prototype) as VirtualNode
-    node._$initializeVirtual(virtualName, owner, owner._$nodeTreeContext)
+    node._$initializeVirtual(virtualName, owner, owner._$nodeTreeContext, null)
     return node
   }
 }

@@ -90,11 +90,10 @@ import {
   PropertyList,
   MethodList,
   ComponentInstance,
-  GeneralComponentInstance,
   Empty,
 } from './component_params'
 import { Behavior } from './behavior'
-import { Component, ComponentDefinition, GeneralComponentDefinition } from './component'
+import { Component, ComponentDefinition, GeneralComponent, GeneralComponentDefinition } from './component'
 import { Event } from './event'
 import { getDefaultComponentSpace } from './global_options'
 
@@ -123,7 +122,7 @@ export const registerElement = <
 export function createElement(
   tagName: string,
   compDef?: GeneralComponentDefinition,
-): GeneralComponentInstance
+): GeneralComponent
 export function createElement<
   TData extends DataList,
   TProperty extends PropertyList,
@@ -135,7 +134,7 @@ export function createElement<
 export function createElement(
   tagName: string,
   compDef?: GeneralComponentDefinition,
-): GeneralComponentInstance {
+): GeneralComponent {
   return Component.create(tagName, compDef || null)
 }
 
