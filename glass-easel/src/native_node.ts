@@ -98,7 +98,8 @@ export class NativeNode extends Element {
     }
     if (backendElement) {
       if (!(BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike))) {
-        ;(backendElement as backend.Element | composedBackend.Element).associateValue?.(node)
+        // ;(backendElement as backend.Element | composedBackend.Element).associateValue?.(node)
+        ;(backendElement as unknown as { __wxElement: typeof node }).__wxElement = node
       } else {
         ;(owner._$nodeTreeContext as domlikeBackend.Context).associateValue(
           backendElement as domlikeBackend.Element,

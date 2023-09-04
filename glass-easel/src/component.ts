@@ -571,7 +571,8 @@ export class Component<
     // associate in backend
     if (backendElement) {
       if (!(BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike))) {
-        ;(backendElement as backend.Element | composedBackend.Element).associateValue?.(comp)
+        // ;(backendElement as backend.Element | composedBackend.Element).associateValue?.(comp)
+        ;(backendElement as unknown as { __wxElement: typeof comp }).__wxElement = comp
       } else {
         ;(nodeTreeContext as domlikeBackend.Context).associateValue(
           backendElement as domlikeBackend.Element,
