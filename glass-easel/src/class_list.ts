@@ -2,7 +2,7 @@ import * as backend from './backend/backend_protocol'
 import * as composedBackend from './backend/composed_backend_protocol'
 import * as domlikeBackend from './backend/domlike_backend_protocol'
 import { BM, BackendMode } from './backend/mode'
-import { Element, GeneralComponent, GeneralBackendElement } from '.'
+import { Element, GeneralComponent, GeneralBackendElement, StyleSegmentIndex } from '.'
 import { MutationObserverTarget } from './mutation_observer'
 
 const CLASS_NAME_REG_EXP = /(~|\^+)?-?[_0-9a-z][-_0-9a-z]*/gi
@@ -66,6 +66,8 @@ export class ClassList {
   private _$aliasDirty = false
   /** @internal */
   private _$rawNames: string[] = []
+  /** @internal */
+  private _$rawNamesSegmentSep: number[] = []
   /** @internal */
   private _$hasResolvedNames = false
   /** @internal */
@@ -347,11 +349,33 @@ export class ClassList {
   }
 
   /** Set class string */
-  setClassNames(names: string) {
+  setClassNames(names: string, index: StyleSegmentIndex = 0) {
     let n: string
     if (names === undefined || names === null) n = ''
     else n = String(names)
-    this._$rawNames = n.match(CLASS_NAME_REG_EXP) || []
+    const newRawNames = n.match(CLASS_NAME_REG_EXP) || []
+    while (this._$rawNamesSegmentSep.length < index) {
+      this._$rawNamesSegmentSep.push(
+        this._$rawNamesSegmentSep.length > 0
+          ? this._$rawNamesSegmentSep[this._$rawNamesSegmentSep.length - 1]!
+          : this._$rawNames.length,
+      )
+    }
+    if (this._$rawNamesSegmentSep.length === 0) {
+      this._$rawNames = newRawNames
+    } else {
+      const segEnd =
+        index < this._$rawNamesSegmentSep.length
+          ? this._$rawNamesSegmentSep[index]!
+          : this._$rawNames.length
+      const segStart = index > 0 ? this._$rawNamesSegmentSep[index - 1]! : 0
+      const segLen = segEnd - segStart
+      const lenDiff = newRawNames.length - segLen
+      for (let i = index; i < this._$rawNamesSegmentSep.length; i += 1) {
+        this._$rawNamesSegmentSep[i] += lenDiff
+      }
+      this._$rawNames.splice(segStart, segLen, ...newRawNames)
+    }
     this._$updateResolvedNames()
     const elem = this._$elem
     if (elem._$mutationObserverTarget) {

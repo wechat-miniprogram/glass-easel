@@ -19,7 +19,7 @@ impl StrRef {
 impl Drop for StrRef {
     fn drop(&mut self) {
         unsafe {
-            drop(slice::from_raw_parts_mut(self.buf, self.len));
+            let _ = Box::from_raw(slice::from_raw_parts_mut(self.buf, self.len));
         }
     }
 }
@@ -329,7 +329,7 @@ impl TmplGroup {
 impl Drop for TmplGroup {
     fn drop(&mut self) {
         unsafe {
-            drop(&mut *(self.inner as *mut group::TmplGroup));
+            let _ = Box::from_raw(&mut *(self.inner as *mut group::TmplGroup));
         }
     }
 }

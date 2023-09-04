@@ -52,7 +52,7 @@ describe('node tree structure', () => {
         <div wx:if="{{cond1}}">a</div>
         <div wx:if="{{cond2}}">b</div>
         <div wx:else>c</div>
-        <div wx:if="{{cond1}}">d</div>
+        <div wx:if="{{cond1?2:0}}">d</div>
         <div wx:elif="{{cond2}}">e</div>
         <div wx:else>f</div>
       `),
@@ -272,7 +272,7 @@ describe('node tree structure', () => {
     const checkIndex = () => {
       for (let i = 0; i < listBlock.childNodes.length; i += 1) {
         const itemBlock = listBlock.childNodes[i] as glassEasel.Element
-        expect((itemBlock.childNodes[0] as glassEasel.Element).dataset!.i).toBe(i)
+        expect((itemBlock.childNodes[0] as glassEasel.Element).dataset.i).toBe(i)
       }
     }
     glassEasel.Element.pretendAttached(elem)
@@ -520,7 +520,7 @@ describe('node tree structure', () => {
       const keys = Object.keys(elem.data.list)
       for (let i = 0; i < listBlock.childNodes.length; i += 1) {
         const itemBlock = listBlock.childNodes[i] as glassEasel.Element
-        expect((itemBlock.childNodes[0] as glassEasel.Element).dataset!.i).toBe(keys[i])
+        expect((itemBlock.childNodes[0] as glassEasel.Element).dataset.i).toBe(keys[i])
       }
     }
     glassEasel.Element.pretendAttached(elem)
@@ -830,11 +830,17 @@ describe('node tree structure', () => {
             <template name="child">
               <span>{{ obj.a }}</span>
             </template>
+            <template name="child2">
+              <span>{{ a }}</span>
+            </template>
           `,
           '': `
-          <import src="./child" />
+            <import src="./child" />
             <div>
               <template is="child" data="{{ obj }}" />
+            </div>
+            <div>
+              <template is="child2" data="{{ ...obj }}" />
             </div>
           `,
         }),
@@ -844,7 +850,38 @@ describe('node tree structure', () => {
       })
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    expect(domHtml(elem)).toBe('<div><span>123</span></div><div><span>123</span></div>')
+    elem.setData({ obj: { a: 456 } })
+    expect(domHtml(elem)).toBe('<div><span>456</span></div><div><span>456</span></div>')
+    elem.setData({ 'obj.a': 789 })
+    expect(domHtml(elem)).toBe('<div><span>789</span></div><div><span>789</span></div>')
+  })
+
+  test('template-name data cascaded passing', () => {
+    const def = glassEasel
+      .registerElement({
+        template: tmpl(`
+          <template name="child">
+            <template is="child2" data="{{ a }}" />
+          </template>
+          <template name="child2">
+            <span>{{ a }}</span>
+          </template>
+          <div>
+            <template is="child" data="{{ ...obj }}" />
+          </div>
+        `),
+        data: {
+          obj: { a: 123 },
+        },
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
     expect(domHtml(elem)).toBe('<div><span>123</span></div>')
+    elem.setData({ obj: { a: 456 } })
+    expect(domHtml(elem)).toBe('<div><span>456</span></div>')
+    elem.setData({ 'obj.a': 789 })
+    expect(domHtml(elem)).toBe('<div><span>789</span></div>')
   })
 
   test('static template-is', () => {
@@ -1132,7 +1169,7 @@ describe('node tree structure', () => {
     const elem = glassEasel.Component.createWithContext('root', def, domBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<div></div>')
-    expect(elem.getShadowRoot()!.childNodes[0]!.asElement()!.dataset!.camelcase).toBe(123)
+    expect(elem.getShadowRoot()!.childNodes[0]!.asElement()!.dataset.camelcase).toBe(123)
   })
 
   test('attribute name cases', () => {

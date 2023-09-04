@@ -19,7 +19,7 @@ import {
   NormalizedComponentOptions,
 } from './global_options'
 import { StyleScopeManager } from './class_list'
-import { GeneralBackendContext } from '.'
+import { GeneralBackendContext, safeCallback } from '.'
 import { TraitBehavior } from './trait_behaviors'
 
 const normalizePath = (path: string, basePath: string): string => {
@@ -97,7 +97,7 @@ export class ComponentWaitingList {
 
   remove(callback: (c: GeneralComponentDefinition) => void) {
     const index = this._$callbacks.indexOf(callback)
-    // must gurrantee order here (cannot swap-remove)
+    // must guarantee order here (cannot swap-remove)
     this._$callbacks.splice(index, 1)
   }
 
@@ -145,6 +145,10 @@ export class ComponentSpace {
   private _$pubListWaiting = Object.create(null) as {
     [path: string]: ComponentWaitingList
   }
+  /** @internal */
+  private _$groupingListWaiting:
+    | { waiting: ComponentWaitingList; comp: GeneralComponentDefinition }[]
+    | null = null
   /** @internal */
   _$componentWaitingListener:
     | ((isPub: boolean, alias: string, owner: GeneralComponent) => void)
@@ -221,11 +225,11 @@ export class ComponentSpace {
    *
    * The component `is` is actually treated as the "path" of the component.
    * In other words, the component `is` field can be a string like `path/to/the/component` .
-   * Other components can be used by the component with "relative path" spacified.
+   * Other components can be used by the component with "relative path" specified.
    * In this method, if the `path` is given as a relative path (not started with `/` ),
    * it will be converted according to the `basePath` .
    * If the `path` is given as a URL-like format,
-   * the component will be searched in imported comopnent spaces ( `importSpace()` for details).
+   * the component will be searched in imported component spaces ( `importSpace()` for details).
    */
   getComponentByUrl(path: string, basePath: string): GeneralComponentDefinition {
     const { domain, absPath } = normalizeUrl(path, basePath)
@@ -242,7 +246,7 @@ export class ComponentSpace {
    * Get a component by the `path`
    *
    * Similar to `getComponentByUrl()` ,
-   * but returns `null` instead of the default component if no compnent was found.
+   * but returns `null` instead of the default component if no component was found.
    */
   getComponentByUrlWithoutDefault(
     path: string,
@@ -373,16 +377,57 @@ export class ComponentSpace {
   _$registerComponent(is: string, comp: GeneralComponentDefinition) {
     this._$list[is] = comp
     this._$behaviorList[is] = comp.behavior as unknown as GeneralBehavior
-    const arr = this._$listWaiting[is]
-    if (arr) {
+    const waiting = this._$listWaiting[is]
+    if (waiting) {
       delete this._$listWaiting[is]
-      arr.call(comp)
+      if (this._$groupingListWaiting) {
+        this._$groupingListWaiting.push({ waiting, comp })
+      } else {
+        waiting.call(comp)
+      }
     }
   }
 
   /** @internal */
   _$registerBehavior(is: string, beh: GeneralBehavior) {
     this._$behaviorList[is] = beh
+  }
+
+  /**
+   * Start a series of components and behaviors registration
+   *
+   * In most cases, `groupRegister` is prefered.
+   */
+  startGroupRegister() {
+    this._$groupingListWaiting = []
+  }
+
+  /**
+   * End a series of components and behaviors registration
+   *
+   * In most cases, `groupRegister` is prefered.
+   */
+  endGroupRegister() {
+    const arr = this._$groupingListWaiting
+    if (!arr) return
+    this._$groupingListWaiting = null
+    for (let i = 0; i < arr.length; i += 1) {
+      const { waiting, comp } = arr[i]!
+      waiting.call(comp)
+    }
+  }
+
+  /**
+   * Group a series of components and behaviors registration
+   *
+   * If any placeholder should be replaced,
+   * the replacement will happen after the whole series of registration.
+   */
+  groupRegister<R>(cb: () => R): R | undefined {
+    this.startGroupRegister()
+    const ret = safeCallback('group register', cb, this, [])
+    this.endGroupRegister()
+    return ret
   }
 
   /**

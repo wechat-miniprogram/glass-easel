@@ -53,11 +53,14 @@ export class IntersectionObserver {
     targetSelector: string,
     listener: (status: glassEasel.backend.IntersectionStatus) => void,
   ) {
+    const shadowRoot = this._$comp._$.getShadowRoot()
     let targets: glassEasel.Element[]
-    if (this._$observeAll) {
-      targets = this._$comp._$.querySelectorAll(targetSelector)
+    if (!shadowRoot) {
+      targets = []
+    } else if (this._$observeAll) {
+      targets = shadowRoot.querySelectorAll(targetSelector)
     } else {
-      const elem = this._$comp._$.querySelector(targetSelector)
+      const elem = shadowRoot.querySelector(targetSelector)
       if (elem === null) {
         targets = []
       } else {
@@ -65,10 +68,10 @@ export class IntersectionObserver {
       }
     }
     let relativeElement: glassEasel.Element | null
-    if (this._$selector === null) {
+    if (this._$selector === null || !shadowRoot) {
       relativeElement = null
     } else {
-      const rel = this._$comp._$.querySelector(this._$selector)
+      const rel = shadowRoot.querySelector(this._$selector)
       if (rel === null) {
         // TODO warn no matched relative element
       } else {

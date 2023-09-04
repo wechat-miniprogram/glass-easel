@@ -73,7 +73,15 @@ npm install --save-dev glass-easel-template-compiler
 The interface of [glass-easel-miniprogram-adapter](./glass-easel-miniprogram-adapter) is the same as the custom component interface of MiniProgram.
 [glass-easel-miniprogram-template](./glass-easel-miniprogram-template) is a project template.
 
-Furthermore, TypeScript modules contains TSDoc documents, which can be built with `npm run doc` (generated documents are in the `docs` directory); rust module documents can be retrived through `cargo doc` (like common rust crates).
+TypeScript modules support TSDoc. The auto-generated documents are in GitHub pages.
+
+* [TSDoc documents for glass-easel](https://wechat-miniprogram.github.io/glass-easel/docs/glass-easel)
+* [TSDoc documents for glass-easel-miniprogram-adapter](https://wechat-miniprogram.github.io/glass-easel/docs/glass-easel-miniprogram-adapter)
+
+For the rust interface, see the generated documents in docs.rs.
+
+* [glass-easel-template-compiler documents in docs.rs](https://docs.rs/glass-easel-template-compiler/latest/glass_easel_template_compiler/)
+* [glass-easel-stylesheet-compiler documents in docs.rs](https://docs.rs/glass-easel-stylesheet-compiler/latest/glass_easel_stylesheet_compiler/)
 
 ## F.A.Q.
 
@@ -91,7 +99,7 @@ However, no MiniProgram code can use any _glass-easel_ submodules currently, bec
 
 No. This module is the framework itself. Components like `<view />` `<image />` are not included.
 
-This is because the implamentation of the components are complex and deeply coupled with WeChat environment interfaces. We cannot simply reuse the code in web environments.
+This is because the implementation of the components are complex and deeply coupled with WeChat environment interfaces. We cannot simply reuse the code in web environments.
 
 We will consider do another implementation on web in future.
 

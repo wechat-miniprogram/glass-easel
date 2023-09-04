@@ -51,15 +51,15 @@ export type MutationObserverEvent =
 export type MutationObserverListener<T> = (this: Element, ev: T) => void
 
 export class MutationObserverTarget {
-  private _$bindedElement: Element
+  private _$boundElement: Element
   private _$subtreeObserversCount = 0
   attrObservers: FuncArr<MutationObserverListener<MutationObserverAttrEvent>> | null = null
   textObservers: FuncArr<MutationObserverListener<MutationObserverTextEvent>> | null = null
   childObservers: FuncArr<MutationObserverListener<MutationObserverChildEvent>> | null = null
   attachObservers: FuncArr<MutationObserverListener<MutationObserverAttachEvent>> | null = null
 
-  constructor(bindedElement: Element) {
-    this._$bindedElement = bindedElement
+  constructor(boundElement: Element) {
+    this._$boundElement = boundElement
   }
 
   attachChild(child: Element) {
@@ -79,7 +79,7 @@ export class MutationObserverTarget {
 
   updateSubtreeCount(diff: number) {
     this._$subtreeObserversCount += diff
-    const children = this._$bindedElement.childNodes
+    const children = this._$boundElement.childNodes
     children.forEach((child) => {
       if (child instanceof Element) {
         if (!child._$mutationObserverTarget) {
@@ -146,8 +146,8 @@ export class MutationObserver {
   private _$listener: MutationObserverListener<MutationObserverEvent> | null
   private _$normalizedListener: MutationObserverListener<MutationObserverEvent> | null
   private _$subtreeListenersCount = 0
-  private _$bindedFuncArrs: FuncArr<MutationObserverListener<MutationObserverEvent>>[] = []
-  private _$bindedTarget: MutationObserverTarget | null = null
+  private _$boundFuncArrs: FuncArr<MutationObserverListener<MutationObserverEvent>>[] = []
+  private _$boundTarget: MutationObserverTarget | null = null
 
   constructor(listener: (ev: MutationObserverEvent) => void) {
     this._$listener = listener
@@ -188,11 +188,11 @@ export class MutationObserver {
           if (ev.target === this) listener.call(this as Element, ev)
         }
     this._$normalizedListener = cb
-    this._$bindedTarget = target
+    this._$boundTarget = target
     if (options.properties) {
       if (!target.attrObservers) target.attrObservers = new FuncArr()
       target.attrObservers.add(cb)
-      this._$bindedFuncArrs.push(
+      this._$boundFuncArrs.push(
         target.attrObservers as FuncArr<MutationObserverListener<MutationObserverEvent>>,
       )
       this._$subtreeListenersCount += 1
@@ -200,7 +200,7 @@ export class MutationObserver {
     if (options.childList) {
       if (!target.childObservers) target.childObservers = new FuncArr()
       target.childObservers.add(cb)
-      this._$bindedFuncArrs.push(
+      this._$boundFuncArrs.push(
         target.childObservers as FuncArr<MutationObserverListener<MutationObserverEvent>>,
       )
       this._$subtreeListenersCount += 1
@@ -208,7 +208,7 @@ export class MutationObserver {
     if (options.characterData) {
       if (!target.textObservers) target.textObservers = new FuncArr()
       target.textObservers.add(cb)
-      this._$bindedFuncArrs.push(
+      this._$boundFuncArrs.push(
         target.textObservers as FuncArr<MutationObserverListener<MutationObserverEvent>>,
       )
       this._$subtreeListenersCount += 1
@@ -219,7 +219,7 @@ export class MutationObserver {
     if (options.attachStatus) {
       if (!target.attachObservers) target.attachObservers = new FuncArr()
       target.attachObservers.add(cb)
-      this._$bindedFuncArrs.push(
+      this._$boundFuncArrs.push(
         target.attachObservers as FuncArr<MutationObserverListener<MutationObserverEvent>>,
       )
     }
@@ -227,9 +227,9 @@ export class MutationObserver {
 
   /** End observation */
   disconnect() {
-    this._$bindedTarget?.updateSubtreeCount(-this._$subtreeListenersCount)
-    const arr = this._$bindedFuncArrs
-    this._$bindedFuncArrs = []
+    this._$boundTarget?.updateSubtreeCount(-this._$subtreeListenersCount)
+    const arr = this._$boundFuncArrs
+    this._$boundFuncArrs = []
     const nl = this._$normalizedListener
     if (nl) {
       arr.forEach((funcArr) => {

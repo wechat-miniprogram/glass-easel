@@ -897,7 +897,13 @@ impl TmplElement {
                                 write!(w, "{}?{}:", gen_lit_str(&v), index + 1)?;
                             }
                             CondItem::Dynamic(p) => {
-                                p.value_expr(w)?;
+                                if p.above_cond_expr() {
+                                    w.paren(|w| {
+                                        p.value_expr(w)
+                                    })?;
+                                } else {
+                                    p.value_expr(w)?;
+                                }
                                 write!(w, "?{}:", index + 1)?;
                             }
                         }
@@ -1101,9 +1107,9 @@ impl TmplElement {
                                         var_key, var_target, var_target
                                     )?;
                                     p.value_expr(w)?;
-                                    write!(w, ",U?")?;
+                                    write!(w, ",K||(U?")?;
                                     p.lvalue_state_expr(w, scopes)?;
-                                    write!(w, ":undefined).C(C,T,E,B,F,S,J)")?;
+                                    write!(w, ":undefined)).C(C,T,E,B,F,S,J)")?;
                                     Ok(())
                                 })
                             }

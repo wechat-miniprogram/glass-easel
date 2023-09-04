@@ -86,7 +86,7 @@ export class ComponentCaller<
   TMethod extends MethodList,
   TComponentExport,
 > {
-  /** @internal */
+  /** The corresponding `Component` */
   _$!: glassEasel.Component<TData, TProperty, TMethod>
   /** @internal */
   _$export?: (source: GeneralComponent | null) => TComponentExport

@@ -56,7 +56,15 @@ npm install --save-dev glass-easel-template-compiler
 glass-easel-miniprogram-adapter 接口与 [小程序自定义组件](https://developers.weixin.qq.com/miniprogram/dev/framework/custom-component/) 接口一致。
 [glass-easel-miniprogram-template](./glass-easel-miniprogram-template) 是一个供参考的项目模板。
 
-此外， TypeScript 编写的子模块支持 TSDoc ，可以在子模块代码目录中通过 `npm run doc` 来生成详细的接口文档（生成好的文档位于 `docs` 子目录中）； rust 编写的子模块，则可以通过 `cargo doc` 来生成详细的接口文档（与普通 rust crate 类似）。
+TypeScript 编写的子模块支持 TSDoc ，其生成文档可供参考：
+
+* [glass-easel TSDoc 接口文档](https://wechat-miniprogram.github.io/glass-easel/docs/glass-easel)
+* [glass-easel-miniprogram-adapter TSDoc 接口文档](https://wechat-miniprogram.github.io/glass-easel/docs/glass-easel-miniprogram-adapter)
+
+对于 rust 编写的子模块， cargo doc 生成文档可供参考：
+
+* [位于 docs.rs 的 glass-easel-template-compiler 接口文档](https://docs.rs/glass-easel-template-compiler/latest/glass_easel_template_compiler/)
+* [位于 docs.rs 的 glass-easel-stylesheet-compiler 接口文档](https://docs.rs/glass-easel-stylesheet-compiler/latest/glass_easel_stylesheet_compiler/)
 
 ## 常见问题
 

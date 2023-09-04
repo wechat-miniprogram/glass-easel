@@ -393,6 +393,59 @@ describe('Component Relations', function () {
       expect(c3.getRelationNodes('')).toStrictEqual([])
     })
 
+    it('should link cascade ancestors and descendants', function () {
+      var ancestorBeh = regBeh({})
+      var descendantBeh = regBeh({})
+      regElem({
+        is: 'relation-ancestor-b',
+        behaviors: [ancestorBeh],
+        relations: {
+          'relation-b': {
+            target: descendantBeh,
+            type: 'descendant',
+            linked: function (target) {
+              expect(this).toBe(target.parentNode)
+              callOrder.push(this.id)
+            },
+          },
+        },
+      })
+      regElem({
+        is: 'relation-descendant-b',
+        behaviors: [descendantBeh],
+        relations: {
+          'relation-b': {
+            target: ancestorBeh,
+            type: 'ancestor',
+            linked: function (target) {
+              expect(target).toBe(this.parentNode)
+              callOrder.push(this.id)
+            },
+          },
+        },
+      })
+      regElem({
+        is: 'relation-ancestor-descendant',
+        template: `
+          <relation-ancestor-b id="p1">
+            <relation-descendant-b id="c1">
+              <relation-ancestor-b id="p2">
+                <relation-descendant-b id="c2" />
+              </relation-ancestor-b>
+            </relation-descendant-b>
+          </relation-ancestor-b>
+        `,
+      })
+      var elem = createElem('relation-ancestor-descendant')
+      var callOrder = []
+      glassEasel.Element.pretendAttached(elem)
+      expect(callOrder).toStrictEqual(['p1', 'c1', 'p2', 'c2'])
+      expect(elem.$.p1.getRelationNodes('relation-b')).toStrictEqual([elem.$.c1])
+      expect(elem.$.c1.getRelationNodes('relation-b')).toStrictEqual([elem.$.p1])
+      expect(elem.$.p2.getRelationNodes('relation-b')).toStrictEqual([elem.$.c2])
+      expect(elem.$.c2.getRelationNodes('relation-b')).toStrictEqual([elem.$.p2])
+    })
+
     it('should trigger linkFailed handler when cannot link two nodes', function () {
       regElem({
         is: 'relation-cnt-failed',
@@ -516,6 +569,53 @@ describe('Component Relations', function () {
       expect(expectOrder.length).toBe(0)
       expect(elem.$.a.getRelationNodes('relation-virtual-host-b')[0]).toBe(elem.$.b)
       expect(elem.$.b.getRelationNodes('relation-virtual-host-a')[0]).toBe(elem.$.a)
+    })
+
+    it('should support relative paths', function () {
+      var expectOrder = [1, 2]
+      regElem({
+        is: 'relation/path/a',
+        options: {
+          lazyRegistration: true,
+        },
+        template: '<slot />',
+        relations: {
+          './b': {
+            type: 'descendant',
+            linked: function (target) {
+              expect(expectOrder.shift()).toBe(1)
+            },
+          },
+        },
+      })
+      regElem({
+        is: 'relation/path/b',
+        options: {
+          lazyRegistration: true,
+        },
+        relations: {
+          '../path/a': {
+            type: 'ancestor',
+            linked: function (target) {
+              expect(expectOrder.shift()).toBe(2)
+            },
+          },
+        },
+      })
+      var def = regElem({
+        is: 'relation/path',
+        using: {
+          'a': './path/a',
+          'b': 'path/b',
+        },
+        template:
+          '<a id="a"> <b id="b" /> </a>',
+      })
+      var elem = glassEasel.Component.createWithContext('test', def, domBackend)
+      glassEasel.Element.pretendAttached(elem)
+      expect(expectOrder.length).toBe(0)
+      expect(elem.$.a.getRelationNodes('./b')[0]).toBe(elem.$.b)
+      expect(elem.$.b.getRelationNodes('../path/a')[0]).toBe(elem.$.a)
     })
   })
 })

@@ -79,7 +79,7 @@ describe('placeholder', () => {
     matchElementWithDom(elem)
   })
 
-  test('using other component as placeholder', () => {
+  test('using another component as placeholder', () => {
     const componentSpace = new glassEasel.ComponentSpace()
     const viewDef = componentSpace.define('view').registerComponent()
     componentSpace.setGlobalUsingComponent('view', viewDef)
@@ -98,6 +98,42 @@ describe('placeholder', () => {
       .registerComponent()
     const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
     expect(domHtml(elem)).toBe('<child>test</child>')
+    matchElementWithDom(elem)
+  })
+
+  test('group register other components as placeholders', () => {
+    const componentSpace = new glassEasel.ComponentSpace()
+    componentSpace.define('').registerComponent()
+
+    const def = componentSpace
+      .define()
+      .placeholders({
+        parent: '',
+      })
+      .definition({
+        using: {
+          parent: 'parent',
+        },
+        template: tmpl('<parent />'),
+      })
+      .registerComponent()
+    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    expect(domHtml(elem)).toBe('<parent></parent>')
+    matchElementWithDom(elem)
+
+    componentSpace.groupRegister(() => {
+      const parentDef = componentSpace
+        .define('parent')
+        .usingComponents({
+          child: 'child',
+        })
+        .template(tmpl('<child />'))
+        .registerComponent()
+      componentSpace.setGlobalUsingComponent('parent', parentDef)
+      const childDef = componentSpace.define('child').template(tmpl('CHILD')).registerComponent()
+      componentSpace.setGlobalUsingComponent('child', childDef)
+    })
+    expect(domHtml(elem)).toBe('<parent><child>CHILD</child></parent>')
     matchElementWithDom(elem)
   })
 

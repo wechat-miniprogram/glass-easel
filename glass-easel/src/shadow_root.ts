@@ -251,7 +251,8 @@ export class ShadowRoot extends VirtualNode {
    * Create a component if the given tag name is a component in the space, or a native node if not
    *
    * The component `using` map is not used.
-   * The tag name is not a relative path to the host component, but an absolute path.
+   * Consider using `checkComponentPlaceholder` to check if the tag name is in the `using` map.
+   * The global using registered with `ComponentSpace.prototype.getGlobalUsingComponent` is still used.
    */
   createComponentOrNativeNode(
     tagName: string,
@@ -385,7 +386,7 @@ export class ShadowRoot extends VirtualNode {
    * Get the elements that should be composed in specified slot
    *
    * This method always returns a new array (or null if the specified slot is invalid).
-   * It is convinient but less performant.
+   * It is convenient but less performant.
    * For better performance, consider using `forEachNodeInSpecifiedSlot` .
    */
   getSlotContentArray(slot: Element): Node[] | null {

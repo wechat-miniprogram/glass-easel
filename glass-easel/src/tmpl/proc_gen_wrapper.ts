@@ -894,10 +894,7 @@ export class ProcGenWrapper {
 
   // set dataset
   d(elem: Element, name: string, v: unknown) {
-    let dataset: { [name: string]: unknown }
-    if (elem.dataset) dataset = elem.dataset
-    else dataset = elem.dataset = {}
-    dataset[name] = v
+    elem.dataset[name] = v
   }
 
   // set mark

@@ -2,9 +2,13 @@
 
 ## 监听数据字段变化
 
-通过数据监听器，可以在某些属性或数据字段被设置时触发一个函数。
+通过数据监听器，可以在某些属性或数据字段被设置时触发一个响应函数。
 
-例如，可以在 `a` 和 `b` 两个字段中任何一个被设置时，触发一个函数：
+这个响应函数会在属性或数据字段应用到模板前被调用，可以在总体上减少模板更新次数从而提升性能。
+
+在这个响应函数中，可以使用 `updateData` 来更新其他的数据字段，这些数据字段会响应函数执行完毕后生效。注意，虽然也可以使用 `setData` ，但数据监听器中的 `setData` 并不会立刻应用到模板上，而是像 `updateData` 一样、等到数据监听器执行完毕后才应用到模板上。
+
+例如，可以在 `a` 和 `b` 两个字段中任何一个被设置时，触发一个响应函数：
 
 ```js
 // 使用 Definition API 添加数据监听器
@@ -21,8 +25,6 @@ export const addComponent = componentSpace.defineComponent({
   observers: {
     'a, b': function () {
       // 数据监听器中，最好使用 updateData 而非 setData
-      // （事实上，使用 setData 将与 updateData 等效）
-      // 数据监听器执行完后，会自动将更新应用到模板上
       this.updateData({
         sum: this.data.a + this.data.b,
       })

@@ -48,7 +48,7 @@ import {
   getDeepCopyStrategy,
 } from './data_proxy'
 import { Relation, generateRelationDefinitionGroup, RelationDefinitionGroup } from './relation'
-import { Template, TemplateEngine } from './template_engine'
+import { Template, TemplateEngine, TemplateInstance } from './template_engine'
 import { ClassList } from './class_list'
 import { GeneralBackendContext, GeneralBackendElement } from './node'
 import { DataPath, parseSinglePath, parseMultiPaths } from './data_path'
@@ -250,6 +250,22 @@ export class ComponentDefinition<
     return this.behavior.getComponentDependencies()
   }
 
+  /**
+   * Update the template field
+   *
+   * This method has no effect if the template engine does not support template update.
+   */
+  updateTemplate(template: { [key: string]: unknown }) {
+    this.behavior._$updateTemplate(template)
+    if (this._$detail?.template.updateTemplate) {
+      this._$detail.template.updateTemplate(this.behavior as unknown as GeneralBehavior)
+    } else {
+      triggerWarning(
+        `The template engine of component "${this.is}" does not support template update`,
+      )
+    }
+  }
+
   isPrepared(): boolean {
     return !!this._$detail
   }
@@ -374,6 +390,8 @@ export class Component<
   /** @internal */
   _$external: boolean
   shadowRoot: ShadowRoot | ExternalShadowRoot
+  /** @internal */
+  _$tmplInst: TemplateInstance | undefined
   /** @internal */
   _$relation: Relation | null
   /** @internal */
@@ -619,16 +637,21 @@ export class Component<
 
     // call init functions
     let initDone = false
-    function relationInit(def: RelationParams): RelationHandler<unknown, never>
+    function relationInit(relationDef: RelationParams): RelationHandler<unknown, never>
     function relationInit<TOut extends { [x: string]: unknown }>(
-      def: TraitRelationParams<TOut>,
+      relationDef: TraitRelationParams<TOut>,
     ): RelationHandler<unknown, TOut>
     function relationInit<TOut extends { [x: string]: unknown }>(
-      def: RelationParams | TraitRelationParams<TOut>,
+      relationDef: RelationParams | TraitRelationParams<TOut>,
     ): RelationHandler<unknown, unknown> {
       if (initDone) throw new Error('Cannot execute init-time functions after initialization')
-      const target = def.target
-      const normalizedRel = normalizeRelation(behavior.is, 'undefined', def)
+      const target = relationDef.target
+      const normalizedRel = normalizeRelation(
+        behavior.ownerSpace,
+        behavior.is,
+        'undefined',
+        relationDef,
+      )
       let key: symbol
       if (normalizedRel) {
         key = relation.add(normalizedRel)
@@ -657,7 +680,7 @@ export class Component<
       const builderContext: BuilderContext<any, any, any> = {
         self: methodCaller,
         data,
-        setData: comp.setData.bind(comp) as (newData: { [x: string]: unknown }) => void,
+        setData: comp.setData.bind(comp) as (newData?: { [x: string]: unknown }) => void,
         implement: <TIn extends { [x: string]: unknown }>(
           traitBehavior: TraitBehavior<TIn, { [x: string]: unknown }>,
           impl: TIn,
@@ -754,6 +777,7 @@ export class Component<
     // init template with init data
     if (propEarlyInit && initPropValues !== undefined) initPropValues(comp)
     tmplInst.initValues(dataGroup.innerData || dataGroup.data)
+    comp._$tmplInst = tmplInst
     dataGroup.setUpdateListener(tmplInst.updateValues.bind(tmplInst))
 
     // bind behavior listeners
@@ -939,6 +963,25 @@ export class Component<
     return this.shadowRoot as ShadowRoot
   }
 
+  /**
+   * Apply the template updates to this component instance
+   *
+   * This method has no effect if the template engine does not support template update.
+   */
+  applyTemplateUpdates(): void {
+    if (this._$tmplInst?.updateTemplate) {
+      const dataGroup = this._$dataGroup
+      this._$tmplInst.updateTemplate(
+        this._$definition._$detail!.template,
+        dataGroup.innerData || dataGroup.data,
+      )
+    } else {
+      triggerWarning(
+        `The template engine of component "${this.is}" does not support template update`,
+      )
+    }
+  }
+
   static listProperties<
     TData extends DataList,
     TProperty extends PropertyList,
@@ -964,21 +1007,37 @@ export class Component<
     return compDef.behavior._$methodMap
   }
 
-  /** Get a method */
+  /**
+   * Get a method
+   *
+   * If `useMethodCallerListeners` option is set for this component,
+   * this method will use the corresponding fields in the `methodCaller` .
+   */
   static getMethod<
     TData extends DataList,
     TProperty extends PropertyList,
     TMethod extends MethodList,
   >(comp: Component<TData, TProperty, TMethod>, methodName: string): GeneralFuncType | undefined {
+    if (comp._$definition._$options.useMethodCallerListeners) {
+      const method = comp._$methodCaller[methodName]
+      return typeof method === 'function' ? method : undefined
+    }
     return comp._$methodMap[methodName]
   }
 
-  /** Call a method */
+  /**
+   * Call a method
+   *
+   * If `useMethodCallerListeners` option is set for this component,
+   * this method will use the corresponding fields in the `methodCaller` .
+   * Returns `undefined` if there is no such method.
+   */
   callMethod<T extends string>(
     methodName: T,
     ...args: Parameters<MethodList[T]>
   ): ReturnType<MethodList[T]> | undefined {
-    return this._$methodMap[methodName]?.call(this, ...args)
+    const func = Component.getMethod(this, methodName)
+    return func?.call(this, ...args)
   }
 
   /**
@@ -1254,18 +1313,20 @@ export class Component<
    * All data observers will not be triggered immediately before applied.
    * Reads of the data will get the unchanged value before applied.
    */
-  updateData(newData: Partial<SetDataSetter<DataWithPropertyValues<TData, TProperty>>>): void
-  updateData(newData: Record<string, any>): void {
+  updateData(newData?: Partial<SetDataSetter<DataWithPropertyValues<TData, TProperty>>>): void
+  updateData(newData?: Record<string, any>): void {
     const dataProxy = this._$dataGroup
     if (dataProxy === undefined) {
       throw new Error('Cannot update data before component created')
     }
-    const keys = Object.keys(newData)
-    for (let i = 0; i < keys.length; i += 1) {
-      const key = keys[i]!
-      const p = parseSinglePath(key)
-      if (p) {
-        dataProxy.replaceDataOnPath(p, newData[key])
+    if (typeof newData === 'object' && newData !== null) {
+      const keys = Object.keys(newData)
+      for (let i = 0; i < keys.length; i += 1) {
+        const key = keys[i]!
+        const p = parseSinglePath(key)
+        if (p) {
+          dataProxy.replaceDataOnPath(p, newData[key])
+        }
       }
     }
   }
@@ -1277,18 +1338,20 @@ export class Component<
    * When called inside observers, the data update will not be applied to templates.
    * Inside observers, it is recommended to use `updateData` instead.
    */
-  setData(newData: Partial<SetDataSetter<DataWithPropertyValues<TData, TProperty>>>): void
-  setData(newData: Record<string, any>): void {
+  setData(newData?: Partial<SetDataSetter<DataWithPropertyValues<TData, TProperty>>>): void
+  setData(newData?: Record<string, any> | undefined): void {
     const dataProxy = this._$dataGroup
     if (dataProxy === undefined) {
       throw new Error('Cannot update data before component created')
     }
-    const keys = Object.keys(newData)
-    for (let i = 0; i < keys.length; i += 1) {
-      const key = keys[i]!
-      const p = parseSinglePath(key)
-      if (p) {
-        dataProxy.replaceDataOnPath(p, newData[key])
+    if (typeof newData === 'object' && newData !== null) {
+      const keys = Object.keys(newData)
+      for (let i = 0; i < keys.length; i += 1) {
+        const key = keys[i]!
+        const p = parseSinglePath(key)
+        if (p) {
+          dataProxy.replaceDataOnPath(p, newData[key])
+        }
       }
     }
     dataProxy.applyDataUpdates()

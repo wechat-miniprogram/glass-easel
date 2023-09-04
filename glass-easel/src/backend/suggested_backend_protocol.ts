@@ -1,8 +1,8 @@
 import { GeneralBackendContext, Node } from '../node'
 import {
   BoundingClientRect,
-  GetAllComputedStylesResponese,
-  GetMatchedRulesResponese,
+  GetAllComputedStylesResponses,
+  GetMatchedRulesResponses,
   ScrollOffset,
 } from './mode'
 
@@ -11,9 +11,9 @@ interface GetWrapper<T> {
 }
 
 export interface Element {
-  getAllComputedStyles(cb: (res: GetAllComputedStylesResponese) => void): void
+  getAllComputedStyles(cb: (res: GetAllComputedStylesResponses) => void): void
   getBoundingClientRect(cb: (res: BoundingClientRect) => void): void
-  getMatchedRules(cb: (res: GetMatchedRulesResponese) => void): void
+  getMatchedRules(cb: (res: GetMatchedRulesResponses) => void): void
   replaceStyleSheetInlineStyle(inlineStyle: string): void
   getScrollOffset(cb: (res: ScrollOffset) => void): void
   setScrollPosition(scrollLeft: number, scrollTop: number, duration: number): void

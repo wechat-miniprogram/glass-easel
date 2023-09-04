@@ -39,16 +39,16 @@ import {
 import { SlotMode } from './shadow_root'
 
 /**
- * The "style" attributes segments
+ * The "style" attribute and class list segments
  *
- * This allows different modules set the "style" attribute of an element
+ * This allows different modules set the "style" attribute or the class list of an element
  * without overriding each other.
- * The final "style" attribute value is the concat of all segments.
- * When calling `setNodeStyle` on an element,
+ * The final value is the concat of all segments.
+ * When calling `setNodeStyle` or `setNodeClass` on an element,
  * a segment can be specified.
  */
 export const enum StyleSegmentIndex {
-  /** The main style segment, generally managed by the template engine */
+  /** The main style segment, generally managed by the template engine (or manually set) */
   MAIN = 0,
   /** The template style segment, preserved for template engine */
   TEMPLATE_EXTRA = 1,
@@ -101,7 +101,7 @@ export class Element implements NodeCast {
   _$placeholderHandler: (() => void) | undefined
   /** @internal */
   _$virtual: boolean
-  dataset: { [name: string]: unknown } | null
+  dataset: { [name: string]: unknown }
   /** @internal */
   private _$marks: { [name: string]: unknown } | null
   /** @internal */
@@ -153,7 +153,7 @@ export class Element implements NodeCast {
     this._$inheritSlots = false
     this._$placeholderHandler = undefined
     this._$virtual = virtual
-    this.dataset = null
+    this.dataset = {}
     this._$marks = null
     this._$attached = false
     this.classList = null
@@ -371,6 +371,11 @@ export class Element implements NodeCast {
     return this._$virtual
   }
 
+  /** Set the node class */
+  setNodeClass(classNames: string, index: StyleSegmentIndex = 0) {
+    this.classList?.setClassNames(classNames, index)
+  }
+
   /** Set the node style */
   setNodeStyle(styleSegment: string, index: StyleSegmentIndex = 0) {
     if (this._$styleSegments[index] === styleSegment) return
@@ -424,6 +429,9 @@ export class Element implements NodeCast {
 
   private static checkAndCallDetached(node: Node) {
     const callFunc = function callFunc(node: Node) {
+      if (node._$destroyOnDetach) {
+        node.destroyBackendElement()
+      }
       if (node instanceof Element && node._$attached) {
         if (node instanceof Component) {
           node.triggerLifetime('beforeDetach', [])
@@ -451,9 +459,6 @@ export class Element implements NodeCast {
         } else {
           node._$attached = false
         }
-      }
-      if (node._$destroyOnDetach) {
-        node.destroyBackendElement()
       }
     }
     callFunc(node)
@@ -880,7 +885,7 @@ export class Element implements NodeCast {
           (BM.DOMLIKE || (BM.DYNAMIC && context.mode === BackendMode.Domlike)
             ? (context as domlikeBackend.Context).document.createDocumentFragment()
             : (context as backend.Context | composedBackend.Context).createFragment())
-        sharedFrag = frag
+        sharedFrag = f
 
         const recNonVirtual = (c: Node) => {
           // since `TextNode` also has `backendElement` private field, just make it as `Element`
@@ -1760,7 +1765,7 @@ export class Element implements NodeCast {
     }
   }
 
-  private static insertChildPlaceholerReplace(
+  private static insertChildPlaceholderReplace(
     parent: Element,
     posIndex: number,
     replacer: Element,
@@ -1949,7 +1954,7 @@ export class Element implements NodeCast {
   selfReplaceWith(replaceWith: Element) {
     const parent = this.parentNode
     if (parent) {
-      Element.insertChildPlaceholerReplace(parent, this.parentIndex, replaceWith)
+      Element.insertChildPlaceholderReplace(parent, this.parentIndex, replaceWith)
     }
   }
 
@@ -1998,7 +2003,7 @@ export class Element implements NodeCast {
     if (finalChanged === FinalChanged.Init) this._$updateEventDefaultPrevented(name, false)
     else if (finalChanged === FinalChanged.Added) this._$updateEventDefaultPrevented(name, true)
     if (this instanceof Component && this._$definition._$options.listenerChangeLifetimes) {
-      this.triggerLifetime('listenerChanged', [true, name, func, options])
+      this.triggerLifetime('listenerChange', [true, name, func, options])
     }
   }
 
@@ -2008,7 +2013,7 @@ export class Element implements NodeCast {
     if (finalChanged === FinalChanged.Failed) return
     if (finalChanged !== FinalChanged.NotChanged) this._$updateEventDefaultPrevented(name, false)
     if (this instanceof Component && this._$definition._$options.listenerChangeLifetimes) {
-      this.triggerLifetime('listenerChanged', [false, name, func, options])
+      this.triggerLifetime('listenerChange', [false, name, func, options])
     }
   }
 
@@ -2434,7 +2439,7 @@ export class Element implements NodeCast {
    * Get the composed children
    *
    * This method always returns a new array.
-   * It is convinient but less performant.
+   * It is convenient but less performant.
    * For better performance, consider using `forEachComposedChild` .
    */
   getComposedChildren(): Node[] {

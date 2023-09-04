@@ -617,4 +617,19 @@ describe('partial update', () => {
     const comp = glassEasel.Component.createWithContext('root', compDef, domBackend)
     expect(comp.data).toStrictEqual({ a: 123, b: ['a'] })
   })
+
+  test('should allow set empty data', () => {
+    const compDef = componentSpace
+      .define()
+      .data(() => ({
+        a: 123,
+        b: 'abc',
+      }))
+      .registerComponent()
+    const comp = glassEasel.Component.createWithContext('root', compDef, domBackend)
+    comp.updateData({ a: 456 })
+    expect(comp.data.a).toBe(123)
+    comp.setData(undefined)
+    expect(comp.data.a).toBe(456)
+  })
 })

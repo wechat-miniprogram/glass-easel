@@ -21,7 +21,7 @@ export const enum ElementIteratorType {
 /**
  * An iterator for node tree traversal
  *
- * This iterator is convinient but seems a little slower.
+ * This iterator is convenient but seems a little slower.
  */
 export class ElementIterator {
   private _$node: Node
@@ -88,19 +88,20 @@ export class ElementIterator {
     const nodeTypeLimit: any = this._$nodeTypeLimit
     const composed = this._$composed
     if (this._$isAncestor) {
-      const rec = (node: Node): boolean => {
-        let cur = node
-        for (;;) {
-          if (cur instanceof nodeTypeLimit) {
-            if (f(cur) === false) return false
-          }
-          const next = composed ? cur.getComposedParent() : cur.parentNode
-          if (!next) break
-          cur = next
+      let cur = this._$node
+      for (;;) {
+        if (cur instanceof nodeTypeLimit) {
+          if (f(cur) === false) return
         }
-        return true
+        let next: Element | null
+        if (composed) {
+          next = cur.getComposedParent()
+        } else {
+          next = cur.parentNode
+        }
+        if (next) cur = next
+        else break
       }
-      rec(this._$node)
     } else {
       const rootFirst = this._$rootFirst
       const rec = (node: Node): boolean => {

@@ -60,18 +60,28 @@ export class GlassEaselTemplateEngine implements templateEngine.TemplateEngine {
 }
 
 class GlassEaselTemplate implements templateEngine.Template {
-  genObjectGroupEnv: ProcGenEnv
-  updateMode: string
-  disallowNativeNode: boolean
+  genObjectGroupEnv!: ProcGenEnv
+  updateMode!: string
+  disallowNativeNode!: boolean
   eventObjectFilter?: (x: ShadowedEvent<unknown>) => ShadowedEvent<unknown>
 
   constructor(behavior: GeneralBehavior) {
-    if (typeof behavior._$template !== 'object' && behavior._$template !== undefined) {
+    this.updateTemplate(behavior)
+  }
+
+  /**
+   * Update the underlying template content
+   *
+   * This method does not affect created instances.
+   */
+  updateTemplate(behavior: GeneralBehavior) {
+    const template = behavior._$template
+    if (typeof template !== 'object' && template !== undefined) {
       throw new Error(
         `Component template of ${behavior.is} must be a valid compiled template (or "null" for default template).`,
       )
     }
-    const c = (behavior._$template as ComponentTemplate | null | undefined) || {
+    const c = (template as ComponentTemplate | null | undefined) || {
       content: DEFAULT_PROC_GEN_GROUP,
     }
     this.genObjectGroupEnv = {
@@ -89,15 +99,26 @@ class GlassEaselTemplate implements templateEngine.Template {
 }
 
 class GlassEaselTemplateInstance implements templateEngine.TemplateInstance {
-  template: GlassEaselTemplate
   comp: GeneralComponent
   shadowRoot: ShadowRoot
-  procGenWrapper: ProcGenWrapper
+  procGenWrapper!: ProcGenWrapper
+  forceBindingMapUpdate!: BindingMapUpdateEnabled
   bindingMapGen: { [field: string]: BindingMapGen[] } | undefined
-  forceBindingMapUpdate: BindingMapUpdateEnabled
 
   constructor(template: GlassEaselTemplate, comp: GeneralComponent) {
-    this.template = template
+    this.comp = comp
+    this.shadowRoot = ShadowRoot.createShadowRoot(comp)
+    this.shadowRoot.destroyBackendElementOnDetach()
+    this._$applyTemplate(template)
+  }
+
+  updateTemplate(template: GlassEaselTemplate, data: DataValue) {
+    this._$applyTemplate(template)
+    this.shadowRoot.removeChildren(0, this.shadowRoot.childNodes.length)
+    this.bindingMapGen = this.procGenWrapper.create(data)
+  }
+
+  private _$applyTemplate(template: GlassEaselTemplate) {
     const procGen = template.genObjectGroupEnv.group('') || DEFAULT_PROC_GEN_GROUP('')
     if (template.updateMode === 'bindingMap') {
       this.forceBindingMapUpdate = BindingMapUpdateEnabled.Forced
@@ -106,15 +127,13 @@ class GlassEaselTemplateInstance implements templateEngine.TemplateInstance {
     } else {
       this.forceBindingMapUpdate = BindingMapUpdateEnabled.Enabled
     }
-    this.comp = comp
-    this.shadowRoot = ShadowRoot.createShadowRoot(comp)
-    this.shadowRoot.destroyBackendElementOnDetach()
     this.procGenWrapper = new ProcGenWrapper(
       this.shadowRoot,
       procGen,
       template.disallowNativeNode,
       template.eventObjectFilter,
     )
+    this.bindingMapGen = undefined
   }
 
   initValues(data: DataValue): ShadowRoot | ExternalShadowRoot {

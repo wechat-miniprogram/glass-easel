@@ -93,6 +93,8 @@ export type ComponentOptions = {
   writeFieldsToNode?: boolean
   /** Write node ID to backend node */
   writeIdToDOM?: boolean
+  /** Use the methods in method caller as the event handlers or not */
+  useMethodCallerListeners?: boolean
   /** Generate a prefix for ID written to backend node */
   idPrefixGenerator?: ((this: GeneralComponent) => string) | null
   /** Filter some fields out when applying to templates */
@@ -121,6 +123,7 @@ export type NormalizedComponentOptions = {
   reflectToAttributes: boolean
   writeFieldsToNode: boolean
   writeIdToDOM: boolean
+  useMethodCallerListeners: boolean
   idPrefixGenerator: ((this: GeneralComponent) => string) | null
   pureDataPattern: RegExp | null
   dataDeepCopy: DeepCopyKind
@@ -160,6 +163,7 @@ export const globalOptions: NormalizedComponentOptions & EnvironmentOptions = {
   reflectToAttributes: false,
   writeFieldsToNode: true,
   writeIdToDOM: false,
+  useMethodCallerListeners: false,
   idPrefixGenerator: null,
   pureDataPattern: null,
   dataDeepCopy: DeepCopyKind.Simple,
@@ -196,6 +200,10 @@ export const normalizeComponentOptions = (
     writeFieldsToNode:
       p.writeFieldsToNode !== undefined ? p.writeFieldsToNode : b.writeFieldsToNode,
     writeIdToDOM: p.writeIdToDOM !== undefined ? p.writeIdToDOM : b.writeIdToDOM,
+    useMethodCallerListeners:
+      p.useMethodCallerListeners !== undefined
+        ? p.useMethodCallerListeners
+        : b.useMethodCallerListeners,
     idPrefixGenerator:
       p.idPrefixGenerator !== undefined ? p.idPrefixGenerator : b.idPrefixGenerator,
     pureDataPattern: p.pureDataPattern !== undefined ? p.pureDataPattern : b.pureDataPattern,

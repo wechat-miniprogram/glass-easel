@@ -175,7 +175,7 @@ describe('event', () => {
           listenerChangeLifetimes: true,
         },
         lifetimes: {
-          listenerChanged: (
+          listenerChange: (
             isAdd: boolean,
             eventName: string,
             listener: any,
@@ -251,6 +251,27 @@ describe('component utils', () => {
     expect(compDef.isPrepared()).toBe(true)
     expect(glassEasel.Component.getMethodsFromDef(compDef.general()).abc).toBe(undefined)
     const comp = glassEasel.createElement('root', compDef.general())
+    expect(glassEasel.Component.getMethod(comp.general(), 'abc')!()).toBe('abc')
+    expect(comp.callMethod('abc')).toBe('abc')
+  })
+
+  test('#getMethodsFromDef #getMethod #callMethod (when `useMethodCallerListeners` is set)', () => {
+    const compDef = glassEasel.Component.register(
+      {
+        options: {
+          useMethodCallerListeners: true,
+        },
+      },
+      componentSpace,
+    )
+    const comp = glassEasel.createElement('root', compDef.general())
+    const caller = {
+      abc() {
+        return 'abc'
+      },
+    }
+    comp.setMethodCaller(caller as any)
+    expect(glassEasel.Component.getMethodsFromDef(compDef.general()).abc).toBeUndefined()
     expect(glassEasel.Component.getMethod(comp.general(), 'abc')!()).toBe('abc')
     expect(comp.callMethod('abc')).toBe('abc')
   })
@@ -336,6 +357,36 @@ describe('component utils', () => {
     const compDef = componentSpace.defineComponent({ template })
     const elem = glassEasel.createElement('root', compDef.general())
     expect(elem.getShadowRoot()!.childNodes[0]).toBeInstanceOf(glassEasel.Component)
+  })
+
+  test('template content update', () => {
+    const compDef = componentSpace
+      .define()
+      .template(tmpl('ABC-{{num}}'))
+      .data(() => ({
+        num: 123,
+      }))
+      .registerComponent()
+    const elem = glassEasel.createElement('root', compDef.general())
+    glassEasel.Element.pretendAttached(elem)
+    const shadowRoot = elem.getShadowRoot()!
+    expect(shadowRoot.childNodes[0]!.asTextNode()!.textContent).toBe('ABC-123')
+    elem.setData({ num: 456 })
+    expect(shadowRoot.childNodes[0]!.asTextNode()!.textContent).toBe('ABC-456')
+
+    compDef.updateTemplate(tmpl('DEF-{{num}}'))
+    expect(shadowRoot.childNodes[0]!.asTextNode()!.textContent).toBe('ABC-456')
+    const elem2 = glassEasel.createElement('root', compDef.general())
+    const shadowRoot2 = elem2.getShadowRoot()!
+    expect(shadowRoot2.childNodes[0]!.asTextNode()!.textContent).toBe('DEF-123')
+
+    elem.applyTemplateUpdates()
+    expect(shadowRoot.childNodes[0]!.asTextNode()!.textContent).toBe('DEF-456')
+    elem.setData({ num: 789 })
+    expect(shadowRoot.childNodes[0]!.asTextNode()!.textContent).toBe('DEF-789')
+
+    elem2.applyTemplateUpdates()
+    expect(shadowRoot2.childNodes[0]!.asTextNode()!.textContent).toBe('DEF-123')
   })
 
   test('property dash name conversion', () => {

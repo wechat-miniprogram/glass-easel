@@ -56,6 +56,7 @@ describe('Element Iterator', function () {
         expect(e).toBe(expectResArr.shift())
       },
     )
+    expect(expectResArr.length).toBe(0)
   })
 
   it('should support composed-ancestors traversing', function () {
@@ -78,6 +79,7 @@ describe('Element Iterator', function () {
         expect(e).toBe(expectResArr.shift())
       },
     )
+    expect(expectResArr.length).toBe(0)
   })
 
   it('should support ancestors traversing with break', function () {
@@ -89,6 +91,7 @@ describe('Element Iterator', function () {
         expect(e).toBe(expectResArr.shift())
       },
     )
+    expect(expectResArr.length).toBe(0)
   })
 
   it('should support shadow-descendants-root-first traversing', function () {
@@ -99,6 +102,7 @@ describe('Element Iterator', function () {
         expect(e).toBe(expectResArr.shift())
       },
     )
+    expect(expectResArr.length).toBe(0)
   })
 
   it('should support shadow-descendants-root-last traversing', function () {
@@ -111,6 +115,7 @@ describe('Element Iterator', function () {
     ).forEach(function (e) {
       expect(e).toBe(expectResArr.shift())
     })
+    expect(expectResArr.length).toBe(0)
   })
 
   it('should support composed-descendants-root-first traversing', function () {
@@ -135,6 +140,22 @@ describe('Element Iterator', function () {
         expect(e).toBe(expectResArr.shift())
       },
     )
+    expect(expectResArr.length).toBe(0)
+    var expectResArr = [
+      elem.$.g.$.e,
+      elem.$.g.$.e.childNodes[0],
+      elem.$.h,
+      elem.$.h.childNodes[0],
+      elem.$.i,
+      elem.$.i.shadowRoot,
+      elem.$.i.shadowRoot.childNodes[0],
+    ]
+    glassEasel.ElementIterator.create(elem.$.g.$.e, 'composed-descendants-root-first', Object).forEach(
+      function (e) {
+        expect(e).toBe(expectResArr.shift())
+      },
+    )
+    expect(expectResArr.length).toBe(0)
   })
 
   it('should support composed-descendants-root-last traversing', function () {
@@ -147,17 +168,19 @@ describe('Element Iterator', function () {
     ).forEach(function (e) {
       expect(e).toBe(expectResArr.shift())
     })
+    expect(expectResArr.length).toBe(0)
   })
 
   it('should support root-first traversing with break', function () {
     var elem = createElem('element-iterator-combined')
-    var expectResArr = [elem.$.g, elem.$.g.shadowRoot, elem.$.g.$.d]
+    var expectResArr = [elem.$.g, elem.$.g.shadowRoot]
     glassEasel.ElementIterator.create(elem.$.g, 'composed-descendants-root-first', Object).forEach(
       function (e) {
         if (e === elem.$.g.$.d) return false
         expect(e).toBe(expectResArr.shift())
       },
     )
+    expect(expectResArr.length).toBe(0)
   })
 
   it('should support root-last traversing with break', function () {
@@ -171,5 +194,6 @@ describe('Element Iterator', function () {
       if (e === elem.$.g.$.d) return false
       expect(e).toBe(expectResArr.shift())
     })
+    expect(expectResArr.length).toBe(0)
   })
 })
