@@ -14,14 +14,8 @@ componentSpace.defineComponent({
 
 describe('domlike backend', () => {
   beforeAll(() => {
-    domBackend.onEvent((target: glassEasel.domlikeBackend.Element, type, detail, options) => {
-      let cur = target as Element & glassEasel.domlikeBackend.Element
-      while (cur && !cur.__wxElement) {
-        cur = cur.parentNode as Element & glassEasel.domlikeBackend.Element
-      }
-      if (!cur) return
-      const ev = new glassEasel.Event(type, detail, options)
-      glassEasel.Event.dispatchEvent(target.__wxElement as any, ev)
+    domBackend.onEvent((target, type, detail, options) => {
+      glassEasel.Event.triggerEvent(target, type, detail, options)
     })
   })
 
