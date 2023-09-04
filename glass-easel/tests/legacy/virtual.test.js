@@ -42,8 +42,8 @@ const testCases = function (testBackend) {
     root.$$.id = 'root'
     var backendRoot = testBackend.getRootNode()
     if (testBackend === shadowBackend) {
-      var placeholder = backendRoot.getShadowRoot().createElement('div')
-      backendRoot.getShadowRoot().getRootNode().appendChild(placeholder)
+      var placeholder = backendRoot.createElement('div')
+      backendRoot.appendChild(placeholder)
       glassEasel.Element.replaceDocumentElement(root, backendRoot, placeholder)
     } else if (testBackend === domBackend) {
       var placeholder = testBackend.document.createElement('div')

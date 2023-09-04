@@ -5,13 +5,13 @@ import { DataPath, MultiPaths } from './data_path'
 import { DeepCopyKind } from './global_options'
 import { MutationObserverTarget } from './mutation_observer'
 import {
-  GeneralComponentInstance,
   DataList,
   PropertyList,
   MethodList,
   ComponentInstance,
   DataWithPropertyValues,
 } from './component_params'
+import { GeneralComponent } from './component'
 
 // eslint-disable-next-line @typescript-eslint/unbound-method
 const hasOwnProperty = Object.prototype.hasOwnProperty
@@ -132,7 +132,7 @@ const callObserver = <
     f,
     comp.getMethodCaller() as any,
     args,
-    (comp as unknown as GeneralComponentInstance) || undefined,
+    (comp as unknown as GeneralComponent) || undefined,
   )
 }
 
@@ -641,7 +641,7 @@ export class DataGroup<
             prop.observer,
             comp.getMethodCaller() as any,
             [newValue, oldValue],
-            comp as unknown as GeneralComponentInstance,
+            comp as unknown as GeneralComponent,
           )
         }
         if (comp._$mutationObserverTarget) {

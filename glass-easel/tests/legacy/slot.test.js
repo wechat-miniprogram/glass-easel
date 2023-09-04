@@ -42,8 +42,8 @@ const testCases = function (testBackend) {
     root.$$.id = 'root'
     var backendRoot = testBackend.getRootNode()
     if (testBackend === shadowBackend) {
-      var placeholder = backendRoot.getShadowRoot().createElement('div')
-      backendRoot.getShadowRoot().getRootNode().appendChild(placeholder)
+      var placeholder = backendRoot.createElement('div')
+      backendRoot.appendChild(placeholder)
       glassEasel.Element.replaceDocumentElement(root, backendRoot, placeholder)
     } else if (testBackend === domBackend) {
       var placeholder = testBackend.document.createElement('div')
@@ -134,43 +134,43 @@ const testCases = function (testBackend) {
       elem.appendChild(text)
       elem.$.b.childNodes[0].appendChild(text2)
       expect(elem.childNodes).toStrictEqual([text])
-      expect(elem.shadowRoot.getContainingSlot(null).getComposedChildren()).toStrictEqual([text])
-      expect(elem.shadowRoot.getContainingSlot(null).getComposedParent()).toBe(null)
+      expect(elem.shadowRoot.getSlotElementFromName('').getComposedChildren()).toStrictEqual([text])
+      expect(elem.shadowRoot.getSlotElementFromName('').getComposedParent()).toBe(null)
       expect(elem.$.b.childNodes[0].childNodes).toStrictEqual([
-        elem.shadowRoot.getContainingSlot(null),
+        elem.shadowRoot.getSlotElementFromName(''),
         text2,
       ])
-      expect(elem.$.b.childNodes[0].shadowRoot.getContainingSlot(null)).toBe(null)
+      expect(elem.$.b.childNodes[0].shadowRoot.getSlotElementFromName('')).toBe(null)
       matchElementWithDom(elem)
 
       var a = elem.$.b.childNodes[0]
       var newSlot = a.shadowRoot.createVirtualNode('slot')
       glassEasel.Element.setSlotName(newSlot)
       a.shadowRoot.insertBefore(newSlot, a.$.a)
-      expect(a.shadowRoot.getContainingSlot(null)).toBe(newSlot)
-      expect(a.shadowRoot.getContainingSlot(null).getComposedChildren()).toStrictEqual([
-        elem.shadowRoot.getContainingSlot(null),
+      expect(a.shadowRoot.getSlotElementFromName('')).toBe(newSlot)
+      expect(a.shadowRoot.getSlotElementFromName('').getComposedChildren()).toStrictEqual([
+        elem.shadowRoot.getSlotElementFromName(''),
         text2,
       ])
-      expect(elem.shadowRoot.getContainingSlot(null).getComposedChildren()).toStrictEqual([text])
-      expect(elem.shadowRoot.getContainingSlot(null).getComposedParent()).toBe(newSlot)
+      expect(elem.shadowRoot.getSlotElementFromName('').getComposedChildren()).toStrictEqual([text])
+      expect(elem.shadowRoot.getSlotElementFromName('').getComposedParent()).toBe(newSlot)
       expect(a.shadowRoot.childNodes[0].getComposedChildren()).toStrictEqual([
-        elem.shadowRoot.getContainingSlot(null),
+        elem.shadowRoot.getSlotElementFromName(''),
         text2,
       ])
       matchElementWithDom(elem)
 
       a.shadowRoot.appendChild(newSlot)
-      expect(a.shadowRoot.getContainingSlot(null)).toBe(newSlot)
-      expect(a.shadowRoot.getContainingSlot(null).getComposedChildren()).toStrictEqual([
-        elem.shadowRoot.getContainingSlot(null),
+      expect(a.shadowRoot.getSlotElementFromName('')).toBe(newSlot)
+      expect(a.shadowRoot.getSlotElementFromName('').getComposedChildren()).toStrictEqual([
+        elem.shadowRoot.getSlotElementFromName(''),
         text2,
       ])
-      expect(elem.shadowRoot.getContainingSlot(null).getComposedChildren()).toStrictEqual([text])
-      expect(elem.shadowRoot.getContainingSlot(null).getComposedParent()).toBe(newSlot)
+      expect(elem.shadowRoot.getSlotElementFromName('').getComposedChildren()).toStrictEqual([text])
+      expect(elem.shadowRoot.getSlotElementFromName('').getComposedParent()).toBe(newSlot)
       expect(
         a.shadowRoot.childNodes[a.shadowRoot.childNodes.length - 1].getComposedChildren(),
-      ).toStrictEqual([elem.shadowRoot.getContainingSlot(null), text2])
+      ).toStrictEqual([elem.shadowRoot.getSlotElementFromName(''), text2])
       matchElementWithDom(elem)
     })
   })
@@ -350,7 +350,9 @@ const testCases = function (testBackend) {
 
       var slot1dup = elem.shadowRoot.createNativeNode('span')
       glassEasel.Element.setSlotName(slot1dup, '1')
+      slot1.cancelDestroyBackendElementOnDetach()
       slot1.parentNode.replaceChild(slot1dup, slot1)
+      slot1.destroyBackendElementOnDetach()
       expect(slot1.getComposedParent()).toBe(null)
       expect(slot1.getComposedChildren()).toStrictEqual([])
       expect(elem2.getComposedParent()).toBe(slot1dup)
@@ -858,7 +860,9 @@ const testCases = function (testBackend) {
       expect(s3.getComposedChildren()).toStrictEqual([])
       matchElementWithDom(p1)
 
+      p1slot.cancelDestroyBackendElementOnDetach()
       p1.$.e.removeChild(p1slot)
+      p1slot.destroyBackendElementOnDetach()
       expect(p1slot.getComposedChildren()).toStrictEqual([])
       expect(s1.getComposedChildren()).toStrictEqual([])
       expect(s2.getComposedChildren()).toStrictEqual([])
@@ -919,7 +923,9 @@ const testCases = function (testBackend) {
       expect(s2.getComposedChildren()).toStrictEqual([])
       matchElementWithDom(p1)
 
+      p1slot0.cancelDestroyBackendElementOnDetach()
       p1slot0.parentNode.removeChild(p1slot0)
+      p1slot0.destroyBackendElementOnDetach()
       expect(p1slot0.getComposedChildren()).toStrictEqual([])
       expect(p1slot1.getComposedChildren()).toStrictEqual([c2])
       expect(p1slot2.getComposedChildren()).toStrictEqual([])

@@ -10,8 +10,10 @@ import {
   MediaQueryStatus,
   IntersectionStatus,
 } from './mode'
+import { Element as GlassEaselElement } from '../element'
+import * as suggestedBackend from './suggested_backend_protocol'
 
-export interface Context {
+export interface Context extends Partial<suggestedBackend.Context> {
   mode: BackendMode.Domlike
   destroy(): void
   getWindowWidth(): number
@@ -28,6 +30,7 @@ export interface Context {
     createTextNode(content: string): Element
     createDocumentFragment(): Element
   }
+  associateValue(element: Element, value: GlassEaselElement): void
   onEvent(
     listener: (
       target: unknown,
@@ -55,7 +58,7 @@ export interface Context {
   ): Observer
 }
 
-export interface Element {
+export interface Element extends Partial<suggestedBackend.Element> {
   _$wxArgs?: {
     modelListeners: { [name: string]: ((newValue: unknown) => void) | null }
   }
@@ -74,12 +77,13 @@ export interface Element {
   textContent: string
   nextSibling: Element | undefined
   childNodes: Element[]
+  parentNode: Element | null
   getBoundingClientRect(): BoundingClientRect
   scrollLeft: number
   scrollTop: number
   scrollWidth: number
   scrollHeight: number
-  __wxElement?: unknown
+  __wxElement?: GlassEaselElement
   addEventListener<K extends keyof HTMLElementEventMap>(
     type: K,
     listener: (this: HTMLElement, ev: HTMLElementEventMap[K]) => unknown,
@@ -173,6 +177,10 @@ export class CurrentWindowBackendContext implements Context {
 
   getRootNode(): Element {
     return document.body as unknown as Element
+  }
+
+  associateValue(element: Element, value: GlassEaselElement): void {
+    element.__wxElement = value
   }
 
   onEvent(

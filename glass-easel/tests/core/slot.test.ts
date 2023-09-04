@@ -65,6 +65,7 @@ describe('slot', () => {
           domBackend,
         )
         const childElem = parentElem.getShadowRoot()!.childNodes[0]!.asInstanceOf(child)!
+        const a = childElem.$.a as glassEasel.Element
 
         const slot1 = childElem.getShadowRoot()!.createVirtualNode('slot')
         glassEasel.Element.setSlotName(slot1, '')
@@ -84,14 +85,17 @@ describe('slot', () => {
         expect(domHtml(parentElem)).toBe('<child><span id="a"></span></child>')
         matchElementWithDom(parentElem)
 
-        childElem.$.a?.appendChild(slotA1 as any)
+        a.appendChild(slotA1)
         expect(childElem.childNodes.length).toBe(4)
+        expect(slotA1.getComposedChildren()).toEqual(childElem.childNodes)
         expect(domHtml(parentElem)).toBe('<child><span id="a"><comp>A</comp></span></child>')
         expect(ops).toEqual([[-1, 'A']])
         matchElementWithDom(parentElem)
 
-        childElem.$.a?.appendChild(slotA2 as any)
+        a.appendChild(slotA2)
         expect(childElem.childNodes.length).toBe(8)
+        expect(slotA1.getComposedChildren()).toEqual(childElem.childNodes.slice(0, 4))
+        expect(slotA2.getComposedChildren()).toEqual(childElem.childNodes.slice(4, 8))
         expect(domHtml(parentElem)).toBe(
           '<child><span id="a"><comp>A</comp><comp>A</comp></span></child>',
         )
@@ -101,8 +105,11 @@ describe('slot', () => {
         ])
         matchElementWithDom(parentElem)
 
-        childElem.$.a?.insertBefore(slotB as any, slotA2 as any)
+        a.insertBefore(slotB, slotA2)
         expect(childElem.childNodes.length).toBe(12)
+        expect(slotA1.getComposedChildren()).toEqual(childElem.childNodes.slice(0, 4))
+        expect(slotA2.getComposedChildren()).toEqual(childElem.childNodes.slice(4, 8))
+        expect(slotB.getComposedChildren()).toEqual(childElem.childNodes.slice(8, 12))
         expect(domHtml(parentElem)).toBe(
           '<child><span id="a"><comp>A</comp><comp>B</comp><comp>A</comp></span></child>',
         )
@@ -113,8 +120,10 @@ describe('slot', () => {
         ])
         matchElementWithDom(parentElem)
 
-        childElem.$.a?.removeChild(slotA1 as any)
+        a.removeChild(slotA1)
         expect(childElem.childNodes.length).toBe(8)
+        expect(slotA2.getComposedChildren()).toEqual(childElem.childNodes.slice(0, 4))
+        expect(slotB.getComposedChildren()).toEqual(childElem.childNodes.slice(4, 8))
         expect(domHtml(parentElem)).toBe(
           '<child><span id="a"><comp>B</comp><comp>A</comp></span></child>',
         )
@@ -126,8 +135,11 @@ describe('slot', () => {
         ])
         matchElementWithDom(parentElem)
 
-        childElem.$.a?.appendChild(slotA1 as any)
+        a.appendChild(slotA1)
         expect(childElem.childNodes.length).toBe(12)
+        expect(slotA2.getComposedChildren()).toEqual(childElem.childNodes.slice(0, 4))
+        expect(slotB.getComposedChildren()).toEqual(childElem.childNodes.slice(4, 8))
+        expect(slotA1.getComposedChildren()).toEqual(childElem.childNodes.slice(8, 12))
         expect(domHtml(parentElem)).toBe(
           '<child><span id="a"><comp>B</comp><comp>A</comp><comp>A</comp></span></child>',
         )
@@ -140,8 +152,12 @@ describe('slot', () => {
         ])
         matchElementWithDom(parentElem)
 
-        childElem.$.a?.appendChild(slot1 as any)
+        a.appendChild(slot1)
         expect(childElem.childNodes.length).toBe(16)
+        expect(slotA2.getComposedChildren()).toEqual(childElem.childNodes.slice(0, 4))
+        expect(slotB.getComposedChildren()).toEqual(childElem.childNodes.slice(4, 8))
+        expect(slotA1.getComposedChildren()).toEqual(childElem.childNodes.slice(8, 12))
+        expect(slot1.getComposedChildren()).toEqual(childElem.childNodes.slice(12, 16))
         expect(domHtml(parentElem)).toBe(
           '<child><span id="a"><comp>B</comp><comp>A</comp><comp>A</comp><comp>D</comp></span></child>',
         )
@@ -190,62 +206,135 @@ describe('slot', () => {
 
         const contentB = parentElem.getShadowRoot()!.createVirtualNode('virtual')
         glassEasel.Element.setInheritSlots(contentB)
-        contentB.appendChild(parentElem.getShadowRoot()!.createTextNode('B'))
+        const textB = parentElem.getShadowRoot()!.createTextNode('B')
+        contentB.appendChild(textB)
 
         glassEasel.Element.pretendAttached(parentElem)
+        expect(slotA.getComposedChildren()).toEqual([])
+        expect(slotB.getComposedChildren()).toEqual([])
+        expect(slotC.getComposedChildren()).toEqual([])
         expect(domHtml(parentElem)).toBe('<child><span></span></child>')
         matchElementWithDom(parentElem)
 
         childElem.appendChild(contentA)
+        expect(contentA.getComposedParent()).toBe(null)
+        expect(slotA.getComposedChildren()).toEqual([])
+        expect(slotB.getComposedChildren()).toEqual([])
+        expect(slotC.getComposedChildren()).toEqual([])
         expect(domHtml(parentElem)).toBe('<child><span></span></child>')
         matchElementWithDom(parentElem)
 
         glassEasel.Element.setSlotElement(contentA, slotA)
+        expect(contentA.getComposedParent()).toBe(slotA)
+        expect(slotA.getComposedChildren()).toEqual([contentA])
+        expect(slotB.getComposedChildren()).toEqual([])
+        expect(slotC.getComposedChildren()).toEqual([])
         expect(domHtml(parentElem)).toBe('<child>A<span></span></child>')
         matchElementWithDom(parentElem)
 
         glassEasel.Element.setSlotElement(contentA, slotB)
+        expect(contentA.getComposedParent()).toBe(slotB)
+        expect(slotA.getComposedChildren()).toEqual([])
+        expect(slotB.getComposedChildren()).toEqual([contentA])
+        expect(slotC.getComposedChildren()).toEqual([])
         expect(domHtml(parentElem)).toBe('<child><span>A</span></child>')
         matchElementWithDom(parentElem)
 
         childElem.removeChild(contentA)
+        expect(contentA.getComposedParent()).toBe(null)
+        expect(slotA.getComposedChildren()).toEqual([])
+        expect(slotB.getComposedChildren()).toEqual([])
+        expect(slotC.getComposedChildren()).toEqual([])
         expect(domHtml(parentElem)).toBe('<child><span></span></child>')
         matchElementWithDom(parentElem)
 
         glassEasel.Element.setSlotElement(contentA, slotC)
         childElem.appendChild(contentA)
+        expect(contentA.getComposedParent()).toBe(slotC)
+        expect(slotA.getComposedChildren()).toEqual([])
+        expect(slotB.getComposedChildren()).toEqual([])
+        expect(slotC.getComposedChildren()).toEqual([contentA])
         expect(domHtml(parentElem)).toBe('<child><span></span>A</child>')
         matchElementWithDom(parentElem)
 
         childElem.appendChild(contentB)
+        expect(contentA.getComposedParent()).toBe(slotC)
+        expect(contentB.getComposedParent()).toBe(null)
+        expect(textB.getComposedParent()).toBe(null)
+        expect(slotA.getComposedChildren()).toEqual([])
+        expect(slotB.getComposedChildren()).toEqual([])
+        expect(slotC.getComposedChildren()).toEqual([contentA])
         expect(domHtml(parentElem)).toBe('<child><span></span>A</child>')
         matchElementWithDom(parentElem)
 
         glassEasel.Element.setSlotElement(contentB, slotC)
+        expect(contentA.getComposedParent()).toBe(slotC)
+        expect(contentB.getComposedParent()).toBe(slotC)
+        expect(textB.getComposedParent()).toBe(slotC)
+        expect(slotA.getComposedChildren()).toEqual([])
+        expect(slotB.getComposedChildren()).toEqual([])
+        expect(slotC.getComposedChildren()).toEqual([contentA, contentB, textB])
         expect(domHtml(parentElem)).toBe('<child><span></span>AB</child>')
         matchElementWithDom(parentElem)
 
         childElem.appendChild(contentA)
+        expect(contentA.getComposedParent()).toBe(slotC)
+        expect(contentB.getComposedParent()).toBe(slotC)
+        expect(textB.getComposedParent()).toBe(slotC)
+        expect(slotA.getComposedChildren()).toEqual([])
+        expect(slotB.getComposedChildren()).toEqual([])
+        expect(slotC.getComposedChildren()).toEqual([contentB, textB, contentA])
         expect(domHtml(parentElem)).toBe('<child><span></span>BA</child>')
         matchElementWithDom(parentElem)
 
         glassEasel.Element.setSlotElement(contentB, slotB)
+        expect(contentA.getComposedParent()).toBe(slotC)
+        expect(contentB.getComposedParent()).toBe(slotB)
+        expect(textB.getComposedParent()).toBe(slotB)
+        expect(slotA.getComposedChildren()).toEqual([])
+        expect(slotB.getComposedChildren()).toEqual([contentB, textB])
+        expect(slotC.getComposedChildren()).toEqual([contentA])
         expect(domHtml(parentElem)).toBe('<child><span>B</span>A</child>')
         matchElementWithDom(parentElem)
 
         childElem.removeChild(contentB)
+        expect(contentA.getComposedParent()).toBe(slotC)
+        expect(contentB.getComposedParent()).toBe(null)
+        expect(textB.getComposedParent()).toBe(null)
+        expect(slotA.getComposedChildren()).toEqual([])
+        expect(slotB.getComposedChildren()).toEqual([])
+        expect(slotC.getComposedChildren()).toEqual([contentA])
         expect(domHtml(parentElem)).toBe('<child><span></span>A</child>')
         matchElementWithDom(parentElem)
 
         glassEasel.Element.setSlotElement(contentB, slotA)
         childElem.appendChild(contentB)
+        expect(contentA.getComposedParent()).toBe(slotC)
+        expect(contentB.getComposedParent()).toBe(slotA)
+        expect(textB.getComposedParent()).toBe(slotA)
+        expect(slotA.getComposedChildren()).toEqual([contentB, textB])
+        expect(slotB.getComposedChildren()).toEqual([])
+        expect(slotC.getComposedChildren()).toEqual([contentA])
         expect(domHtml(parentElem)).toBe('<child>B<span></span>A</child>')
+        matchElementWithDom(parentElem)
 
         childElem.removeChild(contentA)
+        expect(contentA.getComposedParent()).toBe(null)
+        expect(contentB.getComposedParent()).toBe(slotA)
+        expect(textB.getComposedParent()).toBe(slotA)
+        expect(slotA.getComposedChildren()).toEqual([contentB, textB])
+        expect(slotB.getComposedChildren()).toEqual([])
+        expect(slotC.getComposedChildren()).toEqual([])
         expect(domHtml(parentElem)).toBe('<child>B<span></span></child>')
         matchElementWithDom(parentElem)
 
         childElem.removeChild(contentB)
+        expect(contentA.getComposedParent()).toBe(null)
+        expect(contentB.getComposedParent()).toBe(null)
+        expect(textB.getComposedParent()).toBe(null)
+        expect(slotA.getComposedChildren()).toEqual([])
+        expect(slotB.getComposedChildren()).toEqual([])
+        expect(slotC.getComposedChildren()).toEqual([])
         expect(domHtml(parentElem)).toBe('<child><span></span></child>')
         matchElementWithDom(parentElem)
       })
@@ -1044,10 +1133,10 @@ describe('slot', () => {
         )
         expect(ops).toEqual([
           [0, '0:1'],
-          [-1, '0:1'],
           [0, '1:2'],
-          [-1, '1:2'],
           [0, '2:3'],
+          [-1, '0:1'],
+          [-1, '1:2'],
           [-1, '2:3'],
         ])
         matchElementWithDom(parentElem)
@@ -1059,10 +1148,10 @@ describe('slot', () => {
           [-2, '1:2'],
           [-2, '2:3'],
           [0, '0:4'],
-          [-1, '0:4'],
           [0, '1:5'],
-          [-1, '1:5'],
           [0, '2:6'],
+          [-1, '0:4'],
+          [-1, '1:5'],
           [-1, '2:6'],
         ])
         expect(domHtml(parentElem)).toBe(
@@ -1353,11 +1442,6 @@ describe('slot', () => {
       const multiSlot = (multiElem.$.a as glassEasel.Element).childNodes[0]!.asElement()!
       const dynamicSlot = (dynamicElem.$.a as glassEasel.Element).childNodes[0]!.asElement()!
 
-      expect(parentElem.getShadowRoot()!.getSingleSlotElement()).toBe(null)
-      expect(singleElem.getShadowRoot()!.getSingleSlotElement()).toBe(singleSlot)
-      expect(multiElem.getShadowRoot()!.getSingleSlotElement()).toBe(undefined)
-      expect(dynamicElem.getShadowRoot()!.getSingleSlotElement()).toBe(undefined)
-
       expect(parentElem.getShadowRoot()!.getSlotElementFromName('')).toBe(null)
       expect(singleElem.getShadowRoot()!.getSlotElementFromName('')).toBe(singleSlot)
       expect(multiElem.getShadowRoot()!.getSlotElementFromName('')).toBe(null)
@@ -1385,6 +1469,7 @@ describe('slot', () => {
         sr: glassEasel.ShadowRoot,
         slot: glassEasel.Element,
         expectedContent: glassEasel.Node[],
+        expectedNode: glassEasel.Node[],
       ) => {
         const contentArr = sr.getSlotContentArray(slot)!
         expect(contentArr?.length).toBe(expectedContent.length)
@@ -1403,30 +1488,71 @@ describe('slot', () => {
             return
           }
           expect(s).toBe(slot)
-          expect(node).toBe(expectedContent?.[cur])
+          expect(node).toBe(expectedContent[cur])
           cur += 1
         })
-        expect(cur).toBe(expectedContent?.length)
+        expect(cur).toBe(expectedContent.length)
         cur = 0
         sr.forEachNodeInSpecifiedSlot(slot, (node) => {
-          expect(node).toBe(expectedContent?.[cur])
+          expect(node).toBe(expectedContent[cur])
           cur += 1
         })
-        expect(cur).toBe(expectedContent?.length)
+        expect(cur).toBe(expectedContent.length)
+        cur = 0
+        sr.forEachSlotContentInSlot((node, s) => {
+          if (!s) {
+            if (node.asTextNode()) {
+              expect(node.asTextNode()!.textContent).toBe('M')
+              expect(node.asVirtualNode()).toBe(null)
+            } else {
+              expect(node.asVirtualNode()).toBeTruthy()
+            }
+            return
+          }
+          expect(s).toBe(slot)
+          expect(node).toBe(expectedNode[cur])
+          cur += 1
+        })
+        expect(cur).toBe(expectedNode.length)
+        cur = 0
+        sr.forEachSlotContentInSpecifiedSlot(slot, (node) => {
+          expect(node).toBe(expectedNode[cur])
+          cur += 1
+        })
+        expect(cur).toBe(expectedNode.length)
       }
-      checkSlotContentMethods(singleElem.getShadowRoot()!, singleSlot, [
-        singleElem.childNodes[0]!,
-        (singleElem.childNodes[0] as glassEasel.Element).childNodes[0]!,
-        singleElem.childNodes[1]!,
-      ])
-      checkSlotContentMethods(multiElem.getShadowRoot()!, multiSlot, [
-        (multiElem.childNodes[0] as glassEasel.Element).childNodes[0]!,
-      ])
-      checkSlotContentMethods(dynamicElem.getShadowRoot()!, dynamicSlot, [
-        dynamicElem.childNodes[0]!,
-        (dynamicElem.childNodes[0] as glassEasel.Element).childNodes[0]!,
-        dynamicElem.childNodes[1]!,
-      ])
+      checkSlotContentMethods(
+        singleElem.getShadowRoot()!,
+        singleSlot,
+        [
+          singleElem.childNodes[0]!,
+          (singleElem.childNodes[0] as glassEasel.Element).childNodes[0]!,
+          singleElem.childNodes[1]!,
+        ],
+        [
+          (singleElem.childNodes[0] as glassEasel.Element).childNodes[0]!,
+          singleElem.childNodes[1]!,
+        ],
+      )
+      checkSlotContentMethods(
+        multiElem.getShadowRoot()!,
+        multiSlot,
+        [(multiElem.childNodes[0] as glassEasel.Element).childNodes[0]!],
+        [(multiElem.childNodes[0] as glassEasel.Element).childNodes[0]!],
+      )
+      checkSlotContentMethods(
+        dynamicElem.getShadowRoot()!,
+        dynamicSlot,
+        [
+          dynamicElem.childNodes[0]!,
+          (dynamicElem.childNodes[0] as glassEasel.Element).childNodes[0]!,
+          dynamicElem.childNodes[1]!,
+        ],
+        [
+          (dynamicElem.childNodes[0] as glassEasel.Element).childNodes[0]!,
+          dynamicElem.childNodes[1]!,
+        ],
+      )
     })
   })
 })

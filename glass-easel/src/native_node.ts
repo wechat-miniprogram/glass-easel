@@ -28,19 +28,18 @@ export class NativeNode extends Element {
     const node = Object.create(NativeNode.prototype) as NativeNode
     node.is = tagName
     node._$placeholderHandler = placeholderHandler
+    const nodeTreeContext = owner._$nodeTreeContext
     let backendElement: GeneralBackendElement | null
     if (BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike)) {
-      backendElement = (owner._$nodeTreeContext as domlikeBackend.Context).document.createElement(
-        tagName,
-      )
+      backendElement = (nodeTreeContext as domlikeBackend.Context).document.createElement(tagName)
     } else if (BM.SHADOW || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Shadow)) {
       const backend = owner._$backendShadowRoot
       backendElement = backend?.createElement(tagName, stylingName ?? tagName) || null
     } else {
-      const backend = owner._$nodeTreeContext as composedBackend.Context
+      const backend = nodeTreeContext as composedBackend.Context
       backendElement = backend.createElement(tagName, stylingName ?? tagName)
     }
-    node._$initialize(false, backendElement, owner)
+    node._$initialize(false, backendElement, owner, nodeTreeContext)
     node.classList = new ClassList(node, null)
     if (owner && backendElement) {
       const styleScope = owner.getHostNode()._$definition._$options.styleScope
@@ -58,9 +57,14 @@ export class NativeNode extends Element {
         }
       }
     }
-    if (!(BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike))) {
-      if (backendElement) {
+    if (backendElement) {
+      if (!(BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike))) {
         ;(backendElement as backend.Element | composedBackend.Element).associateValue(node)
+      } else {
+        ;(owner._$nodeTreeContext as domlikeBackend.Context).associateValue(
+          backendElement as domlikeBackend.Element,
+          node,
+        )
       }
     }
     return node
