@@ -908,12 +908,11 @@ export class Element implements NodeCast {
       let frag: composedElement | null = null
       let firstSlotNode: Node | null = null
       if (newChild) {
+        // FIXME: revert changes here to reuse an existing fragment
         const f =
-          sharedFrag ||
-          (BM.DOMLIKE || (BM.DYNAMIC && context.mode === BackendMode.Domlike)
+          BM.DOMLIKE || (BM.DYNAMIC && context.mode === BackendMode.Domlike)
             ? (context as domlikeBackend.Context).document.createDocumentFragment()
-            : (context as backend.Context | composedBackend.Context).createFragment())
-        sharedFrag = f
+            : (context as backend.Context | composedBackend.Context).createFragment()
 
         const recNonVirtual = (c: Node) => {
           // since `TextNode` also has `backendElement` private field, just make it as `Element`
