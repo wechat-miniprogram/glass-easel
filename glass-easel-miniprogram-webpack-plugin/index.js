@@ -1,5 +1,3 @@
-/* eslint-disable */
-
 const fs = require('fs').promises
 const path = require('path')
 const webpack = require('webpack')
@@ -10,6 +8,7 @@ const { TmplGroup } = require('glass-easel-template-compiler')
 
 const { escapeJsString } = require('./helpers')
 
+const GlassEaselMiniprogramWxmlLoader = path.join(__dirname, 'wxml_loader.js')
 const GlassEaselMiniprogramWxssLoader = path.join(__dirname, 'wxss_loader.js')
 
 const PLUGIN_NAME = 'GlassEaselMiniprogramWebpackPlugin'
@@ -290,6 +289,12 @@ class GlassEaselMiniprogramWebpackPlugin {
                     }
                   }
                 })
+              } else if (extName === '.wxml' && compPath !== 'app') {
+                loaders.forEach((x) => {
+                  if (x.loader === GlassEaselMiniprogramWxmlLoader) {
+                    x.options = { compPath }
+                  }
+                })
               }
             }
           }
@@ -314,7 +319,7 @@ class GlassEaselMiniprogramWebpackPlugin {
             index.codeSpace.addComponentStaticConfig('${escapeJsString(compPath)}', ${json})
             index.codeSpace.addCompiledTemplate('${escapeJsString(compPath)}', {
               groupList: index.genObjectGroups,
-              content: index.genObjectGroups['${escapeJsString(compPath)}']
+              content: index.genObjectGroups[require('${escapeJsString(codeRoot)}/${escapeJsString(compPath)}.wxml')]
             })
             index.codeSpace.addStyleSheet(
               '${escapeJsString(compPath)}',
@@ -388,4 +393,5 @@ class GlassEaselMiniprogramWebpackPlugin {
 }
 
 exports.GlassEaselMiniprogramWebpackPlugin = GlassEaselMiniprogramWebpackPlugin
+exports.GlassEaselMiniprogramWxmlLoader = GlassEaselMiniprogramWxmlLoader
 exports.GlassEaselMiniprogramWxssLoader = GlassEaselMiniprogramWxssLoader

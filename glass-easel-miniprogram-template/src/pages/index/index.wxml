@@ -2,7 +2,7 @@
   <image class="logo" src="resources/logo_256.png" />
 </view>
 <view class="hello" bind:tap="helloTap">
-  Hello world!
+  Hello world! 4
 </view>
 <view class="hello" hidden="{{ !showAgain }}">
   Hello world again!
