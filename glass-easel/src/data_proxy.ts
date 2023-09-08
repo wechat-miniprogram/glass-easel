@@ -346,7 +346,6 @@ export class DataGroup<
         data = simpleDeepCopy(newData)
       }
     }
-    if (prop.comparer && !prop.comparer(data, this.data[propName])) return false
     this._$pendingChanges.push([[propName], data, undefined, undefined])
     return true
   }
@@ -418,6 +417,7 @@ export class DataGroup<
       const propName = String(path[0])
       const excluded = pureDataPattern ? pureDataPattern.test(propName) : false
       const prop: PropertyDefinition | undefined = propFields[propName]
+      let changed = true
       if (prop && path.length === 1) {
         // do update for 1-level fields
         const oldData: unknown = this.data[propName]
@@ -489,7 +489,16 @@ export class DataGroup<
             }
           }
         }
-        if (!excluded && oldData !== filteredData) {
+        changed = prop.comparer
+          ? !!safeCallback(
+              'Property Comparer',
+              prop.comparer,
+              comp!,
+              [newData, oldData],
+              comp?.general(),
+            )
+          : oldData !== filteredData
+        if (!excluded && changed) {
           propChanges.push({
             propName,
             prop,
@@ -605,7 +614,7 @@ export class DataGroup<
         }
       }
       markTriggerBitOnPath(this._$observerTree, this._$observerStatus, path)
-      if (!excluded) {
+      if (!excluded && changed) {
         combinedChanges.push(change)
       }
       if (this._$doingUpdates) {
