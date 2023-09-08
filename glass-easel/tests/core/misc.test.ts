@@ -1,5 +1,7 @@
 import { tmpl, domBackend } from '../base/env'
 import * as glassEasel from '../../src'
+import { Context } from '../base/composed_backend'
+import type { Element } from '../base/composed_backend'
 
 const componentSpace = new glassEasel.ComponentSpace()
 componentSpace.updateComponentOptions({
@@ -501,31 +503,10 @@ describe('component utils', () => {
       )
       .registerComponent()
 
-    class MyBackendContext extends glassEasel.composedBackend.EmptyComposedBackendContext {
-      // eslint-disable-next-line class-methods-use-this
-      override createElement(tagName: string, stylingName: string): MyBackendElement {
-        return new MyBackendElement(tagName, stylingName)
-      }
-    }
-    class MyBackendElement extends glassEasel.composedBackend.EmptyComposedBackendElement {
-      tagName: string
-      stylingName: string
-
-      constructor(tagName: string, stylingName: string) {
-        super()
-        this.tagName = tagName
-        this.stylingName = stylingName
-      }
-    }
-
-    const elem = glassEasel.Component.createWithContext(
-      'root',
-      compDef.general(),
-      new MyBackendContext(),
-    )
+    const elem = glassEasel.Component.createWithContext('root', compDef.general(), new Context())
     glassEasel.Element.pretendAttached(elem)
-    const e = elem.getShadowRoot()!.childNodes[0]!.asElement()!.$$ as MyBackendElement
-    expect(e.tagName).toBe('wx-normal')
-    expect(e.stylingName).toBe('normal-comp')
+    const e = elem.getShadowRoot()!.childNodes[0]!.asElement()!.$$ as Element
+    expect(e._$logicalTagName).toBe('wx-normal')
+    expect(e._$stylingTagName).toBe('normal-comp')
   })
 })

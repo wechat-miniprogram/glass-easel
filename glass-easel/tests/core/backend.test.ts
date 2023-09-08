@@ -1,4 +1,5 @@
 import { domBackend, shadowBackend, composedBackend, tmpl } from '../base/env'
+import * as ComposedBackend from '../base/composed_backend'
 import * as glassEasel from '../../src'
 
 const componentSpace = new glassEasel.ComponentSpace()
@@ -131,21 +132,21 @@ describe('backend', () => {
     const textNode = nativeNode.childNodes[0]! as glassEasel.TextNode
     glassEasel.Element.pretendAttached(elem)
     expect(virtualNode.$$).toBe(null)
-    expect(nativeNode.$$).toBeInstanceOf(glassEasel.composedBackend.EmptyComposedBackendElement)
-    expect(textNode.$$).toBeInstanceOf(glassEasel.composedBackend.EmptyComposedBackendElement)
+    expect(nativeNode.$$).toBeInstanceOf(ComposedBackend.Element)
+    expect(textNode.$$).toBeInstanceOf(ComposedBackend.TextNode)
     elem.setData({
       text: '456',
     })
     expect(virtualNode.$$).toBe(null)
-    expect(nativeNode.$$).toBeInstanceOf(glassEasel.composedBackend.EmptyComposedBackendElement)
-    expect(textNode.$$).toBeInstanceOf(glassEasel.composedBackend.EmptyComposedBackendElement)
+    expect(nativeNode.$$).toBeInstanceOf(ComposedBackend.Element)
+    expect(textNode.$$).toBeInstanceOf(ComposedBackend.TextNode)
     elem.setData({
       text: '',
     })
     expect(virtualNode.$$).toBe(null)
     expect(nativeNode.$$).toBe(null)
     expect(textNode.$$).toBe(null)
-    expect(elem.$$).toBeInstanceOf(glassEasel.composedBackend.EmptyComposedBackendElement)
+    expect(elem.$$).toBeInstanceOf(ComposedBackend.Element)
     glassEasel.Element.pretendDetached(elem)
     expect(elem.$$).toBe(null)
   })
