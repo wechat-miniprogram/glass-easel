@@ -438,4 +438,21 @@ describe('binding expression', () => {
     elem.setData({ c: 0 })
     expect(eA.dataset.a).toEqual(100)
   })
+
+  test('function call', () => {
+    const def = glassEasel.registerElement({
+      template: tmpl(`
+        <div id="n1" data-a="{{ f(a, 1) }}"></div>
+      `),
+      data: {
+        a: 2,
+        f: (a: number, b: number) => a + b,
+      },
+    })
+    const elem = glassEasel.createElement('root', def.general())
+    const n1 = elem.getShadowRoot()!.getElementById('n1')!
+    expect(n1.dataset.a).toEqual(3)
+    elem.setData({ a: 10 })
+    expect(n1.dataset.a).toEqual(11)
+  })
 })
