@@ -1467,6 +1467,10 @@ export class Behavior<
             else if (type === NormalizedPropertyType.Boolean) value = false
             else if (type === NormalizedPropertyType.Array) value = []
             else value = null
+          } else if (propDef.default !== undefined) {
+            triggerWarning(
+              `the initial value of property "${name}" is not used when its default is provided (when preparing behavior "${is}").`,
+            )
           }
           let observer: ((newValue: any, oldValue: any) => void) | null
           if (typeof propDef.observer === 'function') {
