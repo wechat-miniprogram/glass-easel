@@ -546,7 +546,8 @@ export class Element implements NodeCast {
         const node = slotNodes[i]!
         Element._$spliceSlotNodes(newSlot!, -1, 0, [node])
         Element._$updateContainingSlot(node, newSlot)
-        Element.insertChildReassign(node.parentNode!, node, null, newSlot, node.parentIndex)
+        if (!node._$inheritSlots)
+          Element.insertChildReassign(node.parentNode!, node, null, newSlot, node.parentIndex)
       }
     } else if (!newSlot) {
       const slotNodes = [...oldSlot.slotNodes!]
@@ -555,7 +556,8 @@ export class Element implements NodeCast {
         const node = slotNodes[i]!
         Element._$spliceSlotNodes(oldSlot, 0, 1, undefined)
         Element._$updateContainingSlot(node, newSlot)
-        Element.insertChildReassign(node.parentNode!, node, oldSlot, null, node.parentIndex)
+        if (!node._$inheritSlots)
+          Element.insertChildReassign(node.parentNode!, node, oldSlot, null, node.parentIndex)
       }
     } else {
       const slotNodes = [...oldSlot.slotNodes!]
@@ -565,7 +567,8 @@ export class Element implements NodeCast {
         Element._$spliceSlotNodes(oldSlot, 0, 1, undefined)
         Element._$spliceSlotNodes(newSlot, -1, 0, [node])
         Element._$updateContainingSlot(node, newSlot)
-        Element.insertChildReassign(node.parentNode!, node, oldSlot, newSlot, node.parentIndex)
+        if (!node._$inheritSlots)
+          Element.insertChildReassign(node.parentNode!, node, oldSlot, newSlot, node.parentIndex)
       }
     }
   }
@@ -1355,7 +1358,7 @@ export class Element implements NodeCast {
             oldPosIndex,
           )
         } else {
-          Element.insertChildComposed(parent, null, newChild, true, oldPosIndex)
+          Element.insertChildComposed(oldParent, null, newChild, true, oldPosIndex)
         }
 
         containingSlotUpdater?.updateContainingSlot()
@@ -1784,6 +1787,10 @@ export class Element implements NodeCast {
     if (!(placeholder instanceof Element)) {
       throw new Error('Cannot replace on text nodes.')
     }
+    /* istanbul ignore if  */
+    if (placeholder._$slotName !== null || replacer._$slotName !== null) {
+      throw new Error('Cannot replace on slot nodes.')
+    }
     if (placeholder === replacer) return
 
     // change the parent of replacer's children
@@ -1866,7 +1873,12 @@ export class Element implements NodeCast {
       }
       ;(frag as backend.Element).release()
     } else {
-      Element.insertChildComposed(parent, replacer, placeholder, true, posIndex)
+      if (placeholder.isVirtual()) {
+        // virtual placeholder does not need to remove
+        Element.insertChildComposed(parent, replacer, undefined, false, posIndex)
+      } else {
+        Element.insertChildComposed(parent, replacer, placeholder, true, posIndex)
+      }
       for (let i = 0; i < replacedChildren.length; i += 1) {
         const child = replacedChildren[i]!
         Element.insertChildComposed(replacer, child, undefined, false, i)
