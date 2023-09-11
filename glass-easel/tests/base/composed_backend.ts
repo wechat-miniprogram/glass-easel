@@ -197,21 +197,37 @@ const stringifyType = (v: unknown) => {
   return v.constructor.name
 }
 
+/**
+ * https://developer.mozilla.org/en-US/docs/Web/API/Node/nodeType
+ */
+const enum NODE_TYPE {
+  ELEMENT_NODE = 1,
+  TEXT_NODE = 3,
+  DOCUMENT_NODE = 9,
+  DOCUMENT_FRAGMENT_NODE = 11,
+}
+
 /** An element for empty backend implementation */
 abstract class Node implements glassEasel.composedBackend.Element {
   public _$currentMethod: string | null = null
   private _$released = false
-  private _$associatedValue: unknown | null = null
   private _$ownerContext: Context
 
-  public _$children: Node[] = []
-  public _$parent: null | Node = null
+  ELEMENT_NODE = NODE_TYPE.ELEMENT_NODE
+  TEXT_NODE = NODE_TYPE.TEXT_NODE
+  DOCUMENT_NODE = NODE_TYPE.DOCUMENT_NODE
+  DOCUMENT_FRAGMENT_NODE = NODE_TYPE.DOCUMENT_FRAGMENT_NODE
 
-  private _$id = ''
+  public abstract nodeType: NODE_TYPE
+  public __wxElement: glassEasel.Element | undefined
+  public childNodes: Node[] = []
+  public parentNode: null | Node = null
+  public id = ''
+  public textContent: string | null = null
+
   private _$style = ''
   private _$styleScope = 0
   private _$classes: Array<[string, number]> = []
-  protected _$textContent: string | null = null
   private _$attributes: Record<string, any> = {}
 
   constructor(ownerContext: Context) {
@@ -229,19 +245,19 @@ abstract class Node implements glassEasel.composedBackend.Element {
 
   private assertFragment(frag: Node) {
     if (!(frag instanceof Fragment)) this.throws(`expect a fragment but got ${stringifyType(frag)}`)
-    if (frag._$parent !== null) {
+    if (frag.parentNode !== null) {
       this.throws('fragment should have no parent')
     }
   }
   private assertDetached(child: Node) {
     if (!(child instanceof Node)) this.throws(`expect an element but got ${stringifyType(child)}`)
-    if (child._$parent !== null) this.throws('newChild is not detached')
+    if (child.parentNode !== null) this.throws('newChild is not detached')
   }
   private assertChild(child: Node) {
     if (!(child instanceof Node)) this.throws(`expect an element but got ${stringifyType(child)}`)
-    const index = this._$children.indexOf(child)
+    const index = this.childNodes.indexOf(child)
     if (index === -1) this.throws('element is not a child of `this`')
-    if (child._$parent !== this) this.throws('element is not a child of `this`')
+    if (child.parentNode !== this) this.throws('element is not a child of `this`')
     return index
   }
   private assertChildWithIndex(child: Node, index?: number) {
@@ -253,16 +269,16 @@ abstract class Node implements glassEasel.composedBackend.Element {
     return actualIndex
   }
   private assertIndex(index: number) {
-    if (index >= this._$children.length) {
+    if (index >= this.childNodes.length) {
       this.throws(
-        `provided index is invalid, got ${index} but only ${this._$children.length} children exist`,
+        `provided index is invalid, got ${index} but only ${this.childNodes.length} children exist`,
       )
     }
   }
   private assertDeleteCount(deleteCount: number, index: number) {
-    if (deleteCount + index > this._$children.length) {
+    if (deleteCount + index > this.childNodes.length) {
       this.throws(
-        `try to remove ${deleteCount} children starting from ${index}, but there are only ${this._$children.length} children.`,
+        `try to remove ${deleteCount} children starting from ${index}, but there are only ${this.childNodes.length} children.`,
       )
     }
   }
@@ -284,7 +300,7 @@ abstract class Node implements glassEasel.composedBackend.Element {
     Object.entries(this._$attributes).forEach(([key, value]) => {
       props[key] = `${value as unknown as string}`
     })
-    props.id = this._$id
+    props.id = this.id
     props.style = this._$style
     props.class = this._$classes.map((c) => `${c[0]}$${c[1]}`).join(' ')
     const propsStr = Object.entries(props)
@@ -298,12 +314,12 @@ abstract class Node implements glassEasel.composedBackend.Element {
       ret.push(`<${this.logicalTagName()} $${this._$styleScope}`)
     }
     if (propsStr.length > 0) ret.push(` ${propsStr}`)
-    if (this._$textContent === null && this._$children.length === 0) {
+    if (this.textContent === null && this.childNodes.length === 0) {
       ret.push(' />\n')
     } else {
       ret.push('>\n')
-      if (this._$textContent !== null) ret.push(`${indent}  ${this._$textContent}\n`)
-      this._$children.forEach((child) => {
+      if (this.textContent !== null) ret.push(`${indent}  ${this.textContent}\n`)
+      this.childNodes.forEach((child) => {
         ret.push(child.dumpToString(`${indent}  `))
       })
       ret.push(`${indent}</${this.logicalTagName()}>\n`)
@@ -321,22 +337,22 @@ abstract class Node implements glassEasel.composedBackend.Element {
   }
 
   @protocolMethod
-  associateValue(v: unknown): void {
-    this._$associatedValue = v
+  associateValue(v: glassEasel.Element): void {
+    this.__wxElement = v
   }
 
   @protocolMethod
   appendChild(child: Node): void {
     this.assertDetached(child)
-    this._$children.push(child)
-    child._$parent = this
+    this.childNodes.push(child)
+    child.parentNode = this
   }
 
   @protocolMethod
   removeChild(child: Node, index?: number): void {
     const actualIndex = this.assertChildWithIndex(child, index)
-    this._$children.splice(actualIndex, 1)
-    child._$parent = null
+    this.childNodes.splice(actualIndex, 1)
+    child.parentNode = null
   }
 
   @protocolMethod
@@ -347,16 +363,16 @@ abstract class Node implements glassEasel.composedBackend.Element {
       this.appendChild(child)
     } else if (before === undefined && processedIndex !== undefined) {
       this.assertIndex(processedIndex)
-      this._$children.splice(processedIndex, 0, child)
-      child._$parent = this
+      this.childNodes.splice(processedIndex, 0, child)
+      child.parentNode = this
     } else if (before !== undefined && processedIndex === undefined) {
       const actualIndex = this.assertChild(before)
-      this._$children.splice(actualIndex, 0, child)
-      child._$parent = this
+      this.childNodes.splice(actualIndex, 0, child)
+      child.parentNode = this
     } else if (before !== undefined && processedIndex !== undefined) {
       const actualIndex = this.assertChildWithIndex(before, processedIndex)
-      this._$children.splice(actualIndex, 0, child)
-      child._$parent = this
+      this.childNodes.splice(actualIndex, 0, child)
+      child.parentNode = this
     }
   }
 
@@ -368,20 +384,20 @@ abstract class Node implements glassEasel.composedBackend.Element {
       this.appendChild(child)
     } else if (oldChild === undefined && processedIndex !== undefined) {
       this.assertIndex(processedIndex)
-      const oldChild = this._$children[processedIndex]
-      this._$children.splice(processedIndex, 1, child)
-      oldChild!._$parent = null
-      child._$parent = this
+      const oldChild = this.childNodes[processedIndex]
+      this.childNodes.splice(processedIndex, 1, child)
+      oldChild!.parentNode = null
+      child.parentNode = this
     } else if (oldChild !== undefined && processedIndex === undefined) {
       const actualIndex = this.assertChild(oldChild)
-      this._$children.splice(actualIndex, 1, child)
-      oldChild._$parent = null
-      child._$parent = this
+      this.childNodes.splice(actualIndex, 1, child)
+      oldChild.parentNode = null
+      child.parentNode = this
     } else if (oldChild !== undefined && processedIndex !== undefined) {
       const actualIndex = this.assertChildWithIndex(oldChild, processedIndex)
-      this._$children.splice(actualIndex, 1, child)
-      oldChild._$parent = null
-      child._$parent = this
+      this.childNodes.splice(actualIndex, 1, child)
+      oldChild.parentNode = null
+      child.parentNode = this
     }
   }
 
@@ -390,39 +406,39 @@ abstract class Node implements glassEasel.composedBackend.Element {
     this.assertFragment(list)
     const index = this.assertChild(before)
     this.assertDeleteCount(deleteCount, index)
-    const removed = this._$children.splice(index, deleteCount, ...list._$children)
-    list._$children.forEach((newChild) => {
-      newChild._$parent = this
+    const removed = this.childNodes.splice(index, deleteCount, ...list.childNodes)
+    list.childNodes.forEach((newChild) => {
+      newChild.parentNode = this
     })
-    list._$children = []
+    list.childNodes = []
     removed.forEach((child) => {
-      child._$parent = null
+      child.parentNode = null
     })
   }
 
   @protocolMethod
   spliceAppend(list: Node): void {
     this.assertFragment(list)
-    this._$children.splice(this._$children.length, 0, ...list._$children)
-    list._$children.forEach((newChild) => {
-      newChild._$parent = this
+    this.childNodes.splice(this.childNodes.length, 0, ...list.childNodes)
+    list.childNodes.forEach((newChild) => {
+      newChild.parentNode = this
     })
-    list._$children = []
+    list.childNodes = []
   }
 
   @protocolMethod
   spliceRemove(before: Node, deleteCount: number): void {
     const index = this.assertChild(before)
     this.assertDeleteCount(deleteCount, index)
-    const removed = this._$children.splice(index, deleteCount)
+    const removed = this.childNodes.splice(index, deleteCount)
     removed.forEach((child) => {
-      child._$parent = null
+      child.parentNode = null
     })
   }
 
   @protocolMethod
   setId(id: string): void {
-    this._$id = id
+    this.id = id
   }
 
   @protocolMethod
@@ -472,7 +488,7 @@ abstract class Node implements glassEasel.composedBackend.Element {
 
   @protocolMethod
   setText(content: string): void {
-    this._$textContent = content
+    this.textContent = content
   }
 
   @protocolMethod
@@ -538,9 +554,12 @@ abstract class Node implements glassEasel.composedBackend.Element {
   }
 }
 
-class Root extends Node {}
+class Root extends Node {
+  public nodeType = NODE_TYPE.DOCUMENT_NODE
+}
 
 export class Element extends Node {
+  public nodeType = NODE_TYPE.ELEMENT_NODE
   public _$logicalTagName: string
   public _$stylingTagName: string
 
@@ -552,10 +571,13 @@ export class Element extends Node {
 }
 
 export class TextNode extends Node {
+  public nodeType = NODE_TYPE.TEXT_NODE
   constructor(ownerContext: Context, textContent: string) {
     super(ownerContext)
-    this._$textContent = textContent
+    this.textContent = textContent
   }
 }
 
-export class Fragment extends Node {}
+export class Fragment extends Node {
+  public nodeType = NODE_TYPE.DOCUMENT_FRAGMENT_NODE
+}
