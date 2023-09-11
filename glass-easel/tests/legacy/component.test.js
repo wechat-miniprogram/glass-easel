@@ -235,14 +235,12 @@ describe('Component', function () {
         properties: {
           a: {
             type: String,
-            value: 'abc',
             default: function () {
               return 'def'
             },
           },
           b: {
             type: Number,
-            value: 123,
             default: function () {
               return 456
             },
