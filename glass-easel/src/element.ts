@@ -1991,6 +1991,7 @@ export class Element implements NodeCast {
     finalChanged: FinalChanged,
     options: EventListenerOptions = {},
   ) {
+    if (!this._$backendElement) return
     const capture = !!options.capture || !!options.useCapture
     let mutLevel: MutLevel
     switch (finalChanged) {
