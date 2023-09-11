@@ -24,7 +24,7 @@ use super::*;
 // M: = R.m
 // N: the `Node` to operate (may be undefined)
 // O: = R.r
-// P: the current path
+// P (preserved for runtime)
 // Q (extra runtime helpers)
 // R: the global script module / the `ProcGenWrapper` object
 // S: the `DefineSlot` function
@@ -40,13 +40,14 @@ use super::*;
 // A: filter binding function in change properties bindings
 // B: filter binding function in event bindings
 
-const RUNTIME_ITEMS: [(&'static str, &'static str); 3] = [
+const RUNTIME_ITEMS: [(&'static str, &'static str); 4] = [
     ("X", "function(a){return a==null?Object.create(null):a}"),
     ("Y", "function(a){return a==null?'':String(a)}"),
     (
         "Z",
         "function(a,b){if(a===true)return true;if(a)return a[b]}",
     ),
+    ("P", "function(a){return typeof a==='function'?a:()=>{}}"),
 ];
 
 const WXS_RUNTIME: &'static str = r#"
