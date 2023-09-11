@@ -1847,6 +1847,10 @@ export class Element implements NodeCast {
     containingSlotUpdater?.updateContainingSlot()
     containingSlotUpdater?.removeSlotNodes()
 
+    // handling child nodes list for parent
+    parent.childNodes[posIndex] = replacer
+    replacer.parentIndex = posIndex
+
     // spread in composed tree
     if (BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) {
       if (parent._$backendElement) {
@@ -1878,10 +1882,6 @@ export class Element implements NodeCast {
 
     parent._$mutationObserverTarget?.detachChild(placeholder)
     parent._$mutationObserverTarget?.attachChild(replacer)
-
-    // handling child nodes list for parent
-    parent.childNodes[posIndex] = replacer
-    replacer.parentIndex = posIndex
 
     // handling child nodes list for replacer
     replacer.childNodes.push(...placeholder.childNodes)
