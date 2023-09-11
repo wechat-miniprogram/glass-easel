@@ -84,6 +84,8 @@ describe('define', () => {
         },
       })
 
+      const traitBeh = Behavior.trait<{ a: () => void }>()
+
       Component({
         options: {
           propertyEarlyInit: true,
@@ -135,6 +137,8 @@ describe('define', () => {
         relations: {
           invalid: {
             type: 'parent',
+            // FIXME the target should accept wrapped behaviors
+            target: traitBeh._$,
           },
         },
         externalClasses: [],
