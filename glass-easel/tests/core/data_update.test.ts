@@ -536,6 +536,7 @@ describe('partial update', () => {
         comparer(newValue, oldValue) {
           execArr.push('A')
           if (newValue === 'abc') return false
+          if (newValue === 'ghi') return true
           return newValue !== oldValue
         },
         observer() {
@@ -561,19 +562,22 @@ describe('partial update', () => {
       }))
       .registerComponent()
     const comp = glassEasel.Component.createWithContext('root', compDef, domBackend)
-    expect(execArr).toStrictEqual(['A'])
+    expect(execArr).toStrictEqual(['A', 'B'])
     execArr = []
     glassEasel.Element.pretendAttached(comp)
     comp.setData({ p: '' })
     expect(execArr).toStrictEqual(['A', 'B', 'C'])
     execArr = []
     comp.setData({ p: 'abc' })
-    expect(execArr).toStrictEqual(['A'])
+    expect(execArr).toStrictEqual(['A', 'B'])
     execArr = []
     comp.setData({ p: '' })
-    expect(execArr).toStrictEqual(['A'])
+    expect(execArr).toStrictEqual(['A', 'B', 'C'])
     execArr = []
-    comp.setData({ p: 'def' })
+    comp.setData({ p: 'ghi' })
+    expect(execArr).toStrictEqual(['A', 'B', 'C'])
+    execArr = []
+    comp.setData({ p: 'ghi' })
     expect(execArr).toStrictEqual(['A', 'B', 'C'])
   })
 

@@ -1,5 +1,3 @@
-/* eslint-disable */
-
 const fs = require('fs').promises
 const path = require('path')
 const webpack = require('webpack')
@@ -10,6 +8,7 @@ const { TmplGroup } = require('glass-easel-template-compiler')
 
 const { escapeJsString } = require('./helpers')
 
+const GlassEaselMiniprogramWxmlLoader = path.join(__dirname, 'wxml_loader.js')
 const GlassEaselMiniprogramWxssLoader = path.join(__dirname, 'wxss_loader.js')
 
 const PLUGIN_NAME = 'GlassEaselMiniprogramWebpackPlugin'
@@ -113,10 +112,19 @@ class GlassEaselMiniprogramWebpackPlugin {
     }
 
     // search for component files
-    let codeRootWatching = false
+    let codeRootPromises = null
     const searchCodeRoot = async (enableWatch) => {
-      if (codeRootWatching) return
-      codeRootWatching = true
+      if (codeRootPromises) {
+        // wait a short while for changes
+        await new Promise((resolve) => {
+          setTimeout(resolve, 250)
+        })
+        const promises = codeRootPromises
+        codeRootPromises = []
+        await Promise.all(promises)
+        return
+      }
+      codeRootPromises = []
       const handleFile = async (relPath) => {
         // for app.json, spread the global field
         if (relPath === 'app.json') {
@@ -212,14 +220,13 @@ class GlassEaselMiniprogramWebpackPlugin {
 
       // await readdirp(codeRoot, handleFile)
       await new Promise((resolve, reject) => {
-        const promises = []
         const watcher = chokidar.watch(codeRoot, { ignoreInitial: false })
         watcher
           .on('add', (p) => {
-            promises.push(handleFile(normalizePath(p)))
+            codeRootPromises.push(handleFile(normalizePath(p)))
           })
           .on('change', (p) => {
-            promises.push(handleFile(normalizePath(p)))
+            codeRootPromises.push(handleFile(normalizePath(p)))
           })
           .on('unlink', (p) => {
             removeEntry(normalizePath(p))
@@ -228,6 +235,8 @@ class GlassEaselMiniprogramWebpackPlugin {
             throw new Error(err)
           })
           .on('ready', () => {
+            const promises = codeRootPromises
+            codeRootPromises = []
             Promise.all(promises)
               .then(() => {
                 if (!enableWatch) return watcher.close()
@@ -290,6 +299,12 @@ class GlassEaselMiniprogramWebpackPlugin {
                     }
                   }
                 })
+              } else if (extName === '.wxml' && compPath !== 'app') {
+                loaders.forEach((x) => {
+                  if (x.loader === GlassEaselMiniprogramWxmlLoader) {
+                    x.options = { compPath }
+                  }
+                })
               }
             }
           }
@@ -314,12 +329,14 @@ class GlassEaselMiniprogramWebpackPlugin {
             index.codeSpace.addComponentStaticConfig('${escapeJsString(compPath)}', ${json})
             index.codeSpace.addCompiledTemplate('${escapeJsString(compPath)}', {
               groupList: index.genObjectGroups,
-              content: index.genObjectGroups['${escapeJsString(compPath)}']
+              content: index.genObjectGroups[require(
+                '${escapeJsString(codeRoot)}/${escapeJsString(compPath)}.wxml'
+              )]
             })
             index.codeSpace.addStyleSheet(
               '${escapeJsString(compPath)}',
               '${escapeJsString(compPath)}',
-              ${scopeNameStr},
+              ${scopeNameStr}
             )
             index.codeSpace.globalComponentEnv(index.globalObject, '${escapeJsString(
               compPath,
@@ -388,4 +405,5 @@ class GlassEaselMiniprogramWebpackPlugin {
 }
 
 exports.GlassEaselMiniprogramWebpackPlugin = GlassEaselMiniprogramWebpackPlugin
+exports.GlassEaselMiniprogramWxmlLoader = GlassEaselMiniprogramWxmlLoader
 exports.GlassEaselMiniprogramWxssLoader = GlassEaselMiniprogramWxssLoader

@@ -901,7 +901,7 @@ export class ProcGenWrapper {
 
   // set dataset
   d(elem: Element, name: string, v: unknown) {
-    elem.dataset[name] = v
+    elem.setDataset(name, v)
   }
 
   // set mark

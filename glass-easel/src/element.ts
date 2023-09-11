@@ -10,6 +10,7 @@ import {
   EventOptions,
   EventTarget,
   FinalChanged,
+  MutLevel,
 } from './event'
 import { triggerWarning } from './func_arr'
 import { ParsedSelector } from './selector'
@@ -2018,13 +2019,33 @@ export class Element implements NodeCast {
     Event.dispatchEvent(this, ev)
   }
 
-  private _$updateEventDefaultPrevented(name: string, enabled: boolean) {
-    if (!this._$backendElement) return
+  /* @internal */
+  private _$setListenerStats(
+    name: string,
+    finalChanged: FinalChanged,
+    options: EventListenerOptions = {},
+  ) {
+    const capture = !!options.capture || !!options.useCapture
+    let mutLevel: MutLevel
+    switch (finalChanged) {
+      case FinalChanged.None:
+        mutLevel = MutLevel.None
+        break
+      case FinalChanged.Mut:
+        mutLevel = MutLevel.Mut
+        break
+      case FinalChanged.Final:
+        mutLevel = MutLevel.Final
+        break
+      default:
+        return
+    }
     if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
-      ;(this._$nodeTreeContext as domlikeBackend.Context).setElementEventDefaultPrevented(
+      ;(this._$nodeTreeContext as domlikeBackend.Context).setListenerStats(
         this._$backendElement as domlikeBackend.Element,
         name,
-        enabled,
+        capture,
+        mutLevel,
       )
     } else {
       ;(this._$backendElement as backend.Element).setEventDefaultPrevented(
@@ -2037,8 +2058,7 @@ export class Element implements NodeCast {
   /** Add an event listener on the element */
   addListener(name: string, func: EventListener<unknown>, options?: EventListenerOptions) {
     const finalChanged = this._$eventTarget.addListener(name, func, options)
-    if (finalChanged === FinalChanged.Init) this._$updateEventDefaultPrevented(name, false)
-    else if (finalChanged === FinalChanged.Added) this._$updateEventDefaultPrevented(name, true)
+    this._$setListenerStats(name, finalChanged, options)
     if (this instanceof Component && this._$definition._$options.listenerChangeLifetimes) {
       this.triggerLifetime('listenerChange', [true, name, func, options])
     } else if (this instanceof NativeNode && typeof this._$listenerChangeCb === 'function') {
@@ -2050,7 +2070,7 @@ export class Element implements NodeCast {
   removeListener(name: string, func: EventListener<unknown>, options?: EventListenerOptions) {
     const finalChanged = this._$eventTarget.removeListener(name, func, options)
     if (finalChanged === FinalChanged.Failed) return
-    if (finalChanged !== FinalChanged.NotChanged) this._$updateEventDefaultPrevented(name, false)
+    this._$setListenerStats(name, finalChanged, options)
     if (this instanceof Component && this._$definition._$options.listenerChangeLifetimes) {
       this.triggerLifetime('listenerChange', [false, name, func, options])
     } else if (this instanceof NativeNode && typeof this._$listenerChangeCb === 'function') {
@@ -2106,6 +2126,15 @@ export class Element implements NodeCast {
       delete this._$nodeAttributes[name]
     }
     if (this._$backendElement) this._$backendElement.removeAttribute(name)
+  }
+
+  /** Set a dataset on the element */
+  setDataset(name: string, value: unknown) {
+    this.dataset[name] = value
+
+    if (BM.SHADOW || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Shadow)) {
+      ;(this._$backendElement as backend.Element).setDataset(name, value)
+    }
   }
 
   /** Set a mark on the element */
@@ -2689,5 +2718,21 @@ export class Element implements NodeCast {
       )
     }
     return null
+  }
+
+  /**
+   * Get an interactive context
+   */
+  getContext(cb: (res: unknown) => void): void {
+    const backendElement = this._$backendElement
+    if (!backendElement) return
+    if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
+      ;(this._$nodeTreeContext as domlikeBackend.Context).getContext(
+        backendElement as domlikeBackend.Element,
+        cb,
+      )
+    } else {
+      ;(backendElement as backend.Element).getContext(cb)
+    }
   }
 }

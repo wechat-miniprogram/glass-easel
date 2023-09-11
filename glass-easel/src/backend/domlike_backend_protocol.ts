@@ -1,7 +1,7 @@
 /* eslint-disable class-methods-use-this */
 /* global window, document */
 
-import { EventOptions, EventBubbleStatus } from '../event'
+import { EventOptions, EventBubbleStatus, MutLevel } from '../event'
 import { safeCallback, triggerWarning } from '../func_arr'
 import {
   BackendMode,
@@ -39,7 +39,7 @@ export interface Context extends Partial<suggestedBackend.Context> {
       options: EventOptions,
     ) => EventBubbleStatus,
   ): void
-  setElementEventDefaultPrevented(element: Element, type: string, enabled: boolean): void
+  setListenerStats(element: Element, type: string, capture: boolean, mutLevel: MutLevel): void
   setModelBindingStat(
     element: Element,
     attributeName: string,
@@ -56,6 +56,7 @@ export interface Context extends Partial<suggestedBackend.Context> {
     status: MediaQueryStatus,
     listener: (res: { matches: boolean }) => void,
   ): Observer
+  getContext(element: Element, cb: (res: unknown) => void): void
 }
 
 export interface Element extends Partial<suggestedBackend.Element> {
@@ -120,6 +121,7 @@ export class CurrentWindowBackendContext implements Context {
   private _$styleSheetRegistry = Object.create(null) as { [path: string]: string }
   private _$delegatedEventListeners = Object.create(null) as Record<string, true>
   private _$elementEventListeners = new WeakMap<Element, Record<string, true>>()
+  private _$elementCaptureEventListeners = new WeakMap<Element, Record<string, true>>()
   private _$triggedEvents = new WeakSet<Event>()
   private _$eventListener?: (
     target: any,
@@ -213,12 +215,17 @@ export class CurrentWindowBackendContext implements Context {
   }
 
   private _$trigger(ev: Event, type: string, detail: unknown, bubbles: boolean, composed: boolean) {
-    if (!this._$eventListener) return
-    const target = ev.target
-    const bubbleStatus = this._$eventListener(target, type, detail, {
+    if (!this._$eventListener || !ev.target) return
+
+    let t: Element | null = ev.target as any as Element
+    while (t && !t.__wxElement) t = t.parentNode
+    if (!t) return
+
+    const bubbleStatus = this._$eventListener(t.__wxElement!, type, detail, {
       originalEvent: ev,
       bubbles,
       composed,
+      capturePhase: true,
     })
     if (bubbleStatus === EventBubbleStatus.NoDefault) {
       ev.preventDefault()
@@ -377,13 +384,14 @@ export class CurrentWindowBackendContext implements Context {
     listeners.mouseup = true
   }
 
-  setElementEventDefaultPrevented(element: Element, type: string, _enabled: boolean): void {
+  setListenerStats(element: Element, type: string, capture: boolean, mutLevel: MutLevel): void {
     // for non-passive events,
     // the default-prevented status can also be found in `EventBubbleStatus` ,
     // so there is nothing to do with non-passive events.
     if (!element) return
 
     const shouldDelegate = DELEGATE_EVENTS.includes(type)
+    const defaultPrevented = mutLevel === MutLevel.Final
 
     if (shouldDelegate) {
       if (this._$delegatedEventListeners[type]) return
@@ -392,6 +400,7 @@ export class CurrentWindowBackendContext implements Context {
       document.body.addEventListener(
         type,
         (ev) => {
+          if (defaultPrevented) ev.preventDefault()
           this._$trigger(ev, type, this._$getEventDetail(ev), ev.bubbles, ev.composed)
         },
         { capture: true },
@@ -399,16 +408,18 @@ export class CurrentWindowBackendContext implements Context {
       return
     }
 
-    if (!this._$elementEventListeners.has(element)) {
-      this._$elementEventListeners.set(element, Object.create(null))
-    }
-    const listeners = this._$elementEventListeners.get(element)!
+    const elementEventListeners = capture
+      ? this._$elementCaptureEventListeners
+      : this._$elementEventListeners
+    if (!elementEventListeners.has(element)) elementEventListeners.set(element, Object.create(null))
+    const listeners = elementEventListeners.get(element)!
     if (listeners[type]) return
     listeners[type] = true
 
     element.addEventListener(type, (ev) => {
       if (this._$triggedEvents.has(ev)) return
       this._$triggedEvents.add(ev)
+      if (defaultPrevented) ev.preventDefault()
       this._$trigger(ev, type, this._$getEventDetail(ev), ev.bubbles, ev.composed)
     })
   }
@@ -541,5 +552,9 @@ export class CurrentWindowBackendContext implements Context {
         window.removeEventListener('resize', listenerFunc)
       },
     }
+  }
+
+  getContext(element: Element, cb: (res: unknown) => void): void {
+    cb(null)
   }
 }

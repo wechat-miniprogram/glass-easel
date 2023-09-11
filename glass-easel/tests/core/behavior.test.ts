@@ -223,7 +223,6 @@ describe('chaining-form interface', () => {
       .define()
       .property('propA', {
         type: Number,
-        value: 123,
         default: () => 456,
       })
       .observer('propA', () => {
