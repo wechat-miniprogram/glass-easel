@@ -62,7 +62,7 @@ export const enum NormalizedPropertyType {
 export type PropertyDefinition = {
   type: NormalizedPropertyType
   optionalTypes: NormalizedPropertyType[] | null
-  value: unknown | undefined
+  value: unknown
   default: (() => unknown) | undefined
   observer: ((newValue: unknown, oldValue: unknown) => void) | null
   comparer: ((newValue: unknown, oldValue: unknown) => boolean) | null

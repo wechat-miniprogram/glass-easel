@@ -1047,7 +1047,7 @@ export class Component<
   callMethod<T extends string>(
     methodName: T,
     ...args: Parameters<MethodList[T]>
-  ): ReturnType<MethodList[T]> | undefined {
+  ): ReturnType<MethodList[T]> {
     const func = Component.getMethod(this, methodName)
     return func?.call(this, ...args)
   }

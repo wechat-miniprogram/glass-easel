@@ -13,11 +13,13 @@
     "url": "https://github.com/wechat-miniprogram/glass-easel/issues"
   },
   "homepage": "https://github.com/wechat-miniprogram/glass-easel",
-  "main": "dist/index.js",
+  "main": "dist/glass_easel.all.js",
+  "module": "dist/glass_easel.all.es.js",
+  "types": "dist/glass_easel.d.ts",
   "scripts": {
     "doc": "typedoc src/index.ts --excludePrivate --excludeProtected --excludeInternal",
-    "build": "webpack --config webpack.config.js",
-    "dev": "webpack --config webpack.config.js --watch",
+    "build": "rollup --config rollup.config.ts --configPlugin @rollup/plugin-typescript",
+    "dev": "GLASS_EASEL_ARGS=--dev npm run build",
     "lint": "eslint --ext .js,.ts src",
     "test": "jest -c jest.config.js",
     "coverage": "jest -c jest.config.js --collect-coverage"
