@@ -702,11 +702,11 @@ const testCases = function (testBackend) {
       var elem = createElem('component-attr-a')
       expect(elem.data.da).toBe(1)
       expect(elem.$.a.$$.getAttribute('attr-a')).toBe('1')
-      expect(elem.$.a.getAttribute('attr-a')).toBe('1')
+      expect(elem.$.a.getAttribute('attr-a')).toBe(1)
       elem.data = { da: 2 }
       expect(elem.data.da).toBe(2)
       expect(elem.$.a.$$.getAttribute('attr-a')).toBe('2')
-      expect(elem.$.a.getAttribute('attr-a')).toBe('2')
+      expect(elem.$.a.getAttribute('attr-a')).toBe(2)
     })
 
     it('should reflect to attributes', function () {

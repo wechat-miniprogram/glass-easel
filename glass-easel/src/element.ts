@@ -2055,12 +2055,10 @@ export class Element implements NodeCast {
   }
 
   /** Get an attribute value ( `null` if not set or removed) */
-  getAttribute(name: string): string | null {
+  getAttribute(name: string): unknown {
     if (!this._$nodeAttributes) return null
     if (!Object.prototype.hasOwnProperty.call(this._$nodeAttributes, name)) return null
-    const value = this._$nodeAttributes[name]
-    if (value === false) return null
-    return value === true || value === undefined || value === null ? '' : String(value)
+    return this._$nodeAttributes[name]
   }
 
   /** Update an attribute value */
