@@ -23,10 +23,10 @@
     "coverage": "jest -c jest.config.js --collect-coverage"
   },
   "peerDependencies": {
-    "glass-easel": "*"
+    "glass-easel": "0.2"
   },
   "devDependencies": {
-    "glass-easel": "*",
-    "glass-easel-template-compiler": "*"
+    "glass-easel": "0.2",
+    "glass-easel-template-compiler": "0.2"
   }
 }

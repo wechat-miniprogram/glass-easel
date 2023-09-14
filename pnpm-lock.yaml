@@ -78,16 +78,16 @@ importers:
   glass-easel:
     devDependencies:
       glass-easel-template-compiler:
-        specifier: '*'
+        specifier: '0.2'
         version: link:../glass-easel-template-compiler
 
   glass-easel-miniprogram-adapter:
     devDependencies:
       glass-easel:
-        specifier: '*'
+        specifier: '0.2'
         version: link:../glass-easel
       glass-easel-template-compiler:
-        specifier: '*'
+        specifier: '0.2'
         version: link:../glass-easel-template-compiler
 
   glass-easel-miniprogram-template:
@@ -130,17 +130,17 @@ importers:
         specifier: ^3.5.3
         version: 3.5.3
       glass-easel:
-        specifier: '0.1'
-        version: 0.1.0
+        specifier: '0.2'
+        version: link:../glass-easel
       glass-easel-miniprogram-adapter:
-        specifier: '0.1'
-        version: 0.1.0(glass-easel@0.1.0)
+        specifier: '0.2'
+        version: link:../glass-easel-miniprogram-adapter
       glass-easel-stylesheet-compiler:
-        specifier: '0.1'
-        version: 0.1.0
+        specifier: '0.2'
+        version: link:../glass-easel-stylesheet-compiler
       glass-easel-template-compiler:
-        specifier: '0.1'
-        version: 0.1.0
+        specifier: '0.2'
+        version: link:../glass-easel-template-compiler
       source-map:
         specifier: ^0.7.4
         version: 0.7.4
@@ -2669,30 +2669,6 @@ packages:
     resolution: {integrity: sha512-Ln0UQDlxH1BapMu3GPtf7CuYNwRZf2gwCuPqbyG6pB8WfmFpzqcy4xtAaAMUhnNqjMKTiCPZG2oMT3YSx8U2NA==}
     engines: {node: '>=0.10.0'}
     dev: true
-
-  /glass-easel-miniprogram-adapter@0.1.0(glass-easel@0.1.0):
-    resolution: {integrity: sha512-5VhrvgfolDq02oEb1qd9aOVjqR6csMiT46hYZUjml6oJtDDKD/fxzcGQ1FuMWV8Yj0S+I5GMnejXafcODSDY6w==}
-    deprecated: critical build bugs
-    peerDependencies:
-      glass-easel: '*'
-    dependencies:
-      glass-easel: 0.1.0
-    dev: false
-
-  /glass-easel-stylesheet-compiler@0.1.0:
-    resolution: {integrity: sha512-BNgj6PXeN15Heun3FPTDkNJf2oiNmECWKQJWW5CW4mceQ5g0K5meNmNri7ngIIzTQW/GUbRZE0v3DD69tMDoaQ==}
-    deprecated: critical build bugs
-    dev: false
-
-  /glass-easel-template-compiler@0.1.0:
-    resolution: {integrity: sha512-ZilgjWhDD5nDyZCjwAYlj1imPlDh8e6wHWMZ8kjWM45LhvWoy7TRoufOWiW5lblbWBmBg3VIsGnYH/CXlymrQA==}
-    deprecated: critical build bugs
-    dev: false
-
-  /glass-easel@0.1.0:
-    resolution: {integrity: sha512-YfBQXZcXGFTybAJLsqjyz28/DmUOSDC3qv1gIdymhvORLenxWI1iKhjzo5ypIc1dlhJkJDePfgMun6OvJY6pIQ==}
-    deprecated: critical build bugs
-    dev: false
 
   /glob-parent@5.1.2:
     resolution: {integrity: sha512-AOIgSQCepiJYwP3ARnGx+5VnTu2HBYdzbGP45eLw1vr3zB3vZLeyed1sC9hnbcOc9/SrMyM5RPQrkGz4aS9Zow==}
