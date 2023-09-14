@@ -2058,10 +2058,17 @@ export class Element implements NodeCast {
         capture,
         mutLevel,
       )
-    } else {
-      ;(this._$backendElement as backend.Element).setEventDefaultPrevented(
+    } else if (BM.COMPOSED || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Composed)) {
+      ;(this._$backendElement as composedBackend.Element).setEventDefaultPrevented(
         name,
-        revertEventDefaultPrevented ? !enabled : enabled,
+        revertEventDefaultPrevented ? !capture : capture,
+      )
+    } else {
+      ;(this._$nodeTreeContext as domlikeBackend.Context).setListenerStats(
+        this._$backendElement as domlikeBackend.Element,
+        name,
+        capture,
+        mutLevel,
       )
     }
   }

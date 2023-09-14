@@ -40,6 +40,7 @@ export interface Context extends Partial<suggestedBackend.Context> {
     ) => EventBubbleStatus,
   ): void
   setListenerStats(element: Element, type: string, capture: boolean, mutLevel: MutLevel): void
+  setElementEventDefaultPrevented(element: Element, type: string, enabled: boolean): void
   setModelBindingStat(
     element: Element,
     attributeName: string,
@@ -382,6 +383,42 @@ export class CurrentWindowBackendContext implements Context {
     listeners.mousedown = true
     listeners.mousemove = true
     listeners.mouseup = true
+  }
+
+  setElementEventDefaultPrevented(element: Element, type: string, _enabled: boolean): void {
+    // for non-passive events,
+    // the default-prevented status can also be found in `EventBubbleStatus` ,
+    // so there is nothing to do with non-passive events.
+    if (!element) return
+
+    const shouldDelegate = DELEGATE_EVENTS.includes(type)
+
+    if (shouldDelegate) {
+      if (this._$delegatedEventListeners[type]) return
+      this._$delegatedEventListeners[type] = true
+
+      document.body.addEventListener(
+        type,
+        (ev) => {
+          this._$trigger(ev, type, this._$getEventDetail(ev), ev.bubbles, ev.composed)
+        },
+        { capture: true },
+      )
+      return
+    }
+
+    if (!this._$elementEventListeners.has(element)) {
+      this._$elementEventListeners.set(element, Object.create(null))
+    }
+    const listeners = this._$elementEventListeners.get(element)!
+    if (listeners[type]) return
+    listeners[type] = true
+
+    element.addEventListener(type, (ev) => {
+      if (this._$triggedEvents.has(ev)) return
+      this._$triggedEvents.add(ev)
+      this._$trigger(ev, type, this._$getEventDetail(ev), ev.bubbles, ev.composed)
+    })
   }
 
   setListenerStats(element: Element, type: string, capture: boolean, mutLevel: MutLevel): void {

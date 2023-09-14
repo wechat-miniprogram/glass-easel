@@ -64,6 +64,7 @@ export interface Element extends Partial<suggestedBackend.Element> {
   getBoundingClientRect(cb: (res: BoundingClientRect) => void): void
   getScrollOffset(cb: (res: ScrollOffset) => void): void
   setModelBindingStat(attributeName: string, listener: ((newValue: unknown) => void) | null): void
+  setEventDefaultPrevented(type: string, enabled: boolean): void
   setListenerStats(type: string, capture: boolean, mutLevel: MutLevel): void
   createIntersectionObserver(
     relativeElement: Element | null,
@@ -274,6 +275,10 @@ export class EmptyComposedBackendElement implements Element {
         scrollHeight: 0,
       })
     }, 0)
+  }
+
+  setEventDefaultPrevented(_type: string, _enabled: boolean): void {
+    // empty
   }
 
   setListenerStats(_type: string, _capture: boolean, _mutLevel: MutLevel): void {
