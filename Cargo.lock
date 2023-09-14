@@ -276,7 +276,7 @@ dependencies = [
 
 [[package]]
 name = "glass-easel-stylesheet-compiler"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "clap 2.33.3",
  "console_log",
@@ -290,7 +290,7 @@ dependencies = [
 
 [[package]]
 name = "glass-easel-template-compiler"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "cbindgen",
  "clap 2.33.3",

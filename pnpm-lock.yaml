@@ -78,32 +78,32 @@ importers:
   glass-easel:
     devDependencies:
       glass-easel-template-compiler:
-        specifier: '0.2'
+        specifier: 0.2.1
         version: link:../glass-easel-template-compiler
 
   glass-easel-miniprogram-adapter:
     devDependencies:
       glass-easel:
-        specifier: '0.2'
+        specifier: 0.2.1
         version: link:../glass-easel
       glass-easel-template-compiler:
-        specifier: '0.2'
+        specifier: 0.2.1
         version: link:../glass-easel-template-compiler
 
   glass-easel-miniprogram-template:
     dependencies:
       glass-easel:
-        specifier: '0.2'
+        specifier: 0.2.1
         version: link:../glass-easel
       glass-easel-miniprogram-adapter:
-        specifier: '0.2'
+        specifier: 0.2.1
         version: link:../glass-easel-miniprogram-adapter
     devDependencies:
       css-loader:
         specifier: ^6.7.1
         version: 6.7.3(webpack@5.75.0)
       glass-easel-miniprogram-webpack-plugin:
-        specifier: '0.2'
+        specifier: 0.2.1
         version: link:../glass-easel-miniprogram-webpack-plugin
       less:
         specifier: ^4.1.3
@@ -130,16 +130,16 @@ importers:
         specifier: ^3.5.3
         version: 3.5.3
       glass-easel:
-        specifier: '0.2'
+        specifier: 0.2.1
         version: link:../glass-easel
       glass-easel-miniprogram-adapter:
-        specifier: '0.2'
+        specifier: 0.2.1
         version: link:../glass-easel-miniprogram-adapter
       glass-easel-stylesheet-compiler:
-        specifier: '0.2'
+        specifier: 0.2.1
         version: link:../glass-easel-stylesheet-compiler
       glass-easel-template-compiler:
-        specifier: '0.2'
+        specifier: 0.2.1
         version: link:../glass-easel-template-compiler
       source-map:
         specifier: ^0.7.4
