@@ -115,11 +115,18 @@ export const convertGenerics = (
           genericImpls[key] = target
         }
       } else {
-        const defaultComp = genericDefaults[key] || space.getDefaultComponent()
+        let defaultComp = genericDefaults[key]
         if (!defaultComp) {
-          throw new Error(
-            `Cannot find default component for generic "${key}" (on component "${compDef.is}")`,
-          )
+          defaultComp = space.getDefaultComponent()
+          if (!defaultComp) {
+            throw new Error(
+              `Cannot find default component for generic "${key}" (on component "${compDef.is}")`,
+            )
+          } else {
+            triggerWarning(
+              `Cannot find impl for generic "${key}", using default component (on component "${compDef.is}")`,
+            )
+          }
         }
         genericImpls[key] =
           typeof defaultComp === 'string'
@@ -159,11 +166,18 @@ export const resolvePlaceholder = (
     }
   }
   if (ret) return ret
-  const comp = space.getGlobalUsingComponent(placeholder) ?? space.getDefaultComponent()
+  let comp = space.getGlobalUsingComponent(placeholder)
   if (!comp) {
-    throw new Error(
-      `Cannot find default component for placeholder target "${placeholder}" (on component "${behavior.is}")`,
-    )
+    comp = space.getDefaultComponent()
+    if (!comp) {
+      throw new Error(
+        `Cannot find default component for placeholder target "${placeholder}" (on component "${behavior.is}")`,
+      )
+    } else {
+      triggerWarning(
+        `Cannot find placeholder target "${placeholder}", using default component (on component "${behavior.is}")`,
+      )
+    }
   }
   return comp
 }

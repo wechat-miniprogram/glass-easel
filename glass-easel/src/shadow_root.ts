@@ -15,6 +15,7 @@ import { ComponentDefinitionWithPlaceholder } from './behavior'
 import { BM, BackendMode } from './backend/mode'
 import { DeepCopyStrategy, getDeepCopyStrategy } from './data_proxy'
 import { deepCopy, simpleDeepCopy } from './data_utils'
+import { triggerWarning } from './func_arr'
 
 export const enum SlotMode {
   Direct = 0,
@@ -229,10 +230,17 @@ export class ShadowRoot extends VirtualNode {
     }
 
     // find in the space otherwise
-    const comp = space.getGlobalUsingComponent(compName) ?? space.getDefaultComponent()
+    let comp = space.getGlobalUsingComponent(compName)
     /* istanbul ignore if */
     if (!comp) {
-      throw new Error(`Cannot find component "${compName}"`)
+      comp = space.getDefaultComponent()
+      if (!comp) {
+        throw new Error(`Cannot find component "${compName}"`)
+      } else {
+        triggerWarning(
+          `Cannot find using component "${compName}", using default component (on component "${beh.is}")`,
+        )
+      }
     }
     if (typeof comp === 'string') {
       return this.createNativeNodeWithInit(comp, tagName, undefined, initPropValues)
