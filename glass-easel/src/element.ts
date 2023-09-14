@@ -2055,30 +2055,17 @@ export class Element implements NodeCast {
   }
 
   /** Get an attribute value ( `null` if not set or removed) */
-  getAttribute(name: string): unknown {
-    if (this._$nodeAttributes) return this._$nodeAttributes[name]
-    return null
+  getAttribute(name: string): string | null {
+    if (!this._$nodeAttributes) return null
+    if (!Object.prototype.hasOwnProperty.call(this._$nodeAttributes, name)) return null
+    const value = this._$nodeAttributes[name]
+    if (value === false) return null
+    return value === true || value === undefined || value === null ? '' : String(value)
   }
 
   /** Update an attribute value */
   updateAttribute(name: string, value: unknown) {
-    if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
-      if (typeof value === 'boolean') {
-        if (value === true) {
-          this.setAttribute(name, '')
-        } else {
-          this.removeAttribute(name)
-        }
-      } else {
-        this.setAttribute(name, value === undefined || value === null ? '' : String(value))
-      }
-    } else {
-      if (value === undefined) {
-        this.removeAttribute(name)
-      } else {
-        this.setAttribute(name, value)
-      }
-    }
+    this.setAttribute(name, value)
   }
 
   /** Set an attribute value */
@@ -2091,8 +2078,20 @@ export class Element implements NodeCast {
       this._$nodeAttributes = attrs
     }
     attrs[name] = value
-    if (this._$backendElement) {
-      this._$backendElement.setAttribute(name, value)
+    const be = this._$backendElement
+    if (be) {
+      if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
+        if (value === false) {
+          be.removeAttribute(name)
+        } else {
+          be.setAttribute(
+            name,
+            value === true || value === undefined || value === null ? '' : String(value),
+          )
+        }
+      } else {
+        be.setAttribute(name, value)
+      }
     }
   }
 
@@ -2314,7 +2313,16 @@ export class Element implements NodeCast {
 
       const newSlot = node.containingSlot as Element | null
 
-      Element.insertChildReassign(node.parentNode!, node, oldSlot, newSlot, node.parentIndex)
+      const recv = (node: Node) => {
+        if (node instanceof Element && node._$inheritSlots) {
+          for (let i = 0; i < node.childNodes.length; i += 1) {
+            recv(node.childNodes[i]!)
+          }
+        } else {
+          Element.insertChildReassign(node.parentNode!, node, oldSlot, newSlot, node.parentIndex)
+        }
+      }
+      recv(node)
 
       containingSlotUpdater?.insertSlotNodes()
     }

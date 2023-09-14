@@ -1,34 +1,35 @@
 /* eslint-disable */
 
-const { tmpl, domBackend, shadowBackend, execWithWarn } = require('../base/env')
+const { tmpl, domBackend, execWithWarn, composedBackend } = require('../base/env')
 const glassEasel = require('../../src')
 
-const componentSpace = new glassEasel.ComponentSpace()
-componentSpace.updateComponentOptions({
-  writeFieldsToNode: true,
-})
-componentSpace.defineComponent({
-  is: '',
-})
 
-const regBeh = (config) => {
-  return componentSpace.defineBehavior(config)
-}
+const testCases = function (testBackend) {
+  const componentSpace = new glassEasel.ComponentSpace()
+  componentSpace.updateComponentOptions({
+    writeFieldsToNode: true,
+  })
+  componentSpace.defineComponent({
+    is: '',
+  })
 
-const regElem = (config) => {
-  const { template, ...c } = config
-  if (template) c.template = tmpl(template)
-  const ret = componentSpace.defineComponent(c)
-  componentSpace.setGlobalUsingComponent(config.is, ret)
-  return ret
-}
+  const regBeh = (config) => {
+    return componentSpace.defineBehavior(config)
+  }
 
-const createElem = (is, backend) => {
-  const def = componentSpace.getComponent(is)
-  return glassEasel.Component.createWithContext(is || 'test', def, backend || domBackend)
-}
+  const regElem = (config) => {
+    const { template, ...c } = config
+    if (template) c.template = tmpl(template)
+    const ret = componentSpace.defineComponent(c)
+    componentSpace.setGlobalUsingComponent(config.is, ret)
+    return ret
+  }
 
-describe('Component', function () {
+  const createElem = (is, backend) => {
+    const def = componentSpace.getComponent(is)
+    return glassEasel.Component.createWithContext(is || 'test', def, backend || testBackend)
+  }
+
   describe('#register', function () {
     it('should be able to register component', function () {
       regElem({
@@ -562,7 +563,9 @@ describe('Component', function () {
       var elem = createElem('')
       expect(elem).toBeInstanceOf(glassEasel.Element)
       expect(elem.is).toBe('')
-      expect(elem.$$).toBeInstanceOf(window.HTMLElement)
+      if (testBackend === domBackend) {
+        expect(elem.$$).toBeInstanceOf(window.HTMLElement)
+      }
     })
 
     it('should call lifetime methods', function () {
@@ -922,53 +925,77 @@ describe('Component', function () {
           extraStyleScope: glassEasel.StyleScopeManager.globalScope(),
         },
         behaviors: ['component-class-beh'],
-        template: '<span id="b"></span>',
+        template: '<span id="b" class="bb"></span>',
+      })
+      regElem({
+        is: 'component-class-c',
+        options: {
+          styleScope: componentSpace.styleScopeManager.register('component-class-c'),
+          extraStyleScope: componentSpace.styleScopeManager.register('component-class-cc'),
+        },
+        behaviors: ['component-class-beh'],
+        template: '<span id="c" class="cc"></span>',
       })
     })
 
     it('should allow setting classes', function () {
       var elem = createElem('component-class-a')
-      var elem2 = createElem('component-class-b')
       expect(elem.$.a.classList.contains('aa')).toBe(true)
-      expect(elem2.$.b.classList.contains('aa')).toBe(false)
       expect(elem.$.a.classList.contains('component-class-a--aa')).toBe(false)
-      expect(elem2.$.b.classList.contains('component-class-b--aa')).toBe(false)
       expect(elem.$.a.class).toBe('aa')
       expect(elem.$.a.$$.getAttribute('class')).toBe('component-class-a--aa')
-      expect(elem2.$.b.class).toBe('')
-      expect(elem2.$.b.$$.getAttribute('class')).toBe(null)
       elem.$.a.classList.toggle('aa')
       elem.$.a.classList.toggle('a-a')
+      expect(elem.$.a.class).toBe('a-a')
       expect(elem.$.a.classList.contains('aa')).toBe(false)
       expect(elem.$.a.classList.contains('a-a')).toBe(true)
       expect(elem.$.a.$$.getAttribute('class')).toBe('component-class-a--a-a')
       elem.$.a.classList.toggle('aa', false)
       elem.$.a.classList.toggle('a-a', true)
+      expect(elem.$.a.class).toBe('a-a')
       expect(elem.$.a.classList.contains('aa')).toBe(false)
       expect(elem.$.a.classList.contains('a-a')).toBe(true)
       expect(elem.$.a.$$.getAttribute('class')).toBe('component-class-a--a-a')
     })
 
-    it('should allow setting classes in non-DOM backend', function () {
-      var elem = createElem('component-class-a', shadowBackend)
-      var elem2 = createElem('component-class-b', shadowBackend)
-      expect(elem.$.a.classList.contains('aa')).toBe(true)
-      expect(elem2.$.b.classList.contains('aa')).toBe(false)
-      expect(elem.$.a.classList.contains('component-class-a--aa')).toBe(false)
-      expect(elem2.$.b.classList.contains('component-class-b--aa')).toBe(false)
-      expect(elem.$.a.class).toBe('aa')
-      expect(elem2.$.b.class).toBe('')
-      elem.$.a.class = 'aa'
-      expect(elem.$.a.classList.contains('aa')).toBe(true)
-      expect(elem.$.a.classList.contains('a-a')).toBe(false)
-      elem.$.a.classList.toggle('aa', false)
-      elem.$.a.classList.toggle('a-a', true)
-      expect(elem.$.a.classList.contains('aa')).toBe(false)
-      expect(elem.$.a.classList.contains('a-a')).toBe(true)
-      elem.$.a.destroyBackendElement()
-      elem.$.a.class = 'aa'
-      expect(elem.$.a.classList.contains('aa')).toBe(true)
-      expect(elem.$.a.classList.contains('a-a')).toBe(false)
+    it('should allow setting classes with extra global style scope', function () {
+      var elem = createElem('component-class-b')
+      expect(elem.$.b.classList.contains('bb')).toBe(true)
+      expect(elem.$.b.classList.contains('component-class-b--bb')).toBe(false)
+      expect(elem.$.b.class).toBe('bb')
+      expect(elem.$.b.$$.getAttribute('class')).toBe('bb component-class-b--bb')
+      elem.$.b.classList.toggle('bb')
+      elem.$.b.classList.toggle('b-b')
+      expect(elem.$.b.class).toBe('b-b')
+      expect(elem.$.b.classList.contains('bb')).toBe(false)
+      expect(elem.$.b.classList.contains('b-b')).toBe(true)
+      expect(elem.$.b.$$.getAttribute('class')).toBe('b-b component-class-b--b-b')
+      elem.$.b.classList.toggle('bb', false)
+      elem.$.b.classList.toggle('b-b', true)
+      expect(elem.$.b.class).toBe('b-b')
+      expect(elem.$.b.classList.contains('bb')).toBe(false)
+      expect(elem.$.b.classList.contains('b-b')).toBe(true)
+      expect(elem.$.b.$$.getAttribute('class')).toBe('b-b component-class-b--b-b')
+    })
+
+    it('should allow setting classes with extra style scope', function () {
+      var elem = createElem('component-class-c')
+      expect(elem.$.c.classList.contains('cc')).toBe(true)
+      expect(elem.$.c.classList.contains('component-class-c--cc')).toBe(false)
+      expect(elem.$.c.class).toBe('cc')
+      expect(elem.$.c.$$.getAttribute('class')).toBe('component-class-cc--cc component-class-c--cc')
+      elem.$.c.classList.toggle('cc')
+      elem.$.c.classList.toggle('c-c')
+      expect(elem.$.c.class).toBe('c-c')
+      expect(elem.$.c.classList.contains('cc')).toBe(false)
+      expect(elem.$.c.classList.contains('c-c')).toBe(true)
+      expect(elem.$.c.$$.getAttribute('class')).toBe('component-class-cc--c-c component-class-c--c-c')
+      elem.$.c.classList.toggle('cc', false)
+      elem.$.c.classList.toggle('c-c', true)
+      expect(elem.$.c.class).toBe('c-c')
+      expect(elem.$.c.classList.contains('cc')).toBe(false)
+      expect(elem.$.c.classList.contains('c-c')).toBe(true)
+      expect(elem.$.c.$$.getAttribute('class')).toBe('component-class-cc--c-c component-class-c--c-c')
     })
 
     it('should be able to disable class prefix', function () {
@@ -1090,159 +1117,161 @@ describe('Component', function () {
       }
     })
 
-    it('should support external classes', function () {
-      regElem({
-        is: 'component-external-classes-native',
-        options: {
-          externalComponent: true,
-          styleScope: componentSpace.styleScopeManager.register(
-            'component-external-classes-native',
-          ),
-        },
+    if (testBackend === domBackend) {
+      it('should support external classes', function () {
+        regElem({
+          is: 'component-external-classes-native',
+          options: {
+            externalComponent: true,
+            styleScope: componentSpace.styleScopeManager.register(
+              'component-external-classes-native',
+            ),
+          },
+        })
+        regElem({
+          is: 'component-external-classes-a',
+          options: {
+            styleScope: componentSpace.styleScopeManager.register('component-external-classes-a'),
+          },
+          externalClasses: ['A1'],
+          template: '<component-external-classes-native id="child" class="static A1" /> <slot />',
+        })
+        regElem({
+          is: 'component-external-classes-b',
+          externalClasses: ['B1', 'B2'],
+          options: {
+            styleScope: componentSpace.styleScopeManager.register('component-external-classes-b'),
+          },
+          template:
+            '<component-external-classes-a id="a1" class="B1" /> <component-external-classes-a id="a2" class="B2 static" />',
+        })
+        regElem({
+          is: 'component-external-classes-c',
+          externalClasses: ['C1'],
+          options: {
+            styleScope: componentSpace.styleScopeManager.register('component-external-classes-c'),
+          },
+          template: '<component-external-classes-b id="b1" class="C1" />',
+        })
+        regElem({
+          is: 'component-external-classes-d',
+          options: {
+            styleScope: componentSpace.styleScopeManager.register('component-external-classes-d'),
+          },
+          template: '<component-external-classes-c id="c1" /> <span id="span" />',
+        })
+        var elem = createElem('component-external-classes-d')
+        expect(elem.$.c1.hasExternalClass('C1')).toBe(true)
+        expect(elem.$.c1.hasExternalClass('C123')).toBe(false)
+
+        expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
+          'component-external-classes-a--static',
+        )
+        expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('')
+        expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
+          'component-external-classes-b--static',
+        )
+        expect(elem.$.c1.$.b1.$$.getAttribute('class')).toBe('')
+        expect(elem.$.c1.$$.getAttribute('class')).toBe(null)
+        elem.$.c1.$.b1.$.a1.setExternalClass('A1', 'B1')
+        expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
+          'component-external-classes-a--static',
+        )
+        elem.$.c1.$.b1.setExternalClass('B1', 'C1')
+        expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
+          'component-external-classes-a--static',
+        )
+        expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('')
+        expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
+          'component-external-classes-b--static',
+        )
+        elem.$.c1.setExternalClass('C1', 'AAA')
+        expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
+          'component-external-classes-a--static component-external-classes-d--AAA',
+        )
+        expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('component-external-classes-d--AAA')
+        expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
+          'component-external-classes-b--static',
+        )
+        expect(elem.$.c1.$.b1.$$.getAttribute('class')).toBe('component-external-classes-d--AAA')
+        expect(elem.$.c1.$$.getAttribute('class')).toBe(null)
+
+        elem.$.c1.$.b1.$.a2.setExternalClass('A1', 'B2 BBB')
+        elem.$.c1.$.b1.setExternalClass('B2', 'C1')
+        expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
+          'component-external-classes-a--static component-external-classes-d--AAA',
+        )
+        expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('component-external-classes-d--AAA')
+        expect(elem.$.c1.$.b1.$.a2.$.child.$$.getAttribute('class')).toBe(
+          'component-external-classes-a--static component-external-classes-d--AAA component-external-classes-b--BBB',
+        )
+        expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
+          'component-external-classes-d--AAA component-external-classes-b--static',
+        )
+        expect(elem.$.c1.$.b1.$$.getAttribute('class')).toBe('component-external-classes-d--AAA')
+
+        elem.$.c1.setExternalClass('C1', 'BBB')
+        expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
+          'component-external-classes-a--static component-external-classes-d--BBB',
+        )
+        expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('component-external-classes-d--BBB')
+        expect(elem.$.c1.$.b1.$.a2.$.child.$$.getAttribute('class')).toBe(
+          'component-external-classes-a--static component-external-classes-d--BBB component-external-classes-b--BBB',
+        )
+        expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
+          'component-external-classes-d--BBB component-external-classes-b--static',
+        )
+        expect(elem.$.c1.$.b1.$$.getAttribute('class')).toBe('component-external-classes-d--BBB')
+
+        var a3 = elem.$.c1.$.b1.shadowRoot.createNativeNode('div')
+        a3.id = 'a3'
+        a3.class = null
+        expect(a3.class).toBe('')
+        a3.class = 'B1 B2'
+        expect(a3.$$.getAttribute('class')).toBe('component-external-classes-d--BBB')
+        elem.$.c1.$.b1.$.a2.appendChild(a3)
+        expect(elem.$.c1.$.b1.$.a3.$$.getAttribute('class')).toBe('component-external-classes-d--BBB')
+
+        elem.$.c1.$.b1.setExternalClass('B2', '~CCC CCCC')
+        expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
+          'component-external-classes-a--static component-external-classes-d--BBB',
+        )
+        expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('component-external-classes-d--BBB')
+        expect(elem.$.c1.$.b1.$.a2.$.child.$$.getAttribute('class')).toBe(
+          'component-external-classes-a--static component-external-classes-d--CCC component-external-classes-c--CCCC component-external-classes-b--BBB',
+        )
+        expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
+          'component-external-classes-d--CCC component-external-classes-c--CCCC component-external-classes-b--static',
+        )
+        expect(elem.$.c1.$.b1.$.a3.$$.getAttribute('class')).toBe(
+          'component-external-classes-d--BBB component-external-classes-d--CCC component-external-classes-c--CCCC',
+        )
+        expect(elem.$.c1.$.b1.$$.getAttribute('class')).toBe('component-external-classes-d--BBB')
+
+        elem.$.c1.$.b1.scheduleExternalClassChange('B1', '')
+        elem.$.c1.$.b1.scheduleExternalClassChange('B2', '^CCC')
+        expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
+          'component-external-classes-a--static component-external-classes-d--BBB',
+        )
+        elem.$.c1.$.b1.applyExternalClassChanges()
+        expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
+          'component-external-classes-a--static',
+        )
+        elem.$.c1.$.b1.applyExternalClassChanges()
+        expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
+          'component-external-classes-a--static',
+        )
+        expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('')
+        expect(elem.$.c1.$.b1.$.a2.$.child.$$.getAttribute('class')).toBe(
+          'component-external-classes-a--static component-external-classes-d--CCC component-external-classes-b--BBB',
+        )
+        expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
+          'component-external-classes-d--CCC component-external-classes-b--static',
+        )
+        expect(elem.$.c1.$.b1.$.a3.$$.getAttribute('class')).toBe('component-external-classes-d--CCC')
+        expect(elem.$.c1.$.b1.$$.getAttribute('class')).toBe('component-external-classes-d--BBB')
       })
-      regElem({
-        is: 'component-external-classes-a',
-        options: {
-          styleScope: componentSpace.styleScopeManager.register('component-external-classes-a'),
-        },
-        externalClasses: ['A1'],
-        template: '<component-external-classes-native id="child" class="static A1" /> <slot />',
-      })
-      regElem({
-        is: 'component-external-classes-b',
-        externalClasses: ['B1', 'B2'],
-        options: {
-          styleScope: componentSpace.styleScopeManager.register('component-external-classes-b'),
-        },
-        template:
-          '<component-external-classes-a id="a1" class="B1" /> <component-external-classes-a id="a2" class="B2 static" />',
-      })
-      regElem({
-        is: 'component-external-classes-c',
-        externalClasses: ['C1'],
-        options: {
-          styleScope: componentSpace.styleScopeManager.register('component-external-classes-c'),
-        },
-        template: '<component-external-classes-b id="b1" class="C1" />',
-      })
-      regElem({
-        is: 'component-external-classes-d',
-        options: {
-          styleScope: componentSpace.styleScopeManager.register('component-external-classes-d'),
-        },
-        template: '<component-external-classes-c id="c1" /> <span id="span" />',
-      })
-      var elem = createElem('component-external-classes-d')
-      expect(elem.$.c1.hasExternalClass('C1')).toBe(true)
-      expect(elem.$.c1.hasExternalClass('C123')).toBe(false)
-
-      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
-        'component-external-classes-a--static',
-      )
-      expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('')
-      expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
-        'component-external-classes-b--static',
-      )
-      expect(elem.$.c1.$.b1.$$.getAttribute('class')).toBe('')
-      expect(elem.$.c1.$$.getAttribute('class')).toBe(null)
-      elem.$.c1.$.b1.$.a1.setExternalClass('A1', 'B1')
-      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
-        'component-external-classes-a--static',
-      )
-      elem.$.c1.$.b1.setExternalClass('B1', 'C1')
-      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
-        'component-external-classes-a--static',
-      )
-      expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('')
-      expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
-        'component-external-classes-b--static',
-      )
-      elem.$.c1.setExternalClass('C1', 'AAA')
-      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
-        'component-external-classes-a--static component-external-classes-d--AAA',
-      )
-      expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('component-external-classes-d--AAA')
-      expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
-        'component-external-classes-b--static',
-      )
-      expect(elem.$.c1.$.b1.$$.getAttribute('class')).toBe('component-external-classes-d--AAA')
-      expect(elem.$.c1.$$.getAttribute('class')).toBe(null)
-
-      elem.$.c1.$.b1.$.a2.setExternalClass('A1', 'B2 BBB')
-      elem.$.c1.$.b1.setExternalClass('B2', 'C1')
-      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
-        'component-external-classes-a--static component-external-classes-d--AAA',
-      )
-      expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('component-external-classes-d--AAA')
-      expect(elem.$.c1.$.b1.$.a2.$.child.$$.getAttribute('class')).toBe(
-        'component-external-classes-a--static component-external-classes-d--AAA component-external-classes-b--BBB',
-      )
-      expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
-        'component-external-classes-d--AAA component-external-classes-b--static',
-      )
-      expect(elem.$.c1.$.b1.$$.getAttribute('class')).toBe('component-external-classes-d--AAA')
-
-      elem.$.c1.setExternalClass('C1', 'BBB')
-      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
-        'component-external-classes-a--static component-external-classes-d--BBB',
-      )
-      expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('component-external-classes-d--BBB')
-      expect(elem.$.c1.$.b1.$.a2.$.child.$$.getAttribute('class')).toBe(
-        'component-external-classes-a--static component-external-classes-d--BBB component-external-classes-b--BBB',
-      )
-      expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
-        'component-external-classes-d--BBB component-external-classes-b--static',
-      )
-      expect(elem.$.c1.$.b1.$$.getAttribute('class')).toBe('component-external-classes-d--BBB')
-
-      var a3 = elem.$.c1.$.b1.shadowRoot.createNativeNode('div')
-      a3.id = 'a3'
-      a3.class = null
-      expect(a3.class).toBe('')
-      a3.class = 'B1 B2'
-      expect(a3.$$.getAttribute('class')).toBe('component-external-classes-d--BBB')
-      elem.$.c1.$.b1.$.a2.appendChild(a3)
-      expect(elem.$.c1.$.b1.$.a3.$$.getAttribute('class')).toBe('component-external-classes-d--BBB')
-
-      elem.$.c1.$.b1.setExternalClass('B2', '~CCC CCCC')
-      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
-        'component-external-classes-a--static component-external-classes-d--BBB',
-      )
-      expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('component-external-classes-d--BBB')
-      expect(elem.$.c1.$.b1.$.a2.$.child.$$.getAttribute('class')).toBe(
-        'component-external-classes-a--static component-external-classes-d--CCC component-external-classes-c--CCCC component-external-classes-b--BBB',
-      )
-      expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
-        'component-external-classes-d--CCC component-external-classes-c--CCCC component-external-classes-b--static',
-      )
-      expect(elem.$.c1.$.b1.$.a3.$$.getAttribute('class')).toBe(
-        'component-external-classes-d--BBB component-external-classes-d--CCC component-external-classes-c--CCCC',
-      )
-      expect(elem.$.c1.$.b1.$$.getAttribute('class')).toBe('component-external-classes-d--BBB')
-
-      elem.$.c1.$.b1.scheduleExternalClassChange('B1', '')
-      elem.$.c1.$.b1.scheduleExternalClassChange('B2', '^CCC')
-      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
-        'component-external-classes-a--static component-external-classes-d--BBB',
-      )
-      elem.$.c1.$.b1.applyExternalClassChanges()
-      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
-        'component-external-classes-a--static',
-      )
-      elem.$.c1.$.b1.applyExternalClassChanges()
-      expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
-        'component-external-classes-a--static',
-      )
-      expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('')
-      expect(elem.$.c1.$.b1.$.a2.$.child.$$.getAttribute('class')).toBe(
-        'component-external-classes-a--static component-external-classes-d--CCC component-external-classes-b--BBB',
-      )
-      expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
-        'component-external-classes-d--CCC component-external-classes-b--static',
-      )
-      expect(elem.$.c1.$.b1.$.a3.$$.getAttribute('class')).toBe('component-external-classes-d--CCC')
-      expect(elem.$.c1.$.b1.$$.getAttribute('class')).toBe('component-external-classes-d--BBB')
-    })
+    }
 
     afterAll(function () {
       glassEasel.globalOptions.writeExtraInfoToAttr = false
@@ -1448,4 +1477,11 @@ describe('Component', function () {
       ['pd', { customProp: 'customValue' }],
     ])
   })
+}
+
+describe('Component (DOM backend)', function () {
+  testCases(domBackend)
+})
+describe('Component (composed backend)', function () {
+  testCases(composedBackend)
 })
