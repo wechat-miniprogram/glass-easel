@@ -1017,7 +1017,7 @@ describe('Component', function () {
         options: {
           styleScope: componentSpace.styleScopeManager.register('a'),
         },
-        template: '<span id="a" class="a ^a ^^aa ~a"></span>',
+        template: '<span id="a" class="a ^a1 ^^a2 ^^^a3 ^^^^a4 ~a5"></span>',
       })
       regElem({
         is: 'component-class-special-prefix-b',
@@ -1025,25 +1025,25 @@ describe('Component', function () {
           styleScope: componentSpace.styleScopeManager.register('b'),
           extraStyleScope: glassEasel.StyleScopeManager.globalScope(),
         },
-        template: '<component-class-special-prefix-a id="b" class="b ^b ^^b ^^^bbb ~bb" />',
+        template: '<component-class-special-prefix-a id="b" class="b ^b1 ^^b2 ^^^b3 ~b4" />',
       })
       regElem({
         is: 'component-class-special-prefix-c',
         options: {
           styleScope: componentSpace.styleScopeManager.register('c'),
         },
-        template: '<component-class-special-prefix-b id="c" class="c ^c ~c" />',
+        template: '<component-class-special-prefix-b id="c" class="c ^c1 ^^c2 ~c3" />',
       })
       var elem = createElem('component-class-special-prefix-c')
-      expect(elem.$.c.class).toBe('c ^c ~c')
-      expect(elem.$.c.$$.getAttribute('class')).toBe('c--c c')
-      expect(elem.$.c.shadowRoot.querySelector('.bb').$$.getAttribute('class')).toBe(
-        'b b--b c--b c--bbb c--bb',
+      expect(elem.$.c.class).toBe('c ^c1 ^^c2 ~c3')
+      expect(elem.$.c.$$.getAttribute('class')).toBe('c--c c--c1 c--c2 c--c3')
+      expect(elem.$.c.shadowRoot.querySelector('.b2').$$.getAttribute('class')).toBe(
+        'b b--b c--b1 c--b2 c--b3 c--b4',
       )
-      expect(elem.$.c.$.b.shadowRoot.querySelector('.aa').$$.getAttribute('class')).toBe(
-        'a--a b--a c--aa c--a',
+      expect(elem.$.c.$.b.shadowRoot.querySelector('.a2').$$.getAttribute('class')).toBe(
+        'a--a b--a1 c--a2 c--a3 c--a4 c--a5',
       )
-      expect(elem.$.c.$.b.$.a.$$.getAttribute('class')).toBe('a--a b--a c--aa c--a')
+      expect(elem.$.c.$.b.$.a.$$.getAttribute('class')).toBe('a--a b--a1 c--a2 c--a3 c--a4 c--a5')
     })
 
     it('should adding write ID and class prefix info to DOM when required', function () {

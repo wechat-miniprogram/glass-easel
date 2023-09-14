@@ -1,7 +1,7 @@
 {
   "name": "glass-easel-miniprogram-adapter",
   "description": "The MiniProgram interface adapter of the glass-easel project",
-  "version": "0.1.1",
+  "version": "0.2.1",
   "repository": {
     "type": "git",
     "url": "https://github.com/wechat-miniprogram/glass-easel.git"
@@ -23,10 +23,10 @@
     "coverage": "jest -c jest.config.js --collect-coverage"
   },
   "peerDependencies": {
-    "glass-easel": "*"
+    "glass-easel": "0.2.1"
   },
   "devDependencies": {
-    "glass-easel": "*",
-    "glass-easel-template-compiler": "*"
+    "glass-easel": "0.2.1",
+    "glass-easel-template-compiler": "0.2.1"
   }
 }

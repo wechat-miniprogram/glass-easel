@@ -49,7 +49,7 @@ import {
 } from './data_proxy'
 import { Relation, generateRelationDefinitionGroup, RelationDefinitionGroup } from './relation'
 import { Template, TemplateEngine, TemplateInstance } from './template_engine'
-import { ClassList } from './class_list'
+import { ClassList, StyleScopeManager } from './class_list'
 import { GeneralBackendContext, GeneralBackendElement } from './node'
 import { DataPath, parseSinglePath, parseMultiPaths } from './data_path'
 import { ExternalShadowRoot } from './external_shadow_tree'
@@ -543,7 +543,19 @@ export class Component<
         externalClassAlias[externalClasses[i]!] = null
       }
     }
-    comp.classList = new ClassList(comp, externalClassAlias)
+    const styleScope = owner
+      ? owner.getHostNode().getComponentOptions().styleScope
+      : StyleScopeManager.globalScope()
+    const extraStyleScope = owner
+      ? owner.getHostNode().getComponentOptions().extraStyleScope ?? undefined
+      : undefined
+    comp.classList = new ClassList(
+      comp,
+      externalClassAlias,
+      owner ? owner.getHostNode().classList : null,
+      styleScope,
+      extraStyleScope,
+    )
     if (backendElement) {
       const styleScope = owner
         ? owner.getHostNode()._$definition._$options.styleScope

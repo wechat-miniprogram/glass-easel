@@ -265,10 +265,6 @@ impl TmplTree {
         w.paren(|w| {
             w.function(|w| {
                 w.expr_stmt(|w| {
-                    write!(w, "var P={}", gen_lit_str(&self.path))?;
-                    Ok(())
-                })?;
-                w.expr_stmt(|w| {
                     write!(w, "var H={{}}")?;
                     Ok(())
                 })?;
@@ -391,7 +387,7 @@ impl TmplTree {
                     has_scripts,
                 )?;
                 w.expr_stmt(|w| {
-                    write!(w, "return function(P){{return H[P]}}")?;
+                    write!(w, "return function(R){{return H[R]}}")?;
                     Ok(())
                 })?;
                 Ok(())

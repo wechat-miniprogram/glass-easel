@@ -76,22 +76,16 @@ export class ClassList {
   constructor(
     elem: Element,
     externalNameAlias: { [externalName: string]: string[] | null } | null,
+    owner: ClassList | null,
+    styleScope: number,
+    extraStyleScope: number | undefined,
   ) {
     this._$elem = elem
-    const ownerComp = elem.ownerShadowRoot?.getHostNode()
-    if (ownerComp) {
-      const compOptions = ownerComp.getComponentOptions()
-      this._$owner = ownerComp.classList
-      this._$defaultScope = compOptions.styleScope
-      this._$extraScope =
-        compOptions.extraStyleScope === null ? undefined : compOptions.extraStyleScope
-      this._$rootScope = ownerComp.classList!._$rootScope ?? this._$defaultScope
-    } else {
-      this._$owner = null
-      this._$defaultScope = StyleScopeManager.globalScope()
-      this._$extraScope = undefined
-      this._$rootScope = undefined
-    }
+    this._$owner = owner
+    this._$defaultScope = styleScope
+    this._$extraScope = extraStyleScope
+    // root owner got globalScope as it's styleScope, avoid the root owner
+    this._$rootScope = owner?._$owner ? owner._$rootScope : styleScope
     this._$alias = externalNameAlias
     if (externalNameAlias) {
       const resolved = Object.create(null) as { [externalName: string]: null }
@@ -128,12 +122,13 @@ export class ClassList {
       cb(this._$rootScope, name.slice(1))
     } else if (name[0] === '^') {
       let n = name.slice(1)
-      let owner = this._$owner
-      while (owner && n[0] === '^') {
+      let owner: ClassList | null | undefined = this._$owner
+      while (n[0] === '^') {
         n = n.slice(1)
-        owner = owner._$owner
+        owner = owner?._$owner
       }
-      const scopeId = owner ? owner._$defaultScope : this._$rootScope
+      // root owner got globalScope as it's styleScope, avoid the root owner
+      const scopeId = owner?._$owner ? owner._$defaultScope : this._$rootScope
       cb(scopeId, n)
     } else {
       if (this._$extraScope !== undefined) {

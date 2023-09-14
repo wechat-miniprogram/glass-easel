@@ -2,7 +2,7 @@ import * as backend from './backend/backend_protocol'
 import * as composedBackend from './backend/composed_backend_protocol'
 import * as domlikeBackend from './backend/domlike_backend_protocol'
 import { globalOptions } from './global_options'
-import { ClassList } from './class_list'
+import { ClassList, StyleScopeManager } from './class_list'
 import { Element } from './element'
 import { ShadowRoot } from './shadow_root'
 import type { EventListener, GeneralBackendElement } from '.'
@@ -79,7 +79,16 @@ export class NativeNode extends Element {
       backendElement = backend.createElement(tagName, stylingName ?? tagName)
     }
     node._$initialize(false, backendElement, owner, nodeTreeContext)
-    node.classList = new ClassList(node, null)
+    const ownerOptions = owner.getHostNode().getComponentOptions()
+    const styleScope = owner ? ownerOptions.styleScope : StyleScopeManager.globalScope()
+    const extraStyleScope = owner ? ownerOptions.extraStyleScope ?? undefined : undefined
+    node.classList = new ClassList(
+      node,
+      null,
+      owner ? owner.getHostNode().classList : null,
+      styleScope,
+      extraStyleScope,
+    )
     if (owner && backendElement) {
       const styleScope = owner.getHostNode()._$definition._$options.styleScope
       if (styleScope) {

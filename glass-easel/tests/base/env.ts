@@ -3,6 +3,7 @@
 
 import { TmplGroup } from 'glass-easel-template-compiler'
 import * as glassEasel from '../../src'
+import * as ComposedBackend from './composed_backend'
 
 glassEasel.globalOptions.throwGlobalError = true
 const warningThrow = (msg: string) => {
@@ -79,4 +80,4 @@ export const multiTmpl = (src: { [path: string]: string }, options?: TemplateOpt
 
 export const domBackend = new glassEasel.domlikeBackend.CurrentWindowBackendContext()
 export const shadowBackend = new glassEasel.backend.EmptyBackendContext()
-export const composedBackend = new glassEasel.composedBackend.EmptyComposedBackendContext()
+export const composedBackend = new ComposedBackend.Context()

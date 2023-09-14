@@ -19,7 +19,8 @@
         "declaration": true,
         "declarationMap": true,
         "declarationDir": "dist/types",
-        "preserveConstEnums": true
+        "preserveConstEnums": true,
+        "experimentalDecorators": true
     },
     "ts-node": {
         "compilerOptions": {

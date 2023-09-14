@@ -442,7 +442,7 @@ describe('binding expression', () => {
   test('function call', () => {
     const def = glassEasel.registerElement({
       template: tmpl(`
-        <div id="n1" data-a="{{ f(a, 1) }}"></div>
+        <div id="n1" data-a="{{ f(a, 1) }}" data-b="{{ noop() }}"></div>
       `),
       data: {
         a: 2,
@@ -452,6 +452,7 @@ describe('binding expression', () => {
     const elem = glassEasel.createElement('root', def.general())
     const n1 = elem.getShadowRoot()!.getElementById('n1')!
     expect(n1.dataset.a).toEqual(3)
+    expect(n1.dataset.b).toBeUndefined()
     elem.setData({ a: 10 })
     expect(n1.dataset.a).toEqual(11)
   })

@@ -288,7 +288,7 @@ export class EmptyComposedBackendElement implements Element {
   }
 
   createIntersectionObserver(
-    _relativeElement: Element | null,
+    _relativeElement: EmptyComposedBackendElement | null,
     _relativeElementMargin: string,
     _thresholds: number[],
     _listener: (res: IntersectionStatus) => void,

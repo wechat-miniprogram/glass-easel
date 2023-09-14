@@ -1,18 +1,18 @@
 {
   "name": "glass-easel-miniprogram-template",
-  "version": "0.1.1",
+  "version": "0.2.1",
   "main": "src/index.ts",
   "scripts": {
     "build": "webpack --config webpack.config.js",
     "dev": "webpack --config webpack.config.js --watch"
   },
   "dependencies": {
-    "glass-easel": "0.1",
-    "glass-easel-miniprogram-adapter": "0.1"
+    "glass-easel": "0.2.1",
+    "glass-easel-miniprogram-adapter": "0.2.1"
   },
   "devDependencies": {
     "css-loader": "^6.7.1",
-    "glass-easel-miniprogram-webpack-plugin": "0.1",
+    "glass-easel-miniprogram-webpack-plugin": "0.2.1",
     "less": "^4.1.3",
     "less-loader": "^11.0.0",
     "mini-css-extract-plugin": "^2.6.1",

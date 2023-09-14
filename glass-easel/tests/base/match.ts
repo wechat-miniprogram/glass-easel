@@ -31,34 +31,41 @@ export const native = (structure: {
 
 // check the structure of a backend element
 const testBackend = (elem: Element): void => {
-  const testDom = (elem: HTMLElement) => {
-    expect(elem).toBeInstanceOf(HTMLElement)
-    let sr = elem
-    let host = (sr as unknown as domlikeBackend.Element).__wxElement as GeneralComponent | undefined
-    while (!host) {
-      sr = sr.parentElement!
-      host = (sr as unknown as domlikeBackend.Element).__wxElement as GeneralComponent | undefined
+  const testDom = (be: domlikeBackend.Element) => {
+    if (elem.getBackendContext().mode === BackendMode.Domlike) {
+      expect(be).toBeInstanceOf(HTMLElement)
     }
-    const slot = (host.shadowRoot as ExternalShadowRoot).slot as unknown as HTMLElement
-    if (elem === slot) {
+    let sr = be
+    let host = sr.__wxElement as GeneralComponent | undefined
+    while (!host) {
+      sr = sr.parentNode!
+      host = sr.__wxElement as GeneralComponent | undefined
+    }
+    const slot = (host.shadowRoot as ExternalShadowRoot).slot as domlikeBackend.Element
+    if (be === slot) {
       host.childNodes.forEach((child, i) => {
         if (child instanceof TextNode) {
-          expect(child.textContent).toBe(elem.childNodes[i]!.textContent)
+          expect(child.textContent).toBe(be.childNodes[i]!.textContent)
         } else {
           // eslint-disable-next-line no-use-before-define
           virtual(child)
         }
       })
     } else {
-      for (let i = 0; i < elem.childNodes.length; i += 1) {
-        const domChild = elem.childNodes[i]
-        if (domChild instanceof HTMLElement) testDom(domChild)
-        else expect(domChild).toBeInstanceOf(Text)
+      for (let i = 0; i < be.childNodes.length; i += 1) {
+        const domChild = be.childNodes[i]! as Node & domlikeBackend.Element
+        if (domChild.nodeType === domChild.TEXT_NODE) {
+          if (elem.getBackendContext().mode === BackendMode.Domlike) {
+            expect(domChild).toBeInstanceOf(Text)
+          }
+        } else {
+          testDom(domChild)
+        }
       }
     }
   }
-  if (elem.getBackendContext().mode === BackendMode.Domlike) {
-    testDom(elem.getBackendElement() as unknown as HTMLElement)
+  if (elem.getBackendContext().mode !== BackendMode.Shadow) {
+    testDom(elem.getBackendElement() as domlikeBackend.Element)
   }
 }
 
@@ -84,7 +91,7 @@ export const virtual = (elem: Element, defDomElem?: HTMLElement, defIndex?: numb
         if (child instanceof Element) {
           virtual(child)
         } else if (child instanceof TextNode) {
-          if (elem.getBackendContext().mode === BackendMode.Domlike) {
+          if (elem.getBackendContext().mode !== BackendMode.Shadow) {
             expect(child.textContent).toBe(
               (child.getBackendElement() as unknown as HTMLElement).textContent,
             )
@@ -160,7 +167,7 @@ export const virtual = (elem: Element, defDomElem?: HTMLElement, defIndex?: numb
 
   // get the backend element if it is domlike backend
   let domElem: HTMLElement | undefined
-  if (elem.getBackendContext().mode === BackendMode.Domlike) {
+  if (elem.getBackendContext().mode !== BackendMode.Shadow) {
     if (elem instanceof Component && elem._$external) {
       domElem = (elem.shadowRoot as ExternalShadowRoot).slot as unknown as HTMLElement
     } else {
