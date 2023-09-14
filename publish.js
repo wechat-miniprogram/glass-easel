@@ -36,14 +36,23 @@ if (gitStatusRes.status !== 0 || gitStatusRes.stdout.length > 0) {
 ].forEach((p) => {
   let content = fs.readFileSync(p, { encoding: 'utf8' })
   let oldVersion
-  content = content.replace(/"version": "(.+)"/, (_, v) => {
-    oldVersion = v
-    return `"version": "${version}"`
-  })
+  const refVersions = []
+  content = content
+    .replace(/"version": "(.+)"/, (_, v) => {
+      oldVersion = v
+      return `"version": "${version}"`
+    })
+    .replace(/"(glass-easel|glass-easel-[-a-z]+)": "(.+)"/g, (_, mod, v) => {
+      refVersions.push({ mod, v })
+      return `"${mod}": "${version}"`
+    })
   if (!oldVersion) {
     throw new Error(`version segment not found in ${p}`)
   }
   console.info(`Update ${p} version from "${oldVersion}" to "${version}"`)
+  refVersions.forEach(({ mod, v }) => {
+    console.info(`  + dependency ${mod} version from "${v}" to "${version}"`)
+  })
   writeFileAndGitAdd(p, content)
 })
 
@@ -64,21 +73,9 @@ if (gitStatusRes.status !== 0 || gitStatusRes.stdout.length > 0) {
   },
 )
 
-// cargo test
-console.info('Run cargo test')
-if (childProcess.spawnSync('cargo', ['test'], { stdio: 'inherit' }).status !== 0) {
-  throw new Error('failed to clean glass-easel dist')
-}
-
 // pnpm install
 console.info('Run pnpm install')
 if (childProcess.spawnSync('pnpm', ['install'], { stdio: 'inherit' }).status !== 0) {
-  throw new Error('failed to clean glass-easel dist')
-}
-
-// npm test
-console.info('Run pnpm test')
-if (childProcess.spawnSync('pnpm', ['test', '-r'], { stdio: 'inherit' }).status !== 0) {
   throw new Error('failed to clean glass-easel dist')
 }
 
@@ -137,6 +134,35 @@ if (
   }).status !== 0
 ) {
   throw new Error('failed to compile glass-easel-miniprogram-adapter')
+}
+
+// compile glass-easel-miniprogram-template
+console.info('Compile glass-easel-miniprogram-template')
+if (
+  childProcess.spawnSync('rm', ['-rf', 'dist'], { cwd: 'glass-easel-miniprogram-template' })
+    .status !== 0
+) {
+  throw new Error('failed to clean glass-easel dist')
+}
+if (
+  childProcess.spawnSync('npm', ['run', 'build'], {
+    cwd: 'glass-easel-miniprogram-template',
+    stdio: 'inherit',
+  }).status !== 0
+) {
+  throw new Error('failed to compile glass-easel-miniprogram-template')
+}
+
+// cargo test
+console.info('Run cargo test')
+if (childProcess.spawnSync('cargo', ['test'], { stdio: 'inherit' }).status !== 0) {
+  throw new Error('failed to clean glass-easel dist')
+}
+
+// npm test
+console.info('Run pnpm test')
+if (childProcess.spawnSync('pnpm', ['test', '-r'], { stdio: 'inherit' }).status !== 0) {
+  throw new Error('failed to clean glass-easel dist')
 }
 
 // add lock files
