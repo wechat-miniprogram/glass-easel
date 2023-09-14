@@ -1,6 +1,5 @@
 /* eslint-disable no-console */
 
-const fs = require('fs')
 const childProcess = require('child_process')
 
 // check arguments
