@@ -1,4 +1,4 @@
-import { tmpl, composedBackend, domBackend } from '../base/env'
+import { tmpl, composedBackend, domBackend, shadowBackend } from '../base/env'
 import * as glassEasel from '../../src'
 import { virtual as matchElementWithDom } from '../base/match'
 
@@ -445,4 +445,5 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
 }
 
 describe('placeholder (DOM backend)', () => testCases(domBackend))
+describe('placeholder (shadow backend)', () => testCases(shadowBackend))
 describe('placeholder (composed backend)', () => testCases(composedBackend))

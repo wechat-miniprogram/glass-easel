@@ -1,10 +1,4 @@
-import {
-  BM,
-  BackendMode,
-  type GeneralBackendContext,
-  type GeneralBackendElement,
-  type backend,
-} from './backend'
+import { BM, BackendMode, type GeneralBackendContext } from './backend'
 import { performanceMeasureEnd, performanceMeasureStart } from './devtool'
 import { Element } from './element'
 import { ENV } from './global_options'
@@ -22,24 +16,24 @@ export class VirtualNode extends Element {
     super()
   }
 
+  /* @internal */
   protected _$initializeVirtual(
     virtualName: string,
     owner: ShadowRoot,
     nodeTreeContext: GeneralBackendContext,
-    backendElement: GeneralBackendElement | null,
   ) {
     this.is = String(virtualName)
     if (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Shadow)) {
       const shadowRoot = owner._$backendShadowRoot!
       if (ENV.DEV) performanceMeasureStart('backend.createVirtualNode')
-      const be = (backendElement as backend.Element) || shadowRoot.createVirtualNode(virtualName)
+      const be = shadowRoot.createVirtualNode(virtualName)
       if (ENV.DEV) performanceMeasureEnd()
       this._$initialize(true, be, owner, nodeTreeContext)
       if (ENV.DEV) performanceMeasureStart('backend.associateValue')
       be.associateValue(this)
       if (ENV.DEV) performanceMeasureEnd()
     } else {
-      this._$initialize(true, backendElement, owner, nodeTreeContext)
+      this._$initialize(true, null, owner, nodeTreeContext)
     }
   }
 
@@ -47,7 +41,7 @@ export class VirtualNode extends Element {
 
   static create(virtualName: string, owner: ShadowRoot): VirtualNode {
     const node = Object.create(VirtualNode.prototype) as VirtualNode
-    node._$initializeVirtual(virtualName, owner, owner._$nodeTreeContext, null)
+    node._$initializeVirtual(virtualName, owner, owner._$nodeTreeContext)
     return node
   }
 }

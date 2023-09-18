@@ -22,6 +22,7 @@ glass-easel 支持自定义后端。后端必须向 glass-easel 提供以下这�
 * 文本节点（仅承载文本，无子节点）；
 * 片段节点（用于临时承载节点树片段）；
 * 组件节点（仅 Shadow Mode ，拥有自己的 shadow tree ，可为虚拟或非虚拟）；
+* 组件根节点（仅 Shadow Mode，组件的 shadowRoot 节点）；
 * 虚拟节点（仅 Shadow Mode ）。
 
 ### 接口形式
@@ -97,6 +98,46 @@ glass-easel 并不会自行调用这个接口。应由其他模块调用这个�
 
 禁用一段已插入的样式表。
 
+### `Context#render(cb: (Error | null) => void): void`
+
+等待下一次渲染完成时的回调，即与后端节拍器对齐。
+
+后端必须保证回调是异步的。在回调中，设置新的属性应能触发 CSS transition 动画。
+
+### `Context#getRootNode(): Element`
+
+获得根节点。
+
+**在 Shadow Mode 下** ，根节点必须是组件根节点； **在 Composed Mode 下** ，根节点必须是普通节点。
+
+### `Context#createElement(tagName: string): Element`
+
+创建一个普通节点。
+
+**仅 Composed Mode 有效。**
+
+### `Context#createTextNode(content: string): Element`
+
+创建一个文本节点。
+
+**仅 Composed Mode 有效。**
+
+### `Context#createFragment(): Element`
+
+创建一个片段节点。它用于表示节点数组，方便批量插入和移除节点。
+
+### `Context#onEvent(listener: (target: Node, type: string, detail: any, options: EventOptions) => EventBubbleStatus | void): void`
+
+设置全局事件回调函数。这个回调函数只有一个。
+
+**仅 Composed Mode 有效**，Shadow Mode 参考下一个签名。
+
+### `Context#onEvent(createEvent: (type: string, detail: unknown, options: EventOptions) => Event<unknown>, listener: (event: Event<unknown>, currentTarget: Node, mark: Record<string, unknown> | null, target: Node, isCapture: boolean) => EventBubbleStatus | void): void`
+
+设置全局事件回调函数。这个回调函数只有一个。
+
+**仅 Shadow Mode 有效**，Composed Mode 参考上一个签名。
+
 ### `Context#addStyleSheetRule(mediaQueryStr: string, selector: string): number | null`
 
 插入一段样式表规则，返回它对应的规则序号。
@@ -169,38 +210,6 @@ glass-easel 并不会自行调用这个接口。应由其他模块调用这个�
 
 **这只是一个建议性质的接口。** glass-easel 并不会自行调用这个接口，但其他相关模块很可能调用。
 
-### `Context#render(cb: (Error | null) => void): void`
-
-等待下一次渲染完成时的回调，即与后端节拍器对齐。
-
-后端必须保证回调是异步的。在回调中，设置新的属性应能触发 CSS transition 动画。
-
-### `Context#getRootNode(): Element`
-
-获得根节点。
-
-**在 Shadow Mode 下** ，根节点必须是组件节点； **在 Composed Mode 下** ，根节点必须是普通节点。
-
-### `Context#createElement(tagName: string): Element`
-
-创建一个普通节点。
-
-**仅 Composed Mode 有效。**
-
-### `Context#createTextNode(content: string): Element`
-
-创建一个文本节点。
-
-**仅 Composed Mode 有效。**
-
-### `Context#createFragment(): Element`
-
-创建一个片段节点。它用于表示节点数组，方便批量插入和移除节点。
-
-### `Context#onEvent(listener: (target: Node, type: string, detail: any, options: EventOptions) => EventBubbleStatus): void`
-
-设置全局事件回调函数。这个回调函数只有一个。
-
 ### `Context#setFocusedNode(target: Node): void`
 
 设置焦点所在节点。如果节点不可聚焦，则移除焦点。
@@ -225,6 +234,7 @@ glass-easel 并不会自行调用这个接口。应由其他模块调用这个�
 
 监听器必然在开始监听时触发一次，用于返回初始的媒体查询状态信息。
 
+**这只是一个建议性质的接口。** glass-easel 并不会自行调用这个接口，但其他相关模块很可能调用。
 
 ## Element
 
@@ -232,11 +242,11 @@ glass-easel 并不会自行调用这个接口。应由其他模块调用这个�
 
 释放一个节点。
 
-### `Element#associateValue(associatedValue?: Node): void`
+### `Element#associateValue(associatedValue?: Element): void`
 
-通知节点相关信息已经创建完毕，并为节点设置一个关联值。对除文本节点以外的节点都会调用一次。
+通知节点相关信息已经创建完毕，并为节点设置一个关联值。
 
-对于使用 `Context#createElement` 或 `ShadowRootContext#createComponent` 创建的节点，会被调用且仅被调用一次；对于其他节点，不会被调用。
+创建的节点会被调用且仅被调用一次；文本 (TextNode) 节点，不会被调用。
 
 ### `Element#getShadowRoot(): ShadowRootContext | undefined`
 
@@ -312,17 +322,57 @@ glass-easel 并不会自行调用这个接口。应由其他模块调用这个�
 
 **仅 Shadow Mode 有效。**
 
-### `Element#setSlot(slot: string, inherit: boolean)`
+### `Element#setContainingSlot(slot: Element | undefined | null)`
 
-设置节点的目标 slot ；若 `inherit` 为 true ，则将节点设为 slot-inherit 节点。
-
-对于 slot-inherit 节点，它的子节点在 composed tree 上并不视为子节点，而视为它之后的兄弟节点。这可以使得这些子节点拥有不同的目标 slot 。
-
-节点仅在初始化阶段、还没有子节点时才会被设为 slot-inherit 节点；一旦节点被设为 slot-inherit 节点，就不会再被设为非 slot-inherit 节点。
+设置节点的目标 slot ；`undefined` 表示节点没有目标 slot；`null` 表示节点的目标 slot 为空 （即节点的 composedParent 为空）。
 
 **仅 Shadow Mode 有效。**
 
-### `Element#setStyleScope(styleScope: number): void`
+### `Element#reassignContainingSlot(oldSlot: Element | null, newSlot: Element | null)`
+
+替换节点的目标 slot；`null` 表示节点的目标 slot 为空 （即节点的 composedParent 为空）。
+
+**仅 Shadow Mode 有效。**
+
+### `Element#spliceBeforeSlotNodes(before: number, deleteCount: number, list: Element)`
+
+更改当前节点的 slot 内容，删除从 `before` 开始的 `deleteCount` 个节点，并在这个位置插入 `list` 中包含的所有节点。
+
+`list` 必然是片段节点，应被清空，但可能被再次使用。
+
+当前节点一定是一个 slot 节点。
+
+**仅 Shadow Mode 有效。**
+
+### `Element#spliceAppendSlotNodes(list: Element)`
+
+追加当前节点的 slot 内容，在末尾插入 `list` 中包含的所有节点。
+
+`list` 必然是片段节点，应被清空，但可能被再次使用。
+
+当前节点一定是一个 slot 节点。
+
+**仅 Shadow Mode 有效。**
+
+### `Element#spliceRemoveSlotNodes(before: number, deleteCount: number)`
+
+更改当前节点的 slot 内容，删除从 `before` 开始的 `deleteCount` 个节点。
+
+当前节点一定是一个 slot 节点。
+
+**仅 Shadow Mode 有效。**
+
+### `Element#setInheritSlots()`
+
+设置节点为 slot-inherit。
+
+对于 slot-inherit 节点，它的子节点在 composed tree 上并不视为子节点，而视为它之后的兄弟节点。这可以使得这些子节点拥有不同的目标 slot 。
+
+节点仅在初始化阶段、还没有子节点时才会被设为 slot-inherit 节点；
+
+**仅 Shadow Mode 有效。**
+
+### `Element#setStyleScope(styleScope: number, extraStyleScope: number | undefined, hostStyleScope?: number | undefined): void`
 
 设置节点的 scope 标识符。对于同一个节点，最多被设置一次。
 
@@ -330,13 +380,13 @@ glass-easel 并不会自行调用这个接口。应由其他模块调用这个�
 
 在匹配样式规则时，如果使用除 class 以外的节点选择器（如标签名选择器、 ID 选择器）来匹配这个节点，则样式表的 scope 标识符必须为空或等于这个节点的 scope 标识符。
 
-**在 Shadow Mode 下** ，仅对普通节点和非虚组件节点调用； **在 Composed Mode 下** ，仅对普通节点调用。
+**仅 Composed Mode 有效**
 
-### `Element#replaceStyleSheetInlineStyle(styleText: string): void`
+### `Element#setStyle(styleText: string): void`
 
 设置节点 style 。
 
-**在 Shadow Mode 下** ，仅对普通节点和非虚组件节点调用； **在 Composed Mode 下** ，仅对普通节点调用。
+不会对文本节点调用。
 
 ### `Element#addClass(elementClass: string, styleScope?: number): void`
 
@@ -346,7 +396,9 @@ glass-easel 并不会自行调用这个接口。应由其他模块调用这个�
 
 在匹配样式规则时，如果使用这个 class 来匹配这个节点，则样式表的 scope 标识符必须为空或等于这个 `styleScope` 。
 
-**在 Shadow Mode 下** ，仅对普通节点和非虚组件节点调用； **在 Composed Mode 下** ，仅对普通节点调用。
+不会对文本节点调用。
+
+**在 Shadow Mode 下** ，不会传递 styleScope；
 
 ### `Element#removeClass(elementClass: string, styleScope?: number): void`
 
@@ -354,25 +406,43 @@ glass-easel 并不会自行调用这个接口。应由其他模块调用这个�
 
 如果 styleScope 不为非负整数，则视为空。
 
-**在 Shadow Mode 下** ，仅对普通节点和非虚组件节点调用； **在 Composed Mode 下** ，仅对普通节点调用。
+不会对文本节点调用。
+
+**在 Shadow Mode 下** ，不会传递 styleScope；
 
 ### `Element#clearClasses(): void`
 
 移除所有 class 。
 
-**在 Shadow Mode 下** ，仅对普通节点和非虚组件节点调用； **在 Composed Mode 下** ，仅对普通节点调用。
+不会对文本节点调用。
 
-### `Element#setAttribute(name: string, value: any): void`
+### `Element#setClassAlias(className: string, target: string): void`
 
-设置节点的一个属性。
+更新一个节点的 class 别名。
 
-仅对普通节点调用。
+不会对文本节点调用。
+
+**仅 Shadow Mode 有效。**
+
+### `Element#setAttribute(name: string, value: unknown): void`
+
+设置节点的一个属性。value 可能为任何类型。
+
+不会对文本节点调用。
 
 ### `Element#removeAttribute(name: string): void`
 
 移除节点的一个属性。
 
-仅对普通节点调用。
+不会对文本节点调用。
+
+### `Element#setDataset(name: string, value: unknown): void`
+
+设置节点的一个 dataset 属性。value 可能为任何类型。
+
+不会对文本节点调用。
+
+**仅 Shadow Mode 有效。**
 
 ### `Element#setText(content: string): void`
 
@@ -380,7 +450,25 @@ glass-easel 并不会自行调用这个接口。应由其他模块调用这个�
 
 仅对文本节点调用。
 
-### `async Element#getContext(): any`
+## `Element#setModelBindingStat(attributeName: string, listener: ((newValue: unknown) => void) | null): void`
+
+同步一个节点上的数据绑定设置。`attributeName` 表示字段名；`listener` 表示数据绑定更新回调。
+
+仅对普通节点调用
+
+## `Element#setListenerStats(type: string, capture: boolean, mutLevel: MutLevel): void`
+
+同步一个节点上的事件响应设置。`type` 表示事件名；`capture` 表示事件响应是否是捕获节点；`mutLevel` 表示事件响应类型。
+
+若 `mutLevel` 为 `MutLevel.None`，则表示为普通响应。
+
+若 `mutLevel` 为 `MutLevel.Mut`，则表示为互斥响应；该轮事件冒泡中，若已经执行过一个互斥响应，则之后的互斥响应不会被执行。
+
+若 `mutLevel` 为 `MutLevel.Final`，则表示为最终响应；事件冒泡会被停止，且阻止事件默认行为。
+
+不会对文本节点调用。
+
+### `async Element#getContext(): unknown`
 
 获得与对应节点关联的上下文对象。
 
@@ -427,11 +515,15 @@ type glass-easelCSSRule = {
 
 如果节点没有布局信息，返回全 0 值。
 
+**这只是一个建议性质的接口。** glass-easel 并不会自行调用这个接口，但其他相关模块很可能调用。
+
 ### `Element#createIntersectionObserver(...)`
 
 创建一个 IntersectionObserver 用于监听相交状态变化。
 
 监听器必然在开始监听时触发一次，用于返回初始的相交状态信息。
+
+**这只是一个建议性质的接口。** glass-easel 并不会自行调用这个接口，但其他相关模块很可能调用。
 
 ### `async Element#getScrollPosition(): { scrollLeft: number, scrollTop: number, scrollWidth: number, scrollHeight: number }`
 
@@ -447,28 +539,19 @@ type glass-easelCSSRule = {
 
 **这只是一个建议性质的接口。** glass-easel 并不会自行调用这个接口，但其他相关模块很可能调用。
 
-### `Element#setEventDefaultPrevented(type: string, enabled: boolean)`
-
-将一个节点上的某个事件响应设置（或取消设置）为禁止默认行为的。
-
-节点上被绑定某个事件的监听器时，无论 `enabled` 值如何，这个调用必然被触发。因此可用于判断该节点是否曾绑定有该事件的监听器。
-
-
 ## ShadowRootContext
 
 代表一个 shadow tree 环境。
 
 **这个对象仅 Shadow Mode 有效。**
 
-### `ShadowRootContext#getRootNode(): Element`
-
-获得根节点。
-
-**仅 Shadow Mode 有效。**
-
-### `ShadowRootContext#createElement(tagName: string): Element`
+### `ShadowRootContext#createElement(logicalName: string, stylingName: string): Element`
 
 创建一个普通节点。
+
+`logicalName` 为节点自身定义的名字。
+
+`stylingName` 为被使用时设置的别名。
 
 **仅 Shadow Mode 有效。**
 
@@ -478,19 +561,25 @@ type glass-easelCSSRule = {
 
 **仅 Shadow Mode 有效。**
 
-### `ShadowRootContext#createComponent(tagName: string, isVirtual: boolean): Element`
+### `ShadowRootContext#createComponent(tagName: string, external: boolean, virtualHost: boolean, styleScope: number, extraStyleScope: number | null, externalClasses: string[] | undefined): Element`
 
-创建一个组件节点。可以指定为虚或非虚。虚组件节点的 tagName 无效。
+创建一个组件节点。
+
+`tagName` 表示组件的名称 （对应 stylingName）。
+
+`external` 表示组件是否是一个外部组件节点。外部组件是一个已经预建好的后端节点树，与其他部分直接拼接在一起。
+
+`virtualHost` 表示组件是否是一个虚拟组件。虚拟组件是一个最外层是虚拟节点的组件。
+
+`styleScope` 表示组件的 scope 标识符。
+
+`extraStyleScope` 表示组件的额外 scope 标识符。
+
+`externalClasses` 表示节点的 external class 列表。
 
 **仅 Shadow Mode 有效。**
 
-### `createExternalComponent(shadowRoot: Element, slot: Element): Element`
-
-创建一个外部组件节点。外部组件是一个已经预建好的后端节点树，与其他部分直接拼接在一起。
-
-**仅 Shadow Mode 有效。**
-
-### `ShadowRootContext#createVirtualNode(): Element`
+### `ShadowRootContext#createVirtualNode(virtualName: string): Element`
 
 创建一个虚节点。
 
@@ -501,11 +590,12 @@ type glass-easelCSSRule = {
 表示以 Shadow Mode 还是 Composed Mode 运行。
 
 * `ContextMode.Composed = 1` 运行于 Composed Mode ；
-* `ConetxtMode.Shadow = 2` 运行于 Shadow Mode 。
+* `ContextMode.Shadow = 2` 运行于 Shadow Mode 。
 
-## enum EventBubbleStatus
+## enum MutLevel
 
-表示冒泡状态。
+表示事件响应设置。
 
-* `EventBubbleStatus.Normal = 0` 无特殊操作；
-* `EventBubbleStatus.NoDefault = 1` 禁用默认操作。
+* `MutLevel.None = 0` 普通响应；
+* `MutLevel.Mut = 1` 互斥响应，一轮冒泡只执行第一个互斥响应；
+* `MutLevel.Final = 2` 响应后终止冒泡且禁用默认操作；

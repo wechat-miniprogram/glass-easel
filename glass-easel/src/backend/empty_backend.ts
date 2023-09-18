@@ -1,16 +1,10 @@
 /* eslint-disable class-methods-use-this */
 
-import { type EventBubbleStatus, type EventOptions, type MutLevel } from '../event'
+import { type Element as GlassEaselElement } from '../element'
+import { type Event, type EventBubbleStatus, type EventOptions, type MutLevel } from '../event'
 import { safeCallback } from '../func_arr'
 import { type Context, type Element, type ShadowRootContext } from './backend_protocol'
-import {
-  BackendMode,
-  type BoundingClientRect,
-  type IntersectionStatus,
-  type MediaQueryStatus,
-  type Observer,
-  type ScrollOffset,
-} from './shared'
+import { BackendMode } from './shared'
 
 export const enum EmptyBackendElementType {
   Fragment,
@@ -23,8 +17,11 @@ export const enum EmptyBackendElementType {
 /** An empty backend implementation */
 export class EmptyBackendContext implements Context {
   mode: BackendMode.Shadow = BackendMode.Shadow
+  /* @internal */
   private _$styleSheetIdInc = 1
+  /* @internal */
   private _$renderCallbacks: ((err: Error) => void)[] | null = null
+  /* @internal */
   private _$shadowRoot: EmptyBackendShadowRootContext = new EmptyBackendShadowRootContext()
 
   destroy(): void {
@@ -84,25 +81,16 @@ export class EmptyBackendContext implements Context {
   }
 
   onEvent(
+    _createEvent: (type: string, detail: unknown, options: EventOptions) => Event<unknown>,
     _listener: (
-      target: unknown,
-      type: string,
-      detail: unknown,
-      options: EventOptions,
+      event: Event<unknown>,
+      currentTarget: GlassEaselElement,
+      mark: Record<string, unknown> | null,
+      target: GlassEaselElement,
+      isCapture: boolean,
     ) => EventBubbleStatus,
   ): void {
     // empty
-  }
-
-  createMediaQueryObserver(
-    _status: MediaQueryStatus,
-    _listener: (res: { matches: boolean }) => void,
-  ): Observer {
-    return {
-      disconnect: () => {
-        /* empty */
-      },
-    }
   }
 }
 
@@ -122,7 +110,7 @@ export class EmptyBackendElement implements Element {
     // empty
   }
 
-  associateValue(_v: unknown): void {
+  associateValue(_v: GlassEaselElement): void {
     // empty
   }
 
@@ -170,7 +158,7 @@ export class EmptyBackendElement implements Element {
     // empty
   }
 
-  setContainingSlot(_slot: EmptyBackendElement): void {
+  setContainingSlot(_slot: EmptyBackendElement | undefined | null): void {
     // empty
   }
 
@@ -194,27 +182,23 @@ export class EmptyBackendElement implements Element {
     // empty
   }
 
-  setVirtualHost(): void {
-    // empty
-  }
-
-  setStyleScope(_styleScope: number): void {
-    // empty
-  }
-
   setStyle(_styleText: string): void {
     // empty
   }
 
-  addClass(_elementClass: string, _styleScope?: number): void {
+  addClass(_className: string): void {
     // empty
   }
 
-  removeClass(_elementClass: string, _styleScope?: number): void {
+  removeClass(_className: string): void {
     // empty
   }
 
   clearClasses(): void {
+    // empty
+  }
+
+  setClassAlias(_className: string, _target: string[]): void {
     // empty
   }
 
@@ -234,28 +218,6 @@ export class EmptyBackendElement implements Element {
     // empty
   }
 
-  getBoundingClientRect(cb: (res: BoundingClientRect) => void): void {
-    setTimeout(() => {
-      cb({
-        left: 0,
-        top: 0,
-        width: 0,
-        height: 0,
-      })
-    }, 0)
-  }
-
-  getScrollOffset(cb: (res: ScrollOffset) => void): void {
-    setTimeout(() => {
-      cb({
-        scrollLeft: 0,
-        scrollTop: 0,
-        scrollWidth: 0,
-        scrollHeight: 0,
-      })
-    }, 0)
-  }
-
   setListenerStats(_type: string, _capture: boolean, _mutLevel: MutLevel): void {
     // empty
   }
@@ -265,23 +227,6 @@ export class EmptyBackendElement implements Element {
     _listener: ((newValue: unknown) => void) | null,
   ): void {
     // empty
-  }
-
-  createIntersectionObserver(
-    _relativeElement: Element | null,
-    _relativeElementMargin: string,
-    _thresholds: number[],
-    _listener: (res: IntersectionStatus) => void,
-  ): Observer {
-    return {
-      disconnect: () => {
-        /* empty */
-      },
-    }
-  }
-
-  getContext(cb: (res: unknown) => void): void {
-    cb(null)
   }
 }
 
@@ -303,7 +248,14 @@ export class EmptyBackendShadowRootContext
     return new EmptyBackendElement(EmptyBackendElementType.TextNode)
   }
 
-  createComponent(_tagName: string): EmptyBackendElement {
+  createComponent(
+    _tagName: string,
+    _external: boolean,
+    _virtualHost: boolean,
+    _styleScope: number,
+    _extraStyleScope: number | null,
+    _externalClasses: string[] | undefined,
+  ): EmptyBackendElement {
     return new EmptyBackendElement(EmptyBackendElementType.Component)
   }
 

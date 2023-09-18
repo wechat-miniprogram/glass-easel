@@ -1,6 +1,6 @@
 /* eslint-disable */
 
-const { tmpl, domBackend, shadowBackend, composedBackend } = require('../base/env')
+const { tmpl, domBackend, shadowBackend, composedBackend, getCustomExternalTemplateEngine } = require('../base/env')
 const glassEasel = require('../../src')
 
 const componentSpace = new glassEasel.ComponentSpace()
@@ -42,9 +42,8 @@ const testCases = function (testBackend) {
     root.$$.id = 'root'
     var backendRoot = testBackend.getRootNode()
     if (testBackend === shadowBackend) {
-      var placeholder = backendRoot.createElement('div')
-      backendRoot.appendChild(placeholder)
-      glassEasel.Element.replaceDocumentElement(root, backendRoot, placeholder)
+      backendRoot.appendChild(root.getBackendElement())
+      glassEasel.Element.pretendAttached(root)
     } else if (testBackend === domBackend) {
       var placeholder = testBackend.document.createElement('div')
       backendRoot.appendChild(placeholder)
@@ -113,26 +112,48 @@ const testCases = function (testBackend) {
       matchElementWithDom(e1)
     })
 
-    if (testBackend === domBackend)
-      it('should work in a native-rendered root', function () {
-        regElem({
-          is: 'virtual-node-a',
-          options: {
-            externalComponent: true,
-          },
-          template: '<div><slot></slot></div>',
-        })
-        var e1 = root.shadowRoot.createComponent('virtual-node-a')
-        var e2 = glassEasel.NativeNode.create('span', root.shadowRoot)
-        var e3 = glassEasel.TextNode.create('text', root.shadowRoot)
-        var v1 = glassEasel.VirtualNode.create('virtual', root.shadowRoot)
-        var v2 = glassEasel.VirtualNode.create('virtual', root.shadowRoot)
-        v1.appendChild(e2)
-        v1.appendChild(e3)
-        e2.appendChild(v2)
-        e1.appendChild(v1)
-        matchElementWithDom(e1, e1.shadowRoot.root)
+    it('should work in a native-rendered root', function () {
+      regElem({
+        is: 'virtual-node-a',
+        options: {
+          externalComponent: true,
+          templateEngine:
+            testBackend === domBackend
+              ? undefined
+              : getCustomExternalTemplateEngine(comp => {
+                  var root = comp.getBackendElement()
+                  var slot
+                  if (testBackend === shadowBackend) {
+                    var shadowRoot = root.getShadowRoot()
+                    slot = shadowRoot.createElement('div', 'div')
+                    slot.setSlotName('')
+                    shadowRoot.appendChild(slot)
+                  } else {
+                    slot = testBackend.createElement('div', 'div')
+                    root.appendChild(slot)
+                  }
+                  return {
+                    root,
+                    slot,
+                    getIdMap: () => ({}),
+                    handleEvent() {},
+                    setListener() {},
+                  }
+                }),
+        },
+        template: '<div><slot></slot></div>',
       })
+      var e1 = root.shadowRoot.createComponent('virtual-node-a')
+      var e2 = glassEasel.NativeNode.create('span', root.shadowRoot)
+      var e3 = glassEasel.TextNode.create('text', root.shadowRoot)
+      var v1 = glassEasel.VirtualNode.create('virtual', root.shadowRoot)
+      var v2 = glassEasel.VirtualNode.create('virtual', root.shadowRoot)
+      v1.appendChild(e2)
+      v1.appendChild(e3)
+      e2.appendChild(v2)
+      e1.appendChild(v1)
+      matchElementWithDom(e1, e1.shadowRoot.root)
+    })
   })
 
   describe('#insertBefore', function () {
@@ -238,6 +259,8 @@ const testCases = function (testBackend) {
       matchElementWithDom(e1)
       matchElementWithDom(v3)
       expect(v3.parentNode).toBe(null)
+      v1.replaceChild(v2, v2)
+      matchElementWithDom(e1)
     })
 
     it('should convert to correct DOM replaceChild (replacing indirectly at the end)', function () {

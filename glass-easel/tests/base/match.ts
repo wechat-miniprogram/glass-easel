@@ -5,6 +5,7 @@ import {
   ShadowRoot,
   Element,
   domlikeBackend,
+  backend,
   TextNode,
   BackendMode,
 } from '../../src'
@@ -30,7 +31,7 @@ export const native = (structure: {
 }
 
 // check the structure of a backend element
-const testBackend = (elem: Element): void => {
+const testBackend = (elem: GeneralComponent): void => {
   const testDom = (be: domlikeBackend.Element) => {
     if (elem.getBackendContext().mode === BackendMode.Domlike) {
       expect(be).toBeInstanceOf(HTMLElement)
@@ -64,7 +65,13 @@ const testBackend = (elem: Element): void => {
       }
     }
   }
-  if (elem.getBackendContext().mode !== BackendMode.Shadow) {
+  if (elem.getBackendContext().mode === BackendMode.Shadow) {
+    testDom(
+      (
+        elem.getBackendElement() as backend.Element
+      ).getShadowRoot() as unknown as domlikeBackend.Element,
+    )
+  } else {
     testDom(elem.getBackendElement() as domlikeBackend.Element)
   }
 }
@@ -91,11 +98,9 @@ export const virtual = (elem: Element, defDomElem?: HTMLElement, defIndex?: numb
         if (child instanceof Element) {
           virtual(child)
         } else if (child instanceof TextNode) {
-          if (elem.getBackendContext().mode !== BackendMode.Shadow) {
-            expect(child.textContent).toBe(
-              (child.getBackendElement() as unknown as HTMLElement).textContent,
-            )
-          }
+          expect(child.textContent).toBe(
+            (child.getBackendElement() as unknown as HTMLElement).textContent,
+          )
         } else {
           throw new Error()
         }
@@ -167,14 +172,11 @@ export const virtual = (elem: Element, defDomElem?: HTMLElement, defIndex?: numb
 
   // get the backend element if it is domlike backend
   let domElem: HTMLElement | undefined
-  if (elem.getBackendContext().mode !== BackendMode.Shadow) {
-    if (elem instanceof Component && elem._$external) {
-      domElem = (elem.shadowRoot as ExternalShadowRoot).slot as unknown as HTMLElement
-    } else {
-      domElem =
-        defDomElem ||
-        ((elem.getBackendElement() || undefined) as unknown as HTMLElement | undefined)
-    }
+  if (elem instanceof Component && elem._$external) {
+    domElem = (elem.shadowRoot as ExternalShadowRoot).slot as unknown as HTMLElement
+  } else {
+    domElem =
+      defDomElem || ((elem.getBackendElement() || undefined) as unknown as HTMLElement | undefined)
   }
 
   // check the composed children recursively

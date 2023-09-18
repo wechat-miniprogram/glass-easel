@@ -1,4 +1,11 @@
-import { tmpl, multiTmpl, domBackend, execWithWarn, composedBackend } from '../base/env'
+import {
+  tmpl,
+  multiTmpl,
+  domBackend,
+  execWithWarn,
+  composedBackend,
+  shadowBackend,
+} from '../base/env'
 import { virtual as matchElementWithDom } from '../base/match'
 import * as glassEasel from '../../src'
 
@@ -1565,7 +1572,11 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
   })
 
   test('setting external classes', () => {
-    const cs = new glassEasel.ComponentSpace()
+    const cs = new glassEasel.ComponentSpace(
+      undefined,
+      undefined,
+      glassEasel.getDefaultComponentSpace().styleScopeManager,
+    )
     const ssm = cs.styleScopeManager
     const subComp = cs.defineComponent({
       externalClasses: ['class', 'ext-class'],
@@ -1605,6 +1616,70 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     })
     expect(domHtml(elem)).toBe(
       '<sub-comp class="p--static"><div class="p--static p--a-class"></div></sub-comp>',
+    )
+  })
+
+  test('setting nested external classes', () => {
+    const cs = new glassEasel.ComponentSpace(
+      undefined,
+      undefined,
+      glassEasel.getDefaultComponentSpace().styleScopeManager,
+    )
+    const ssm = cs.styleScopeManager
+    const subComp = cs.defineComponent({
+      externalClasses: ['class', 'ext-class'],
+      template: tmpl(`
+        <div class="class ext-class"></div>
+      `),
+    })
+    const def = cs
+      .defineComponent({
+        options: {
+          styleScope: ssm.register('p'),
+        },
+        using: {
+          sub: subComp.general(),
+        },
+        properties: {
+          dynamic: String,
+        },
+        externalClasses: ['a-class'],
+        template: tmpl(`
+          <sub class="static {{ dynamic || '' }}" ext-class="a-class" />
+        `),
+      })
+      .general()
+    const parent = cs.defineComponent({
+      options: {
+        styleScope: ssm.register('pp'),
+        extraStyleScope: glassEasel.StyleScopeManager.globalScope(),
+      },
+      using: {
+        def,
+      },
+      data: {
+        dynamic1: '',
+        dynamic2: '',
+      },
+      template: tmpl(`<def dynamic="{{dynamic1}}" a-class="root {{dynamic2}}" />`),
+    })
+    const elem = glassEasel.Component.createWithContext('root', parent, testBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe(
+      '<def><sub class="p--static"><div class="p--static root pp--root"></div></sub></def>',
+    )
+    elem.setData({
+      dynamic1: 'dynamic',
+    })
+    expect(domHtml(elem)).toBe(
+      '<def><sub class="p--static p--dynamic"><div class="p--static root pp--root p--dynamic"></div></sub></def>',
+    )
+    elem.setData({
+      dynamic1: '',
+      dynamic2: 'dynamic',
+    })
+    expect(domHtml(elem)).toBe(
+      '<def><sub class="p--static"><div class="p--static root pp--root dynamic pp--dynamic"></div></sub></def>',
     )
   })
 
@@ -1661,4 +1736,5 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
 }
 
 describe('node tree structure (DOM backend)', () => testCases(domBackend))
+describe('node tree structure (shadow backend)', () => testCases(shadowBackend))
 describe('node tree structure (composed backend)', () => testCases(composedBackend))

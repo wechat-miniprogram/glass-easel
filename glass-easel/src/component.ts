@@ -69,7 +69,7 @@ import {
   type RelationDefinitionGroup,
   type RelationHandler,
 } from './relation'
-import { type ShadowRoot } from './shadow_root'
+import { ShadowRoot } from './shadow_root'
 import { type Template, type TemplateEngine, type TemplateInstance } from './template_engine'
 import { getDefaultTemplateEngine } from './tmpl'
 import { TraitBehavior, TraitGroup } from './trait_behaviors'
@@ -546,31 +546,39 @@ export class Component<
     comp._$external = external
     comp.tagName = tagName
     comp._$methodCaller = comp
+    comp._$virtual = virtualHost
 
     // create backend element
     let backendElement: GeneralBackendElement | null = null
     if (BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike)) {
       if (!virtualHost) {
         if (ENV.DEV) performanceMeasureStart('backend.createElement')
-        backendElement = (
-          (owner ? owner._$nodeTreeContext : nodeTreeContext) as domlikeBackend.Context
-        ).document.createElement(tagName)
+        backendElement = (nodeTreeContext as domlikeBackend.Context).document.createElement(tagName)
         if (ENV.DEV) performanceMeasureEnd()
       }
     } else if (BM.COMPOSED || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Composed)) {
       if (!virtualHost) {
         if (ENV.DEV) performanceMeasureStart('backend.createElement')
-        backendElement = (
-          (owner ? owner._$nodeTreeContext : nodeTreeContext) as composedBackend.Context
-        ).createElement(options.hostNodeTagName, tagName)
+        backendElement = (nodeTreeContext as composedBackend.Context).createElement(
+          options.hostNodeTagName,
+          tagName,
+        )
         if (ENV.DEV) performanceMeasureEnd()
       }
     } else if (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Shadow)) {
       if (ENV.DEV) performanceMeasureStart('component.createComponent')
-      backendElement = (
+      const be = (
         owner ? owner._$backendShadowRoot! : (nodeTreeContext as backend.Context).getRootNode()
-      ).createComponent(tagName)
+      ).createComponent(
+        tagName,
+        external,
+        virtualHost,
+        options.styleScope ?? StyleScopeManager.globalScope(),
+        options.extraStyleScope,
+        behavior._$externalClasses,
+      )
       if (ENV.DEV) performanceMeasureEnd()
+      backendElement = be
     }
     comp._$initialize(virtualHost, backendElement, owner, nodeTreeContext)
 
@@ -584,21 +592,19 @@ export class Component<
     const styleScopeManager = ownerHost?._$behavior.ownerSpace.styleScopeManager
     comp.classList = new ClassList(
       comp,
-      nodeTreeContext.mode,
-      behavior._$externalClasses || null,
+      behavior._$externalClasses,
       ownerHost ? ownerHost.classList : null,
       styleScope,
       extraStyleScope,
       styleScopeManager,
     )
     if (backendElement) {
-      if (styleScope) {
-        if (!(BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike))) {
-          ;(backendElement as backend.Element | composedBackend.Element).setStyleScope(
-            styleScope,
-            options.styleScope ?? StyleScopeManager.globalScope(),
-          )
-        }
+      if (BM.COMPOSED || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Composed)) {
+        ;(backendElement as composedBackend.Element).setStyleScope(
+          styleScope,
+          extraStyleScope,
+          options.styleScope ?? StyleScopeManager.globalScope(),
+        )
       }
       if (styleScopeManager && writeExtraInfoToAttr) {
         const prefix = styleScopeManager.queryName(styleScope)
@@ -607,6 +613,13 @@ export class Component<
         }
       }
     }
+
+    // create template engine
+    const tmplInst = template.createInstance(
+      comp as GeneralComponent,
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      ShadowRoot.createShadowRoot,
+    )
 
     // associate in backend
     if (backendElement) {
@@ -836,7 +849,6 @@ export class Component<
     initDone = true
 
     // init data
-    const tmplInst = template.createInstance(comp as unknown as GeneralComponent)
     const shadowRoot = tmplInst.shadowRoot
     comp.shadowRoot = shadowRoot
     const dataGroup = new DataGroup(
@@ -1071,6 +1083,18 @@ export class Component<
     )
   }
 
+  /**
+   * Returns the owner component space of this component
+   */
+  getOwnerSpace(): ComponentSpace {
+    return this._$behavior.ownerSpace
+  }
+
+  /** Get whether the component is external or not */
+  isExternal(): boolean {
+    return this._$external
+  }
+
   static listProperties<
     TData extends DataList,
     TProperty extends PropertyList,
@@ -1245,13 +1269,18 @@ export class Component<
 
   /** Check the existence of an external class */
   hasExternalClass(name: string): boolean {
-    return (this.classList as ClassList)._$hasAlias(name)
+    return this.classList!._$hasAlias(name)
   }
 
   /** Update an external class value */
   setExternalClass(name: string, target: string | string[]) {
     this.scheduleExternalClassChange(name, target)
     this.applyExternalClassChanges()
+  }
+
+  /** Get all external classes */
+  getExternalClasses(): string[] | undefined {
+    return this.classList!._$getAlias()
   }
 
   /** Schedule an update for an external class value */
@@ -1262,6 +1291,7 @@ export class Component<
   /** Update multiple external class values */
   applyExternalClassChanges() {
     if (this._$external) return
+    if (!this.classList!._$shouldUpdateExternalClass()) return
     const recv = (node: Node) => {
       if (!isElement(node)) return
       const classList = node.classList

@@ -1,4 +1,4 @@
-import { tmpl, domBackend, composedBackend } from '../base/env'
+import { tmpl, domBackend, composedBackend, shadowBackend } from '../base/env'
 import { virtual as matchElementWithDom } from '../base/match'
 import * as glassEasel from '../../src'
 
@@ -8,14 +8,14 @@ const domHtml = (elem: glassEasel.Element): string => {
 }
 
 const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
-const componentSpace = new glassEasel.ComponentSpace()
-componentSpace.updateComponentOptions({
-  writeFieldsToNode: true,
-  writeIdToDOM: true,
-})
-componentSpace.defineComponent({
-  is: '',
-})
+  const componentSpace = new glassEasel.ComponentSpace()
+  componentSpace.updateComponentOptions({
+    writeFieldsToNode: true,
+    writeIdToDOM: true,
+  })
+  componentSpace.defineComponent({
+    is: '',
+  })
 
   describe('dynamic slot', () => {
     describe('core', () => {
@@ -1696,4 +1696,5 @@ componentSpace.defineComponent({
 }
 
 describe('slot (DOM backend)', () => testCases(domBackend))
+describe('slot (shadow backend)', () => testCases(shadowBackend))
 describe('slot (composed backend)', () => testCases(composedBackend))

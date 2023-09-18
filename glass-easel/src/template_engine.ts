@@ -26,7 +26,10 @@ export interface Template {
   /**
    * Create a template instance for a component instance
    */
-  createInstance(elem: GeneralComponent): TemplateInstance
+  createInstance(
+    elem: GeneralComponent,
+    createShadowRoot: (component: GeneralComponent) => ShadowRoot,
+  ): TemplateInstance
 
   /**
    * Update the content of the template (optional)

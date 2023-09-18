@@ -1,4 +1,4 @@
-import { tmpl } from '../base/env'
+import { domBackend, tmpl } from '../base/env'
 import * as glassEasel from '../../src'
 
 describe('binding expression', () => {
@@ -23,7 +23,7 @@ describe('binding expression', () => {
         truefalse: 123,
       },
     })
-    const elem = glassEasel.createElement('root', def.general())
+    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
     const n1 = elem.getShadowRoot()!.getElementById('n1')!
     const n2 = elem.getShadowRoot()!.getElementById('n2')!
     const n3 = elem.getShadowRoot()!.getElementById('n3')!
@@ -53,7 +53,7 @@ describe('binding expression', () => {
         c: 5,
       },
     })
-    const elem = glassEasel.createElement('root', def.general())
+    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
     const n1 = elem.getShadowRoot()!.getElementById('n1')!
     const n2 = elem.getShadowRoot()!.getElementById('n2')!
     const n3 = elem.getShadowRoot()!.getElementById('n3')!
@@ -85,7 +85,7 @@ describe('binding expression', () => {
         b: 456,
       },
     })
-    const elem = glassEasel.createElement('root', def.general())
+    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
     const n1 = elem.getShadowRoot()!.getElementById('n1')!
     const n2 = elem.getShadowRoot()!.getElementById('n2')!
     const n3 = elem.getShadowRoot()!.getElementById('n3')!
@@ -118,7 +118,7 @@ describe('binding expression', () => {
         b: 11,
       },
     })
-    const elem = glassEasel.createElement('root', def.general())
+    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
     const n1 = elem.getShadowRoot()!.getElementById('n1')!
     const n2 = elem.getShadowRoot()!.getElementById('n2')!
     const n3 = elem.getShadowRoot()!.getElementById('n3')!
@@ -178,7 +178,7 @@ describe('binding expression', () => {
         b: 6,
       },
     })
-    const elem = glassEasel.createElement('root', def.general())
+    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
     const n1 = elem.getShadowRoot()!.getElementById('n1')!
     const n2 = elem.getShadowRoot()!.getElementById('n2')!
     const n3 = elem.getShadowRoot()!.getElementById('n3')!
@@ -208,7 +208,7 @@ describe('binding expression', () => {
         c: 2,
       },
     })
-    const elem = glassEasel.createElement('root', def.general())
+    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
     const n1 = elem.getShadowRoot()!.getElementById('n1')!
     expect(n1.dataset.a).toEqual(1)
     elem.setData({ a: 0 })
@@ -233,7 +233,7 @@ describe('binding expression', () => {
         <div id="n10" data-a="{{ - (1 + 3) }}" data-b="{{ 3 - (2 - 1) }}"></div>
       `),
     })
-    const elem = glassEasel.createElement('root', def.general())
+    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
     const n0 = elem.getShadowRoot()!.getElementById('n0')!
     expect(n0.dataset.a).toEqual(3)
     const n1 = elem.getShadowRoot()!.getElementById('n1')!
@@ -271,7 +271,7 @@ describe('binding expression', () => {
         <div id="a" data-a="{{ [123, a, 456] }}"></div>
       `),
     })
-    const elem = glassEasel.createElement('root', def.general())
+    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
     const eA = elem.getShadowRoot()!.getElementById('a')!
     expect(eA.dataset.a).toEqual([123, undefined, 456])
     elem.setData({ a: 789 })
@@ -295,7 +295,7 @@ describe('binding expression', () => {
         <template is="test" data="{{ arr: [a[b], a[c]] }}" />
       `),
     })
-    const elem = glassEasel.createElement('comp', comp.general())
+    const elem = glassEasel.Component.createWithContext('comp', comp.general(), domBackend)
     expect(onTChanged).toBeCalledTimes(1)
     expect(onUChanged).toBeCalledTimes(1)
     elem.setData({ a: [0, 1], b: 0, c: 1 })
@@ -325,7 +325,7 @@ describe('binding expression', () => {
         ].join(''),
       ),
     })
-    const elem = glassEasel.createElement('comp', comp.general())
+    const elem = glassEasel.Component.createWithContext('comp', comp.general(), domBackend)
     expect(onTChanged).toBeCalledTimes(1)
     expect(onUChanged).toBeCalledTimes(1)
     elem.setData({ a: [0, 1], b: 0, c: 1 })
@@ -349,7 +349,7 @@ describe('binding expression', () => {
         } as { b: number | { c: number } } | number,
       },
     })
-    const elem = glassEasel.createElement('root', def)
+    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
     const eA = elem.getShadowRoot()!.getElementById('a')!
     const eB = elem.getShadowRoot()!.getElementById('b')!
     const eC = elem.getShadowRoot()!.getElementById('c')!
@@ -388,7 +388,7 @@ describe('binding expression', () => {
         d: 0,
       },
     })
-    const elem = glassEasel.createElement('root', def)
+    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
     const eA = elem.getShadowRoot()!.getElementById('a')!
     const eB = elem.getShadowRoot()!.getElementById('b')!
     const eC = elem.getShadowRoot()!.getElementById('c')!
@@ -424,7 +424,7 @@ describe('binding expression', () => {
         c: 0,
       },
     })
-    const elem = glassEasel.createElement('root', def.general())
+    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
     const eA = elem.getShadowRoot()!.getElementById('a')!
     expect(eA.dataset.a).toEqual(20)
     elem.setData({ c: 1 })
@@ -449,7 +449,7 @@ describe('binding expression', () => {
         f: (a: number, b: number) => a + b,
       },
     })
-    const elem = glassEasel.createElement('root', def.general())
+    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
     const n1 = elem.getShadowRoot()!.getElementById('n1')!
     expect(n1.dataset.a).toEqual(3)
     expect(n1.dataset.b).toBeUndefined()

@@ -144,6 +144,7 @@ export class Element implements NodeCast {
     throw new Error('Element cannot be constructed directly')
   }
 
+  /* @internal */
   protected _$initialize(
     virtual: boolean,
     backendElement: GeneralBackendElement | null,
@@ -615,7 +616,6 @@ export class Element implements NodeCast {
     }
   }
 
-  /** @internal */
   static insertChildReassign(
     shadowParent: Element,
     child: Node,
@@ -694,7 +694,7 @@ export class Element implements NodeCast {
       }
       cur = cur.parentNode
     }
-    return cur ? cur._$backendElement : null
+    return cur ? (cur._$backendElement as composedElement) : null
   }
 
   private static countNonVirtual(target: Node): [Node, number] | null {
@@ -910,7 +910,8 @@ export class Element implements NodeCast {
     let sharedNonVirtualParent: composedElement | null | undefined
     if (isComponent(slotParent)) {
       if (slotParent._$external) {
-        sharedNonVirtualParent = (slotParent.shadowRoot as ExternalShadowRoot).slot
+        sharedNonVirtualParent = (slotParent.shadowRoot as ExternalShadowRoot)
+          .slot as composedElement
       } else {
         parentConverted = true
       }
@@ -944,7 +945,7 @@ export class Element implements NodeCast {
           sharedFrag ||
           (BM.DOMLIKE || (BM.DYNAMIC && context.mode === BackendMode.Domlike)
             ? (context as domlikeBackend.Context).document.createDocumentFragment()
-            : (context as backend.Context | composedBackend.Context).createFragment())
+            : (context as composedBackend.Context).createFragment())
         sharedFrag = f
 
         const recNonVirtual = (c: Node) => {
@@ -1650,20 +1651,24 @@ export class Element implements NodeCast {
             )
             if (ENV.DEV) performanceMeasureEnd()
           }
-        } else if (relChild) {
-          if (ENV.DEV) performanceMeasureStart('backend.insertBefore')
-          ;(parent._$backendElement as backend.Element).insertBefore(
-            newChild!._$backendElement as backend.Element,
-            relChild._$backendElement as backend.Element,
-            posIndex,
-          )
-          if (ENV.DEV) performanceMeasureEnd()
         } else {
-          if (ENV.DEV) performanceMeasureStart('backend.appendChild')
-          ;(parent._$backendElement as backend.Element).appendChild(
-            newChild!._$backendElement as backend.Element,
-          )
-          if (ENV.DEV) performanceMeasureEnd()
+          // relChild could equal to newChild and have been removed above
+          const before = parent.childNodes[posIndex]
+          if (before) {
+            if (ENV.DEV) performanceMeasureStart('backend.insertBefore')
+            ;(parent._$backendElement as backend.Element).insertBefore(
+              newChild!._$backendElement as backend.Element,
+              before._$backendElement as backend.Element,
+              posIndex,
+            )
+            if (ENV.DEV) performanceMeasureEnd()
+          } else {
+            if (ENV.DEV) performanceMeasureStart('backend.appendChild')
+            ;(parent._$backendElement as backend.Element).appendChild(
+              newChild!._$backendElement as backend.Element,
+            )
+            if (ENV.DEV) performanceMeasureEnd()
+          }
         }
       }
     } else {
@@ -2565,6 +2570,11 @@ export class Element implements NodeCast {
     return element._$inheritSlots
   }
 
+  /** Get whether the slot-inherit mode is set or not */
+  isInheritSlots() {
+    return this._$inheritSlots
+  }
+
   /**
    * Set the binding slot of specific node
    *
@@ -2608,7 +2618,6 @@ export class Element implements NodeCast {
     }
   }
 
-  /** @internal */
   static _$updateContainingSlot(node: Node, containingSlot: Element | null | undefined): void {
     node.containingSlot = containingSlot
 
@@ -2624,7 +2633,6 @@ export class Element implements NodeCast {
     }
   }
 
-  /** @internal */
   static _$spliceSlotNodes(
     slot: Element,
     before: number,
@@ -2902,17 +2910,7 @@ export class Element implements NodeCast {
    */
   getBoundingClientRect(cb: (res: BoundingClientRect) => void): void {
     const backendElement = this._$backendElement
-    if (backendElement) {
-      if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
-        const e = backendElement as domlikeBackend.Element
-        const res = e.getBoundingClientRect()
-        setTimeout(() => {
-          cb(res)
-        }, 0)
-      } else {
-        ;(backendElement as backend.Element | composedBackend.Element).getBoundingClientRect(cb)
-      }
-    } else {
+    if (!backendElement) {
       setTimeout(() => {
         cb({
           left: 0,
@@ -2921,6 +2919,28 @@ export class Element implements NodeCast {
           height: 0,
         })
       }, 0)
+      return
+    }
+    if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
+      const e = backendElement as domlikeBackend.Element
+      const res = e.getBoundingClientRect?.() || { left: 0, top: 0, width: 0, height: 0 }
+      setTimeout(() => {
+        cb(res)
+      }, 0)
+    } else {
+      const be = backendElement as backend.Element | composedBackend.Element
+      if (be.getBoundingClientRect) {
+        be.getBoundingClientRect(cb)
+      } else {
+        setTimeout(() => {
+          cb({
+            left: 0,
+            top: 0,
+            width: 0,
+            height: 0,
+          })
+        }, 0)
+      }
     }
   }
 
@@ -2931,22 +2951,7 @@ export class Element implements NodeCast {
    */
   getScrollOffset(cb: (res: ScrollOffset) => void): void {
     const backendElement = this._$backendElement
-    if (backendElement) {
-      if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
-        const e = backendElement as domlikeBackend.Element
-        const res = {
-          scrollLeft: e.scrollLeft,
-          scrollTop: e.scrollTop,
-          scrollWidth: e.scrollWidth,
-          scrollHeight: e.scrollHeight,
-        }
-        setTimeout(() => {
-          cb(res)
-        }, 0)
-      } else {
-        ;(backendElement as backend.Element | composedBackend.Element).getScrollOffset(cb)
-      }
-    } else {
+    if (!backendElement) {
       setTimeout(() => {
         cb({
           scrollLeft: 0,
@@ -2955,6 +2960,33 @@ export class Element implements NodeCast {
           scrollHeight: 0,
         })
       }, 0)
+      return
+    }
+    if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
+      const e = backendElement as domlikeBackend.Element
+      const res = {
+        scrollLeft: e.scrollLeft || 0,
+        scrollTop: e.scrollTop || 0,
+        scrollWidth: e.scrollWidth || 0,
+        scrollHeight: e.scrollHeight || 0,
+      }
+      setTimeout(() => {
+        cb(res)
+      }, 0)
+    } else {
+      const be = backendElement as backend.Element | composedBackend.Element
+      if (be.getScrollOffset) {
+        be.getScrollOffset(cb)
+      } else {
+        setTimeout(() => {
+          cb({
+            scrollLeft: 0,
+            scrollTop: 0,
+            scrollWidth: 0,
+            scrollHeight: 0,
+          })
+        }, 0)
+      }
     }
   }
 
@@ -2978,7 +3010,9 @@ export class Element implements NodeCast {
         return null
       }
       if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
-        return (this._$nodeTreeContext as domlikeBackend.Context).createIntersectionObserver(
+        const context = this._$nodeTreeContext as domlikeBackend.Context
+        if (!context.createIntersectionObserver) return null
+        return context.createIntersectionObserver(
           backendElement as domlikeBackend.Element,
           (relativeElement?._$backendElement as domlikeBackend.Element | undefined) || null,
           relativeElementMargin,
@@ -2986,8 +3020,10 @@ export class Element implements NodeCast {
           listener,
         )
       }
-      return (backendElement as backend.Element).createIntersectionObserver(
-        (relativeElement?._$backendElement as backend.Element | undefined) || null,
+      const be = backendElement as backend.Element | composedBackend.Element
+      if (!be.createIntersectionObserver) return null
+      return be.createIntersectionObserver(
+        (relativeElement?._$backendElement as any) || null,
         relativeElementMargin,
         thresholds,
         listener,
@@ -3003,12 +3039,19 @@ export class Element implements NodeCast {
     const backendElement = this._$backendElement
     if (!backendElement) return
     if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
-      ;(this._$nodeTreeContext as domlikeBackend.Context).getContext(
-        backendElement as domlikeBackend.Element,
-        cb,
-      )
+      const context = this._$nodeTreeContext as domlikeBackend.Context
+      if (context.getContext) {
+        context.getContext(backendElement as domlikeBackend.Element, cb)
+      } else {
+        cb(null)
+      }
     } else {
-      ;(backendElement as backend.Element).getContext(cb)
+      const be = backendElement as backend.Element | composedBackend.Element
+      if (be.getContext) {
+        be.getContext(cb)
+      } else {
+        cb(null)
+      }
     }
   }
 }
