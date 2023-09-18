@@ -1837,9 +1837,12 @@ export class Element implements NodeCast {
 
     // update containingSlot
     const placeholderContainingSlot = placeholder.containingSlot
+    const placeholderSlotIndex = placeholder.slotIndex
     if (placeholderContainingSlot !== undefined) {
-      Element._$updateContainingSlot(placeholder, undefined)
       Element._$updateContainingSlot(replacer, placeholderContainingSlot)
+      if (placeholderContainingSlot) {
+        Element._$spliceSlotNodes(placeholderContainingSlot, placeholderSlotIndex!, 1, undefined)
+      }
     }
     const containingSlotUpdater = replacedChildren.length
       ? ShadowRoot._$updateSubtreeSlotNodes(
@@ -1886,6 +1889,13 @@ export class Element implements NodeCast {
     }
 
     containingSlotUpdater?.insertSlotNodes()
+
+    if (placeholderContainingSlot !== undefined) {
+      Element._$updateContainingSlot(placeholder, undefined)
+      if (placeholderContainingSlot) {
+        Element._$spliceSlotNodes(placeholderContainingSlot, placeholderSlotIndex!, 0, [replacer])
+      }
+    }
 
     // update subtree slots
     // (assume that placeholder and replacer will never be slot node)
