@@ -1,7 +1,13 @@
-import { tmpl, domBackend } from '../base/env'
+import { tmpl, domBackend, composedBackend } from '../base/env'
 import { virtual as matchElementWithDom } from '../base/match'
 import * as glassEasel from '../../src'
 
+const domHtml = (elem: glassEasel.Element): string => {
+  const domElem = elem.getBackendElement() as unknown as Element
+  return domElem.innerHTML
+}
+
+const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
 const componentSpace = new glassEasel.ComponentSpace()
 componentSpace.updateComponentOptions({
   writeFieldsToNode: true,
@@ -11,12 +17,6 @@ componentSpace.defineComponent({
   is: '',
 })
 
-const domHtml = (elem: glassEasel.Element): string => {
-  const domElem = elem.getBackendElement() as unknown as Element
-  return domElem.innerHTML
-}
-
-describe('slot', () => {
   describe('dynamic slot', () => {
     describe('core', () => {
       test('should support duplicate slot', () => {
@@ -62,7 +62,7 @@ describe('slot', () => {
         const parentElem = glassEasel.Component.createWithContext(
           'root',
           parent.general(),
-          domBackend,
+          testBackend,
         )
         const childElem = parentElem.getShadowRoot()!.childNodes[0]!.asInstanceOf(child)!
         const a = childElem.$.a as glassEasel.Element
@@ -192,7 +192,7 @@ describe('slot', () => {
         const parentElem = glassEasel.Component.createWithContext(
           'root',
           parent.general(),
-          domBackend,
+          testBackend,
         )
         const childElem = parentElem.getShadowRoot()!.childNodes[0]!.asInstanceOf(child)!
 
@@ -378,7 +378,7 @@ describe('slot', () => {
         const parentElem = glassEasel.Component.createWithContext(
           'root',
           parent.general(),
-          domBackend,
+          testBackend,
         )
         const childElem = parentElem.getShadowRoot()!.childNodes[0]!.asInstanceOf(child)!
 
@@ -447,7 +447,7 @@ describe('slot', () => {
         const parentElem = glassEasel.Component.createWithContext(
           'root',
           parent.general(),
-          domBackend,
+          testBackend,
         )
         const childElem = parentElem.getShadowRoot()!.childNodes[0]!.asInstanceOf(child)!
 
@@ -583,7 +583,7 @@ describe('slot', () => {
         const parentElem = glassEasel.Component.createWithContext(
           'root',
           parent.general(),
-          domBackend,
+          testBackend,
         ).asInstanceOf(parent)!
 
         glassEasel.Element.pretendAttached(parentElem)
@@ -843,7 +843,7 @@ describe('slot', () => {
         const parentElem = glassEasel.Component.createWithContext(
           'root',
           parent.general(),
-          domBackend,
+          testBackend,
         ).asInstanceOf(parent)!
 
         glassEasel.Element.pretendAttached(parentElem)
@@ -1018,7 +1018,7 @@ describe('slot', () => {
         const parentElem = glassEasel.Component.createWithContext(
           'root',
           parent.general(),
-          domBackend,
+          testBackend,
         ).asInstanceOf(parent)!
         const childElem = parentElem.getShadowRoot()!.childNodes[0]!.asInstanceOf(child)!
 
@@ -1113,7 +1113,7 @@ describe('slot', () => {
           })
           .registerComponent()
 
-        const parentElem = glassEasel.Component.createWithContext('root', parent, domBackend)
+        const parentElem = glassEasel.Component.createWithContext('root', parent, testBackend)
         glassEasel.Element.pretendAttached(parentElem)
         const childElem = parentElem.getShadowRoot()!.childNodes[1]!.asInstanceOf(child)!
 
@@ -1308,7 +1308,7 @@ describe('slot', () => {
         const parentElem = glassEasel.Component.createWithContext(
           'root',
           parent.general(),
-          domBackend,
+          testBackend,
         )
         const noneElem = parentElem.getShadowRoot()!.childNodes[0]!.asInstanceOf(none)!
         const recElem = parentElem.getShadowRoot()!.childNodes[1]!.asInstanceOf(rec)!
@@ -1368,7 +1368,7 @@ describe('slot', () => {
         const parentElem = glassEasel.Component.createWithContext(
           'root',
           parent.general(),
-          domBackend,
+          testBackend,
         )
 
         expect(domHtml(parentElem)).toBe('<impl><div><div>123</div></div></impl>')
@@ -1434,7 +1434,7 @@ describe('slot', () => {
         })
         .registerComponent()
 
-      const parentElem = glassEasel.Component.createWithContext('root', parent, domBackend)
+      const parentElem = glassEasel.Component.createWithContext('root', parent, testBackend)
       const singleElem = (parentElem.$.s as glassEasel.Element).asInstanceOf(single)!
       const multiElem = (parentElem.$.m as glassEasel.Element).asInstanceOf(multi)!
       const dynamicElem = (parentElem.$.d as glassEasel.Element).asInstanceOf(dynamic)!
@@ -1555,4 +1555,7 @@ describe('slot', () => {
       )
     })
   })
-})
+}
+
+describe('slot (DOM backend)', () => testCases(domBackend))
+describe('slot (composed backend)', () => testCases(composedBackend))

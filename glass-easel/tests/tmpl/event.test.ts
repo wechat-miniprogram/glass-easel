@@ -1,7 +1,7 @@
-import { tmpl, domBackend } from '../base/env'
+import { tmpl, domBackend, composedBackend } from '../base/env'
 import * as glassEasel from '../../src'
 
-describe('event bindings', () => {
+const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
   test('event object', () => {
     const template = Object.assign(
       tmpl(`
@@ -24,7 +24,7 @@ describe('event bindings', () => {
         },
       },
     })
-    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
     elem.getShadowRoot()!.getElementById('a')!.triggerEvent('customEv')
     expect(eventOrder).toStrictEqual([1])
   })
@@ -51,7 +51,7 @@ describe('event bindings', () => {
         },
       },
     })
-    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
     const c = elem.getShadowRoot()!.getElementById('c')!
     c.triggerEvent('customEv', null, { bubbles: true })
     expect(eventOrder).toStrictEqual([3, 2])
@@ -79,7 +79,7 @@ describe('event bindings', () => {
         },
       },
     })
-    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
     const c = elem.getShadowRoot()!.getElementById('c')!
     c.triggerEvent('customEv', null, { bubbles: true })
     expect(eventOrder).toStrictEqual([3, 1])
@@ -107,7 +107,7 @@ describe('event bindings', () => {
         },
       },
     })
-    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
     const c = elem.getShadowRoot()!.getElementById('c')!
     c.triggerEvent('customEv', null, { bubbles: true })
     expect(eventOrder).toStrictEqual([2])
@@ -196,7 +196,7 @@ describe('event bindings', () => {
       },
     })
 
-    const parentElem = glassEasel.Component.createWithContext('root', parent, domBackend)
+    const parentElem = glassEasel.Component.createWithContext('root', parent, testBackend)
     const singleElem = parentElem.$.s as glassEasel.Element
     const multiElem = parentElem.$.m as glassEasel.Element
     const dynamicElem = parentElem.$.d as glassEasel.Element
@@ -258,7 +258,7 @@ describe('event bindings', () => {
         abc: 123,
       },
     })
-    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
     const a = elem.getShadowRoot()!.getElementById('a')!
     expect((elem as unknown as { _test: number })._test).toBe(789)
     expect((a as unknown as { _test: string })._test).toBe('123:')
@@ -285,7 +285,7 @@ describe('event bindings', () => {
         <abc id="a" bind:abc="{{ modA.fA }}" />
       `),
     })
-    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
     glassEasel.Element.pretendAttached(elem)
     const a = elem.getShadowRoot()!.getElementById('a')!
     expect((a as unknown as { _test: string })._test).toBe(123)
@@ -311,8 +311,11 @@ describe('event bindings', () => {
         <abc id="a" worklet:abc="{{ 123 }}" worklet:def="456" />
       `),
     })
-    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(triggered).toStrictEqual(['abc', 'def'])
   })
-})
+}
+
+describe('event bindings (DOM backend)', () => testCases(domBackend))
+describe('event bindings (composed backend)', () => testCases(composedBackend))

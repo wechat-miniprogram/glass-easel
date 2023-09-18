@@ -461,6 +461,51 @@ const testCases = function (testBackend) {
       expect(vc2.parentNode).toBe(null)
       expect(vc2.childNodes.length).toBe(0)
     })
+
+    it('should replace slot contents with children', function () {
+      regElem({
+        is: 'wrapper',
+        template: '<div><slot /></div>',
+      })
+      regElem({
+        is: 'comp1',
+        template: '<div><slot /></div>',
+      })
+      regElem({
+        is: 'comp2',
+        options: { multipleSlots: true },
+        template: '<div><slot name="b"/></div><slot name="a" />',
+      })
+      var e1 = root.shadowRoot.createComponent('wrapper')
+      var e2 = glassEasel.NativeNode.create('e2', root.shadowRoot)
+      var e3 = glassEasel.NativeNode.create('e3', root.shadowRoot)
+      var e4 = glassEasel.NativeNode.create('e4', root.shadowRoot)
+      var v1 = glassEasel.VirtualNode.create('v1', root.shadowRoot)
+      var t1 = glassEasel.TextNode.create('t1', root.shadowRoot)
+      var c1 = root.shadowRoot.createComponent('comp1')
+      var c2 = root.shadowRoot.createComponent('comp2')
+      e1.appendChild(e2)
+      e2.appendChild(e3)
+      e2.appendChild(v1)
+      v1.appendChild(t1)
+      e2.appendChild(e4)
+      e4.slot = 'b'
+
+      e2.selfReplaceWith(c1)
+      matchElementWithDom(e1)
+      expect(e2.parentNode).toBe(null)
+      expect(e2.childNodes.length).toBe(0)
+
+      c1.selfReplaceWith(c2)
+      matchElementWithDom(e1)
+      expect(c1.parentNode).toBe(null)
+      expect(c1.childNodes.length).toBe(0)
+
+      c2.selfReplaceWith(c1)
+      matchElementWithDom(e1)
+      expect(c2.parentNode).toBe(null)
+      expect(c2.childNodes.length).toBe(0)
+    })
   })
 
   describe('component virtualHost', function () {

@@ -1,15 +1,6 @@
-import { tmpl, domBackend } from '../base/env'
+import { tmpl, composedBackend, domBackend } from '../base/env'
 import * as glassEasel from '../../src'
 import { virtual as matchElementWithDom } from '../base/match'
-
-const componentSpace = new glassEasel.ComponentSpace()
-componentSpace.updateComponentOptions({
-  writeFieldsToNode: true,
-  writeIdToDOM: true,
-})
-componentSpace.defineComponent({
-  is: '',
-})
 
 const domHtml = (elem: glassEasel.Element): string => {
   const domElem = elem.getBackendElement() as unknown as Element
@@ -22,7 +13,16 @@ type ComponentWaitingListener = Exclude<
   null
 >
 
-describe('placeholder', () => {
+const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
+  const componentSpace = new glassEasel.ComponentSpace()
+  componentSpace.updateComponentOptions({
+    writeFieldsToNode: true,
+    writeIdToDOM: true,
+  })
+  componentSpace.defineComponent({
+    is: '',
+  })
+
   test('using simple placeholder and waiting', () => {
     const componentSpace = new glassEasel.ComponentSpace()
     componentSpace.updateComponentOptions({
@@ -57,7 +57,7 @@ describe('placeholder', () => {
         `),
       })
       .registerComponent()
-    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
     expect(listener).toHaveBeenCalledTimes(1)
     expect(listener).toHaveBeenNthCalledWith(1, false, 'placeholder/simple/child', elem)
     expect(domHtml(elem)).toBe('<div><child><span></span></child></div>')
@@ -96,7 +96,7 @@ describe('placeholder', () => {
         template: tmpl('<child>test</child>'),
       })
       .registerComponent()
-    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
     expect(domHtml(elem)).toBe('<child>test</child>')
     matchElementWithDom(elem)
   })
@@ -117,7 +117,7 @@ describe('placeholder', () => {
         template: tmpl('<parent />'),
       })
       .registerComponent()
-    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
     expect(domHtml(elem)).toBe('<parent></parent>')
     matchElementWithDom(elem)
 
@@ -162,7 +162,7 @@ describe('placeholder', () => {
         <child-private />
       `),
     })
-    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
     expect(listener).toHaveBeenCalledTimes(2)
     expect(listener).toHaveBeenNthCalledWith(1, true, 'child-pub', elem)
     expect(listener).toHaveBeenNthCalledWith(2, false, 'child', elem)
@@ -210,7 +210,7 @@ describe('placeholder', () => {
         `),
       })
       .registerComponent()
-    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
     expect(listener).toHaveBeenCalledTimes(1)
     expect(listener).toHaveBeenNthCalledWith(1, false, 'placeholder/simple/child', elem)
     expect(domHtml(elem)).toBe('<span>A</span>')
@@ -251,7 +251,7 @@ describe('placeholder', () => {
         `),
       })
       .registerComponent()
-    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
     expect(domHtml(elem)).toBe('<span>A</span>')
     matchElementWithDom(elem)
 
@@ -301,7 +301,7 @@ describe('placeholder', () => {
         `),
       })
       .registerComponent()
-    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
     expect(domHtml(elem)).toBe('<span prop="old">A</span>')
     matchElementWithDom(elem)
 
@@ -372,7 +372,7 @@ describe('placeholder', () => {
         </child>
       `),
     })
-    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
     expect(callOrder).toStrictEqual([1])
     glassEasel.Element.pretendAttached(elem)
     expect(callOrder).toStrictEqual([1, 2, 7])
@@ -405,4 +405,7 @@ describe('placeholder', () => {
     expect(domHtml(elem)).toBe('<child><div>21</div></child>')
     matchElementWithDom(elem)
   })
-})
+}
+
+describe('placeholder (DOM backend)', () => testCases(domBackend))
+describe('placeholder (composed backend)', () => testCases(composedBackend))

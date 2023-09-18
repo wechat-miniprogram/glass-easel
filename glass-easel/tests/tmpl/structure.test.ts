@@ -1,4 +1,4 @@
-import { tmpl, multiTmpl, domBackend, execWithWarn } from '../base/env'
+import { tmpl, multiTmpl, domBackend, execWithWarn, composedBackend } from '../base/env'
 import { virtual as matchElementWithDom } from '../base/match'
 import * as glassEasel from '../../src'
 
@@ -7,7 +7,7 @@ const domHtml = (elem: glassEasel.Element): string => {
   return domElem.innerHTML
 }
 
-describe('node tree structure', () => {
+const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
   test('basic tree building', () => {
     const def = glassEasel
       .registerElement({
@@ -18,7 +18,7 @@ describe('node tree structure', () => {
       `),
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     expect(domHtml(elem)).toBe('<div style="font-weight: bold"><span>Hello world!</span></div>')
   })
 
@@ -36,7 +36,7 @@ describe('node tree structure', () => {
         },
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend).general()
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend).general()
     expect(domHtml(elem)).toBe('<div class="123"><span>abc</span></div>')
     elem.setData({
       a: true,
@@ -62,7 +62,7 @@ describe('node tree structure', () => {
         },
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     expect(domHtml(elem)).toBe('<div>c</div><div>f</div>')
     elem.setData({
       cond1: true,
@@ -98,7 +98,7 @@ describe('node tree structure', () => {
         },
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     expect(domHtml(elem)).toBe('<div>456</div>')
     elem.setData({
       cond: true,
@@ -147,7 +147,7 @@ describe('node tree structure', () => {
         },
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     const child = elem.getShadowRoot()!.getElementById('c')!.asInstanceOf(childComp)!
     expect(domHtml(elem)).toBe('<child><div>A</div></child>')
     matchElementWithDom(elem)
@@ -195,7 +195,7 @@ describe('node tree structure', () => {
         },
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<div><x-c>0</x-c></div><div><x-c>1</x-c></div>')
     expect(ops).toEqual([
@@ -267,7 +267,7 @@ describe('node tree structure', () => {
         },
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     const listBlock = elem.getShadowRoot()!.childNodes[0] as glassEasel.VirtualNode
     const checkIndex = () => {
       for (let i = 0; i < listBlock.childNodes.length; i += 1) {
@@ -370,7 +370,7 @@ describe('node tree structure', () => {
         },
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     expect(
       (elem.getShadowRoot()!.getElementById('a0')!.childNodes[0] as glassEasel.TextNode)
         .textContent,
@@ -441,7 +441,7 @@ describe('node tree structure', () => {
         },
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<div><x-c>a</x-c></div><div><x-c>b</x-c></div>')
     expect(ops).toEqual([
@@ -514,7 +514,7 @@ describe('node tree structure', () => {
         >,
       },
     })
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     const listBlock = elem.getShadowRoot()!.childNodes[0] as glassEasel.VirtualNode
     const checkIndex = () => {
       const keys = Object.keys(elem.data.list)
@@ -692,7 +692,7 @@ describe('node tree structure', () => {
       })
       .general()
     const elem = execWithWarn(1, () =>
-      glassEasel.Component.createWithContext('root', def, domBackend),
+      glassEasel.Component.createWithContext('root', def, testBackend),
     )
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<x-c>x</x-c>')
@@ -743,7 +743,7 @@ describe('node tree structure', () => {
       })
       .general()
     const elem = execWithWarn(1, () =>
-      glassEasel.Component.createWithContext('root', def, domBackend),
+      glassEasel.Component.createWithContext('root', def, testBackend),
     )
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<span>0</span><span>1</span><span>2</span>')
@@ -763,7 +763,7 @@ describe('node tree structure', () => {
         },
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     expect(domHtml(elem)).toBe('<div>123</div>')
     elem.setData({ a: 456 })
     expect(domHtml(elem)).toBe('<div>456</div>')
@@ -780,7 +780,7 @@ describe('node tree structure', () => {
         },
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     expect(domHtml(elem)).toBe('<div></div>')
   })
 
@@ -809,7 +809,7 @@ describe('node tree structure', () => {
         },
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     expect(domHtml(elem)).toBe('<div><span>0:123</span><span>2:789</span></div>')
     elem.setData({ 'arr[0].shown': false })
     expect(domHtml(elem)).toBe('<div><span>2:789</span></div>')
@@ -849,7 +849,7 @@ describe('node tree structure', () => {
         },
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     expect(domHtml(elem)).toBe('<div><span>123</span></div><div><span>123</span></div>')
     elem.setData({ obj: { a: 456 } })
     expect(domHtml(elem)).toBe('<div><span>456</span></div><div><span>456</span></div>')
@@ -876,7 +876,7 @@ describe('node tree structure', () => {
         },
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     expect(domHtml(elem)).toBe('<div><span>123</span></div>')
     elem.setData({ obj: { a: 456 } })
     expect(domHtml(elem)).toBe('<div><span>456</span></div>')
@@ -902,7 +902,7 @@ describe('node tree structure', () => {
         },
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     expect(domHtml(elem)).toBe('<div><span>345</span></div>')
     elem.setData({ b: { a: 200, d: 7 } })
     expect(domHtml(elem)).toBe('<div><span>247</span></div>')
@@ -935,7 +935,7 @@ describe('node tree structure', () => {
         methods: {},
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     expect(domHtml(elem)).toBe('<div></div>')
     elem.setData({ childType: 'A' })
     expect(domHtml(elem)).toBe('<div><span>123</span></div>')
@@ -972,7 +972,7 @@ describe('node tree structure', () => {
         methods: {},
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     expect(domHtml(elem)).toBe('<div></div>')
     elem.setData({ list: [1, 2] })
     expect(domHtml(elem)).toBe('<div><span>0:123</span><span>1:456</span></div>')
@@ -997,7 +997,7 @@ describe('node tree structure', () => {
         },
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     expect(domHtml(elem)).toBe('<div></div>')
   })
 
@@ -1028,7 +1028,7 @@ describe('node tree structure', () => {
         },
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend).asInstanceOf(def)!
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend).asInstanceOf(def)!
     expect(domHtml(elem)).toBe('<div>key: A</div><div>value: a</div>')
 
     elem.setData({ 'c.i': 'B' })
@@ -1055,7 +1055,7 @@ describe('node tree structure', () => {
         data: {},
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend).asInstanceOf(def)!
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend).asInstanceOf(def)!
     expect(domHtml(elem)).toBe('<div>6</div>')
   })
 
@@ -1076,7 +1076,7 @@ describe('node tree structure', () => {
         data: {},
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend).asInstanceOf(def)!
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend).asInstanceOf(def)!
     expect(domHtml(elem)).toBe('<div>6</div>')
   })
 
@@ -1104,7 +1104,7 @@ describe('node tree structure', () => {
         data: {},
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend).asInstanceOf(def)!
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend).asInstanceOf(def)!
     expect(domHtml(elem)).toBe('<div>-1 3</div>')
   })
 
@@ -1134,7 +1134,7 @@ describe('node tree structure', () => {
         },
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<child-comp><div>123</div></child-comp>')
     matchElementWithDom(elem)
@@ -1153,7 +1153,7 @@ describe('node tree structure', () => {
         `),
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<div></div>')
   })
@@ -1166,7 +1166,7 @@ describe('node tree structure', () => {
         `),
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<div></div>')
     expect(elem.getShadowRoot()!.childNodes[0]!.asElement()!.dataset.camelcase).toBe(123)
@@ -1180,9 +1180,41 @@ describe('node tree structure', () => {
         `),
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<div hidden=""></div>')
+  })
+
+  test('attribute types', () => {
+    const def = glassEasel
+      .registerElement({
+        template: tmpl(`
+          <div
+            a="{{true}}"
+            b="{{false}}"
+            c="{{null}}"
+            d="{{undefined}}"
+            e="{{arr}}"
+            f="{{obj}}"
+            g="{{0}}"
+            h="{{NaN}}"
+            i="{{infinity}}"
+            j
+          ></div>
+        `),
+        data: {
+          arr: [],
+          obj: {},
+          NaN,
+          infinity: Infinity,
+        },
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe(
+      '<div a="" c="" d="" e="" f="[object Object]" g="0" h="NaN" i="Infinity" j=""></div>',
+    )
   })
 
   test('property name cases', () => {
@@ -1201,7 +1233,7 @@ describe('node tree structure', () => {
         `),
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(elem.getShadowRoot()!.childNodes[0]!.asInstanceOf(subComp)!.data.propName).toBe('abc')
   })
@@ -1218,7 +1250,7 @@ describe('node tree structure', () => {
         },
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<a href="abc"></a>')
     elem.setData({
@@ -1239,7 +1271,7 @@ describe('node tree structure', () => {
         },
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<div>123</div>')
     expect(domHtml(elem.getShadowRoot()!.getElementById('abc')!)).toBe('123')
@@ -1272,7 +1304,7 @@ describe('node tree structure', () => {
       `),
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<sub-comp><div></div><span></span></sub-comp>')
     matchElementWithDom(elem)
@@ -1316,7 +1348,7 @@ describe('node tree structure', () => {
       `),
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     const subElem = (elem.$.sub as glassEasel.GeneralComponent).asInstanceOf(subComp)!
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<sub-comp><a></a><b></b><c><s></s></c></sub-comp>')
@@ -1378,7 +1410,7 @@ describe('node tree structure', () => {
         },
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<div><span></span></div>')
     const child = elem.getShadowRoot()!.getElementById('child')!
@@ -1410,7 +1442,7 @@ describe('node tree structure', () => {
         },
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
     const child = elem.getShadowRoot()!.getElementById('child')!
     child.triggerEvent('customEv')
@@ -1455,7 +1487,7 @@ describe('node tree structure', () => {
       `),
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe(
       '<sub-comp class="p--static"><div class="p--static p--a-class"></div></sub-comp>',
@@ -1506,7 +1538,7 @@ describe('node tree structure', () => {
         },
       })
       .general()
-    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<sub-comp><div class="a1"></div></sub-comp>')
     expect(ops).toBe(1)
@@ -1524,4 +1556,7 @@ describe('node tree structure', () => {
     expect(domHtml(elem)).toBe('<sub-comp><div class="a2"></div></sub-comp>')
     expect(ops).toBe(3)
   })
-})
+}
+
+describe('node tree structure (DOM backend)', () => testCases(domBackend))
+describe('node tree structure (composed backend)', () => testCases(composedBackend))

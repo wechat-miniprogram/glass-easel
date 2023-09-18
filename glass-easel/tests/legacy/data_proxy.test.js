@@ -277,18 +277,21 @@ describe('DataProxy', function () {
       },
     })
     var elem = createElem('data-proxy-prop-passing-deep-copy')
-    expect(elem.$.c.getAttribute('prop-abc')).toBe('1')
+    expect(elem.$.c.getAttribute('prop-abc')).toBe(1)
+    expect(elem.$.c.$$.getAttribute('prop-abc')).toBe('1')
     var dataGroup = glassEasel.Component.getDataProxy(elem)
     var c = 4
     dataGroup.replaceDataOnPath(['a', 'b'], c)
     c = 5
     dataGroup.applyDataUpdates()
-    expect(elem.$.c.getAttribute('prop-abc')).toBe('4')
+    expect(elem.$.c.getAttribute('prop-abc')).toBe(4)
+    expect(elem.$.c.$$.getAttribute('prop-abc')).toBe('4')
     d = { b: c }
     dataGroup.replaceProperty('a', d)
     d.b = 6
     dataGroup.applyDataUpdates()
-    expect(elem.$.c.getAttribute('prop-abc')).toBe('6')
+    expect(elem.$.c.getAttribute('prop-abc')).toBe(6)
+    expect(elem.$.c.$$.getAttribute('prop-abc')).toBe('6')
   })
 
   describe('#scheduleReplace #setChanges #getChanges', function () {
@@ -530,7 +533,8 @@ describe('DataProxy', function () {
             observer: function () {
               actualOrder.push(0)
               expect(elem.data.prop1).toBe(456)
-              expect(elem.$.a.getAttribute('prop-a')).toBe('456')
+              expect(elem.$.a.getAttribute('prop-a')).toBe(456)
+              expect(elem.$.a.$$.getAttribute('prop-a')).toBe('456')
             },
           },
         },
@@ -538,7 +542,8 @@ describe('DataProxy', function () {
           '**': function () {
             actualOrder.push(1)
             expect(elem.data.prop1).toBe(456)
-            expect(elem.$.a.getAttribute('prop-a')).toBe('123')
+            expect(elem.$.a.getAttribute('prop-a')).toBe(123)
+            expect(elem.$.a.$$.getAttribute('prop-a')).toBe('123')
           },
         },
       })
@@ -563,8 +568,10 @@ describe('DataProxy', function () {
               actualOrder.push(1)
               expect(this.data.propA).toBe(123)
               expect(this.data.dataB).toBe(456)
-              expect(this.$.a.getAttribute('prop-a')).toBe('123')
-              expect(this.$.a.getAttribute('prop-b')).toBe('456')
+              expect(this.$.a.getAttribute('prop-a')).toBe(123)
+              expect(this.$.a.$$.getAttribute('prop-a')).toBe('123')
+              expect(this.$.a.getAttribute('prop-b')).toBe(456)
+              expect(this.$.a.$$.getAttribute('prop-b')).toBe('456')
               expect(elem.data.dataE).toBe(true)
             },
           },

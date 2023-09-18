@@ -227,8 +227,9 @@ abstract class Node implements glassEasel.composedBackend.Element {
 
   private _$style = ''
   private _$styleScope = 0
-  private _$classes: Array<[string, number]> = []
-  private _$attributes: Record<string, any> = {}
+  private _$classes: Array<[string, number | undefined]> = []
+  private _$attributes: Array<[string, unknown]> = []
+  private _$styleScopeManager: glassEasel.StyleScopeManager | undefined
 
   constructor(ownerContext: Context) {
     this._$ownerContext = ownerContext
@@ -283,48 +284,70 @@ abstract class Node implements glassEasel.composedBackend.Element {
     }
   }
 
-  private logicalTagName() {
-    if (this instanceof Root) return 'root'
-    if (this instanceof Fragment) return 'fragment'
-    if (this instanceof TextNode) return 'text'
-    if (this instanceof Element) return this._$logicalTagName
-    throw new Error('unreachable')
-  }
-  // eslint-disable-next-line no-console
-  dump(logFn: (msg: string) => void = console.info) {
-    logFn(this.dumpToString())
-  }
-  dumpToString(indent = ''): string {
-    const ret: string[] = []
-    const props: Record<string, string> = {}
-    Object.entries(this._$attributes).forEach(([key, value]) => {
-      props[key] = `${value as unknown as string}`
-    })
-    props.id = this.id
-    props.style = this._$style
-    props.class = this._$classes.map((c) => `${c[0]}$${c[1]}`).join(' ')
-    const propsStr = Object.entries(props)
-      .filter(([_, value]) => value.length > 0)
-      .map(([key, value]) => `${key}="${value}"`)
-      .join(' ')
-    ret.push(indent)
+  get tagName(): string {
     if (this instanceof Element) {
-      ret.push(`<${this.logicalTagName()} ${this._$stylingTagName}$${this._$styleScope}`)
-    } else {
-      ret.push(`<${this.logicalTagName()} $${this._$styleScope}`)
+      return (
+        this._$logicalTagName === 'wx-x' ? this._$stylingTagName : this._$logicalTagName
+      ).toUpperCase()
     }
-    if (propsStr.length > 0) ret.push(` ${propsStr}`)
-    if (this.textContent === null && this.childNodes.length === 0) {
-      ret.push(' />\n')
-    } else {
-      ret.push('>\n')
-      if (this.textContent !== null) ret.push(`${indent}  ${this.textContent}\n`)
-      this.childNodes.forEach((child) => {
-        ret.push(child.dumpToString(`${indent}  `))
+    return ''
+  }
+
+  get innerHTML(): string {
+    if (this instanceof Element) {
+      return this.childNodes.map((child) => child.outerHTML).join('')
+    }
+    return this.textContent || ''
+  }
+
+  get outerHTML(): string {
+    const ret: string[] = []
+    if (this instanceof Element) {
+      const props: Record<string, string> = {}
+      this._$attributes.forEach(([key]) => {
+        const value = this.getAttribute(key)
+        if (value !== null) {
+          props[key.toLowerCase()] = value
+        }
       })
-      ret.push(`${indent}</${this.logicalTagName()}>\n`)
+      const tagName = this.tagName.toLowerCase()
+      ret.push(`<${tagName}`)
+      if (this.id) props.id = this.getAttribute('id')!
+      if (this._$style) props.style = this.getAttribute('style')!
+      if (this._$classes.length) props.class = this.getAttribute('class')!
+      const propsStr = Object.entries(props)
+        .map(([key, value]) => `${key}="${value}"`)
+        .join(' ')
+      if (propsStr.length > 0) ret.push(` ${propsStr}`)
+      ret.push(`>${this.innerHTML}</${tagName}>`)
+    } else {
+      ret.push(this.innerHTML)
     }
     return ret.join('')
+  }
+
+  getAttribute(name: string): string | null {
+    // eslint-disable-next-line no-param-reassign
+    name = name.toLowerCase()
+    if (name === 'id') return this.id
+    if (name === 'style') return this._$style
+    if (name === 'class')
+      return this._$classes.length
+        ? this._$classes
+            .map(([name, styleScope]) => {
+              let prefix = ''
+              if (styleScope !== undefined) {
+                prefix = this._$styleScopeManager!.queryName(styleScope) || ''
+              }
+              return `${prefix ? `${prefix}--` : ''}${name}`
+            })
+            .join(' ')
+        : null
+    const attr = this._$attributes.find((attr) => attr[0] === name)
+    if (!attr) return null
+    const value = attr[1]
+    if (value === false) return null
+    return value === true || value === undefined || value === null ? '' : String(value)
   }
 
   @protocolMethod
@@ -339,6 +362,10 @@ abstract class Node implements glassEasel.composedBackend.Element {
   @protocolMethod
   associateValue(v: glassEasel.Element): void {
     this.__wxElement = v
+    if (v.ownerShadowRoot) {
+      const ownerSpace = v.ownerShadowRoot.getHostNode()._$behavior.ownerSpace
+      this._$styleScopeManager = ownerSpace.styleScopeManager
+    }
   }
 
   @protocolMethod
@@ -459,14 +486,14 @@ abstract class Node implements glassEasel.composedBackend.Element {
 
   @protocolMethod
   addClass(elementClass: string, styleScope?: number): void {
-    const scope = ensureNonNegativeInteger(styleScope) || 0
+    const scope = ensureNonNegativeInteger(styleScope)
     const index = this._$classes.findIndex((c) => c[0] === elementClass && c[1] === scope)
     if (index === -1) this._$classes.push([elementClass, scope])
   }
 
   @protocolMethod
   removeClass(elementClass: string, styleScope?: number): void {
-    const scope = ensureNonNegativeInteger(styleScope) || 0
+    const scope = ensureNonNegativeInteger(styleScope)
     const index = this._$classes.findIndex((c) => c[0] === elementClass && c[1] === scope)
     if (index !== -1) this._$classes.splice(index, 1)
   }
@@ -478,12 +505,30 @@ abstract class Node implements glassEasel.composedBackend.Element {
 
   @protocolMethod
   setAttribute(name: string, value: unknown): void {
-    this._$attributes[name] = value
+    // eslint-disable-next-line no-param-reassign
+    name = name.toLowerCase()
+    const index = this._$attributes.findIndex((attr) => attr[0] === name)
+    if (value === false) {
+      if (index >= 0) {
+        this._$attributes.splice(index, 1)
+      }
+    } else {
+      if (index >= 0) {
+        this._$attributes[index]![1] = value
+      } else {
+        this._$attributes.push([name, value])
+      }
+    }
   }
 
   @protocolMethod
   removeAttribute(name: string): void {
-    delete this._$attributes[name]
+    // eslint-disable-next-line no-param-reassign
+    name = name.toLowerCase()
+    const index = this._$attributes.findIndex((attr) => attr[0] === name)
+    if (index >= 0) {
+      this._$attributes.splice(index, 1)
+    }
   }
 
   @protocolMethod
