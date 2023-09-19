@@ -458,9 +458,6 @@ export class Element implements NodeCast {
 
   private static checkAndCallDetached(node: Node) {
     const callFunc = function callFunc(node: Node) {
-      if (node._$destroyOnDetach) {
-        node.destroyBackendElement()
-      }
       if (node instanceof Element && node._$attached) {
         if (node instanceof Component) {
           node.triggerLifetime('beforeDetach', [])
@@ -488,6 +485,9 @@ export class Element implements NodeCast {
         } else {
           node._$attached = false
         }
+      }
+      if (node._$destroyOnDetach) {
+        node.destroyBackendElement()
       }
     }
     callFunc(node)
@@ -640,10 +640,12 @@ export class Element implements NodeCast {
               }
               if (removeCount > 0) (backendParent as domlikeBackend.Element).removeChild(rel)
             } else {
-              ;(backendParent as composedBackend.Element).spliceRemove(
-                (before as Element)._$backendElement as composedBackend.Element,
-                removeCount,
-              )
+              if ((before as Element)._$backendElement) {
+                ;(backendParent as composedBackend.Element).spliceRemove(
+                  (before as Element)._$backendElement as composedBackend.Element,
+                  removeCount,
+                )
+              }
             }
           }
         }
@@ -921,9 +923,11 @@ export class Element implements NodeCast {
         const recNonVirtual = (c: Node) => {
           // since `TextNode` also has `backendElement` private field, just make it as `Element`
           // domlike backend also
-          ;(f as composedBackend.Element).appendChild(
-            (c as Element)._$backendElement as composedBackend.Element,
-          )
+          if ((c as Element)._$backendElement) {
+            ;(f as composedBackend.Element).appendChild(
+              (c as Element)._$backendElement as composedBackend.Element,
+            )
+          }
           frag = f
         }
 
@@ -988,12 +992,14 @@ export class Element implements NodeCast {
             }
             if (removeCount > 0) (backendParent as domlikeBackend.Element).removeChild(rel)
           } else {
-            ;(backendParent as composedBackend.Element).spliceBefore(
-              // since `TextNode` also has `backendElement` private field, just make it as `Element`
-              (before as Element)._$backendElement as composedBackend.Element,
-              removeCount,
-              frag as composedBackend.Element,
-            )
+            if ((before as Element)._$backendElement) {
+              ;(backendParent as composedBackend.Element).spliceBefore(
+                // since `TextNode` also has `backendElement` private field, just make it as `Element`
+                (before as Element)._$backendElement as composedBackend.Element,
+                removeCount,
+                frag as composedBackend.Element,
+              )
+            }
           }
         } else {
           if (BM.DOMLIKE || (BM.DYNAMIC && context.mode === BackendMode.Domlike)) {
@@ -1013,11 +1019,13 @@ export class Element implements NodeCast {
           }
           if (removeCount > 0) (backendParent as domlikeBackend.Element).removeChild(rel)
         } else {
-          ;(backendParent as composedBackend.Element).spliceRemove(
-            // since `TextNode` also has `backendElement` private field, just make it as `Element`
-            (before as Element)._$backendElement as composedBackend.Element,
-            removeCount,
-          )
+          if ((before as Element)._$backendElement) {
+            ;(backendParent as composedBackend.Element).spliceRemove(
+              // since `TextNode` also has `backendElement` private field, just make it as `Element`
+              (before as Element)._$backendElement as composedBackend.Element,
+              removeCount,
+            )
+          }
         }
       }
     }
@@ -1037,34 +1045,46 @@ export class Element implements NodeCast {
             // FIXME: skyline replaceChild is still exparser type
             // revert back to replaceChild after skyline changes
             const fragment = (context as composedBackend.Context).createFragment()
-            fragment.appendChild((newChild as Element)._$backendElement as composedBackend.Element)
-            ;(sharedNonVirtualParent as composedBackend.Element).spliceBefore(
-              // since `TextNode` also has `backendElement` private field, just make it as `Element`
-              // domlike backend also
-              (relChild as Element)._$backendElement as composedBackend.Element,
-              1,
-              fragment,
-            )
+            if ((newChild as Element)._$backendElement) {
+              fragment.appendChild(
+                (newChild as Element)._$backendElement as composedBackend.Element,
+              )
+            }
+            if ((relChild as Element)._$backendElement) {
+              ;(sharedNonVirtualParent as composedBackend.Element).spliceBefore(
+                // since `TextNode` also has `backendElement` private field, just make it as `Element`
+                // domlike backend also
+                (relChild as Element)._$backendElement as composedBackend.Element,
+                1,
+                fragment,
+              )
+            }
           } else {
-            ;(sharedNonVirtualParent as composedBackend.Element).removeChild(
+            if ((relChild as Element)._$backendElement) {
+              ;(sharedNonVirtualParent as composedBackend.Element).removeChild(
+                // since `TextNode` also has `backendElement` private field, just make it as `Element`
+                // domlike backend also
+                (relChild as Element)._$backendElement as composedBackend.Element,
+              )
+            }
+          }
+        } else if (relChild) {
+          if ((newChild as Element)._$backendElement && (relChild as Element)._$backendElement) {
+            ;(sharedNonVirtualParent as composedBackend.Element).insertBefore(
               // since `TextNode` also has `backendElement` private field, just make it as `Element`
               // domlike backend also
+              (newChild as Element)._$backendElement as composedBackend.Element,
               (relChild as Element)._$backendElement as composedBackend.Element,
             )
           }
-        } else if (relChild) {
-          ;(sharedNonVirtualParent as composedBackend.Element).insertBefore(
-            // since `TextNode` also has `backendElement` private field, just make it as `Element`
-            // domlike backend also
-            (newChild as Element)._$backendElement as composedBackend.Element,
-            (relChild as Element)._$backendElement as composedBackend.Element,
-          )
         } else {
-          ;(sharedNonVirtualParent as composedBackend.Element).appendChild(
-            // since `TextNode` also has `backendElement` private field, just make it as `Element`
-            // domlike backend also
-            (newChild as Element)._$backendElement as composedBackend.Element,
-          )
+          if ((newChild as Element)._$backendElement) {
+            ;(sharedNonVirtualParent as composedBackend.Element).appendChild(
+              // since `TextNode` also has `backendElement` private field, just make it as `Element`
+              // domlike backend also
+              (newChild as Element)._$backendElement as composedBackend.Element,
+            )
+          }
         }
       } else {
         // for node isn't a slot content, simply update
