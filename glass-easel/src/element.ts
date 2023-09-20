@@ -2089,9 +2089,10 @@ export class Element implements NodeCast {
         mutLevel,
       )
     } else if (BM.COMPOSED || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Composed)) {
+      const defaultPrevented = mutLevel === MutLevel.Final
       ;(this._$backendElement as composedBackend.Element).setEventDefaultPrevented(
         name,
-        revertEventDefaultPrevented ? !capture : capture,
+        revertEventDefaultPrevented ? !defaultPrevented : defaultPrevented,
       )
     } else {
       ;(this._$nodeTreeContext as domlikeBackend.Context).setListenerStats(
