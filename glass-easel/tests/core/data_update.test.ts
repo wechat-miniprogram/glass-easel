@@ -185,6 +185,61 @@ describe('partial update', () => {
     expect(execArr).toStrictEqual(['E'])
   })
 
+  test('should be able to update list (full list update)', () => {
+    let execArr = [] as string[]
+    const childCompDef = componentSpace
+      .define()
+      .property('p', String)
+      .observer('p', function () {
+        execArr.push(this.data.p)
+      })
+      .registerComponent()
+    const compDef = componentSpace
+      .define()
+      .usingComponents({
+        child: childCompDef.general(),
+      })
+      .template(
+        tmpl(`
+          <child wx:for="{{list}}" wx:key="k" p="{{item.v}}" />
+        `),
+      )
+      .data(() => ({
+        list: [
+          { k: 1, v: 'A' },
+          { k: 2, v: 'B' },
+          { k: 3, v: 'C' },
+          { k: 4, v: 'D' },
+        ],
+      }))
+      .registerComponent()
+    const comp = glassEasel.Component.createWithContext('root', compDef, domBackend)
+    glassEasel.Element.pretendAttached(comp)
+    const getP = () => {
+      const ret = [] as string[]
+      comp
+        .getShadowRoot()!
+        .childNodes[0]!.asElement()!
+        .childNodes.forEach((child) => {
+          ret.push(child.asElement()!.childNodes[0]!.asInstanceOf(childCompDef)!.data.p)
+        })
+      return ret
+    }
+    expect(getP()).toStrictEqual(['A', 'B', 'C', 'D'])
+    expect(execArr).toStrictEqual(['A', 'B', 'C', 'D'])
+    execArr = []
+    comp.setData({
+      list: [
+        { k: 3, v: 'C' },
+        { k: 5, v: 'E' },
+        { k: 1, v: 'A' },
+        { k: 6, v: 'F' },
+      ],
+    })
+    expect(getP()).toStrictEqual(['C', 'E', 'A', 'F'])
+    expect(execArr).toStrictEqual(['E', 'F', 'C', 'A'])
+  })
+
   test('should be able to update list keys', () => {
     let execArr = [] as string[]
     const childCompDef = componentSpace

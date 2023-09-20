@@ -1,4 +1,4 @@
-import { Element, VirtualNode } from '..'
+import { Element, VirtualNode, dumpElementToString } from '..'
 import { DataValue } from '../data_proxy'
 import { UpdatePathTreeNode, UpdatePathTreeRoot } from './proc_gen_wrapper'
 import { triggerWarning } from '../func_arr'
@@ -327,12 +327,12 @@ export class RangeListManager {
     // decide what operation to be used with each item
     const enum OpKind {
       Stable = 0,
-      ForwardMove,
-      BackwardMove,
+      ForwardMove, // move towards the array end (index increasing direction)
+      BackwardMove, // move towards the array start (index decreasing direction)
     }
     const oldListOp = new Array(oldRawKeys.length) as (OpKind | undefined)[]
     const changedItems = new Array(newRawKeys.length) as (VirtualNode | undefined)[]
-    let prevLcsOldPos = lcsArr[curLcsArrIndex]!
+    let prevLcsOldPos = -1
     for (let i = 0; i < oldPosList.length; i += 1) {
       const oldPos = oldPosList[i]!
       if (i === lcsArr[curLcsArrIndex]) {
