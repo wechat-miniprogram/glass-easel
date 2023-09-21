@@ -1,4 +1,4 @@
-import { Element, VirtualNode, dumpElementToString } from '..'
+import { Element, VirtualNode } from '..'
 import { DataValue } from '../data_proxy'
 import { UpdatePathTreeNode, UpdatePathTreeRoot } from './proc_gen_wrapper'
 import { triggerWarning } from '../func_arr'
