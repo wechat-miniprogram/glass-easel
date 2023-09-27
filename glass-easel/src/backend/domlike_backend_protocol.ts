@@ -33,11 +33,11 @@ export interface Context extends Partial<suggestedBackend.Context> {
   associateValue(element: Element, value: GlassEaselElement): void
   onEvent(
     listener: (
-      target: unknown,
+      target: GlassEaselElement,
       type: string,
       detail: unknown,
       options: EventOptions,
-    ) => EventBubbleStatus,
+    ) => EventBubbleStatus | void,
   ): void
   setListenerStats(element: Element, type: string, capture: boolean, mutLevel: MutLevel): void
   setModelBindingStat(
@@ -117,12 +117,19 @@ export class CurrentWindowBackendContext implements Context {
     createTextNode(content: string): Element
     createDocumentFragment(): Element
   }
+  /* @internal */
   private _$styleSheets: HTMLElement[] = []
+  /* @internal */
   private _$styleSheetRegistry = Object.create(null) as { [path: string]: string }
+  /* @internal */
   private _$delegatedEventListeners = Object.create(null) as Record<string, true>
+  /* @internal */
   private _$elementEventListeners = new WeakMap<Element, Record<string, true>>()
+  /* @internal */
   private _$elementCaptureEventListeners = new WeakMap<Element, Record<string, true>>()
+  /* @internal */
   private _$triggedEvents = new WeakSet<Event>()
+  /* @internal */
   private _$eventListener?: (
     target: any,
     type: string,
@@ -158,7 +165,8 @@ export class CurrentWindowBackendContext implements Context {
     const styleText = this._$styleSheetRegistry[path]
     if (styleText === undefined) throw new Error(`No style sheet registry "${path}"`)
     const s = document.createElement('style')
-    s.innerText = styleText
+    s.type = 'text/css'
+    s.innerHTML = styleText
     if (styleScope !== undefined) s.setAttribute('wx-style-scope', String(styleScope))
     document.head.appendChild(s)
     const id = this._$styleSheets.length
@@ -187,7 +195,7 @@ export class CurrentWindowBackendContext implements Context {
 
   onEvent(
     listener: (
-      target: any,
+      target: GlassEaselElement,
       type: string,
       detail: any,
       options: EventOptions,
@@ -199,6 +207,7 @@ export class CurrentWindowBackendContext implements Context {
     this._$eventListener = listener
   }
 
+  /* @internal */
   private _$getEventDetail(ev: Event) {
     const detail: { [key: string]: unknown } = {}
     let e: Event = ev
@@ -214,6 +223,7 @@ export class CurrentWindowBackendContext implements Context {
     return detail
   }
 
+  /* @internal */
   private _$trigger(ev: Event, type: string, detail: unknown, bubbles: boolean, composed: boolean) {
     if (!this._$eventListener || !ev.target) return
 
@@ -232,6 +242,7 @@ export class CurrentWindowBackendContext implements Context {
     }
   }
 
+  /* @internal */
   private _$initEvent() {
     const TAP_DIST = 10
 
