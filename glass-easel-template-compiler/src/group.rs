@@ -218,6 +218,14 @@ impl TmplGroup {
         }
     }
 
+    /// import another group.
+    pub fn import_group(&mut self, group: &TmplGroup) {
+        self.trees.extend(group.trees.clone());
+        self.scripts.extend(group.scripts.clone());
+        self.has_scripts = self.has_scripts || group.has_scripts;
+        self.extra_runtime_string.push_str(&group.extra_runtime_string);
+    }
+
     /// Add a ref of a parsed tree in the group.
     pub fn get_tree(&self, path: &str) -> Result<&TmplTree, TmplError> {
         match self.trees.get(path) {
@@ -260,7 +268,7 @@ impl TmplGroup {
     }
 
     /// Add a script segment into the group.
-    /// 
+    ///
     /// The `content` must be valid JavaScript file content.
     /// `require` and `exports` can be visited in this JavaScript segment, similar to Node.js.
     pub fn add_script(&mut self, path: &str, content: &str) -> Result<(), TmplParseError> {
@@ -270,7 +278,7 @@ impl TmplGroup {
     }
 
     /// Set extra runtime JavaScript code as a string.
-    /// 
+    ///
     /// The `content` must be valid JavaScript statements, ended by semicolon.
     pub fn set_extra_runtime_script(&mut self, content: &str) {
         self.extra_runtime_string = content.to_string();

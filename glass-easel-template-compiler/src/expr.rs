@@ -7,7 +7,7 @@ use crate::TmplError;
 use std::fmt;
 use std::fmt::Write;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum TmplExpr {
     ScopeIndex(usize),
     Ident(String),

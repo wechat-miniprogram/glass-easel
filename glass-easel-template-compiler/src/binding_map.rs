@@ -2,12 +2,12 @@ use std::{collections::HashMap, fmt::Write};
 
 use crate::{escape::gen_lit_str, proc_gen::JsFunctionScopeWriter, TmplError};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct BindingMapCollector {
     fields: HashMap<String, BindingMapField>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum BindingMapField {
     Mapped(usize),
     Disabled,
@@ -53,7 +53,7 @@ impl BindingMapCollector {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct BindingMapKeys {
     keys: Vec<(String, usize)>,
 }
