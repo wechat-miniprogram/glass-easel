@@ -20,7 +20,7 @@
         "declarationMap": true,
         "declarationDir": "dist/types",
         "preserveConstEnums": true,
-        "experimentalDecorators": true
+        "stripInternal": true
     },
     "ts-node": {
         "compilerOptions": {

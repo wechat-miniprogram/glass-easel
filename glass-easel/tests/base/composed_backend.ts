@@ -1,16 +1,5 @@
 import * as glassEasel from '../../src'
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const protocolMethod = (instance: any, propertyKey: string, descriptor: PropertyDescriptor) => {
-  const originalFn = descriptor.value as unknown as (...args: any[]) => any
-  descriptor.value = function (this: Context | Element, ...args: any[]) {
-    if (this._$currentMethod === null) this._$currentMethod = propertyKey
-    const ret: unknown = originalFn.apply(this, args)
-    this._$currentMethod = null
-    return ret
-  }
-}
-
 const enum ThrowOption {
   StyleScopeNotFound,
   StyleSheetNotFound,
@@ -46,82 +35,65 @@ export class Context implements glassEasel.composedBackend.Context {
         options: glassEasel.EventOptions,
       ) => glassEasel.EventBubbleStatus) = null
 
-  public shouldThrows(when?: ThrowOption) {
-    if (when === undefined) return true
+  public shouldThrows(when: ThrowOption) {
     if (this._$throwOn === true) return true
     if (typeof this._$throwOn !== 'boolean' && this._$throwOn[when]) return true
     return false
   }
-  // eslint-disable-next-line class-methods-use-this
-  private throws(message: string, when?: ThrowOption) {
-    if (!this.shouldThrows(when)) return
-    const method = this._$currentMethod || 'unknownMethod'
-    this._$currentMethod = null
-    throw new Error(`During ComposedBackend.Context#${method}: ${message}`)
-  }
 
-  @protocolMethod
   destroy(): void {
-    if (this._$destroyed) this.throws('destroyed twice')
+    if (this._$destroyed) throw new Error('destroyed twice')
     this._$destroyed = true
     if (this._$allElements.length !== 0) {
-      this.throws('destroyed with elements not yet destroyed')
+      throw new Error('destroyed with elements not yet destroyed')
     }
   }
 
-  @protocolMethod
   getWindowWidth(): number {
     return this._$windowWidth
   }
 
-  @protocolMethod
   getWindowHeight(): number {
     return this._$windowHeight
   }
 
-  @protocolMethod
   getDevicePixelRatio(): number {
     return this._$devicePixelRatio
   }
 
-  @protocolMethod
   getTheme(): string {
     return this._$theme
   }
 
-  @protocolMethod
   registerStyleSheetContent(path: string, content: unknown): void {
     if (this._$styleSheetContents.has(path)) {
-      this.throws(
-        `Style sheet with path "${path}" registered twice`,
-        ThrowOption.StyleSheetDoubleRegistration,
-      )
+      if (this.shouldThrows(ThrowOption.StyleSheetDoubleRegistration)) {
+        throw new Error(`Style sheet with path "${path}" registered twice`)
+      }
     }
     this._$styleSheetContents.set(path, content)
   }
 
-  @protocolMethod
   appendStyleSheetPath(path: string, styleScope?: number): number {
     const id = this._$styleSheetIdInc
     this._$styleSheetIdInc += 1
     this._$styleScopes.add(styleScope ?? 0)
     if (!this._$styleSheetContents.has(path)) {
-      this.throws(
-        `Style sheet added with path "${path}" not registered`,
-        ThrowOption.StyleSheetNotRegistered,
-      )
+      if (this.shouldThrows(ThrowOption.StyleSheetNotRegistered)) {
+        throw new Error(`Style sheet added with path "${path}" not registered`)
+      }
     }
     return id
   }
 
-  @protocolMethod
   disableStyleSheet(index: number): void {
     if (index >= this._$styleSheetIdInc) {
-      this.throws(`Style sheet with id "${index}" not exists`, ThrowOption.StyleSheetNotFound)
+      if (this.shouldThrows(ThrowOption.StyleSheetNotFound)) {
+        throw new Error(`Style sheet with id "${index}" not exists`)
+      }
     }
   }
 
-  @protocolMethod
   render(cb: (err: Error | null) => void): void {
     if (this._$renderCallbacks) {
       this._$renderCallbacks.push(cb)
@@ -141,27 +113,22 @@ export class Context implements glassEasel.composedBackend.Context {
     this._$rootNode = rootNode
   }
 
-  @protocolMethod
   getRootNode(): Node {
     return this._$rootNode
   }
 
-  @protocolMethod
   createElement(tagName: string, stylingName: string): Node {
     return new Element(this, tagName, stylingName)
   }
 
-  @protocolMethod
   createTextNode(textContent: string): Node {
     return new TextNode(this, textContent)
   }
 
-  @protocolMethod
   createFragment(): Node {
     return new Fragment(this)
   }
 
-  @protocolMethod
   onEvent(
     _listener: (
       target: glassEasel.Element,
@@ -173,7 +140,6 @@ export class Context implements glassEasel.composedBackend.Context {
     this._$eventEmitter = _listener
   }
 
-  @protocolMethod
   // eslint-disable-next-line class-methods-use-this
   createMediaQueryObserver(
     _status: glassEasel.backend.MediaQueryStatus,
@@ -201,10 +167,10 @@ const stringifyType = (v: unknown) => {
  * https://developer.mozilla.org/en-US/docs/Web/API/Node/nodeType
  */
 const enum NODE_TYPE {
-  ELEMENT_NODE = 1,
-  TEXT_NODE = 3,
-  DOCUMENT_NODE = 9,
-  DOCUMENT_FRAGMENT_NODE = 11,
+  ELEMENT_NODE,
+  TEXT_NODE,
+  DOCUMENT_NODE,
+  DOCUMENT_FRAGMENT_NODE,
 }
 
 /** An element for empty backend implementation */
@@ -237,48 +203,45 @@ abstract class Node implements glassEasel.composedBackend.Element {
   }
 
   // eslint-disable-next-line class-methods-use-this
-  private throws(message: string, when?: ThrowOption) {
-    if (!this._$ownerContext.shouldThrows(when)) return
-    const method = this._$currentMethod || 'unknownMethod'
-    this._$currentMethod = null
-    throw new Error(`During ComposedBackend.Element#${method}: ${message}`)
-  }
-
   private assertFragment(frag: Node) {
-    if (!(frag instanceof Fragment)) this.throws(`expect a fragment but got ${stringifyType(frag)}`)
+    if (!(frag instanceof Fragment))
+      throw new Error(`expect a fragment but got ${stringifyType(frag)}`)
     if (frag.parentNode !== null) {
-      this.throws('fragment should have no parent')
+      throw new Error('fragment should have no parent')
     }
   }
+  // eslint-disable-next-line class-methods-use-this
   private assertDetached(child: Node) {
-    if (!(child instanceof Node)) this.throws(`expect an element but got ${stringifyType(child)}`)
-    if (child.parentNode !== null) this.throws('newChild is not detached')
+    if (!(child instanceof Node))
+      throw new Error(`expect an element but got ${stringifyType(child)}`)
+    if (child.parentNode !== null) throw new Error('newChild is not detached')
   }
   private assertChild(child: Node) {
-    if (!(child instanceof Node)) this.throws(`expect an element but got ${stringifyType(child)}`)
+    if (!(child instanceof Node))
+      throw new Error(`expect an element but got ${stringifyType(child)}`)
     const index = this.childNodes.indexOf(child)
-    if (index === -1) this.throws('element is not a child of `this`')
-    if (child.parentNode !== this) this.throws('element is not a child of `this`')
+    if (index === -1) throw new Error('element is not a child of `this`')
+    if (child.parentNode !== this) throw new Error('element is not a child of `this`')
     return index
   }
   private assertChildWithIndex(child: Node, index?: number) {
     const actualIndex = this.assertChild(child)
     const processedIndex = ensureNonNegativeInteger(index)
     if (processedIndex !== undefined && processedIndex !== actualIndex) {
-      this.throws(`index mismatched, expected ${actualIndex} but got ${processedIndex}`)
+      throw new Error(`index mismatched, expected ${actualIndex} but got ${processedIndex}`)
     }
     return actualIndex
   }
   private assertIndex(index: number) {
     if (index >= this.childNodes.length) {
-      this.throws(
+      throw new Error(
         `provided index is invalid, got ${index} but only ${this.childNodes.length} children exist`,
       )
     }
   }
   private assertDeleteCount(deleteCount: number, index: number) {
     if (deleteCount + index > this.childNodes.length) {
-      this.throws(
+      throw new Error(
         `try to remove ${deleteCount} children starting from ${index}, but there are only ${this.childNodes.length} children.`,
       )
     }
@@ -350,16 +313,14 @@ abstract class Node implements glassEasel.composedBackend.Element {
     return value === true || value === undefined || value === null ? '' : String(value)
   }
 
-  @protocolMethod
   release(): void {
-    if (this._$released) this.throws('element released twice')
+    if (this._$released) throw new Error('element released twice')
     this._$released = true
     const index = this._$ownerContext._$allElements.indexOf(this)
-    if (index === -1) this.throws('element not found in its owner Context')
+    if (index === -1) throw new Error('element not found in its owner Context')
     this._$ownerContext._$allElements.splice(index, 1)
   }
 
-  @protocolMethod
   associateValue(v: glassEasel.Element): void {
     this.__wxElement = v
     if (v.ownerShadowRoot) {
@@ -368,21 +329,18 @@ abstract class Node implements glassEasel.composedBackend.Element {
     }
   }
 
-  @protocolMethod
   appendChild(child: Node): void {
     this.assertDetached(child)
     this.childNodes.push(child)
     child.parentNode = this
   }
 
-  @protocolMethod
   removeChild(child: Node, index?: number): void {
     const actualIndex = this.assertChildWithIndex(child, index)
     this.childNodes.splice(actualIndex, 1)
     child.parentNode = null
   }
 
-  @protocolMethod
   insertBefore(child: Node, before: Node, index?: number): void {
     this.assertDetached(child)
     const processedIndex = ensureNonNegativeInteger(index)
@@ -403,7 +361,6 @@ abstract class Node implements glassEasel.composedBackend.Element {
     }
   }
 
-  @protocolMethod
   replaceChild(child: Node, oldChild: Node, index?: number): void {
     this.assertDetached(child)
     const processedIndex = ensureNonNegativeInteger(index)
@@ -428,7 +385,6 @@ abstract class Node implements glassEasel.composedBackend.Element {
     }
   }
 
-  @protocolMethod
   spliceBefore(before: Node, deleteCount: number, list: Node): void {
     this.assertFragment(list)
     const index = this.assertChild(before)
@@ -443,7 +399,6 @@ abstract class Node implements glassEasel.composedBackend.Element {
     })
   }
 
-  @protocolMethod
   spliceAppend(list: Node): void {
     this.assertFragment(list)
     this.childNodes.splice(this.childNodes.length, 0, ...list.childNodes)
@@ -453,7 +408,6 @@ abstract class Node implements glassEasel.composedBackend.Element {
     list.childNodes = []
   }
 
-  @protocolMethod
   spliceRemove(before: Node, deleteCount: number): void {
     const index = this.assertChild(before)
     this.assertDeleteCount(deleteCount, index)
@@ -463,47 +417,41 @@ abstract class Node implements glassEasel.composedBackend.Element {
     })
   }
 
-  @protocolMethod
   setId(id: string): void {
     this.id = id
   }
 
-  @protocolMethod
   setStyleScope(styleScope: number): void {
     if (!this._$ownerContext._$styleScopes.has(styleScope)) {
-      this.throws(
-        `set style scope to ${styleScope}, but its owner context do not have a style sheet with that scope`,
-        ThrowOption.StyleScopeNotFound,
-      )
+      if (this._$ownerContext.shouldThrows(ThrowOption.StyleScopeNotFound)) {
+        throw new Error(
+          `set style scope to ${styleScope}, but its owner context do not have a style sheet with that scope`,
+        )
+      }
     }
     this._$styleScope = styleScope
   }
 
-  @protocolMethod
   setStyle(styleText: string): void {
     this._$style = styleText
   }
 
-  @protocolMethod
   addClass(elementClass: string, styleScope?: number): void {
     const scope = ensureNonNegativeInteger(styleScope)
     const index = this._$classes.findIndex((c) => c[0] === elementClass && c[1] === scope)
     if (index === -1) this._$classes.push([elementClass, scope])
   }
 
-  @protocolMethod
   removeClass(elementClass: string, styleScope?: number): void {
     const scope = ensureNonNegativeInteger(styleScope)
     const index = this._$classes.findIndex((c) => c[0] === elementClass && c[1] === scope)
     if (index !== -1) this._$classes.splice(index, 1)
   }
 
-  @protocolMethod
   clearClasses(): void {
     this._$classes = []
   }
 
-  @protocolMethod
   setAttribute(name: string, value: unknown): void {
     // eslint-disable-next-line no-param-reassign
     name = name.toLowerCase()
@@ -521,7 +469,6 @@ abstract class Node implements glassEasel.composedBackend.Element {
     }
   }
 
-  @protocolMethod
   removeAttribute(name: string): void {
     // eslint-disable-next-line no-param-reassign
     name = name.toLowerCase()
@@ -531,12 +478,10 @@ abstract class Node implements glassEasel.composedBackend.Element {
     }
   }
 
-  @protocolMethod
   setText(content: string): void {
     this.textContent = content
   }
 
-  @protocolMethod
   // eslint-disable-next-line class-methods-use-this
   getBoundingClientRect(cb: (res: glassEasel.backend.BoundingClientRect) => void): void {
     setTimeout(() => {
@@ -549,7 +494,6 @@ abstract class Node implements glassEasel.composedBackend.Element {
     }, 0)
   }
 
-  @protocolMethod
   // eslint-disable-next-line class-methods-use-this
   getScrollOffset(cb: (res: glassEasel.backend.ScrollOffset) => void): void {
     setTimeout(() => {
@@ -562,13 +506,11 @@ abstract class Node implements glassEasel.composedBackend.Element {
     }, 0)
   }
 
-  @protocolMethod
   // eslint-disable-next-line class-methods-use-this
   setListenerStats(_type: string, _capture: boolean, _mutLevel: glassEasel.EventMutLevel): void {
     // empty
   }
 
-  @protocolMethod
   // eslint-disable-next-line class-methods-use-this
   setModelBindingStat(
     _attributeName: string,
@@ -577,7 +519,6 @@ abstract class Node implements glassEasel.composedBackend.Element {
     // empty
   }
 
-  @protocolMethod
   // eslint-disable-next-line class-methods-use-this
   createIntersectionObserver(
     _relativeElement: glassEasel.composedBackend.Element | null,
@@ -592,7 +533,6 @@ abstract class Node implements glassEasel.composedBackend.Element {
     }
   }
 
-  @protocolMethod
   // eslint-disable-next-line class-methods-use-this
   getContext(cb: (res: unknown) => void): void {
     cb(null)
