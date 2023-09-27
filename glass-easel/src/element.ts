@@ -787,22 +787,23 @@ export class Element implements NodeCast {
         if (ret) return ret
       }
     }
-    if (!parent._$virtual) return null
-    const containingSlot = parent.containingSlot
-    if (containingSlot === null) return null
-    if (containingSlot !== undefined) {
-      return Element._$findFirstNonVirtualChild(containingSlot, parent.slotIndex! + 1)
+    const recvParent = (parent: Element): Node | null => {
+      if (!parent._$virtual) return null
+      const containingSlot = parent.containingSlot
+      if (containingSlot === null) return null
+      if (containingSlot !== undefined) {
+        return Element._$findFirstNonVirtualChild(containingSlot, parent.slotIndex! + 1)
+      }
+      if (parent instanceof ShadowRoot) {
+        return recvParent(parent.getHostNode())
+      }
+      const p = parent.parentNode
+      if (p) {
+        return Element._$findFirstNonVirtualChild(p, parent.parentIndex + 1)
+      }
+      return null
     }
-    let cur: Element = parent
-    if (parent instanceof ShadowRoot) {
-      cur = parent.getHostNode()
-      if (!cur._$virtual) return null
-    }
-    const p = cur.parentNode
-    if (p) {
-      return Element._$findFirstNonVirtualChild(p, cur.parentIndex + 1)
-    }
-    return null
+    return recvParent(parent)
   }
 
   /**
@@ -825,6 +826,7 @@ export class Element implements NodeCast {
     if (element instanceof ShadowRoot) {
       cur = element.getHostNode()
       if (!cur._$virtual) return null
+      return Element._$findFirstNonVirtualChild(cur, cur.parentIndex + 1)
     }
     const p = cur.parentNode
     if (p) {
@@ -1830,6 +1832,9 @@ export class Element implements NodeCast {
       }
     }
 
+    // handling child nodes list for placeholder
+    placeholder.childNodes = []
+
     // change the parent
     placeholder.parentNode = null
     placeholder.parentIndex = -1
@@ -1876,12 +1881,7 @@ export class Element implements NodeCast {
       }
       ;(frag as backend.Element).release()
     } else {
-      if (placeholder.isVirtual()) {
-        // virtual placeholder does not need to remove
-        Element.insertChildComposed(parent, replacer, undefined, false, posIndex)
-      } else {
-        Element.insertChildComposed(parent, replacer, placeholder, true, posIndex)
-      }
+      Element.insertChildComposed(parent, replacer, placeholder, true, posIndex)
       for (let i = 0; i < replacedChildren.length; i += 1) {
         const child = replacedChildren[i]!
         Element.insertChildComposed(replacer, child, undefined, false, i)
@@ -1906,17 +1906,14 @@ export class Element implements NodeCast {
     parent._$mutationObserverTarget?.attachChild(replacer)
 
     // handling child nodes list for replacer
-    replacer.childNodes.push(...placeholder.childNodes)
+    replacer.childNodes.push(...replacedChildren)
     for (
-      let i = replacer.childNodes.length - placeholder.childNodes.length;
+      let i = replacer.childNodes.length - replacedChildren.length;
       i < replacer.childNodes.length;
       i += 1
     ) {
       replacer.childNodes[i]!.parentIndex = i
     }
-
-    // handling child nodes list for placeholder
-    placeholder.childNodes = []
 
     // update id and slot cache if needed
     parent.ownerShadowRoot?._$markIdCacheDirty()
