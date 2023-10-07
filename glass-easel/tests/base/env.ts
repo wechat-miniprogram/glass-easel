@@ -37,7 +37,7 @@ export const execWithWarn = <T>(expectCount: number, func: () => T): T => {
 
 type TemplateOptions = {
   updateMode?: string
-  disallowNativeNode?: boolean
+  fallbackListenerOnNativeNode?: boolean
 }
 
 export const tmpl = (src: string, options?: TemplateOptions) => {

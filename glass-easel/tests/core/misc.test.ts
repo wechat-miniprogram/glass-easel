@@ -349,16 +349,57 @@ describe('component utils', () => {
     expect(ret.size).toBe(4)
   })
 
-  test('disallowNativeNode', () => {
-    const template = Object.assign(
-      tmpl(`
-        <div />
-      `),
-      { disallowNativeNode: true },
-    )
-    const compDef = componentSpace.defineComponent({ template })
+  test('fallback event', () => {
+    const events: number[] = []
+    const child = componentSpace.defineComponent({})
+    const compDef = componentSpace.defineComponent({
+      using: {
+        child,
+      },
+      template: tmpl(
+        `
+        <child id="child" bind:tap="onTap1" bindtap="onTap2" />
+      `,
+      ),
+      methods: {
+        onTap1() {
+          events.push(1)
+        },
+        onTap2() {
+          events.push(2)
+        },
+      },
+    })
     const elem = glassEasel.createElement('root', compDef.general())
-    expect(elem.getShadowRoot()!.childNodes[0]).toBeInstanceOf(glassEasel.Component)
+    expect(elem.$.child as glassEasel.Element).toBeInstanceOf(glassEasel.Element)
+    expect(elem.$.child as glassEasel.Element).toBeInstanceOf(glassEasel.Component)
+    glassEasel.triggerEvent(elem.$.child as glassEasel.Element, 'tap', {})
+    expect(events).toStrictEqual([1, 2])
+  })
+
+  test('fallback event on NativeNode', () => {
+    const events: number[] = []
+    const compDef = componentSpace.defineComponent({
+      template: tmpl(
+        `
+        <div id="div" bind:tap="onTap1" bindtap="onTap2" />
+      `,
+        { fallbackListenerOnNativeNode: true },
+      ),
+      methods: {
+        onTap1() {
+          events.push(1)
+        },
+        onTap2() {
+          events.push(2)
+        },
+      },
+    })
+    const elem = glassEasel.createElement('root', compDef.general())
+    expect(elem.$.div as glassEasel.Element).toBeInstanceOf(glassEasel.Element)
+    expect(elem.$.div as glassEasel.Element).not.toBeInstanceOf(glassEasel.Component)
+    glassEasel.triggerEvent(elem.$.div as glassEasel.Element, 'tap', {})
+    expect(events).toStrictEqual([1, 2])
   })
 
   test('template content update', () => {

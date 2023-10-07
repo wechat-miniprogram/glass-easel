@@ -36,7 +36,7 @@ export type ComponentTemplate = {
   groupList?: ProcGenGroupList
   content: (name: string) => ProcGen
   updateMode?: string
-  disallowNativeNode?: boolean
+  fallbackListenerOnNativeNode?: boolean
   eventObjectFilter?: (x: ShadowedEvent<unknown>) => ShadowedEvent<unknown>
   procGenWrapperType?: typeof ProcGenWrapper
 }
@@ -62,7 +62,7 @@ export class GlassEaselTemplateEngine implements templateEngine.TemplateEngine {
 class GlassEaselTemplate implements templateEngine.Template {
   genObjectGroupEnv!: ProcGenEnv
   updateMode!: string
-  disallowNativeNode!: boolean
+  fallbackListenerOnNativeNode!: boolean
   eventObjectFilter?: (x: ShadowedEvent<unknown>) => ShadowedEvent<unknown>
 
   constructor(behavior: GeneralBehavior) {
@@ -89,7 +89,7 @@ class GlassEaselTemplate implements templateEngine.Template {
       group: c.content,
     }
     this.updateMode = c.updateMode || ''
-    this.disallowNativeNode = c.disallowNativeNode || false
+    this.fallbackListenerOnNativeNode = c.fallbackListenerOnNativeNode || false
     this.eventObjectFilter = c.eventObjectFilter
   }
 
@@ -130,7 +130,7 @@ class GlassEaselTemplateInstance implements templateEngine.TemplateInstance {
     this.procGenWrapper = new ProcGenWrapper(
       this.shadowRoot,
       procGen,
-      template.disallowNativeNode,
+      template.fallbackListenerOnNativeNode,
       template.eventObjectFilter,
     )
     this.bindingMapGen = undefined
