@@ -207,6 +207,7 @@ export type Lifetimes = {
   moved: () => void
   detached: () => void
   ready: () => void
+  error: (err: unknown) => void
   listenerChange: (
     isAdd: boolean,
     name: string,
@@ -507,7 +508,6 @@ export class Component<
     return typeof func === 'function' && !!(func as unknown as { [tag: symbol]: true })[METHOD_TAG]
   }
 
-  /** @internal */
   static _$advancedCreate<
     TData extends DataList,
     TProperty extends PropertyList,
@@ -530,7 +530,7 @@ export class Component<
       def._$detail!
     const options = def._$options
     const behavior = def.behavior
-    const nodeTreeContext: GeneralBackendContext | null = owner
+    const nodeTreeContext = owner
       ? owner.getBackendContext()
       : backendContext || globalOptions.backendContext || getDefaultBackendContext()
     const external = options.externalComponent
@@ -571,9 +571,10 @@ export class Component<
         }
       } else if (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Shadow)) {
         if (ENV.DEV) performanceMeasureStart('component.createComponent')
-        const be = (
-          owner ? owner._$backendShadowRoot! : (nodeTreeContext as backend.Context).getRootNode()
-        ).createComponent(
+        const sr = owner
+          ? owner._$backendShadowRoot!
+          : (nodeTreeContext as backend.Context).getRootNode()
+        const be = sr.createComponent(
           tagName,
           external,
           virtualHost,
@@ -581,15 +582,15 @@ export class Component<
           options.extraStyleScope,
           behavior._$externalClasses,
         )
-        if (ENV.DEV) performanceMeasureEnd()
         backendElement = be
+        if (ENV.DEV) performanceMeasureEnd()
       }
     }
     comp._$initialize(
       virtualHost,
       backendElement,
       owner,
-      owner ? owner._$nodeTreeContext : nodeTreeContext!,
+      owner?._$nodeTreeContext ?? nodeTreeContext!,
     )
 
     const ownerHost = owner ? owner.getHostNode() : undefined
@@ -624,13 +625,6 @@ export class Component<
       }
     }
 
-    // create template engine
-    const tmplInst = template.createInstance(
-      comp as GeneralComponent,
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      ShadowRoot.createShadowRoot,
-    )
-
     // associate in backend
     if (backendElement) {
       if (ENV.DEV) performanceMeasureStart('backend.associateValue')
@@ -645,6 +639,13 @@ export class Component<
       }
       if (ENV.DEV) performanceMeasureEnd()
     }
+
+    // create template engine
+    const tmplInst = template.createInstance(
+      comp as GeneralComponent,
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      ShadowRoot.createShadowRoot,
+    )
 
     // write attr
     if (writeExtraInfoToAttr && backendElement) {
@@ -1229,7 +1230,7 @@ export class Component<
    * Most cases should take a common method instead.
    */
   triggerLifetime(name: string, args: Parameters<GeneralFuncType>) {
-    const f = this._$lifetimeFuncs[name]
+    const f = this._$lifetimeFuncs?.[name]
     if (f) f.call(this._$methodCaller as any, args, this)
   }
 

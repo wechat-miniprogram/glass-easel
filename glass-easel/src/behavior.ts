@@ -140,10 +140,9 @@ export class BehaviorBuilder<
   TPendingChainingFilter extends ChainingFilterType = never,
   TExtraThisFields extends DataList = Empty,
 > {
+  public is: string | undefined
   /** @internal */
   _$ownerSpace: ComponentSpace
-  /** @internal */
-  _$is: string | undefined
   /** @internal */
   _$behaviors: (string | GeneralBehavior)[] = []
   /** @internal */
@@ -193,7 +192,7 @@ export class BehaviorBuilder<
 
   /** @internal */
   constructor(is: string | undefined, ownerSpace: ComponentSpace) {
-    this._$is = is
+    this.is = is
     this._$ownerSpace = ownerSpace
   }
 
@@ -370,7 +369,7 @@ export class BehaviorBuilder<
     >,
     TChainingFilter
   > {
-    this._$data.push(() => safeCallback('Data Generator', gen, null, [], this._$is) ?? {})
+    this._$data.push(() => safeCallback('Data Generator', gen, null, [], this.is) ?? {})
     return this as any
   }
 
@@ -494,7 +493,7 @@ export class BehaviorBuilder<
       this._$observers.push({ dataPaths: parseMultiPaths(paths as string | string[]), func, once })
     } catch (e) {
       // parse multi paths my throw errors
-      dispatchError(e, `observer`, this._$is)
+      dispatchError(e, `observer`, this.is)
     }
     return this as any
   }
@@ -619,7 +618,7 @@ export class BehaviorBuilder<
     const rawData = def.data
     if (rawData !== undefined) {
       if (typeof rawData === 'function') {
-        this._$data.push(() => safeCallback('Data Generator', rawData, null, [], this._$is) ?? {})
+        this._$data.push(() => safeCallback('Data Generator', rawData, null, [], this.is) ?? {})
       } else {
         this._$staticData = rawData
       }
@@ -657,7 +656,7 @@ export class BehaviorBuilder<
             })
           } catch (e) {
             // parse multi paths may throw errors
-            dispatchError(e, `definition`, this._$is)
+            dispatchError(e, `definition`, this.is)
           }
         }
       } else {
@@ -673,7 +672,7 @@ export class BehaviorBuilder<
             })
           } catch (e) {
             // parse multi paths may throw errors
-            dispatchError(e, `definition`, this._$is)
+            dispatchError(e, `definition`, this.is)
           }
         }
       }
@@ -736,7 +735,7 @@ export class BehaviorBuilder<
     TPendingChainingFilter,
     TExtraThisFields
   > {
-    const is = this._$is
+    const is = this.is
     const behavior = new Behavior(this)
     if (is !== undefined) {
       this._$ownerSpace._$registerBehavior(is, behavior as unknown as GeneralBehavior)
@@ -763,7 +762,7 @@ export class BehaviorBuilder<
    * Finish build, generate a component definition, and register it in the component space
    */
   registerComponent(): ComponentDefinition<TData, TProperty, TMethod> {
-    const is = this._$is
+    const is = this.is
     const behavior = new Behavior(this)
     const compDef = new ComponentDefinition(behavior)
     if (is !== undefined) {
@@ -869,7 +868,7 @@ export class Behavior<
     >,
   ) {
     this._$unprepared = true
-    this.is = builder._$is || ''
+    this.is = builder.is || ''
     this.ownerSpace = builder._$ownerSpace
     this._$builder = builder
     this._$flatAncestors = new Set()

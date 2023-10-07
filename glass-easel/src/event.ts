@@ -162,6 +162,42 @@ export class EventTarget<TEvents extends { [type: string]: unknown }> {
     }
     return FinalChanged.NotChanged
   }
+
+  getListeners() {
+    const finalListeners = Object.create(null) as Record<
+      string,
+      (EventListenerOptions & { listener: EventListener<unknown> })[]
+    >
+    const resolveListeners = (
+      listeners: { [T in keyof TEvents]: EventFuncArr<TEvents[T]> },
+      capture: boolean,
+    ) => {
+      const names = Object.keys(listeners)
+      for (let i = 0; i < names.length; i += 1) {
+        const name = names[i]!
+        const efa = listeners[name] as EventFuncArr<unknown>
+        if (!finalListeners[name]) finalListeners[name] = []
+        const funcArr = efa.funcArr.getArr()
+        if (funcArr) {
+          for (let j = 0; j < funcArr.length; j += 1) {
+            const funcInfo = funcArr[j]!
+            finalListeners[name]!.push({
+              listener: funcInfo.f,
+              mutated: funcInfo.data === MutLevel.Mut,
+              final: funcInfo.data === MutLevel.Final,
+              capture,
+              useCapture: capture,
+            })
+          }
+        }
+      }
+    }
+    resolveListeners(this.listeners, false)
+    if (this.captureListeners) {
+      resolveListeners(this.captureListeners, false)
+    }
+    return finalListeners
+  }
 }
 
 export type ShadowedEvent<TDetail> = Required<Event<TDetail>> & {
