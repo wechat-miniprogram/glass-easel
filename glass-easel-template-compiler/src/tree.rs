@@ -2,7 +2,7 @@
 
 use crate::binding_map::{BindingMapCollector, BindingMapKeys};
 use crate::escape::{escape_html_text, gen_lit_str};
-use crate::proc_gen::{JsExprWriter, JsFunctionScopeWriter, JsIdent, ScopeVar};
+use crate::proc_gen::{JsExprWriter, JsFunctionScopeWriter, JsIdent, ScopeVar, ScopeVarLvaluePath};
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Write;
@@ -353,22 +353,27 @@ impl TmplTree {
                 let has_scripts = if self.scripts.len() > 0 {
                     for script in &self.scripts {
                         let ident = w.gen_ident();
-                        match script {
+                        let lvalue_path = match script {
                             TmplScript::GlobalRef { module_name: _, rel_path } => {
                                 let abs_path = crate::group::path::resolve(&self.path, &rel_path);
                                 w.expr_stmt(|w| {
                                     write!(w, r#"var {}=R[{}]()"#, ident, gen_lit_str(&abs_path))?;
                                     Ok(())
                                 })?;
+                                ScopeVarLvaluePath::Script { abs_path }
                             }
                             TmplScript::Inline { module_name, content } => {
                                 w.expr_stmt(|w| {
                                     write!(w, "var {}=D('{}#{}',(require,exports,module)=>{{{}}})()", ident, &self.path, module_name, content)?;
                                     Ok(())
                                 })?;
+                                ScopeVarLvaluePath::InlineScript {
+                                    path: self.path.clone(),
+                                    mod_name: module_name.clone(),
+                                }
                             }
-                        }
-                        scopes.push(ScopeVar { var: ident, update_path_tree: None, lvalue_path: None })
+                        };
+                        scopes.push(ScopeVar { var: ident, update_path_tree: None, lvalue_path })
                     }
                     true
                 } else {
@@ -516,7 +521,7 @@ impl TmplNode {
                             scopes.push(ScopeVar {
                                 var: var_scope.clone(),
                                 update_path_tree: Some(var_update_path_tree.clone()),
-                                lvalue_path: None,
+                                lvalue_path: ScopeVarLvaluePath::Invalid,
                             });
                         }
                     }
@@ -991,10 +996,10 @@ impl TmplElement {
                 let var_scope_item_lvalue_path = w.gen_ident();
                 w.expr_stmt(|w| {
                     write!(w, "F(")?;
-                    let has_lvalue_path = match &list_expr {
+                    let lvalue_path_from_data_scope = match &list_expr {
                         ListExpr::Static(v) => {
                             write!(w, r#"{},null,undefined,null,"#, gen_lit_str(&v))?;
-                            false
+                            None
                         }
                         ListExpr::Dynamic(p) => {
                             p.value_expr(w)?;
@@ -1008,9 +1013,14 @@ impl TmplElement {
                             )?;
                             p.lvalue_state_expr(w, scopes)?;
                             write!(w, ":undefined,")?;
-                            let has_lvalue_path = p.lvalue_path(w, scopes)?.is_some();
+                            let has_model_lvalue_path = p.is_model_lvalue_path(scopes);
+                            if p.is_general_lvalue_path(scopes) {
+                                p.lvalue_path(w, scopes, false)?;
+                            } else {
+                                write!(w, "null")?;
+                            }
                             write!(w, ",")?;
-                            has_lvalue_path
+                            Some(has_model_lvalue_path)
                         }
                     };
                     let args = TmplNode::to_proc_gen_function_args(&self.children, false)
@@ -1028,16 +1038,19 @@ impl TmplElement {
                         scopes.push(ScopeVar {
                             var: var_scope_item,
                             update_path_tree: Some(var_scope_item_update_path_tree),
-                            lvalue_path: if has_lvalue_path {
-                                Some(var_scope_item_lvalue_path)
+                            lvalue_path: if let Some(from_data_scope) = lvalue_path_from_data_scope {
+                                ScopeVarLvaluePath::Var {
+                                    var_name: var_scope_item_lvalue_path,
+                                    from_data_scope,
+                                }
                             } else {
-                                None
+                                ScopeVarLvaluePath::Invalid
                             },
                         });
                         scopes.push(ScopeVar {
                             var: var_scope_index,
                             update_path_tree: Some(var_scope_index_update_path_tree),
-                            lvalue_path: None,
+                            lvalue_path: ScopeVarLvaluePath::Invalid,
                         });
                         TmplNode::to_proc_gen_define_children_content(
                             &self.children,
@@ -1424,6 +1437,13 @@ impl TmplAttr {
                 }
             };
         }
+        fn maybe_event_binding(name: &str) -> bool {
+            name.starts_with("bind")
+                || name.starts_with("capture-bind")
+                || name.starts_with("catch")
+                || name.starts_with("capture-catch")
+                || name.starts_with("on")
+        }
         match &self.kind {
             TmplAttrKind::WxDirective { .. }
             | TmplAttrKind::Generic { .. }
@@ -1459,8 +1479,15 @@ impl TmplAttr {
                             write!(w, ")O(N,{},", attr_name)?;
                             p.value_expr(w)?;
                             if let TmplAttrKind::ModelProperty { .. } = &self.kind {
-                                write!(w, ",")?;
-                                p.lvalue_path(w, scopes)?;
+                                if p.is_model_lvalue_path(scopes) {
+                                    write!(w, ",")?;
+                                    p.lvalue_path(w, scopes, true)?;
+                                }
+                            } else if maybe_event_binding(&name) {
+                                if p.is_general_lvalue_path(scopes) {
+                                    write!(w, ",null,")?;
+                                    p.lvalue_path(w, scopes, false)?;
+                                }
                             }
                             write!(w, ")")?;
                             Ok(())
@@ -1473,8 +1500,15 @@ impl TmplAttr {
                                         write!(w, "O(N,{},", attr_name)?;
                                         p.value_expr(w)?;
                                         if let TmplAttrKind::ModelProperty { .. } = &self.kind {
-                                            write!(w, ",")?;
-                                            p.lvalue_path(w, scopes)?;
+                                            if p.is_model_lvalue_path(scopes) {
+                                                write!(w, ",")?;
+                                                p.lvalue_path(w, scopes, true)?;
+                                            }
+                                        } else if maybe_event_binding(&name) {
+                                            if p.is_general_lvalue_path(scopes) {
+                                                write!(w, ",null,")?;
+                                                p.lvalue_path(w, scopes, false)?;
+                                            }
                                         }
                                         write!(w, ")")?;
                                         Ok(())
@@ -1503,6 +1537,10 @@ impl TmplAttr {
                             p.lvalue_state_expr(w, scopes)?;
                             write!(w, ")R.p(N,{},", attr_name)?;
                             p.value_expr(w)?;
+                            if p.is_general_lvalue_path(scopes) {
+                                write!(w, ",")?;
+                                p.lvalue_path(w, scopes, false)?;
+                            }
                             write!(w, ")")?;
                             Ok(())
                         })?;
@@ -1598,11 +1636,16 @@ impl TmplAttr {
                         p.value_expr(w)?;
                         write!(
                             w,
-                            ",{},{},{},!0)",
+                            ",{},{},{},!0",
                             if *catch { "!0" } else { "!1" },
                             if *mut_bind { "!0" } else { "!1" },
                             if *capture { "!0" } else { "!1" },
                         )?;
+                        if p.is_general_lvalue_path(scopes) {
+                            write!(w, ",")?;
+                            p.lvalue_path(w, scopes, false)?;
+                        }
+                        write!(w, ")")?;
                         Ok(())
                     })?;
                     if let Some(binding_map_keys) = binding_map_keys {

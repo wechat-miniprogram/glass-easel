@@ -911,6 +911,7 @@ export class ProcGenWrapper {
     mutated: boolean,
     capture: boolean,
     isDynamic: boolean,
+    _generalLvaluePath?: DataPath | null,
   ) {
     const handler = typeof v === 'function' ? this.eventListenerFilter(v) : dataValueToString(v)
     const listener = (ev: ShadowedEvent<unknown>) => {
@@ -945,7 +946,13 @@ export class ProcGenWrapper {
   }
 
   // update a property or external class of a component, or an attribute of a native node
-  r = (elem: Element, name: string, v: unknown, lvaluePath?: DataPath) => {
+  r = (
+    elem: Element,
+    name: string,
+    v: unknown,
+    modelLvaluePath?: DataPath | null,
+    generalLvaluePath?: DataPath | null,
+  ) => {
     const checkFallbackEventListener = (camelName: string) => {
       if (camelName.startsWith('bind')) {
         this.v(
@@ -956,6 +963,7 @@ export class ProcGenWrapper {
           false,
           false,
           true,
+          generalLvaluePath,
         )
       } else if (camelName.startsWith('captureBind')) {
         this.v(
@@ -966,6 +974,7 @@ export class ProcGenWrapper {
           false,
           true,
           true,
+          generalLvaluePath,
         )
       } else if (camelName.startsWith('catch')) {
         this.v(
@@ -976,6 +985,7 @@ export class ProcGenWrapper {
           false,
           false,
           true,
+          generalLvaluePath,
         )
       } else if (camelName.startsWith('captureCatch')) {
         this.v(
@@ -986,9 +996,19 @@ export class ProcGenWrapper {
           false,
           true,
           true,
+          generalLvaluePath,
         )
       } else if (camelName.startsWith('on')) {
-        this.v(elem, camelName.slice('on'.length), dataValueToString(v), false, false, false, true)
+        this.v(
+          elem,
+          camelName.slice('on'.length),
+          dataValueToString(v),
+          false,
+          false,
+          false,
+          true,
+          generalLvaluePath,
+        )
       } else {
         return false
       }
@@ -998,11 +1018,11 @@ export class ProcGenWrapper {
       const nodeDataProxy = Component.getDataProxy(elem)
       const camelName = dashToCamelCase(name)
       if (nodeDataProxy.replaceProperty(camelName, v)) {
-        if (lvaluePath) {
+        if (modelLvaluePath) {
           nodeDataProxy.setModelBindingListener(camelName, (value) => {
             const host = elem.ownerShadowRoot!.getHostNode()
             const nodeDataProxy = Component.getDataProxy(host)
-            nodeDataProxy.replaceDataOnPath(lvaluePath, value)
+            nodeDataProxy.replaceDataOnPath(modelLvaluePath, value)
             nodeDataProxy.applyDataUpdates(false)
           })
         }
@@ -1032,11 +1052,11 @@ export class ProcGenWrapper {
       } else {
         elem.updateAttribute(name, v)
       }
-      if (lvaluePath) {
+      if (modelLvaluePath) {
         elem.setModelBindingListener(name, (value) => {
           const host = elem.ownerShadowRoot!.getHostNode()
           const nodeDataProxy = Component.getDataProxy(host)
-          nodeDataProxy.replaceDataOnPath(lvaluePath, value)
+          nodeDataProxy.replaceDataOnPath(modelLvaluePath, value)
           nodeDataProxy.applyDataUpdates(false)
         })
       }
@@ -1053,7 +1073,7 @@ export class ProcGenWrapper {
   }
 
   // add a change property binding
-  p(elem: Element, name: string, v: ChangePropListener) {
+  p(elem: Element, name: string, v: ChangePropListener, _generalLvaluePath?: DataPath | null) {
     if (elem instanceof Component) {
       if (Component.hasProperty(elem, name)) {
         const tmplArgs = getTmplArgs(elem)
@@ -1073,4 +1093,10 @@ export class ProcGenWrapper {
     this.changePropFilter = changePropFilter
     this.eventListenerFilter = eventListenerFilter
   }
+}
+
+export const enum GeneralLvaluePathPrefix {
+  Data = 0,
+  Script = 1, // `abs_path` followed
+  InlineScript = 2, // `abs_path` and `mod_name` followed
 }
