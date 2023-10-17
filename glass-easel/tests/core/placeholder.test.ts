@@ -405,6 +405,45 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect(domHtml(elem)).toBe('<child><div>21</div></child>')
     matchElementWithDom(elem)
   })
+
+  test('replacing virtual host component', () => {
+    const placeholder = componentSpace.defineComponent({
+      options: {
+        virtualHost: true,
+      },
+      template: tmpl('<div>placeholder</div>'),
+    })
+    const card = componentSpace.defineComponent({
+      template: tmpl(`<div><slot></slot></div>`),
+    })
+    const def = componentSpace.defineComponent({
+      is: 'placeholder/ttt/parent',
+      using: {
+        child: 'child',
+        placeholder: placeholder.general(),
+        card,
+      },
+      placeholders: {
+        child: 'placeholder',
+      },
+      template: tmpl(`
+        <card>
+          <child>content</child>
+        </card>
+      `),
+    })
+    const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
+    matchElementWithDom(elem)
+
+    componentSpace.defineComponent({
+      is: 'placeholder/ttt/child',
+      options: {
+        virtualHost: true,
+      },
+      template: tmpl('<div>actual</div>'),
+    })
+    matchElementWithDom(elem)
+  })
 }
 
 describe('placeholder (DOM backend)', () => testCases(domBackend))

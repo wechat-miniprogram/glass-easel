@@ -52,7 +52,11 @@ export class FuncArr<F extends GeneralFuncType> {
     return ret
   }
 
-  call(caller: ThisType<F>, args: Parameters<F>, relatedComponent?: GeneralComponent): boolean {
+  call(
+    caller: ThisParameterType<F>,
+    args: Parameters<F>,
+    relatedComponent?: GeneralComponent,
+  ): boolean {
     const arr = this._$arr
     let ret = true
     if (arr) {
@@ -75,7 +79,7 @@ export class FuncArr<F extends GeneralFuncType> {
     this: void,
     type: string,
     method: F,
-    caller: ThisType<F>,
+    caller: ThisParameterType<F>,
     args: Parameters<F>,
     relatedComponent?: GeneralComponent,
     avoidErrorHandler = false,
@@ -85,7 +89,8 @@ export class FuncArr<F extends GeneralFuncType> {
       return method.apply(caller, args)
     } catch (e) {
       let msg = `[Error] [Component] ${type || 'Error Listener'} Error @ `
-      if (caller instanceof Component) msg += caller.is
+      if ((caller as any) instanceof Component) msg += (caller as GeneralComponent).is
+      else if (relatedComponent instanceof Component) msg += relatedComponent.is
       msg += `#${method.name || '(anonymous)'}`
       if (relatedComponent) {
         relatedComponent.triggerLifetime('error', [e])
@@ -167,7 +172,7 @@ export class FuncArrWithMeta<F extends GeneralFuncType, T> {
   }
 
   call(
-    caller: ThisType<F>,
+    caller: ThisParameterType<F>,
     args: Parameters<F>,
     retainFn: (data: T) => boolean,
     relatedComponent?: GeneralComponent,

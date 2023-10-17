@@ -77,7 +77,7 @@ describe('backend', () => {
           /* empty */
         }
         expect(
-          (document.querySelector('style[wx-style-scope]') as HTMLStyleElement).innerText,
+          (document.querySelector('style[wx-style-scope]') as HTMLStyleElement).innerHTML,
         ).toBe(styleText)
         context.disableStyleSheet(index)
         expect(document.querySelector('style[wx-style-scope]')).toBe(null)

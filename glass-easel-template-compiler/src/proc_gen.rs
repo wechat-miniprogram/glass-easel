@@ -222,5 +222,20 @@ impl<'a, W: fmt::Write> fmt::Write for JsExprWriter<'a, W> {
 pub(crate) struct ScopeVar {
     pub(crate) var: JsIdent,
     pub(crate) update_path_tree: Option<JsIdent>,
-    pub(crate) lvalue_path: Option<JsIdent>,
+    pub(crate) lvalue_path: ScopeVarLvaluePath,
+}
+
+pub(crate) enum ScopeVarLvaluePath {
+    Invalid,
+    Var {
+        var_name: JsIdent,
+        from_data_scope: bool,
+    },
+    Script {
+        abs_path: String,
+    },
+    InlineScript {
+        path: String,
+        mod_name: String,
+    },
 }

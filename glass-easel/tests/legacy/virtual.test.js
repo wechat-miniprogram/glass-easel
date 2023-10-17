@@ -342,6 +342,7 @@ const testCases = function (testBackend) {
       var e3 = glassEasel.NativeNode.create('e3', root.shadowRoot)
       var v1 = glassEasel.VirtualNode.create('v1', root.shadowRoot)
       var v2 = glassEasel.VirtualNode.create('v2', root.shadowRoot)
+      var v3 = glassEasel.VirtualNode.create('v3', root.shadowRoot)
       var t1 = glassEasel.TextNode.create('t1', root.shadowRoot)
       var t2 = glassEasel.TextNode.create('t2', root.shadowRoot)
       e1.appendChild(e2)
@@ -356,11 +357,17 @@ const testCases = function (testBackend) {
       expect(e2.parentNode).toBe(null)
       expect(e2.childNodes.length).toBe(0)
 
-      v2.selfReplaceWith(e2)
+      v2.selfReplaceWith(v3)
       matchElementWithDom(e1)
       matchElementWithDom(v2)
       expect(v2.parentNode).toBe(null)
       expect(v2.childNodes.length).toBe(0)
+
+      v3.selfReplaceWith(e2)
+      matchElementWithDom(e1)
+      matchElementWithDom(v3)
+      expect(v3.parentNode).toBe(null)
+      expect(v3.childNodes.length).toBe(0)
     })
 
     it('should replace component with children', function () {
@@ -405,6 +412,59 @@ const testCases = function (testBackend) {
     })
 
     it('should replace virtualHost component with children', function () {
+      regElem({
+        is: 'virtual-comp1',
+        options: { virtualHost: true },
+        template: '<div>virtual</div><slot />',
+      })
+      regElem({
+        is: 'comp1',
+        template: '<div>actual</div><slot />',
+      })
+      regElem({
+        is: 'virtual-comp2',
+        options: { multipleSlots: true, virtualHost: true },
+        template: '<slot name="a" /><div>virtual</div><slot name="b"/>',
+      })
+      regElem({
+        is: 'comp2',
+        options: { multipleSlots: true },
+        template: '<div><slot name="b"/>actual</div><slot name="a" />',
+      })
+      var e1 = glassEasel.NativeNode.create('e1', root.shadowRoot)
+      var e2 = glassEasel.NativeNode.create('e2', root.shadowRoot)
+      var e3 = glassEasel.NativeNode.create('e3', root.shadowRoot)
+      var e4 = glassEasel.NativeNode.create('e4', root.shadowRoot)
+      var v1 = glassEasel.VirtualNode.create('v1', root.shadowRoot)
+      var t1 = glassEasel.TextNode.create('t1', root.shadowRoot)
+      var c1 = root.shadowRoot.createComponent('comp1')
+      var vc1 = root.shadowRoot.createComponent('virtual-comp1')
+      var c2 = root.shadowRoot.createComponent('comp2')
+      var vc2 = root.shadowRoot.createComponent('virtual-comp2')
+      e1.appendChild(e2)
+      e2.appendChild(e3)
+      e2.appendChild(v1)
+      v1.appendChild(t1)
+      e2.appendChild(e4)
+      e4.slot = 'b'
+
+      e2.selfReplaceWith(vc1)
+      matchElementWithDom(e1)
+      expect(e2.parentNode).toBe(null)
+      expect(e2.childNodes.length).toBe(0)
+
+      vc1.selfReplaceWith(vc2)
+      matchElementWithDom(e1)
+      expect(vc1.parentNode).toBe(null)
+      expect(vc1.childNodes.length).toBe(0)
+
+      vc2.selfReplaceWith(c2)
+      matchElementWithDom(e1)
+      expect(vc2.parentNode).toBe(null)
+      expect(vc2.childNodes.length).toBe(0)
+    })
+
+    it('should replace nested virtualHost component with children', function () {
       regElem({
         is: 'virtual-comp1',
         options: { virtualHost: true },
@@ -460,6 +520,21 @@ const testCases = function (testBackend) {
       matchElementWithDom(e1)
       expect(vc2.parentNode).toBe(null)
       expect(vc2.childNodes.length).toBe(0)
+
+      c2.selfReplaceWith(vc2)
+      matchElementWithDom(e1)
+      expect(c2.parentNode).toBe(null)
+      expect(c2.childNodes.length).toBe(0)
+
+      vc2.selfReplaceWith(vc1)
+      matchElementWithDom(e1)
+      expect(vc2.parentNode).toBe(null)
+      expect(vc2.childNodes.length).toBe(0)
+
+      vc1.selfReplaceWith(vc2)
+      matchElementWithDom(e1)
+      expect(vc1.parentNode).toBe(null)
+      expect(vc1.childNodes.length).toBe(0)
     })
 
     it('should replace slot contents with children', function () {
@@ -531,7 +606,7 @@ const testCases = function (testBackend) {
       matchElementWithDom(parent)
     })
 
-    if (testBackend === domBackend)
+    if (testBackend !== shadowBackend) {
       it('should handles tree manipulations', function () {
         regElem({
           is: 'virtual-host-c',
@@ -567,6 +642,46 @@ const testCases = function (testBackend) {
         expect(elem.$$.childNodes.length).toBe(0)
         matchElementWithDom(elem)
       })
+    }
+
+    it('should handles wx-if update', function () {
+      regElem({
+        is: 'list-view',
+        options: {
+          virtualHost: true,
+        },
+        template: '<listview><slot /></listview>',
+      })
+      regElem({
+        is: 'virtual-host-b',
+        options: {
+          virtualHost: true,
+        },
+        data: {
+          a: false,
+          b: false,
+        },
+        template: '<a wx:if="{{a}}" /><b wx:if="{{b}}" />',
+      })
+      regElem({
+        is: 'c',
+        options: {},
+        template: '<list-view><virtual-host-b id="b" /></list-view><span />',
+      })
+      var parent = glassEasel.NativeNode.create('span', root.shadowRoot)
+      var elem = root.shadowRoot.createComponent('c')
+      parent.appendChild(elem)
+      matchElementWithDom(parent)
+
+      elem.$.b.setData({ a: true })
+      matchElementWithDom(parent)
+
+      elem.$.b.setData({ a: false, b: true })
+      matchElementWithDom(parent)
+
+      elem.$.b.setData({ b: false })
+      matchElementWithDom(parent)
+    })
   })
 }
 

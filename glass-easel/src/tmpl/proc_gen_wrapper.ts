@@ -147,7 +147,7 @@ export const setGlobalEventObjectFilter = (eventObjectFilter: EventObjectFilter)
 export class ProcGenWrapper {
   shadowRoot: ShadowRoot
   procGen: ProcGen
-  disallowNativeNode: boolean
+  fallbackListenerOnNativeNode: boolean
   bindingMapDisabled = false
   eventObjectFilter: (x: ShadowedEvent<unknown>) => ShadowedEvent<unknown> = emptyFilter
   changePropFilter = emptyFilter
@@ -156,12 +156,12 @@ export class ProcGenWrapper {
   constructor(
     shadowRoot: ShadowRoot,
     procGen: ProcGen,
-    disallowNativeNode: boolean,
+    fallbackListenerOnNativeNode: boolean,
     eventObjectFilter?: (x: ShadowedEvent<unknown>) => ShadowedEvent<unknown>,
   ) {
     this.shadowRoot = shadowRoot
     this.procGen = procGen
-    this.disallowNativeNode = disallowNativeNode
+    this.fallbackListenerOnNativeNode = fallbackListenerOnNativeNode
     if (eventObjectFilter) {
       this.eventObjectFilter = eventObjectFilter
     }
@@ -807,7 +807,7 @@ export class ProcGenWrapper {
         sr?.applySlotUpdates()
       }
     }
-    if (this.disallowNativeNode || typeof placeholding === 'boolean') {
+    if (typeof placeholding === 'boolean') {
       let placeholderCb: (() => void) | undefined
       if (placeholding) {
         placeholderCb = () => {
@@ -918,6 +918,7 @@ export class ProcGenWrapper {
     mutated: boolean,
     capture: boolean,
     isDynamic: boolean,
+    _generalLvaluePath?: DataPath | null,
   ) {
     const handler =
       typeof v === 'function' && typeof this.eventListenerFilter === 'function'
@@ -959,16 +960,88 @@ export class ProcGenWrapper {
   }
 
   // update a property or external class of a component, or an attribute of a native node
-  r(elem: Element, name: string, v: unknown, lvaluePath?: DataPath) {
+  r = (
+    elem: Element,
+    name: string,
+    v: unknown,
+    modelLvaluePath?: DataPath | null,
+    generalLvaluePath?: DataPath | null,
+  ) => {
+    const checkFallbackEventListener = (camelName: string) => {
+      if (camelName.startsWith('bind')) {
+        ProcGenWrapper.prototype.v.call(
+          typeof this !== 'undefined' ? this : ProcGenWrapper.prototype,
+          elem,
+          camelName.slice('bind'.length),
+          dataValueToString(v),
+          false,
+          false,
+          false,
+          true,
+          generalLvaluePath,
+        )
+      } else if (camelName.startsWith('captureBind')) {
+        ProcGenWrapper.prototype.v.call(
+          typeof this !== 'undefined' ? this : ProcGenWrapper.prototype,
+          elem,
+          camelName.slice('captureBind'.length),
+          dataValueToString(v),
+          false,
+          false,
+          true,
+          true,
+          generalLvaluePath,
+        )
+      } else if (camelName.startsWith('catch')) {
+        ProcGenWrapper.prototype.v.call(
+          typeof this !== 'undefined' ? this : ProcGenWrapper.prototype,
+          elem,
+          camelName.slice('catch'.length),
+          dataValueToString(v),
+          true,
+          false,
+          false,
+          true,
+          generalLvaluePath,
+        )
+      } else if (camelName.startsWith('captureCatch')) {
+        ProcGenWrapper.prototype.v.call(
+          typeof this !== 'undefined' ? this : ProcGenWrapper.prototype,
+          elem,
+          camelName.slice('captureCatch'.length),
+          dataValueToString(v),
+          true,
+          false,
+          true,
+          true,
+          generalLvaluePath,
+        )
+      } else if (camelName.startsWith('on')) {
+        ProcGenWrapper.prototype.v.call(
+          typeof this !== 'undefined' ? this : ProcGenWrapper.prototype,
+          elem,
+          camelName.slice('on'.length),
+          dataValueToString(v),
+          false,
+          false,
+          false,
+          true,
+          generalLvaluePath,
+        )
+      } else {
+        return false
+      }
+      return true
+    }
     if (elem instanceof Component) {
       const nodeDataProxy = Component.getDataProxy(elem)
       const camelName = dashToCamelCase(name)
       if (nodeDataProxy.replaceProperty(camelName, v)) {
-        if (lvaluePath) {
+        if (modelLvaluePath) {
           nodeDataProxy.setModelBindingListener(camelName, (value) => {
             const host = elem.ownerShadowRoot!.getHostNode()
             const nodeDataProxy = Component.getDataProxy(host)
-            nodeDataProxy.replaceDataOnPath(lvaluePath, value)
+            nodeDataProxy.replaceDataOnPath(modelLvaluePath, value)
             nodeDataProxy.applyDataUpdates(false)
           })
         }
@@ -986,127 +1059,28 @@ export class ProcGenWrapper {
         elem.setExternalClass(name, dataValueToString(v))
       } else {
         // compatibilities for legacy event binding syntax
-        if (camelName.startsWith('bind')) {
-          ProcGenWrapper.prototype.v.call(
-            typeof this !== 'undefined' ? this : ProcGenWrapper.prototype,
-            elem,
-            camelName.slice('bind'.length),
-            dataValueToString(v),
-            false,
-            false,
-            false,
-            true,
-          )
-        } else if (camelName.startsWith('captureBind')) {
-          ProcGenWrapper.prototype.v.call(
-            typeof this !== 'undefined' ? this : ProcGenWrapper.prototype,
-            elem,
-            camelName.slice('captureBind'.length),
-            dataValueToString(v),
-            false,
-            false,
-            true,
-            true,
-          )
-        } else if (camelName.startsWith('catch')) {
-          ProcGenWrapper.prototype.v.call(
-            typeof this !== 'undefined' ? this : ProcGenWrapper.prototype,
-            elem,
-            camelName.slice('catch'.length),
-            dataValueToString(v),
-            true,
-            false,
-            false,
-            true,
-          )
-        } else if (camelName.startsWith('captureCatch')) {
-          ProcGenWrapper.prototype.v.call(
-            typeof this !== 'undefined' ? this : ProcGenWrapper.prototype,
-            elem,
-            camelName.slice('captureCatch'.length),
-            dataValueToString(v),
-            true,
-            false,
-            true,
-            true,
-          )
-        } else if (camelName.startsWith('on')) {
-          ProcGenWrapper.prototype.v.call(
-            typeof this !== 'undefined' ? this : ProcGenWrapper.prototype,
-            elem,
-            camelName.slice('on'.length),
-            dataValueToString(v),
-            false,
-            false,
-            false,
-            true,
-          )
-        }
+        checkFallbackEventListener(camelName)
       }
     } else if (elem instanceof NativeNode) {
       const camelName = dashToCamelCase(name)
-      // compatibilities for legacy event binding syntax
-      if (camelName.startsWith('bind')) {
-        ProcGenWrapper.prototype.v(
-          elem,
-          camelName.slice('bind'.length),
-          dataValueToString(v),
-          false,
-          false,
-          false,
-          true,
-        )
-      } else if (camelName.startsWith('captureBind')) {
-        ProcGenWrapper.prototype.v(
-          elem,
-          camelName.slice('captureBind'.length),
-          dataValueToString(v),
-          false,
-          false,
-          true,
-          true,
-        )
-      } else if (camelName.startsWith('catch')) {
-        ProcGenWrapper.prototype.v(
-          elem,
-          camelName.slice('catch'.length),
-          dataValueToString(v),
-          true,
-          false,
-          false,
-          true,
-        )
-      } else if (camelName.startsWith('captureCatch')) {
-        ProcGenWrapper.prototype.v(
-          elem,
-          camelName.slice('captureCatch'.length),
-          dataValueToString(v),
-          true,
-          false,
-          true,
-          true,
-        )
-      } else if (camelName.startsWith('on')) {
-        ProcGenWrapper.prototype.v(
-          elem,
-          camelName.slice('on'.length),
-          dataValueToString(v),
-          false,
-          false,
-          false,
-          true,
-        )
+      if (this.fallbackListenerOnNativeNode) {
+        // compatibilities for legacy event binding syntax
+        if (!checkFallbackEventListener(camelName)) {
+          elem.callAttributeFilter(camelName, v, (newPropValue) => {
+            elem.updateAttribute(camelName, newPropValue)
+          })
+        }
       } else {
         elem.callAttributeFilter(camelName, v, (newPropValue) => {
           elem.updateAttribute(camelName, newPropValue)
-          if (lvaluePath) {
-            elem.setModelBindingListener(name, (value) => {
-              const host = elem.ownerShadowRoot!.getHostNode()
-              const nodeDataProxy = Component.getDataProxy(host)
-              nodeDataProxy.replaceDataOnPath(lvaluePath, value)
-              nodeDataProxy.applyDataUpdates(false)
-            })
-          }
+        })
+      }
+      if (modelLvaluePath) {
+        elem.setModelBindingListener(name, (value) => {
+          const host = elem.ownerShadowRoot!.getHostNode()
+          const nodeDataProxy = Component.getDataProxy(host)
+          nodeDataProxy.replaceDataOnPath(modelLvaluePath, value)
+          nodeDataProxy.applyDataUpdates(false)
         })
       }
     }
@@ -1122,7 +1096,7 @@ export class ProcGenWrapper {
   }
 
   // add a change property binding
-  p(elem: Element, name: string, v: ChangePropListener) {
+  p(elem: Element, name: string, v: ChangePropListener, _generalLvaluePath?: DataPath | null) {
     if (elem instanceof Component) {
       if (Component.hasProperty(elem, name)) {
         const tmplArgs = getTmplArgs(elem)
@@ -1142,4 +1116,10 @@ export class ProcGenWrapper {
     this.changePropFilter = changePropFilter
     this.eventListenerFilter = eventListenerFilter
   }
+}
+
+export const enum GeneralLvaluePathPrefix {
+  Data = 0,
+  Script = 1, // `abs_path` followed
+  InlineScript = 2, // `abs_path` and `mod_name` followed
 }
