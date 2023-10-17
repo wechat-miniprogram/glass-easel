@@ -608,19 +608,19 @@ export class Component<
     if (staticData === undefined) {
       if (dataGenFuncs.length === 1) {
         const f = dataGenFuncs[0]!
-        data = f()
+        data = f(comp as unknown as GeneralComponent)
       } else {
         data = {}
         for (let i = 0; i < dataGenFuncs.length; i += 1) {
           const f = dataGenFuncs[i]!
-          Object.assign(data, f())
+          Object.assign(data, f(comp as unknown as GeneralComponent))
         }
       }
     } else {
       data = simpleDeepCopy(staticData)
       for (let i = 0; i < dataGenFuncs.length; i += 1) {
         const f = dataGenFuncs[i]!
-        Object.assign(data, f())
+        Object.assign(data, f(comp as unknown as GeneralComponent))
       }
     }
 
