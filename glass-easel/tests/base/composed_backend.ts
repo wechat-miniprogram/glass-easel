@@ -516,7 +516,6 @@ abstract class Node implements glassEasel.composedBackend.Element {
     // empty
   }
 
-  @protocolMethod
   // eslint-disable-next-line class-methods-use-this
   setModelBindingStat(
     _attributeName: string,
