@@ -439,7 +439,12 @@ export class DataGroup<
           }
           filteredData = oldData
         } else {
-          filteredData = convertValueToType(newData, propName, prop)
+          filteredData = convertValueToType(
+            newData,
+            propName,
+            prop,
+            this._$comp as GeneralComponent | null,
+          )
         }
         if (!excluded) {
           if (this.innerData) {
