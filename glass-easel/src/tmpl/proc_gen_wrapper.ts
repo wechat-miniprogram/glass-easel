@@ -137,12 +137,6 @@ type DefineSlot = (name: string | undefined, slotValueInit?: (elem: Element) => 
 
 type DefinePureVirtualNode = (children: DefineChildren, slot: string | undefined) => void
 
-type EventObjectFilter = (x: ShadowedEvent<unknown>) => ShadowedEvent<unknown>
-
-let _globalEventObjectFilter: EventObjectFilter = emptyFilter
-export const setGlobalEventObjectFilter = (eventObjectFilter: EventObjectFilter) => {
-  _globalEventObjectFilter = eventObjectFilter
-}
 
 export class ProcGenWrapper {
   shadowRoot: ShadowRoot
@@ -920,20 +914,14 @@ export class ProcGenWrapper {
     isDynamic: boolean,
     _generalLvaluePath?: DataPath | null,
   ) {
-    const handler =
-      typeof v === 'function' && typeof this.eventListenerFilter === 'function'
-        ? this.eventListenerFilter(v)
-        : dataValueToString(v)
+    const handler = typeof v === 'function' ? this.eventListenerFilter(v) : dataValueToString(v)
     const listener = (ev: ShadowedEvent<unknown>) => {
       const host = elem.ownerShadowRoot!.getHostNode()
       let ret: boolean | undefined
       const methodCaller = host.getMethodCaller() as { [key: string]: unknown }
       const f = typeof handler === 'function' ? handler : Component.getMethod(host, handler)
       if (typeof f === 'function') {
-        const filteredEv =
-          typeof this.eventObjectFilter === 'function'
-            ? this.eventObjectFilter(ev)
-            : _globalEventObjectFilter(ev)
+        const filteredEv = this.eventObjectFilter(ev)
         ret = (f as (ev: ShadowedEvent<unknown>) => boolean | undefined).call(
           methodCaller,
           filteredEv,
@@ -969,8 +957,7 @@ export class ProcGenWrapper {
   ) => {
     const checkFallbackEventListener = (camelName: string) => {
       if (camelName.startsWith('bind')) {
-        ProcGenWrapper.prototype.v.call(
-          typeof this !== 'undefined' ? this : ProcGenWrapper.prototype,
+        this.v(
           elem,
           camelName.slice('bind'.length),
           dataValueToString(v),
@@ -981,8 +968,7 @@ export class ProcGenWrapper {
           generalLvaluePath,
         )
       } else if (camelName.startsWith('captureBind')) {
-        ProcGenWrapper.prototype.v.call(
-          typeof this !== 'undefined' ? this : ProcGenWrapper.prototype,
+        this.v(
           elem,
           camelName.slice('captureBind'.length),
           dataValueToString(v),
@@ -993,8 +979,7 @@ export class ProcGenWrapper {
           generalLvaluePath,
         )
       } else if (camelName.startsWith('catch')) {
-        ProcGenWrapper.prototype.v.call(
-          typeof this !== 'undefined' ? this : ProcGenWrapper.prototype,
+        this.v(
           elem,
           camelName.slice('catch'.length),
           dataValueToString(v),
@@ -1005,8 +990,7 @@ export class ProcGenWrapper {
           generalLvaluePath,
         )
       } else if (camelName.startsWith('captureCatch')) {
-        ProcGenWrapper.prototype.v.call(
-          typeof this !== 'undefined' ? this : ProcGenWrapper.prototype,
+        this.v(
           elem,
           camelName.slice('captureCatch'.length),
           dataValueToString(v),
@@ -1017,8 +1001,7 @@ export class ProcGenWrapper {
           generalLvaluePath,
         )
       } else if (camelName.startsWith('on')) {
-        ProcGenWrapper.prototype.v.call(
-          typeof this !== 'undefined' ? this : ProcGenWrapper.prototype,
+        this.v(
           elem,
           camelName.slice('on'.length),
           dataValueToString(v),

@@ -18,10 +18,7 @@ import {
   ProcGen,
   BindingMapGen,
   UpdatePathTreeNode,
-  setGlobalEventObjectFilter,
 } from './proc_gen_wrapper'
-
-export { setGlobalEventObjectFilter }
 
 const DEFAULT_PROC_GEN: ProcGen = () => ({
   C: (isCreation, defineTextNode, defineElement, defineIfGroup, defineForLoop, defineSlot) => {
