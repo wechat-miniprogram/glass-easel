@@ -5,7 +5,7 @@ import { BM, BackendMode } from './backend/mode'
 import { Element, GeneralComponent, GeneralBackendElement, StyleSegmentIndex } from '.'
 import { MutationObserverTarget } from './mutation_observer'
 
-const CLASS_NAME_REG_EXP = /(~|\^+)?-?[_0-9a-z][-_0-9a-z]*/gi
+const CLASS_NAME_REG_EXP = /\s+/
 
 /**
  * The style scope identifier
@@ -59,23 +59,27 @@ export class ClassList {
   /** @internal */
   private _$rootScope: StyleScopeId | undefined
   /** @internal */
-  private _$alias: { [externalName: string]: string[] | null } | null
+  private _$externalNames: string[] | null = null
   /** @internal */
-  private _$resolvedAlias: { [externalName: string]: AliasTarget[] | null } | null
+  private _$externalRawAlias: (string[] | undefined)[] | null = null
   /** @internal */
-  private _$aliasDirty = false
+  private _$dirtyExternalNames: string[] | null = null
   /** @internal */
-  private _$rawNames: string[] = []
+  private _$rawNames: string[][] = []
   /** @internal */
-  private _$rawNamesSegmentSep: number[] = []
+  private _$backendNames: string[] = []
   /** @internal */
-  private _$hasResolvedNames = false
+  private _$backendNameScopes: (StyleScopeId | undefined)[] = []
+  /** @internal */
+  private _$backendNamesCount: number[] = []
+  /** @internal */
+  private _$hasAliasNames = false
   /** @internal */
   private _$prefixManager: StyleScopeManager | undefined
 
   constructor(
     elem: Element,
-    externalNameAlias: { [externalName: string]: string[] | null } | null,
+    externalNames: string[] | null,
     owner: ClassList | null,
     styleScope: number,
     extraStyleScope: number | undefined,
@@ -86,15 +90,9 @@ export class ClassList {
     this._$extraScope = extraStyleScope
     // root owner got globalScope as it's styleScope, avoid the root owner
     this._$rootScope = owner?._$owner ? owner._$rootScope : styleScope
-    this._$alias = externalNameAlias
-    if (externalNameAlias) {
-      const resolved = Object.create(null) as { [externalName: string]: null }
-      Object.keys(externalNameAlias).forEach((k) => {
-        resolved[k] = null
-      })
-      this._$resolvedAlias = resolved
-    } else {
-      this._$resolvedAlias = null
+    if (externalNames) {
+      this._$externalNames = externalNames
+      this._$externalRawAlias = []
     }
     if (BM.DOMLIKE || (BM.DYNAMIC && elem.getBackendMode() === BackendMode.Domlike)) {
       this._$prefixManager = elem.ownerShadowRoot
@@ -108,14 +106,15 @@ export class ClassList {
     name: string,
     cb: (scopeId: StyleScopeId | undefined, className: string) => void,
   ) {
-    const resolvedAlias = this._$owner?._$resolvedAlias
-    if (resolvedAlias && resolvedAlias[name] !== undefined) {
-      const targets = resolvedAlias[name]
-      this._$hasResolvedNames = true
-      if (targets) {
-        for (let i = 0; i < targets.length; i += 1) {
-          const target = targets[i]!
-          cb(target.scopeId, target.className)
+    const owner = this._$owner
+    const externalNames = owner?._$externalNames
+    const externalIndex = externalNames ? externalNames.indexOf(name) : -1
+    if (owner && externalIndex !== -1) {
+      this._$hasAliasNames = true
+      const rawAlias = owner._$externalRawAlias![externalIndex]
+      if (rawAlias) {
+        for (let i = 0; i < rawAlias.length; i += 1) {
+          owner._$resolvePrefixes(rawAlias[i]!, cb)
         }
       }
     } else if (name[0] === '~') {
@@ -139,114 +138,135 @@ export class ClassList {
   }
 
   /** @internal */
-  private _$updateResolvedAliases(name: string): boolean {
-    const slices = this._$alias![name]
-    const resolved: AliasTarget[] = []
-    if (slices) {
-      slices.forEach((name) => {
-        this._$resolvePrefixes(name, (scopeId, className) => {
-          resolved.push({
-            scopeId,
-            className,
-          })
-        })
-      })
-    }
-    let changed = false
-    const prevResolved = this._$resolvedAlias![name]
-    if (prevResolved) {
-      if (prevResolved.length !== resolved.length) {
-        changed = true
-      } else {
-        for (let i = 0; i < prevResolved.length; i += 1) {
-          const a = prevResolved[i]!
-          const b = resolved[i]!
-          if (a.scopeId !== b.scopeId || a.className !== b.className) {
-            changed = true
-            break
-          }
-        }
-      }
-    } else if (resolved.length > 0) {
-      changed = true
-    }
-    this._$resolvedAlias![name] = resolved
-    return changed
-  }
-
-  /** @internal */
   _$hasAlias(name: string): boolean {
-    if (this._$alias && this._$alias[name] !== undefined) {
-      return true
-    }
-    return false
+    return !!this._$externalNames && this._$externalNames.includes(name)
   }
 
   /** @internal */
   _$setAlias(name: string, target: string) {
-    if (this._$alias) {
-      const slices = (String(target).match(CLASS_NAME_REG_EXP) as string[]) || null
-      this._$alias[name] = slices
-      const changed = this._$updateResolvedAliases(name)
-      if (changed) this._$aliasDirty = true
-    }
+    if (!this._$externalNames) return
+    const slices = String(target)
+      .split(CLASS_NAME_REG_EXP)
+      .filter((s) => s !== '') // split result could be [ '' ]
+    const externalIndex = this._$externalNames.indexOf(name)
+    if (externalIndex === -1) return
+    this._$dirtyExternalNames = this._$dirtyExternalNames || []
+    this._$dirtyExternalNames.push(name)
+    this._$externalRawAlias![externalIndex] = slices
+  }
+
+  /** @internal */
+  _$getAlias(name: string): string | undefined {
+    if (!this._$externalNames) return undefined
+    const externalIndex = this._$externalNames.indexOf(name)
+    if (externalIndex === -1) return undefined
+    return (this._$externalRawAlias![externalIndex] || []).join(' ')
   }
 
   /** @internal */
   _$spreadAliasUpdate() {
-    if (this._$aliasDirty) {
-      this._$aliasDirty = false
-      const callClassListUpdate = (elem: Element) => {
-        const classList = elem.classList
-        if (classList) {
-          const alias = classList._$alias
-          if (alias) {
-            let changed = false
-            Object.keys(alias).forEach((name) => {
-              if (classList._$updateResolvedAliases(name)) {
-                changed = true
-              }
-            })
-            if (changed) {
-              const comp = elem as GeneralComponent
-              if (comp._$external === false) {
-                callClassListUpdate(comp.shadowRoot as Element)
+    if (!this._$dirtyExternalNames) return
+    const dirtyExternalNames = this._$dirtyExternalNames
+    this._$dirtyExternalNames = null
+    const callClassListUpdate = (elem: Element) => {
+      const classList = elem.classList
+      if (classList) {
+        if (classList._$hasAliasNames) {
+          const externalNames = classList._$externalNames
+          if (externalNames) {
+            for (let externalIndex = 0; externalIndex < externalNames.length; externalIndex += 1) {
+              const externalRawAlias = classList._$externalRawAlias![externalIndex] || []
+              for (let i = 0; i < dirtyExternalNames.length; i += 1) {
+                if (externalRawAlias.includes(dirtyExternalNames[i]!)) {
+                  classList._$dirtyExternalNames = classList._$dirtyExternalNames || []
+                  classList._$dirtyExternalNames.push(externalNames[externalIndex]!)
+                }
               }
             }
+            classList._$spreadAliasUpdate()
           }
-          if (classList._$hasResolvedNames) {
+          const shouldUpdate = classList._$rawNames.some((names) =>
+            names.some((name) => dirtyExternalNames.includes(name)),
+          )
+          if (shouldUpdate) {
             classList._$updateResolvedNames()
           }
         }
-        const children = elem.childNodes
-        children.forEach((child) => {
-          if (child instanceof Element) callClassListUpdate(child)
-        })
       }
-      const comp = this._$elem as GeneralComponent
-      if (comp._$external === false) {
-        callClassListUpdate(comp.shadowRoot as Element)
-      }
+      const children = elem.childNodes
+      children.forEach((child) => {
+        if (child instanceof Element) callClassListUpdate(child)
+      })
+    }
+    const comp = this._$elem as GeneralComponent
+    if (comp._$external === false) {
+      callClassListUpdate(comp.shadowRoot as Element)
     }
   }
 
   /** @internal */
   private _$updateResolvedNames() {
-    const backendElement = this._$elem.getBackendElement()
+    const backendElement = this._$elem._$backendElement
     if (!backendElement) return
-    this._$hasResolvedNames = false
-    if (BM.DOMLIKE || (BM.DYNAMIC && this._$elem.getBackendMode() === BackendMode.Domlike)) {
-      ;(backendElement as domlikeBackend.Element).setAttribute('class', '')
-    } else {
-      ;(backendElement as backend.Element | composedBackend.Element).clearClasses()
+    const rawNames = this._$rawNames
+    const oldBackendNames = this._$backendNames
+    const oldBackendNameScopes = this._$backendNameScopes
+    const oldBackendNamesCount = this._$backendNamesCount
+
+    const newBackendNames: string[] = []
+    const newBackendNameScopes: (StyleScopeId | undefined)[] = []
+    const newBackendNamesCount: number[] = []
+
+    rawNames.forEach((names) =>
+      names.forEach((rawName) => {
+        this._$resolvePrefixes(rawName, (scopeId, className) => {
+          for (let i = 0; i < newBackendNames.length; i += 1) {
+            if (className === newBackendNames[i] && scopeId === newBackendNameScopes[i]) {
+              newBackendNamesCount[i] += 1
+              return
+            }
+          }
+          newBackendNames.push(className)
+          newBackendNameScopes.push(scopeId)
+          newBackendNamesCount.push(1)
+        })
+      }),
+    )
+
+    for (let i = 0; i < newBackendNames.length; i += 1) {
+      let found = false
+      for (let j = 0; j < oldBackendNames.length; j += 1) {
+        if (
+          newBackendNames[i] === oldBackendNames[j] &&
+          newBackendNameScopes[i] === oldBackendNameScopes[j]
+        ) {
+          found = true
+          oldBackendNamesCount[j] = 0 // mark as exists
+          break
+        }
+      }
+      if (!found) {
+        this._$addClassToBackend(newBackendNames[i]!, newBackendNameScopes[i], backendElement)
+      }
     }
-    this._$rawNames.forEach((name) => {
-      this._$addClassToBackend(name, backendElement)
-    })
+    for (let j = 0; j < oldBackendNames.length; j += 1) {
+      // 0 means old exists
+      if (oldBackendNamesCount[j] !== 0) {
+        this._$removeClassFromBackend(oldBackendNames[j]!, oldBackendNameScopes[j], backendElement)
+      }
+    }
+
+    this._$backendNames = newBackendNames
+    this._$backendNameScopes = newBackendNameScopes
+    this._$backendNamesCount = newBackendNamesCount
   }
 
   /** @internal */
-  private _$classListAdd(name: string, scope: StyleScopeId | undefined, e: GeneralBackendElement) {
+  private _$addClassToBackend(
+    name: string,
+    scope: StyleScopeId | undefined,
+    e: GeneralBackendElement,
+  ) {
     if (BM.DOMLIKE || (BM.DYNAMIC && this._$elem.getBackendMode() === BackendMode.Domlike)) {
       const prefix = scope === undefined ? '' : this._$prefixManager?.queryName(scope)
       const val = prefix ? `${prefix}--${name}` : name
@@ -257,7 +277,7 @@ export class ClassList {
   }
 
   /** @internal */
-  private _$classListRemove(
+  private _$removeClassFromBackend(
     name: string,
     scope: StyleScopeId | undefined,
     e: GeneralBackendElement,
@@ -272,61 +292,105 @@ export class ClassList {
   }
 
   /** @internal */
-  private _$addClassToBackend(name: string, backendElement: GeneralBackendElement) {
-    this._$resolvePrefixes(name, (scopeId, className) => {
-      this._$classListAdd(className, scopeId, backendElement)
-    })
-  }
-
-  /** @internal */
-  private _$removeClassFromBackend(name: string, backendElement: GeneralBackendElement) {
-    this._$resolvePrefixes(name, (scopeId, className) => {
-      this._$classListRemove(className, scopeId, backendElement)
-    })
-  }
-
-  toggle(name: string, force?: boolean) {
-    const slices = (String(name).match(CLASS_NAME_REG_EXP) as string[]) || null
-    if (slices) {
-      const backendElement = this._$elem.getBackendElement()
-      slices.forEach((slice) => {
-        const index = this._$rawNames.indexOf(name)
-        let isAdd: boolean
-        if (force === undefined) {
-          if (index < 0) isAdd = true
-          else isAdd = false
-        } else {
-          isAdd = !!force
-        }
-        let changed = false
-        if (isAdd) {
-          if (index < 0) {
-            this._$rawNames.push(slice)
-            if (backendElement) this._$addClassToBackend(slice, backendElement)
-            changed = true
-          }
-        } else if (index >= 0) {
-          this._$rawNames.splice(index, 1)
-          if (backendElement) this._$removeClassFromBackend(slice, backendElement)
-          changed = true
-        }
-        if (changed) {
-          const elem = this._$elem
-          if (elem._$mutationObserverTarget) {
-            MutationObserverTarget.callAttrObservers(elem, {
-              type: 'properties',
-              target: elem,
-              attributeName: 'class',
-            })
-          }
-        }
-      })
+  private _$addClass(
+    name: string,
+    scopeId: StyleScopeId | undefined,
+    backendElement: GeneralBackendElement,
+  ) {
+    const oldClassNames = this._$backendNames
+    const oldScopeIds = this._$backendNameScopes
+    const classNamesCount = this._$backendNamesCount
+    let found = false
+    for (let j = 0; j < oldClassNames.length; j += 1) {
+      if (name === oldClassNames[j] && scopeId === oldScopeIds[j]) {
+        found = true
+        classNamesCount[j] += 1
+        break
+      }
+    }
+    if (!found) {
+      oldClassNames.push(name)
+      oldScopeIds.push(scopeId)
+      classNamesCount.push(1)
+      this._$addClassToBackend(name, scopeId, backendElement)
     }
   }
 
-  contains(name: string): boolean {
-    for (let i = 0; i < this._$rawNames.length; i += 1) {
-      const rn = this._$rawNames[i]!
+  /** @internal */
+  private _$removeClass(
+    name: string,
+    scopeId: StyleScopeId | undefined,
+    backendElement: GeneralBackendElement,
+  ) {
+    const oldClassNames = this._$backendNames
+    const oldScopeIds = this._$backendNameScopes
+    const classNamesCount = this._$backendNamesCount
+    for (let j = 0; j < oldClassNames.length; j += 1) {
+      if (name === oldClassNames[j] && scopeId === oldScopeIds[j]) {
+        if (classNamesCount[j]! <= 1) {
+          oldClassNames.splice(j, 1)
+          oldScopeIds.splice(j, 1)
+          classNamesCount.splice(j, 1)
+          this._$removeClassFromBackend(name, scopeId, backendElement)
+        } else {
+          classNamesCount[j] -= 1
+        }
+        break
+      }
+    }
+  }
+
+  toggle(name: string, force?: boolean, segmentIndex: StyleSegmentIndex = StyleSegmentIndex.MAIN) {
+    if (CLASS_NAME_REG_EXP.test(name)) throw new Error('Class name contains space characters.')
+
+    const backendElement = this._$elem.getBackendElement()
+    const rawClassIndex = this._$rawNames[segmentIndex]
+      ? this._$rawNames[segmentIndex]!.indexOf(name)
+      : -1
+    const isAdd = force === undefined ? rawClassIndex === -1 : !!force
+
+    let changed = false
+    if (isAdd) {
+      if (rawClassIndex === -1) {
+        const rawNames = this._$rawNames
+        if (!rawNames[segmentIndex]) {
+          rawNames[segmentIndex] = []
+        }
+        const names = rawNames[segmentIndex]!
+        names.push(name)
+        if (backendElement) {
+          this._$resolvePrefixes(name, (scopeId, className) => {
+            this._$addClass(className, scopeId, backendElement)
+          })
+        }
+        changed = true
+      }
+    } else if (rawClassIndex !== -1) {
+      const names = this._$rawNames[segmentIndex]
+      if (names) names.splice(rawClassIndex, 1)
+      if (backendElement) {
+        this._$resolvePrefixes(name, (scopeId, className) => {
+          this._$removeClass(className, scopeId, backendElement)
+        })
+      }
+      changed = true
+    }
+    if (changed) {
+      const elem = this._$elem
+      if (elem._$mutationObserverTarget) {
+        MutationObserverTarget.callAttrObservers(elem, {
+          type: 'properties',
+          target: elem,
+          attributeName: 'class',
+        })
+      }
+    }
+  }
+
+  contains(name: string, segmentIndex: StyleSegmentIndex = StyleSegmentIndex.MAIN): boolean {
+    const names = this._$rawNames[segmentIndex] || []
+    for (let i = 0; i < names.length; i += 1) {
+      const rn = names[i]!
       if (rn[0] === '~') {
         const n = rn.slice(1)
         if (n === name) return true
@@ -344,35 +408,19 @@ export class ClassList {
   }
 
   /** Set class string */
-  setClassNames(names: string, index: StyleSegmentIndex = 0) {
+  setClassNames(names: string, segmentIndex: StyleSegmentIndex = StyleSegmentIndex.MAIN) {
     let n: string
     if (names === undefined || names === null) n = ''
     else n = String(names)
-    const newRawNames = n.match(CLASS_NAME_REG_EXP) || []
-    while (this._$rawNamesSegmentSep.length < index) {
-      this._$rawNamesSegmentSep.push(
-        this._$rawNamesSegmentSep.length > 0
-          ? this._$rawNamesSegmentSep[this._$rawNamesSegmentSep.length - 1]!
-          : this._$rawNames.length,
-      )
-    }
-    if (this._$rawNamesSegmentSep.length === 0) {
-      this._$rawNames = newRawNames
-    } else {
-      const segEnd =
-        index < this._$rawNamesSegmentSep.length
-          ? this._$rawNamesSegmentSep[index]!
-          : this._$rawNames.length
-      const segStart = index > 0 ? this._$rawNamesSegmentSep[index - 1]! : 0
-      const segLen = segEnd - segStart
-      const lenDiff = newRawNames.length - segLen
-      for (let i = index; i < this._$rawNamesSegmentSep.length; i += 1) {
-        this._$rawNamesSegmentSep[i] += lenDiff
-      }
-      this._$rawNames.splice(segStart, segLen, ...newRawNames)
-    }
-    this._$updateResolvedNames()
+    const newRawNames = n.split(CLASS_NAME_REG_EXP).filter((s) => s !== '') // split result could be [ '' ]
+
+    const rawNames = this._$rawNames
     const elem = this._$elem
+
+    rawNames[segmentIndex] = newRawNames
+
+    this._$updateResolvedNames()
+
     if (elem._$mutationObserverTarget) {
       MutationObserverTarget.callAttrObservers(elem, {
         type: 'properties',
@@ -383,7 +431,8 @@ export class ClassList {
   }
 
   /** Returns space separated class string */
-  getClassNames(): string {
-    return this._$rawNames ? this._$rawNames.join(' ') : ''
+  getClassNames(segmentIndex: StyleSegmentIndex = StyleSegmentIndex.MAIN): string {
+    const names = this._$rawNames[segmentIndex] || []
+    return names ? names.join(' ') : ''
   }
 }

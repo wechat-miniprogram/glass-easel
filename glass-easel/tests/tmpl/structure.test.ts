@@ -1496,7 +1496,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       dynamic: 'dynamic',
     })
     expect(domHtml(elem)).toBe(
-      '<sub-comp class="p--static p--dynamic"><div class="p--static p--dynamic p--a-class"></div></sub-comp>',
+      '<sub-comp class="p--static p--dynamic"><div class="p--static p--a-class p--dynamic"></div></sub-comp>',
     )
     elem.setData({
       dynamic: '',

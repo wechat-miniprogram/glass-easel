@@ -1484,7 +1484,7 @@ impl TmplAttr {
                                     p.lvalue_path(w, scopes, true)?;
                                 }
                             } else if maybe_event_binding(&name) {
-                                if p.is_general_lvalue_path(scopes) {
+                                if p.is_general_lvalue_path(scopes) && !p.is_model_lvalue_path(scopes) {
                                     write!(w, ",null,")?;
                                     p.lvalue_path(w, scopes, false)?;
                                 }
@@ -1505,7 +1505,7 @@ impl TmplAttr {
                                                 p.lvalue_path(w, scopes, true)?;
                                             }
                                         } else if maybe_event_binding(&name) {
-                                            if p.is_general_lvalue_path(scopes) {
+                                            if p.is_general_lvalue_path(scopes) && !p.is_model_lvalue_path(scopes) {
                                                 write!(w, ",null,")?;
                                                 p.lvalue_path(w, scopes, false)?;
                                             }
@@ -1537,7 +1537,7 @@ impl TmplAttr {
                             p.lvalue_state_expr(w, scopes)?;
                             write!(w, ")R.p(N,{},", attr_name)?;
                             p.value_expr(w)?;
-                            if p.is_general_lvalue_path(scopes) {
+                            if p.is_general_lvalue_path(scopes) && !p.is_model_lvalue_path(scopes) {
                                 write!(w, ",")?;
                                 p.lvalue_path(w, scopes, false)?;
                             }
@@ -1551,6 +1551,10 @@ impl TmplAttr {
                                     w.expr_stmt(|w| {
                                         write!(w, "R.p(N,{},", attr_name)?;
                                         p.value_expr(w)?;
+                                        if p.is_general_lvalue_path(scopes) && !p.is_model_lvalue_path(scopes) {
+                                            write!(w, ",")?;
+                                            p.lvalue_path(w, scopes, false)?;
+                                        }
                                         write!(w, ")")?;
                                         Ok(())
                                     })
@@ -1641,7 +1645,7 @@ impl TmplAttr {
                             if *mut_bind { "!0" } else { "!1" },
                             if *capture { "!0" } else { "!1" },
                         )?;
-                        if p.is_general_lvalue_path(scopes) {
+                        if p.is_general_lvalue_path(scopes) && !p.is_model_lvalue_path(scopes) {
                             write!(w, ",")?;
                             p.lvalue_path(w, scopes, false)?;
                         }
@@ -1662,6 +1666,10 @@ impl TmplAttr {
                                         if *mut_bind { "!0" } else { "!1" },
                                         if *capture { "!0" } else { "!1" },
                                     )?;
+                                    if p.is_general_lvalue_path(scopes) && !p.is_model_lvalue_path(scopes) {
+                                        write!(w, ",")?;
+                                        p.lvalue_path(w, scopes, false)?;
+                                    }
                                     Ok(())
                                 })
                             })?;
