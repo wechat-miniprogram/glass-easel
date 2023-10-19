@@ -26,12 +26,13 @@ import {
   GetFromObserverPathString,
   IsNever,
 } from './component_params'
-import { FuncArr, triggerWarning } from './func_arr'
+import { FuncArr, safeCallback, triggerWarning } from './func_arr'
 import { ComponentOptions, getDefaultComponentSpace } from './global_options'
 import { MultiPaths, parseMultiPaths } from './data_path'
 import { DataValue, DataGroupObserverTree } from './data_proxy'
 import {
   ComponentDefinition,
+  GeneralComponent,
   GeneralComponentDefinition,
   LifetimeFuncs,
   Lifetimes,
@@ -240,9 +241,20 @@ export const convertValueToType = (
   value: unknown,
   propName: string,
   prop: PropertyDefinition,
+  component: GeneralComponent | null,
 ): unknown => {
   const type = prop.type
-  const defaultFn = prop.default
+  const defaultFn =
+    prop.default === undefined
+      ? undefined
+      : () =>
+          safeCallback(
+            `Property "${propName}" Default`,
+            prop.default!,
+            null,
+            [],
+            component || undefined,
+          )
   // try match optional types
   const optionalTypes = prop.optionalTypes
   if (optionalTypes) {
@@ -507,7 +519,7 @@ export class BehaviorBuilder<
   /** @internal */
   _$staticData: { [field: string]: any } | undefined = undefined
   /** @internal */
-  _$data: (() => { [field: string]: any })[] = []
+  _$data: ((component: GeneralComponent) => { [field: string]: any })[] = []
   /** @internal */
   _$properties?: { name: string; def: PropertyListItem<PropertyType, unknown> }[]
   /** @internal */
@@ -701,7 +713,7 @@ export class BehaviorBuilder<
     BehaviorBuilder<T, TData & T, TProperty, TMethod, TChainingFilter, TPendingChainingFilter>,
     TChainingFilter
   > {
-    this._$data.push(gen)
+    this._$data.push((component) => safeCallback('Data Generator', gen, null, [], component) ?? {})
     return this as any
   }
 
@@ -917,7 +929,9 @@ export class BehaviorBuilder<
     const rawData = def.data
     if (rawData !== undefined) {
       if (typeof rawData === 'function') {
-        this._$data.push(rawData as () => DataList)
+        this._$data.push(
+          (component) => safeCallback('Data Generator', rawData, null, [], component) ?? {},
+        )
       } else {
         this._$staticData = rawData
       }
@@ -1075,7 +1089,7 @@ export class Behavior<
   /** @internal */
   _$staticData?: DataList
   /** @internal */
-  _$data: (() => { [field: string]: any })[]
+  _$data: ((component: GeneralComponent) => { [field: string]: any })[]
   /** @internal */
   _$propertyMap: { [name: string]: PropertyDefinition }
   /** @internal */
@@ -1436,7 +1450,7 @@ export class Behavior<
     // init properties
     const properties = builder._$properties
     if (properties !== undefined) {
-      const initValueFuncs: { name: string; func: () => any }[] = []
+      const initValueFuncs: { name: string; func: (this: null) => any }[] = []
       for (let i = 0; i < properties.length; i += 1) {
         const { name, def } = properties[i]!
         const shortHandDef = normalizePropertyTypeShortHand(def)
@@ -1513,11 +1527,11 @@ export class Behavior<
           func: d.default === undefined ? () => simpleDeepCopy(d.value) : d.default,
         })
       }
-      this._$data.push(() => {
+      this._$data.push((component) => {
         const ret: DataList = {}
         for (let i = 0; i < initValueFuncs.length; i += 1) {
           const { name, func } = initValueFuncs[i]!
-          ret[name] = func()
+          ret[name] = safeCallback(`Property "${name}" Default`, func, null, [], component)
         }
         return ret
       })
