@@ -536,13 +536,6 @@ export class Component<
     comp._$initialize(virtualHost, backendElement, owner, nodeTreeContext)
 
     // init class list
-    const externalClassAlias = {} as { [externalName: string]: string[] | null }
-    if (behavior._$externalClasses) {
-      const externalClasses = behavior._$externalClasses
-      for (let i = 0; i < externalClasses.length; i += 1) {
-        externalClassAlias[externalClasses[i]!] = null
-      }
-    }
     const styleScope = owner
       ? owner.getHostNode().getComponentOptions().styleScope
       : StyleScopeManager.globalScope()
@@ -551,7 +544,7 @@ export class Component<
       : undefined
     comp.classList = new ClassList(
       comp,
-      externalClassAlias,
+      behavior._$externalClasses || null,
       owner ? owner.getHostNode().classList : null,
       styleScope,
       extraStyleScope,

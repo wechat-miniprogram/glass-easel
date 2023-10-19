@@ -1167,11 +1167,11 @@ const testCases = function (testBackend) {
         expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
           'component-external-classes-a--static',
         )
-        expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('')
+        expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe(null)
         expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
           'component-external-classes-b--static',
         )
-        expect(elem.$.c1.$.b1.$$.getAttribute('class')).toBe('')
+        expect(elem.$.c1.$.b1.$$.getAttribute('class')).toBe(null)
         expect(elem.$.c1.$$.getAttribute('class')).toBe(null)
         elem.$.c1.$.b1.$.a1.setExternalClass('A1', 'B1')
         expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
@@ -1181,7 +1181,7 @@ const testCases = function (testBackend) {
         expect(elem.$.c1.$.b1.$.a1.$.child.$$.getAttribute('class')).toBe(
           'component-external-classes-a--static',
         )
-        expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('')
+        expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe(null)
         expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
           'component-external-classes-b--static',
         )
@@ -1203,10 +1203,10 @@ const testCases = function (testBackend) {
         )
         expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('component-external-classes-d--AAA')
         expect(elem.$.c1.$.b1.$.a2.$.child.$$.getAttribute('class')).toBe(
-          'component-external-classes-a--static component-external-classes-d--AAA component-external-classes-b--BBB',
+          'component-external-classes-a--static component-external-classes-b--BBB component-external-classes-d--AAA',
         )
         expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
-          'component-external-classes-d--AAA component-external-classes-b--static',
+          'component-external-classes-b--static component-external-classes-d--AAA',
         )
         expect(elem.$.c1.$.b1.$$.getAttribute('class')).toBe('component-external-classes-d--AAA')
 
@@ -1216,10 +1216,10 @@ const testCases = function (testBackend) {
         )
         expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('component-external-classes-d--BBB')
         expect(elem.$.c1.$.b1.$.a2.$.child.$$.getAttribute('class')).toBe(
-          'component-external-classes-a--static component-external-classes-d--BBB component-external-classes-b--BBB',
+          'component-external-classes-a--static component-external-classes-b--BBB component-external-classes-d--BBB',
         )
         expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
-          'component-external-classes-d--BBB component-external-classes-b--static',
+          'component-external-classes-b--static component-external-classes-d--BBB',
         )
         expect(elem.$.c1.$.b1.$$.getAttribute('class')).toBe('component-external-classes-d--BBB')
 
@@ -1238,10 +1238,10 @@ const testCases = function (testBackend) {
         )
         expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('component-external-classes-d--BBB')
         expect(elem.$.c1.$.b1.$.a2.$.child.$$.getAttribute('class')).toBe(
-          'component-external-classes-a--static component-external-classes-d--CCC component-external-classes-c--CCCC component-external-classes-b--BBB',
+          'component-external-classes-a--static component-external-classes-b--BBB component-external-classes-d--CCC component-external-classes-c--CCCC',
         )
         expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
-          'component-external-classes-d--CCC component-external-classes-c--CCCC component-external-classes-b--static',
+          'component-external-classes-b--static component-external-classes-d--CCC component-external-classes-c--CCCC',
         )
         expect(elem.$.c1.$.b1.$.a3.$$.getAttribute('class')).toBe(
           'component-external-classes-d--BBB component-external-classes-d--CCC component-external-classes-c--CCCC',
@@ -1263,10 +1263,10 @@ const testCases = function (testBackend) {
         )
         expect(elem.$.c1.$.b1.$.a1.$$.getAttribute('class')).toBe('')
         expect(elem.$.c1.$.b1.$.a2.$.child.$$.getAttribute('class')).toBe(
-          'component-external-classes-a--static component-external-classes-d--CCC component-external-classes-b--BBB',
+          'component-external-classes-a--static component-external-classes-b--BBB component-external-classes-d--CCC',
         )
         expect(elem.$.c1.$.b1.$.a2.$$.getAttribute('class')).toBe(
-          'component-external-classes-d--CCC component-external-classes-b--static',
+          'component-external-classes-b--static component-external-classes-d--CCC',
         )
         expect(elem.$.c1.$.b1.$.a3.$$.getAttribute('class')).toBe('component-external-classes-d--CCC')
         expect(elem.$.c1.$.b1.$$.getAttribute('class')).toBe('component-external-classes-d--BBB')
