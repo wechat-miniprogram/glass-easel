@@ -240,7 +240,7 @@ impl TmplGroup {
 
     /// Add a template into the group.
     pub fn add_tmpl(&mut self, path: &str, tmpl_str: &str) -> Result<(), TmplParseError> {
-        let mut tmpl = parse_tmpl(tmpl_str)?;
+        let mut tmpl = parse_tmpl(tmpl_str, path)?;
         tmpl.path = path.to_string();
         if tmpl.get_inline_script_module_names().len() > 0 {
             self.has_scripts = true;
@@ -260,7 +260,7 @@ impl TmplGroup {
     }
 
     /// Add a script segment into the group.
-    /// 
+    ///
     /// The `content` must be valid JavaScript file content.
     /// `require` and `exports` can be visited in this JavaScript segment, similar to Node.js.
     pub fn add_script(&mut self, path: &str, content: &str) -> Result<(), TmplParseError> {
@@ -270,7 +270,7 @@ impl TmplGroup {
     }
 
     /// Set extra runtime JavaScript code as a string.
-    /// 
+    ///
     /// The `content` must be valid JavaScript statements, ended by semicolon.
     pub fn set_extra_runtime_script(&mut self, content: &str) {
         self.extra_runtime_string = content.to_string();
