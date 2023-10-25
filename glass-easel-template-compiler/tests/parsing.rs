@@ -29,10 +29,10 @@ fn basic_entities_parsing() {
 #[test]
 fn basic_expr_parsing() {
     let tree =
-        parse_tmpl(r#"<div attr=" {{ (a + 1).b }} "> {{ c - ( d + e ) * 3 }} </div>"#, r#""#).unwrap();
+        parse_tmpl(r#"<div attr=" {{ (a + 1).b }} "> {{ c - ( d + e ) * 3 }} {{+-+-!1 + typeof !typeof void 0}}</div>"#, r#""#).unwrap();
     assert_eq!(
         tree.to_string(),
-        r#"<div attr="{{" "+Y(X(a+1).b)+" "}}">{{" "+Y(c-(d+e)*3)+" "}}</div>"#
+        r#"<div attr="{{" "+Y(X(a+1).b)+" "}}">{{" "+Y(c-(d+e)*3)+" "+Y(+-+-!1+typeof !typeof void 0)}}</div>"#
     );
 }
 

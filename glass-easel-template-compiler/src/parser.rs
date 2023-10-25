@@ -210,6 +210,8 @@ pub fn parse_tmpl(tmpl_str: &str, path: &str) -> Result<TmplTree, TmplParseError
                 Rule::bit_reverse => TmplExpr::BitReverse(next),
                 Rule::positive => TmplExpr::Positive(next),
                 Rule::negative => TmplExpr::Negative(next),
+                Rule::type_of => TmplExpr::TypeOf(next),
+                Rule::void => TmplExpr::Void(next),
                 _ => unreachable!(),
             });
             ret
