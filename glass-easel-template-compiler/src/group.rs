@@ -218,6 +218,14 @@ impl TmplGroup {
         }
     }
 
+    /// import another group.
+    pub fn import_group(&mut self, group: &TmplGroup) {
+        self.trees.extend(group.trees.clone());
+        self.scripts.extend(group.scripts.clone());
+        self.has_scripts = self.has_scripts || group.has_scripts;
+        self.extra_runtime_string.push_str(&group.extra_runtime_string);
+    }
+
     /// Add a ref of a parsed tree in the group.
     pub fn get_tree(&self, path: &str) -> Result<&TmplTree, TmplError> {
         match self.trees.get(path) {
