@@ -23,11 +23,11 @@ export class NativeNode extends Element {
     tagName: string,
     owner: ShadowRoot,
     stylingName?: string,
-    placeholderHandler?: () => void,
+    placeholderHandlerRemover?: () => void,
   ): NativeNode {
     const node = Object.create(NativeNode.prototype) as NativeNode
     node.is = tagName
-    node._$placeholderHandler = placeholderHandler
+    node._$placeholderHandlerRemover = placeholderHandlerRemover
     const nodeTreeContext = owner._$nodeTreeContext
     let backendElement: GeneralBackendElement | null
     if (BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike)) {

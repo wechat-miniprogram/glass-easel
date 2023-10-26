@@ -467,7 +467,7 @@ export class Component<
     owner: ShadowRoot | null,
     backendContext: GeneralBackendContext | null,
     genericImpls: { [name: string]: ComponentDefinitionWithPlaceholder } | null,
-    placeholderHandler: (() => void) | undefined,
+    placeholderHandlerRemover: (() => void) | undefined,
     initPropValues?: (comp: ComponentInstance<TData, TProperty, TMethod>) => void,
   ): ComponentInstance<TData, TProperty, TMethod> {
     if (!def._$detail) def.prepare()
@@ -487,7 +487,7 @@ export class Component<
     // initialize component instance object
     const comp = Object.create(proto) as ComponentInstance<TData, TProperty, TMethod>
     comp._$genericImpls = genericImpls
-    comp._$placeholderHandler = placeholderHandler
+    comp._$placeholderHandlerRemover = placeholderHandlerRemover
     comp._$external = external
     comp.tagName = tagName
     comp._$methodCaller = comp
