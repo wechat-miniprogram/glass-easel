@@ -94,7 +94,12 @@ import {
   Empty,
 } from './component_params'
 import { Behavior } from './behavior'
-import { Component, ComponentDefinition, GeneralComponent, GeneralComponentDefinition } from './component'
+import {
+  Component,
+  ComponentDefinition,
+  GeneralComponent,
+  GeneralComponentDefinition,
+} from './component'
 import { Event } from './event'
 import { getDefaultComponentSpace } from './global_options'
 
