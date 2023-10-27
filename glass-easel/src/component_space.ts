@@ -153,6 +153,8 @@ export class ComponentSpace {
   _$componentWaitingListener:
     | ((isPub: boolean, alias: string, owner: GeneralComponent) => void)
     | null = null
+  /** @internal */
+  _$allowUnusedNativeNode = true
 
   /**
    * Create a new component space
@@ -168,6 +170,7 @@ export class ComponentSpace {
     defaultComponent?: string,
     baseSpace?: ComponentSpace,
     styleScopeManager?: StyleScopeManager,
+    allowUnusedNativeNode = true,
   ) {
     if (baseSpace) {
       Object.assign(this._$list, baseSpace._$pubList)
@@ -176,6 +179,7 @@ export class ComponentSpace {
     this._$defaultComponent = defaultComponent ?? ''
     this._$componentOptions = normalizeComponentOptions({}, baseSpace?._$componentOptions)
     this.styleScopeManager = styleScopeManager || new StyleScopeManager()
+    this._$allowUnusedNativeNode = allowUnusedNativeNode
   }
 
   /**

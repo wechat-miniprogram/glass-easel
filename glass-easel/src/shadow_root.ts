@@ -194,7 +194,11 @@ export class ShadowRoot extends VirtualNode {
     }
 
     // find in the space otherwise
-    const comp = space.getGlobalUsingComponent(compName) ?? space.getDefaultComponent()
+    let comp = space.getGlobalUsingComponent(compName)
+    if (comp === null && space._$allowUnusedNativeNode && compName !== '') {
+      comp = compName
+    }
+    if (!comp) comp = space.getDefaultComponent()
     /* istanbul ignore if */
     if (!comp) {
       throw new Error(`Cannot find component "${compName}"`)
@@ -246,10 +250,14 @@ export class ShadowRoot extends VirtualNode {
       )
     }
 
-    // use native node otherwise
-    const node = NativeNode.create(tagName, this)
-    initPropValues?.(node)
-    return node
+    if (space._$allowUnusedNativeNode) {
+      // use native node otherwise
+      const node = NativeNode.create(tagName, this)
+      initPropValues?.(node)
+      return node
+    } else {
+      throw new Error(`Unknown tag name ${tagName}`)
+    }
   }
 
   /**

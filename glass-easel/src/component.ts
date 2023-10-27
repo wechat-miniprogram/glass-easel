@@ -159,7 +159,11 @@ export const resolvePlaceholder = (
     }
   }
   if (ret) return ret
-  const comp = space.getGlobalUsingComponent(placeholder) ?? space.getDefaultComponent()
+  let comp = space.getGlobalUsingComponent(placeholder)
+  if (comp === null && space._$allowUnusedNativeNode && placeholder !== '') {
+    comp = placeholder
+  }
+  if (!comp) comp = space.getDefaultComponent()
   if (!comp) {
     throw new Error(
       `Cannot find default component for placeholder target "${placeholder}" (on component "${behavior.is}")`,
