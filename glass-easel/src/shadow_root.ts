@@ -255,9 +255,8 @@ export class ShadowRoot extends VirtualNode {
       const node = NativeNode.create(tagName, this)
       initPropValues?.(node)
       return node
-    } else {
-      throw new Error(`Unknown tag name ${tagName}`)
     }
+    throw new Error(`Unknown tag name ${tagName}`)
   }
 
   /**
