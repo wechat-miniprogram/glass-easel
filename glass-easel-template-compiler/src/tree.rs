@@ -26,7 +26,7 @@ fn dash_to_camel(s: &str) -> String {
 }
 
 /// A parsed template.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TmplTree {
     pub(crate) path: String,
     pub(crate) root: TmplElement,
@@ -37,13 +37,13 @@ pub struct TmplTree {
     pub(crate) scripts: Vec<TmplScript>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum TmplNode {
     TextNode(TmplTextNode),
     Element(TmplElement),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum TmplTextNode {
     Static(String),
     Dynamic {
@@ -52,7 +52,7 @@ pub(crate) enum TmplTextNode {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct TmplElement {
     pub(crate) virtual_type: TmplVirtualType,
     pub(crate) tag_name: String,
@@ -64,7 +64,7 @@ pub(crate) struct TmplElement {
     pub(crate) slot_values: Vec<(String, String)>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum TmplVirtualType {
     None,
     Pure,
@@ -95,13 +95,13 @@ pub(crate) enum TmplVirtualType {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct TmplAttr {
     pub(crate) kind: TmplAttrKind,
     pub(crate) value: TmplAttrValue,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum TmplAttrKind {
     WxDirective {
         name: String,
@@ -142,7 +142,7 @@ pub(crate) enum TmplAttrKind {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum TmplAttrValue {
     Static(String),
     Dynamic {
@@ -151,7 +151,7 @@ pub(crate) enum TmplAttrValue {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum TmplScript {
     Inline {
         module_name: String,

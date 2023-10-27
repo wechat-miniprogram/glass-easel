@@ -7,7 +7,7 @@ use crate::TmplError;
 use std::fmt;
 use std::fmt::Write;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum TmplExpr {
     ScopeIndex(usize),
     Ident(String),
@@ -30,6 +30,8 @@ pub(crate) enum TmplExpr {
     BitReverse(Box<TmplExpr>),
     Positive(Box<TmplExpr>),
     Negative(Box<TmplExpr>),
+    TypeOf(Box<TmplExpr>),
+    Void(Box<TmplExpr>),
 
     Multiply(Box<TmplExpr>, Box<TmplExpr>),
     Divide(Box<TmplExpr>, Box<TmplExpr>),
@@ -94,6 +96,8 @@ impl TmplExpr {
             TmplExpr::BitReverse(_) => TmplExprLevel::Unary,
             TmplExpr::Positive(_) => TmplExprLevel::Unary,
             TmplExpr::Negative(_) => TmplExprLevel::Unary,
+            TmplExpr::TypeOf(_) => TmplExprLevel::Unary,
+            TmplExpr::Void(_) => TmplExprLevel::Unary,
             TmplExpr::Multiply(_, _) => TmplExprLevel::Multiply,
             TmplExpr::Divide(_, _) => TmplExprLevel::Multiply,
             TmplExpr::Mod(_, _) => TmplExprLevel::Multiply,
@@ -236,6 +240,12 @@ impl TmplExpr {
             }
             TmplExpr::Negative(x) => {
                 format!("-{}", x.to_expr_string(TmplExprLevel::Unary, is_js_target))
+            }
+            TmplExpr::TypeOf(x) => {
+                format!("typeof {}", x.to_expr_string(TmplExprLevel::Unary, is_js_target))
+            }
+            TmplExpr::Void(x) => {
+                format!("void {}", x.to_expr_string(TmplExprLevel::Unary, is_js_target))
             }
 
             TmplExpr::Multiply(x, y) => {
@@ -848,6 +858,16 @@ impl TmplExpr {
                 x.to_proc_gen_rec_and_end_path(w, scopes, TmplExprLevel::Unary, path_calc, value)?;
                 PathAnalysisState::NotInPath
             }
+            TmplExpr::TypeOf(x) => {
+                write!(value, "typeof ")?;
+                x.to_proc_gen_rec_and_end_path(w, scopes, TmplExprLevel::Unary, path_calc, value)?;
+                PathAnalysisState::NotInPath
+            }
+            TmplExpr::Void(x) => {
+                write!(value, "void ")?;
+                x.to_proc_gen_rec_and_end_path(w, scopes, TmplExprLevel::Unary, path_calc, value)?;
+                PathAnalysisState::NotInPath
+            }
 
             TmplExpr::Multiply(x, y) => {
                 x.to_proc_gen_rec_and_end_path(
@@ -1166,6 +1186,12 @@ impl TmplExpr {
                 x.get_binding_map_keys_rec(bmc, scope_names, should_disable, bmk);
             }
             TmplExpr::Negative(x) => {
+                x.get_binding_map_keys_rec(bmc, scope_names, should_disable, bmk);
+            }
+            TmplExpr::TypeOf(x) => {
+                x.get_binding_map_keys_rec(bmc, scope_names, should_disable, bmk);
+            }
+            TmplExpr::Void(x) => {
                 x.get_binding_map_keys_rec(bmc, scope_names, should_disable, bmk);
             }
 

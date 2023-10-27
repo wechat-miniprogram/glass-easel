@@ -14,12 +14,16 @@
   },
   "homepage": "https://github.com/wechat-miniprogram/glass-easel",
   "files": [
-    "pkg-nodejs/glass_easel_template_compiler*",
+    "pkg/glass_easel_template_compiler*",
+    "/main.js",
+    "/module.js",
     "/README.md"
   ],
-  "main": "pkg-nodejs/glass_easel_template_compiler.js",
-  "types": "pkg-nodejs/glass_easel_template_compiler.d.ts",
+  "main": "main.js",
+  "module": "module.js",
+  "browser": "pkg/glass_easel_template_compiler.js",
+  "types": "pkg/glass_easel_template_compiler.d.ts",
   "scripts": {
-    "build": "wasm-pack build --target nodejs --out-dir pkg-nodejs"
+    "build": "wasm-pack build --target bundler && rollup -o pkg/glass_easel_template_compiler_bg.cjs.js -f cjs pkg/glass_easel_template_compiler_bg.js"
   }
 }
