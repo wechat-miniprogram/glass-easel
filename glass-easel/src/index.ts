@@ -2,7 +2,7 @@
 /* eslint-disable arrow-body-style */
 
 export { TextNode } from './text_node'
-export { NativeNode } from './native_node'
+export { NativeNode, NativeNodeAttributeFilter, ExtendedNativeNodeDefinition } from './native_node'
 export { ShadowRoot } from './shadow_root'
 export { VirtualNode } from './virtual_node'
 export {

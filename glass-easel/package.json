@@ -13,8 +13,8 @@
     "url": "https://github.com/wechat-miniprogram/glass-easel/issues"
   },
   "homepage": "https://github.com/wechat-miniprogram/glass-easel",
-  "main": "dist/glass_easel.all.js",
-  "module": "dist/glass_easel.all.es.js",
+  "main": "dist/glass_easel.composed.global.js",
+  "module": "dist/glass_easel.composed.global.es.js",
   "types": "dist/glass_easel.d.ts",
   "scripts": {
     "doc": "typedoc src/index.ts --excludePrivate --excludeProtected --excludeInternal",
