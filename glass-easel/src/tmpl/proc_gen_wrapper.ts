@@ -783,8 +783,6 @@ export class ProcGenWrapper {
     children: DefineChildren,
     dynamicSlotValueNames: string[] | undefined,
   ): Element {
-    const placeholding = this.shadowRoot.checkComponentPlaceholder(tagName)
-    let elem: Element
     let dynSlot = false
     const initPropValues = (elem: GeneralComponent | NativeNode) => {
       const sr =
@@ -801,55 +799,43 @@ export class ProcGenWrapper {
         sr?.applySlotUpdates()
       }
     }
-    if (typeof placeholding === 'boolean') {
-      let placeholderCb: (() => void) | undefined
-      if (placeholding) {
-        placeholderCb = () => {
-          const replacer = this.shadowRoot.createComponent(
-            tagName,
-            tagName,
-            genericImpls,
-            undefined,
-            initPropValues,
+    const placeholderCallback = () => {
+      const replacer = this.shadowRoot.createComponent(
+        tagName,
+        tagName,
+        genericImpls,
+        undefined,
+        initPropValues,
+      )
+      replacer.destroyBackendElementOnDetach()
+      const replacerShadowRoot = (replacer as GeneralComponent).getShadowRoot()
+      const elemShadowRoot = elem instanceof Component ? elem.getShadowRoot() : null
+      const isElemDynamicSlots = elemShadowRoot?.getSlotMode() === SlotMode.Dynamic
+      const isReplacerDynamicSlots = replacerShadowRoot?.getSlotMode() === SlotMode.Dynamic
+      if (isReplacerDynamicSlots) {
+        if (!isElemDynamicSlots) {
+          throw new Error(
+            'The "dynamicSlots" option of the component and its placeholder should be the same.',
           )
-          replacer.destroyBackendElementOnDetach()
-          const replacerShadowRoot = (replacer as GeneralComponent).getShadowRoot()
-          const elemShadowRoot = elem instanceof Component ? elem.getShadowRoot() : null
-          const isElemDynamicSlots = elemShadowRoot?.getSlotMode() === SlotMode.Dynamic
-          const isReplacerDynamicSlots = replacerShadowRoot?.getSlotMode() === SlotMode.Dynamic
-          if (isReplacerDynamicSlots) {
-            if (!isElemDynamicSlots) {
-              throw new Error(
-                'The "dynamicSlots" option of the component and its placeholder should be the same.',
-              )
-            }
-            elem.parentNode?.replaceChild(replacer, elem)
-          } else {
-            if (isElemDynamicSlots) {
-              throw new Error(
-                'The "dynamicSlots" option of the component and its placeholder should be the same.',
-              )
-            }
-            elem.selfReplaceWith(replacer)
-          }
         }
+        elem.parentNode?.replaceChild(replacer, elem)
+      } else {
+        if (isElemDynamicSlots) {
+          throw new Error(
+            'The "dynamicSlots" option of the component and its placeholder should be the same.',
+          )
+        }
+        elem.selfReplaceWith(replacer)
       }
-      elem = this.shadowRoot.createComponent(
-        tagName,
-        tagName,
-        genericImpls,
-        placeholderCb,
-        initPropValues,
-      )
-      elem.destroyBackendElementOnDetach()
-    } else {
-      elem = this.shadowRoot.createComponentOrNativeNode(
-        placeholding ?? tagName,
-        genericImpls,
-        initPropValues,
-      )
-      elem.destroyBackendElementOnDetach()
     }
+    const elem = this.shadowRoot.createComponent(
+      tagName,
+      tagName,
+      genericImpls,
+      placeholderCallback,
+      initPropValues,
+    )
+    elem.destroyBackendElementOnDetach()
     if (dynSlot) {
       this.bindingMapDisabled = true // IDEA better binding map disable detection
     } else {

@@ -28,22 +28,6 @@ type AppliedSlotMeta = {
   updatePathTree: { [key: string]: true } | undefined
 }
 
-const wrapPlaceholderCallback = (
-  f: (c: GeneralComponentDefinition) => void,
-  cwp: Exclude<ComponentDefinitionWithPlaceholder, string>,
-  owner: GeneralComponent,
-) => {
-  const waiting = cwp.waiting
-  if (waiting) {
-    waiting.add(f)
-    waiting.hintUsed(owner)
-    return () => {
-      waiting.remove(f)
-    }
-  }
-  return undefined
-}
-
 export class ShadowRoot extends VirtualNode {
   private _$host: GeneralComponent
   /** @internal */
@@ -134,11 +118,17 @@ export class ShadowRoot extends VirtualNode {
   createNativeNodeWithInit(
     tagName: string,
     stylingName: string,
-    placeholderHandler: (() => void) | undefined,
+    placeholderHandlerRemover: (() => void) | undefined,
     initPropValues?: (comp: NativeNode) => void,
   ): NativeNode {
     const extendedDef = this._$host._$behavior.ownerSpace.getExtendedNativeNode(tagName)
-    const ret = NativeNode.create(tagName, this, stylingName, extendedDef, placeholderHandler)
+    const ret = NativeNode.create(
+      tagName,
+      this,
+      stylingName,
+      extendedDef,
+      placeholderHandlerRemover,
+    )
     initPropValues?.(ret)
     return ret
   }
@@ -162,26 +152,39 @@ export class ShadowRoot extends VirtualNode {
     const space = beh.ownerSpace
     const compName = usingKey === undefined ? tagName : usingKey
 
-    // if the target is in using list, then use the one in using list
-    const using = beh._$using[compName]
-    if (typeof using === 'string') {
-      return this.createNativeNodeWithInit(using, tagName, undefined, initPropValues)
-    }
-    if (using) {
-      let usingTarget: GeneralComponentDefinition | string | undefined
-      if (using.final) {
-        usingTarget = using.final
-      } else if (using.placeholder !== null) {
-        usingTarget = resolvePlaceholder(using.placeholder, space, using.source, hostGenericImpls)
+    const possibleComponentDefinitions = [
+      // if the target is in using list, then use the one in using list
+      beh._$using[compName],
+      // if the target is in generics list, then use the one
+      hostGenericImpls && hostGenericImpls[compName],
+    ]
+
+    for (let i = 0; i < possibleComponentDefinitions.length; i += 1) {
+      const cwp = possibleComponentDefinitions[i]
+      if (cwp === null || cwp === undefined) continue
+      if (typeof cwp === 'string') {
+        return this.createNativeNodeWithInit(cwp, tagName, undefined, initPropValues)
       }
-      const placeholderHandler = placeholderCallback
-        ? wrapPlaceholderCallback(placeholderCallback, using, host)
-        : undefined
+      let usingTarget: GeneralComponentDefinition | string | undefined
+      let placeholderHandlerRemover: (() => void) | undefined
+      if (cwp.final) {
+        usingTarget = cwp.final
+      } else if (cwp.placeholder !== null) {
+        usingTarget = resolvePlaceholder(cwp.placeholder, space, cwp.source, hostGenericImpls)
+        const waiting = cwp.waiting
+        if (placeholderCallback && waiting) {
+          waiting.add(placeholderCallback)
+          waiting.hintUsed(host)
+          placeholderHandlerRemover = () => {
+            waiting.remove(placeholderCallback)
+          }
+        }
+      }
       if (typeof usingTarget === 'string') {
         return this.createNativeNodeWithInit(
           usingTarget,
           tagName,
-          placeholderHandler,
+          placeholderHandlerRemover,
           initPropValues,
         )
       }
@@ -192,38 +195,7 @@ export class ShadowRoot extends VirtualNode {
           this,
           null,
           convertGenerics(usingTarget, beh, host, genericTargets),
-          placeholderHandler,
-          initPropValues,
-        )
-      }
-    }
-
-    // if the target is in generics list, then use the one
-    const g = hostGenericImpls && hostGenericImpls[compName]
-    if (typeof g === 'string') {
-      return this.createNativeNodeWithInit(g, tagName, undefined, initPropValues)
-    }
-    if (g) {
-      let genImpl: GeneralComponentDefinition | string | undefined
-      if (g.final) {
-        genImpl = g.final
-      } else if (g.placeholder !== null) {
-        genImpl = resolvePlaceholder(g.placeholder, space, g.source, hostGenericImpls)
-      }
-      const placeholderHandler = placeholderCallback
-        ? wrapPlaceholderCallback(placeholderCallback, g, host)
-        : undefined
-      if (typeof genImpl === 'string') {
-        return this.createNativeNodeWithInit(genImpl, tagName, placeholderHandler, initPropValues)
-      }
-      if (genImpl) {
-        return Component._$advancedCreate(
-          tagName,
-          genImpl,
-          this,
-          null,
-          convertGenerics(genImpl, beh, host, genericTargets),
-          placeholderHandler,
+          placeholderHandlerRemover,
           initPropValues,
         )
       }
@@ -231,6 +203,9 @@ export class ShadowRoot extends VirtualNode {
 
     // find in the space otherwise
     let comp = space.getGlobalUsingComponent(compName)
+    if (comp === null && space._$allowUnusedNativeNode && compName !== '') {
+      comp = compName
+    }
     /* istanbul ignore if */
     if (!comp) {
       comp = space.getDefaultComponent()
@@ -288,7 +263,14 @@ export class ShadowRoot extends VirtualNode {
         initPropValues,
       )
     }
-    throw new Error(`unknown tag name: ${tagName}`)
+
+    if (space._$allowUnusedNativeNode) {
+      // use native node otherwise
+      const node = NativeNode.create(tagName, this)
+      initPropValues?.(node)
+      return node
+    }
+    throw new Error(`Unknown tag name ${tagName}`)
   }
 
   /**

@@ -61,11 +61,11 @@ export class NativeNode extends Element {
     owner: ShadowRoot,
     stylingName?: string,
     extendedDefinition?: ExtendedNativeNodeDefinition,
-    placeholderHandler?: () => void,
+    placeholderHandlerRemover?: () => void,
   ): NativeNode {
     const node = Object.create(NativeNode.prototype) as NativeNode
     node.is = tagName
-    node._$placeholderHandler = placeholderHandler
+    node._$placeholderHandlerRemover = placeholderHandlerRemover
     node._$attributeFilters = {}
     const nodeTreeContext = owner._$nodeTreeContext
     let backendElement: GeneralBackendElement | null
