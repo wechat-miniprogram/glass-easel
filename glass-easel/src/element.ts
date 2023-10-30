@@ -99,7 +99,7 @@ export class Element implements NodeCast {
   /** @internal */
   _$inheritSlots: boolean
   /** @internal */
-  _$placeholderHandler: (() => void) | undefined
+  _$placeholderHandlerRemover: (() => void) | undefined
   /** @internal */
   _$virtual: boolean
   dataset: { [name: string]: unknown }
@@ -152,7 +152,7 @@ export class Element implements NodeCast {
     this._$subtreeSlotStart = null
     this._$subtreeSlotEnd = null
     this._$inheritSlots = false
-    this._$placeholderHandler = undefined
+    this._$placeholderHandlerRemover = undefined
     this._$virtual = virtual
     this.dataset = {}
     this._$marks = null
@@ -439,7 +439,7 @@ export class Element implements NodeCast {
         }
         node.childNodes.forEach(callFunc)
         if (node instanceof Component) {
-          const f = node._$placeholderHandler
+          const f = node._$placeholderHandlerRemover
           if (f) f()
           const shadowRoot = node.getShadowRoot()
           if (shadowRoot) callFunc(shadowRoot)
