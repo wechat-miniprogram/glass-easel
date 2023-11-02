@@ -946,7 +946,7 @@ export class ProcGenWrapper {
         this.v(
           elem,
           camelName.slice('bind'.length),
-          dataValueToString(v),
+          typeof v === 'function' ? (v as any) : dataValueToString(v),
           false,
           false,
           false,
@@ -957,7 +957,7 @@ export class ProcGenWrapper {
         this.v(
           elem,
           camelName.slice('captureBind'.length),
-          dataValueToString(v),
+          typeof v === 'function' ? (v as any) : dataValueToString(v),
           false,
           false,
           true,
@@ -968,7 +968,7 @@ export class ProcGenWrapper {
         this.v(
           elem,
           camelName.slice('catch'.length),
-          dataValueToString(v),
+          typeof v === 'function' ? (v as any) : dataValueToString(v),
           true,
           false,
           false,
@@ -979,7 +979,7 @@ export class ProcGenWrapper {
         this.v(
           elem,
           camelName.slice('captureCatch'.length),
-          dataValueToString(v),
+          typeof v === 'function' ? (v as any) : dataValueToString(v),
           true,
           false,
           true,
@@ -990,7 +990,7 @@ export class ProcGenWrapper {
         this.v(
           elem,
           camelName.slice('on'.length),
-          dataValueToString(v),
+          typeof v === 'function' ? (v as any) : dataValueToString(v),
           false,
           false,
           false,
