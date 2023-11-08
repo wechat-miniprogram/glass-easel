@@ -1,13 +1,19 @@
-import * as backend from './backend/backend_protocol'
-import * as composedBackend from './backend/composed_backend_protocol'
-import * as domlikeBackend from './backend/domlike_backend_protocol'
-import { ShadowRoot } from './shadow_root'
-import { Element } from './element'
+import {
+  BM,
+  BackendMode,
+  type GeneralBackendElement,
+  type backend,
+  type composedBackend,
+  type domlikeBackend,
+} from './backend'
+import { type Element } from './element'
 import { MutationObserverTarget } from './mutation_observer'
-import { GeneralBackendElement, NodeCast } from './node'
-import { BM, BackendMode } from './backend/mode'
+import { type NodeCast } from './node'
+import { type ShadowRoot } from './shadow_root'
+import { TEXT_NODE_SYMBOL, isTextNode } from './type_symbol'
 
 export class TextNode implements NodeCast {
+  [TEXT_NODE_SYMBOL]!: true
   _$backendElement: GeneralBackendElement | null
   private _$text: string
   ownerShadowRoot: ShadowRoot
@@ -49,6 +55,8 @@ export class TextNode implements NodeCast {
     this.parentIndex = -1
     this.containingSlot = undefined
   }
+
+  static isTextNode = isTextNode
 
   static create(text: string, ownerShadowRoot: ShadowRoot): TextNode {
     return new TextNode(text, ownerShadowRoot)
@@ -139,3 +147,5 @@ export class TextNode implements NodeCast {
     })
   }
 }
+
+TextNode.prototype[TEXT_NODE_SYMBOL] = true

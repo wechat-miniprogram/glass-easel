@@ -1,17 +1,19 @@
 /* eslint-disable class-methods-use-this */
 /* global document */
 
-import { DataValue, Node, ShadowedEvent, GeneralBackendElement } from '..'
-import { DataPath } from '../data_path'
-import { RangeListManager } from './range_list_diff'
+import { type GeneralBackendElement } from '../backend'
+import { type DataPath } from '../data_path'
+import { type DataValue } from '../data_proxy'
+import { type ShadowedEvent } from '../event'
+import { type GlassEaselTemplateDOMInstance } from './native_rendering'
 import {
-  ProcGen,
-  BindingMapGen,
-  UpdatePathTreeRoot,
   dataValueToString,
-  ProcGenWrapper,
+  type BindingMapGen,
+  type ProcGen,
+  type ProcGenWrapper,
+  type UpdatePathTreeRoot,
 } from './proc_gen_wrapper'
-import type { GlassEaselTemplateDOMInstance } from './native_rendering'
+import { type RangeListManager } from './range_list_diff'
 
 type TmplArgs = {
   key?: number | string

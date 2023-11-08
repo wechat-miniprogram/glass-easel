@@ -471,7 +471,7 @@ describe('intersection observer', () => {
         .register()
     })
 
-    const backendContext = new glassEasel.composedBackend.EmptyComposedBackendContext()
+    const backendContext = new glassEasel.EmptyComposedBackendContext()
     const ab = env.associateBackend(backendContext)
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())

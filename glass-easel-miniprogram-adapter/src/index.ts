@@ -47,7 +47,7 @@ export class MiniProgramEnv {
    * The backend context SHOULD NOT be associated by other environments!
    */
   associateBackend(backendContent?: glassEasel.GeneralBackendContext): AssociatedBackend {
-    const ctx = backendContent ?? new glassEasel.domlikeBackend.CurrentWindowBackendContext()
+    const ctx = backendContent ?? new glassEasel.CurrentWindowBackendContext()
     return new AssociatedBackend(this, ctx)
   }
 

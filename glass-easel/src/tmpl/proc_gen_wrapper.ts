@@ -1,21 +1,17 @@
 /* eslint-disable class-methods-use-this */
 
-import { ProcGenGroupList } from '.'
-import {
-  DataValue,
-  Element,
-  ShadowRoot,
-  VirtualNode,
-  TextNode,
-  Component,
-  GeneralComponent,
-  Node,
-  ShadowedEvent,
-  StyleSegmentIndex,
-  NativeNode,
-} from '..'
-import { DataPath } from '../data_path'
-import { SlotMode } from '../shadow_root'
+import { Component, type GeneralComponent } from '../component'
+import { type DataPath } from '../data_path'
+import { type DataValue } from '../data_proxy'
+import { Element, StyleSegmentIndex } from '../element'
+import { type ShadowedEvent } from '../event'
+import { type NativeNode } from '../native_node'
+import { type Node } from '../node'
+import { SlotMode, type ShadowRoot } from '../shadow_root'
+import { type TextNode } from '../text_node'
+import { type ProcGenGroupList } from '../tmpl'
+import { isComponent, isNativeNode } from '../type_symbol'
+import { type VirtualNode } from '../virtual_node'
 import { RangeListManager } from './range_list_diff'
 
 export type UpdatePathTreeNode = true | { [key: string]: UpdatePathTreeNode } | UpdatePathTreeNode[]
@@ -189,7 +185,7 @@ export class ProcGenWrapper {
         // eslint-disable-next-line no-loop-func
         (elem: Element) => {
           if (prevElement !== null && elem !== prevElement) {
-            if (prevElement instanceof Component) {
+            if (isComponent(prevElement)) {
               if (prevElement.hasPendingChanges()) {
                 const nodeDataProxy = Component.getDataProxy(prevElement)
                 nodeDataProxy.applyDataUpdates(true)
@@ -205,7 +201,7 @@ export class ProcGenWrapper {
     }
     const elem = prevElement as Element | null
     if (elem !== null) {
-      if (elem instanceof Component) {
+      if (isComponent(elem)) {
         if (elem.hasPendingChanges()) {
           const nodeDataProxy = Component.getDataProxy(elem)
           nodeDataProxy.applyDataUpdates(true)
@@ -476,7 +472,7 @@ export class ProcGenWrapper {
         }
         propertyInit(elem, false)
         let dynSlot = false
-        if (elem instanceof Component) {
+        if (isComponent(elem)) {
           const sr = this.dynamicSlotUpdate(elem, dynamicSlotValueNames, children)
           if (sr) dynSlot = true
           if (elem.hasPendingChanges()) {
@@ -784,13 +780,12 @@ export class ProcGenWrapper {
   ): Element {
     let dynSlot = false
     const initPropValues = (elem: GeneralComponent | NativeNode) => {
-      const sr =
-        elem instanceof Component
-          ? this.dynamicSlotUpdate(elem, dynamicSlotValueNames, children)
-          : null
+      const sr = isComponent(elem)
+        ? this.dynamicSlotUpdate(elem, dynamicSlotValueNames, children)
+        : null
       if (sr) dynSlot = true
       propertyInit(elem, true)
-      if (elem instanceof Component) {
+      if (isComponent(elem)) {
         if (elem.hasPendingChanges()) {
           const nodeDataProxy = Component.getDataProxy(elem)
           nodeDataProxy.applyDataUpdates(true)
@@ -808,7 +803,7 @@ export class ProcGenWrapper {
       )
       replacer.destroyBackendElementOnDetach()
       const replacerShadowRoot = (replacer as GeneralComponent).getShadowRoot()
-      const elemShadowRoot = elem instanceof Component ? elem.getShadowRoot() : null
+      const elemShadowRoot = isComponent(elem) ? elem.getShadowRoot() : null
       const isElemDynamicSlots = elemShadowRoot?.getSlotMode() === SlotMode.Dynamic
       const isReplacerDynamicSlots = replacerShadowRoot?.getSlotMode() === SlotMode.Dynamic
       if (isReplacerDynamicSlots) {
@@ -861,11 +856,11 @@ export class ProcGenWrapper {
 
   // set class or external classes named `class`
   c(elem: Element, v: string) {
-    if (elem instanceof Component) {
+    if (isComponent(elem)) {
       // "class" itself can also be an external class
-      const hasExternalClass = (elem as GeneralComponent).hasExternalClass('class')
+      const hasExternalClass = elem.hasExternalClass('class')
       if (hasExternalClass) {
-        ;(elem as GeneralComponent).setExternalClass('class', dataValueToString(v))
+        elem.setExternalClass('class', dataValueToString(v))
       }
       elem.class = dataValueToString(v)
     } else {
@@ -1000,7 +995,7 @@ export class ProcGenWrapper {
       }
       return true
     }
-    if (elem instanceof Component) {
+    if (isComponent(elem)) {
       const nodeDataProxy = Component.getDataProxy(elem)
       const camelName = dashToCamelCase(name)
       if (nodeDataProxy.replaceProperty(camelName, v)) {
@@ -1028,7 +1023,7 @@ export class ProcGenWrapper {
         // compatibilities for legacy event binding syntax
         checkFallbackEventListener(camelName)
       }
-    } else if (elem instanceof NativeNode) {
+    } else if (isNativeNode(elem)) {
       if (this.fallbackListenerOnNativeNode) {
         // compatibilities for legacy event binding syntax
         const camelName = dashToCamelCase(name)
@@ -1051,7 +1046,7 @@ export class ProcGenWrapper {
 
   // set a worklet directive value
   wl(elem: Element, name: string, value: unknown) {
-    if (elem instanceof Component) {
+    if (isComponent(elem)) {
       elem.triggerWorkletChangeLifetime(name, value)
     } else {
       // TODO warn unused worklet
@@ -1060,7 +1055,7 @@ export class ProcGenWrapper {
 
   // add a change property binding
   p(elem: Element, name: string, v: ChangePropListener, _generalLvaluePath?: DataPath | null) {
-    if (elem instanceof Component) {
+    if (isComponent(elem)) {
       if (Component.hasProperty(elem, name)) {
         const tmplArgs = getTmplArgs(elem)
         if (!tmplArgs.changeProp) {

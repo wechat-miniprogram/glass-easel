@@ -1,107 +1,101 @@
 /* eslint-disable import/first */
 /* eslint-disable arrow-body-style */
 
-export { TextNode } from './text_node'
-export { NativeNode } from './native_node'
-export { ShadowRoot } from './shadow_root'
-export { VirtualNode } from './virtual_node'
 export {
-  globalOptions,
-  DeepCopyKind,
-  ComponentOptions,
-  EnvironmentOptions,
-  NormalizedComponentOptions,
-  getDefaultComponentSpace,
-} from './global_options'
-export { Element, StyleSegmentIndex } from './element'
-export * as dataUtils from './data_utils'
+  BackendMode,
+  GeneralBackendContext,
+  GeneralBackendElement,
+  backend,
+  composedBackend,
+  domlikeBackend,
+} from './backend'
+export { CurrentWindowBackendContext } from './backend/current_window_backend_context'
+export { EmptyBackendContext } from './backend/empty_backend'
+export { EmptyComposedBackendContext } from './backend/empty_composed_backend'
+export {
+  Behavior,
+  BehaviorBuilder,
+  BuilderContext,
+  GeneralBehavior,
+  GeneralBehaviorBuilder,
+} from './behavior'
+export { ClassList, StyleScopeId, StyleScopeManager } from './class_list'
+export {
+  Component,
+  ComponentDefinition,
+  GeneralComponent,
+  GeneralComponentDefinition,
+} from './component'
+export * as typeUtils from './component_params'
+export { ComponentSpace, getDefaultComponentSpace } from './component_space'
 export * as dataPath from './data_path'
 export {
-  DataGroup,
-  GeneralDataGroup,
-  DataValue,
-  DataObserver,
   DataChange,
-  PropertyChange,
+  DataGroup,
+  DataObserver,
   DataUpdateCallback,
+  DataValue,
+  GeneralDataGroup,
+  NormalizedPropertyType,
+  PropertyChange,
 } from './data_proxy'
+export * as dataUtils from './data_utils'
+export { Element, StyleSegmentIndex } from './element'
+export { ElementIterator, ElementIteratorType } from './element_iterator'
 export {
   Event,
-  ShadowedEvent,
   EventBubbleStatus,
-  EventOptions,
   EventListener,
   EventListenerOptions,
   MutLevel as EventMutLevel,
+  EventOptions,
+  ShadowedEvent,
 } from './event'
-export * as typeUtils from './component_params'
+export { ExternalShadowRoot } from './external_shadow_tree'
+export { FuncArr, GeneralFuncType, safeCallback } from './func_arr'
 export {
-  Behavior,
-  GeneralBehavior,
-  BehaviorBuilder,
-  GeneralBehaviorBuilder,
-  BuilderContext,
-  NormalizedPropertyType,
-} from './behavior'
+  ComponentOptions,
+  DeepCopyKind,
+  EnvironmentOptions,
+  NormalizedComponentOptions,
+  globalOptions,
+} from './global_options'
+export { MutationObserver, MutationObserver as Observer } from './mutation_observer'
+export { NativeNode } from './native_node'
+export { Node, NodeCast, dumpElement, dumpElementToString, dumpSingleElementToString } from './node'
+export { RelationFailedListener, RelationListener, RelationType } from './relation'
+export { triggerRender } from './render'
+export { ParsedSelector } from './selector'
+export { ShadowRoot } from './shadow_root'
+export * as templateEngine from './template_engine'
+export { TextNode } from './text_node'
+export * as template from './tmpl'
+export { TraitBehavior } from './trait_behaviors'
+export { VirtualNode } from './virtual_node'
 export {
-  Component,
-  ComponentDefinition,
-  GeneralComponent,
-  GeneralComponentDefinition,
-} from './component'
-export { MutationObserver as Observer, MutationObserver } from './mutation_observer'
-export * as mutationObserver from './mutation_observer'
-export {
-  Node,
-  dumpElement,
-  dumpElementToString,
-  dumpSingleElementToString,
-  GeneralBackendElement,
-  GeneralBackendContext,
-  NodeCast,
-} from './node'
-export { ElementIterator, ElementIteratorType } from './element_iterator'
-export {
-  FuncArr,
-  GeneralFuncType,
-  safeCallback,
   addGlobalErrorListener,
-  removeGlobalErrorListener,
   addGlobalWarningListener,
+  removeGlobalErrorListener,
   removeGlobalWarningListener,
 } from './func_arr'
-export { ParsedSelector } from './selector'
-export { StyleScopeManager, ClassList, StyleScopeId } from './class_list'
-export { RelationType, RelationListener, RelationFailedListener } from './relation'
-export { TraitBehavior } from './trait_behaviors'
-export { triggerRender } from './render'
-export { ComponentSpace } from './component_space'
-export { ExternalShadowRoot } from './external_shadow_tree'
-export * as template from './tmpl'
-export * as backend from './backend/backend_protocol'
-export * as composedBackend from './backend/composed_backend_protocol'
-export * as domlikeBackend from './backend/domlike_backend_protocol'
-export { BackendMode } from './backend/mode'
-export * as templateEngine from './template_engine'
-export * as glassEaselTemplate from './tmpl'
 
-import {
-  ComponentParams,
-  DataList,
-  PropertyList,
-  MethodList,
-  ComponentInstance,
-  Empty,
-} from './component_params'
-import { Behavior } from './behavior'
+import { type Behavior } from './behavior'
 import {
   Component,
-  ComponentDefinition,
-  GeneralComponent,
-  GeneralComponentDefinition,
+  type ComponentDefinition,
+  type GeneralComponent,
+  type GeneralComponentDefinition,
 } from './component'
+import {
+  type ComponentInstance,
+  type ComponentParams,
+  type DataList,
+  type Empty,
+  type MethodList,
+  type PropertyList,
+} from './component_params'
+import { getDefaultComponentSpace } from './component_space'
 import { Event } from './event'
-import { getDefaultComponentSpace } from './global_options'
 
 export const registerBehavior = <
   TData extends DataList = Empty,

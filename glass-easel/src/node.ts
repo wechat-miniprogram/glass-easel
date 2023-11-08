@@ -1,22 +1,15 @@
-import * as backend from './backend/backend_protocol'
-import * as composedBackend from './backend/composed_backend_protocol'
-import * as domlikeBackend from './backend/domlike_backend_protocol'
-import { TextNode } from './text_node'
-import { Element } from './element'
-import { VirtualNode } from './virtual_node'
-import { Component, ComponentDefinition } from './component'
-import { NativeNode } from './native_node'
-import { DataList, PropertyList, MethodList, ComponentInstance } from './component_params'
-
-export type GeneralBackendContext =
-  | backend.Context
-  | composedBackend.Context
-  | domlikeBackend.Context
-
-export type GeneralBackendElement =
-  | backend.Element
-  | composedBackend.Element
-  | domlikeBackend.Element
+import { type ComponentDefinition } from './component'
+import {
+  type ComponentInstance,
+  type DataList,
+  type MethodList,
+  type PropertyList,
+} from './component_params'
+import { type Element } from './element'
+import { type NativeNode } from './native_node'
+import { type TextNode } from './text_node'
+import { isComponent, isElement, isNativeNode, isTextNode, isVirtualNode } from './type_symbol'
+import { type VirtualNode } from './virtual_node'
 
 export type Node = TextNode | Element
 
@@ -61,7 +54,7 @@ export interface NodeCast {
 
 const dumpAttributesToString = (elem: Element): string => {
   let ret = ''
-  if (elem instanceof Element) {
+  if (isElement(elem)) {
     if (elem._$slotName !== null) ret += ` (slot) name="${elem._$slotName}"`
     if (elem.id) ret += ` id="${elem.id}"`
     if (elem.slot) ret += ` slot="${elem.slot}"`
@@ -70,10 +63,10 @@ const dumpAttributesToString = (elem: Element): string => {
     const style = elem.style
     if (style) ret += ` style="${elem.style}"`
   }
-  if (elem instanceof VirtualNode) {
+  if (isVirtualNode(elem)) {
     // empty
-  } else if (elem instanceof Component) {
-    Component.listProperties(elem).forEach((propName) => {
+  } else if (isComponent(elem)) {
+    Object.keys(elem._$behavior._$propertyMap).forEach((propName) => {
       ret += ` ${propName}="${String((elem.data as DataList)[propName])}"`
     })
   } else {
@@ -85,20 +78,20 @@ const dumpAttributesToString = (elem: Element): string => {
 }
 
 export const dumpSingleElementToString = (elem: any) => {
-  if (elem instanceof Element) {
+  if (isElement(elem)) {
     let tagName: string
-    if (elem instanceof VirtualNode) {
+    if (isVirtualNode(elem)) {
       tagName = `(virtual):${elem.is}`
-    } else if (elem instanceof Component) {
+    } else if (isComponent(elem)) {
       tagName = `${elem.tagName}:${elem.is}`
-    } else if (elem instanceof NativeNode) {
+    } else if (isNativeNode(elem)) {
       tagName = elem.is
     } else {
       tagName = '(unknown)'
     }
     return `<${tagName}${dumpAttributesToString(elem)}>`
   }
-  if (elem instanceof TextNode) {
+  if (isTextNode(elem)) {
     return elem.textContent.trim()
   }
   if (elem === null) {
@@ -119,8 +112,8 @@ export const dumpElementToString = (elem: any, composed: boolean, tabDepth = 0) 
   let ret = linePrefix + dumpSingleElementToString(elem)
   let isExternal = false
 
-  if (elem instanceof Element) {
-    if (elem instanceof Component) {
+  if (isElement(elem)) {
+    if (isComponent(elem)) {
       isExternal = elem._$external
     }
     if (composed) {

@@ -1,61 +1,72 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 
-import * as backend from './backend/backend_protocol'
-import * as composedBackend from './backend/composed_backend_protocol'
-import * as domlikeBackend from './backend/domlike_backend_protocol'
-import { FuncArr, GeneralFuncType, safeCallback, triggerWarning } from './func_arr'
+import {
+  BM,
+  BackendMode,
+  type GeneralBackendContext,
+  type GeneralBackendElement,
+  type backend,
+  type composedBackend,
+  type domlikeBackend,
+} from './backend'
+import { CurrentWindowBackendContext } from './backend/current_window_backend_context'
+import { EmptyBackendContext } from './backend/empty_backend'
+import { EmptyComposedBackendContext } from './backend/empty_composed_backend'
+import {
+  type Behavior,
+  type BuilderContext,
+  type ComponentDefinitionWithPlaceholder,
+  type GeneralBehavior,
+  type NativeNodeDefinition,
+} from './behavior'
+import { ClassList, StyleScopeManager } from './class_list'
+import {
+  METHOD_TAG,
+  type ComponentInstance,
+  type ComponentMethod,
+  type ComponentParams,
+  type DataList,
+  type DataWithPropertyValues,
+  type DeepReadonly,
+  type GetFromDataPath,
+  type MethodList,
+  type PropertyList,
+  type RelationParams,
+  type SetDataSetter,
+  type TaggedMethod,
+  type TraitRelationParams,
+} from './component_params'
+import { getDefaultComponentSpace, type ComponentSpace } from './component_space'
+import { parseMultiPaths, parseSinglePath, type DataPath } from './data_path'
+import {
+  DataGroup,
+  getDeepCopyStrategy,
+  type DataGroupObserverTree,
+  type DataValue,
+  type DeepCopyStrategy,
+} from './data_proxy'
+import { simpleDeepCopy } from './data_utils'
 import { Element } from './element'
+import { type EventListener, type EventListenerOptions } from './event'
+import { type ExternalShadowRoot } from './external_shadow_tree'
+import { FuncArr, safeCallback, triggerWarning, type GeneralFuncType } from './func_arr'
 import {
   globalOptions,
   normalizeComponentOptions,
-  NormalizedComponentOptions,
-  getDefaultComponentSpace,
-  getDefaultBackendContext,
+  type NormalizedComponentOptions,
 } from './global_options'
-import { ShadowRoot } from './shadow_root'
 import {
-  ComponentInstance,
-  ComponentParams,
-  DataList,
-  PropertyList,
-  MethodList,
-  DataWithPropertyValues,
-  RelationParams,
-  TraitRelationParams,
-  ComponentMethod,
-  TaggedMethod,
-  METHOD_TAG,
-  DeepReadonly,
-  GetFromDataPath,
-  SetDataSetter,
-} from './component_params'
-import {
-  Behavior,
-  GeneralBehavior,
-  ComponentDefinitionWithPlaceholder,
-  RelationHandler,
+  Relation,
+  generateRelationDefinitionGroup,
   normalizeRelation,
-  BuilderContext,
-  NativeNodeDefinition,
-} from './behavior'
-import { ComponentSpace } from './component_space'
-import { simpleDeepCopy } from './data_utils'
-import {
-  DataGroup,
-  DataGroupObserverTree,
-  DataValue,
-  DeepCopyStrategy,
-  getDeepCopyStrategy,
-} from './data_proxy'
-import { Relation, generateRelationDefinitionGroup, RelationDefinitionGroup } from './relation'
-import { Template, TemplateEngine, TemplateInstance } from './template_engine'
-import { ClassList, StyleScopeManager } from './class_list'
-import { GeneralBackendContext, GeneralBackendElement } from './node'
-import { DataPath, parseSinglePath, parseMultiPaths } from './data_path'
-import { ExternalShadowRoot } from './external_shadow_tree'
-import { BM, BackendMode } from './backend/mode'
-import { EventListener, EventListenerOptions } from './event'
+  type RelationDefinitionGroup,
+  type RelationHandler,
+} from './relation'
+import { type ShadowRoot } from './shadow_root'
+import { type Template, type TemplateEngine, type TemplateInstance } from './template_engine'
+import { getDefaultTemplateEngine } from './tmpl'
 import { TraitBehavior, TraitGroup } from './trait_behaviors'
+import { COMPONENT_SYMBOL, isComponent, isElement } from './type_symbol'
 
 export const convertGenerics = (
   compDef: GeneralComponentDefinition,
@@ -232,7 +243,7 @@ export class ComponentDefinition<
       behavior.ownerSpace.getComponentOptions(),
     )
     const templateEngine = this._$options.templateEngine
-    this._$templateEngine = templateEngine
+    this._$templateEngine = templateEngine ?? getDefaultTemplateEngine()
   }
 
   general(): GeneralComponentDefinition {
@@ -369,6 +380,22 @@ export class ComponentDefinition<
 
 let componentInstanceIdInc = 1
 
+let defaultBackendContext: GeneralBackendContext | null = null
+
+export const getDefaultBackendContext = (): GeneralBackendContext => {
+  if (defaultBackendContext) return defaultBackendContext
+  let c: GeneralBackendContext
+  if (BM.DOMLIKE) {
+    c = new CurrentWindowBackendContext()
+  } else if (BM.COMPOSED) {
+    c = new EmptyComposedBackendContext()
+  } else {
+    c = new EmptyBackendContext()
+  }
+  defaultBackendContext = c
+  return c
+}
+
 /**
  * A node that has a shadow tree attached to it
  */
@@ -377,6 +404,7 @@ export class Component<
   TProperty extends PropertyList,
   TMethod extends MethodList,
 > extends Element {
+  [COMPONENT_SYMBOL]: true
   /** @internal */
   _$behavior: Behavior<TData, TProperty, TMethod, any>
   /** @internal */
@@ -408,6 +436,7 @@ export class Component<
   /** @internal */
   private _$methodCaller: ComponentInstance<TData, TProperty, TMethod>
 
+  /* istanbul ignore next */
   constructor() {
     throw new Error('Element cannot be constructed directly')
     // eslint-disable-next-line no-unreachable
@@ -417,6 +446,8 @@ export class Component<
   general(): GeneralComponent {
     return this as unknown as GeneralComponent
   }
+
+  static isComponent = isComponent
 
   /**
    * Cast a general component node to the instance of the specified component
@@ -540,9 +571,8 @@ export class Component<
     comp._$initialize(virtualHost, backendElement, owner, nodeTreeContext)
 
     // init class list
-    const styleScope = owner
-      ? owner.getHostNode().getComponentOptions().styleScope
-      : StyleScopeManager.globalScope()
+    const styleScope =
+      owner?.getHostNode().getComponentOptions().styleScope ?? StyleScopeManager.globalScope()
     const extraStyleScope = owner
       ? owner.getHostNode().getComponentOptions().extraStyleScope ?? undefined
       : undefined
@@ -561,14 +591,16 @@ export class Component<
         if (!(BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike))) {
           ;(backendElement as backend.Element | composedBackend.Element).setStyleScope(
             styleScope,
-            options.styleScope,
+            options.styleScope ?? StyleScopeManager.globalScope(),
           )
         }
       }
       if (owner && writeExtraInfoToAttr) {
         const prefix = owner
           .getHostNode()
-          ._$behavior.ownerSpace?.styleScopeManager.queryName(styleScope)
+          ._$behavior.ownerSpace?.styleScopeManager.queryName(
+            styleScope ?? StyleScopeManager.globalScope(),
+          )
         if (prefix) {
           backendElement.setAttribute('exparser:info-class-prefix', `${prefix}--`)
         }
@@ -1130,7 +1162,7 @@ export class Component<
    */
   triggerPageLifetime(name: string, args: Parameters<GeneralFuncType>) {
     const rec = (node: Element) => {
-      if (node instanceof Component) {
+      if (isComponent(node)) {
         if (node._$pageLifetimeFuncs) {
           const f = node._$pageLifetimeFuncs[name]
           if (f) f.call(node._$methodCaller, args)
@@ -1140,7 +1172,7 @@ export class Component<
       const children = node.childNodes
       for (let i = 0; i < children.length; i += 1) {
         const child = children[i]
-        if (child instanceof Element) {
+        if (isElement(child)) {
           rec(child)
         }
       }
@@ -1367,6 +1399,8 @@ export class Component<
   }
 }
 
+Component.prototype[COMPONENT_SYMBOL] = true
+
 export type GeneralComponentDefinition = ComponentDefinition<
   Record<string, any>,
   Record<string, any>,
@@ -1378,6 +1412,8 @@ export type GeneralComponent = Component<
   Record<string, any>,
   Record<string, any>
 >
+
+export type AnyComponent = Component<any, any, any>
 
 type ComponentInstProto<
   TData extends DataList,

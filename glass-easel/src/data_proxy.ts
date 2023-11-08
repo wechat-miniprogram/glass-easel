@@ -1,20 +1,301 @@
-import { safeCallback, triggerWarning } from './func_arr'
-import { convertValueToType, PropertyDefinition } from './behavior'
+import { type GeneralComponent } from './component'
+import {
+  type ComponentInstance,
+  type DataList,
+  type DataWithPropertyValues,
+  type MethodList,
+  type PropertyList,
+} from './component_params'
+import { type DataPath, type MultiPaths } from './data_path'
 import { deepCopy, simpleDeepCopy } from './data_utils'
-import { DataPath, MultiPaths } from './data_path'
+import { safeCallback, triggerWarning } from './func_arr'
 import { DeepCopyKind } from './global_options'
 import { MutationObserverTarget } from './mutation_observer'
-import {
-  DataList,
-  PropertyList,
-  MethodList,
-  ComponentInstance,
-  DataWithPropertyValues,
-} from './component_params'
-import { GeneralComponent } from './component'
 
 // eslint-disable-next-line @typescript-eslint/unbound-method
 const hasOwnProperty = Object.prototype.hasOwnProperty
+
+export const enum NormalizedPropertyType {
+  Invalid = 'invalid',
+  Any = 'any',
+  String = 'string',
+  Number = 'number',
+  Boolean = 'boolean',
+  Object = 'object',
+  Array = 'array',
+  Function = 'function',
+}
+
+export type PropertyDefinition = {
+  type: NormalizedPropertyType
+  optionalTypes: NormalizedPropertyType[] | null
+  value: unknown
+  default: (() => unknown) | undefined
+  observer: ((newValue: unknown, oldValue: unknown) => void) | null
+  comparer: ((newValue: unknown, oldValue: unknown) => boolean) | null
+  reflectIdPrefix: boolean
+}
+
+export const shallowMerge = (dest: { [key: string]: unknown }, src: { [key: string]: unknown }) => {
+  const keys = Object.keys(src)
+  for (let i = 0; i < keys.length; i += 1) {
+    const key = keys[i]!
+    if (Object.prototype.hasOwnProperty.call(dest, key)) {
+      if (key[0] === '_') {
+        triggerWarning(`data field "${key}" from different behaviors is overriding or merging.`)
+      }
+      if (
+        typeof dest[key] === 'object' &&
+        typeof src[key] === 'object' &&
+        src[key] !== null &&
+        !Array.isArray(src[key])
+      ) {
+        if (Array.isArray(dest[key])) {
+          dest[key] = (dest[key] as DataValue[]).slice()
+        } else {
+          const oldDest = dest[key] as { [key: string]: DataValue }
+          const newDest = {} as { [key: string]: DataValue }
+          const subKeys = Object.keys(oldDest)
+          for (let i = 0; i < subKeys.length; i += 1) {
+            const subKey = subKeys[i]!
+            newDest[subKey] = oldDest[subKey]
+          }
+          dest[key] = newDest
+        }
+        shallowMerge(
+          dest[key] as { [key: string]: unknown },
+          src[key] as { [key: string]: unknown },
+        )
+      } else {
+        dest[key] = src[key]
+      }
+    } else {
+      dest[key] = src[key]
+    }
+  }
+}
+
+export const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefinition | null => {
+  if (propDef === NormalizedPropertyType.String || propDef === String) {
+    return {
+      type: NormalizedPropertyType.String,
+      optionalTypes: null,
+      value: '',
+      default: undefined,
+      observer: null,
+      comparer: null,
+      reflectIdPrefix: false,
+    }
+  }
+  if (propDef === NormalizedPropertyType.Number || propDef === Number) {
+    return {
+      type: NormalizedPropertyType.Number,
+      optionalTypes: null,
+      value: 0,
+      default: undefined,
+      observer: null,
+      comparer: null,
+      reflectIdPrefix: false,
+    }
+  }
+  if (propDef === NormalizedPropertyType.Boolean || propDef === Boolean) {
+    return {
+      type: NormalizedPropertyType.Boolean,
+      optionalTypes: null,
+      value: false,
+      default: undefined,
+      observer: null,
+      comparer: null,
+      reflectIdPrefix: false,
+    }
+  }
+  if (propDef === NormalizedPropertyType.Object || propDef === Object) {
+    return {
+      type: NormalizedPropertyType.Object,
+      optionalTypes: null,
+      value: null,
+      default: undefined,
+      observer: null,
+      comparer: null,
+      reflectIdPrefix: false,
+    }
+  }
+  if (propDef === NormalizedPropertyType.Array || propDef === Array) {
+    return {
+      type: NormalizedPropertyType.Array,
+      optionalTypes: null,
+      value: [],
+      default: undefined,
+      observer: null,
+      comparer: null,
+      reflectIdPrefix: false,
+    }
+  }
+  if (propDef === NormalizedPropertyType.Function || propDef === Function) {
+    return {
+      type: NormalizedPropertyType.Function,
+      optionalTypes: null,
+      value() {
+        /* empty */
+      },
+      default: undefined,
+      observer: null,
+      comparer: null,
+      reflectIdPrefix: false,
+    }
+  }
+  if (propDef === NormalizedPropertyType.Any || propDef === null || propDef === undefined) {
+    return {
+      type: NormalizedPropertyType.Any,
+      optionalTypes: null,
+      value: null,
+      default: undefined,
+      observer: null,
+      comparer: null,
+      reflectIdPrefix: false,
+    }
+  }
+  return null
+}
+
+export const normalizePropertyType = (t: unknown): NormalizedPropertyType => {
+  if (t === NormalizedPropertyType.String || t === String) {
+    return NormalizedPropertyType.String
+  }
+  if (t === NormalizedPropertyType.Number || t === Number) {
+    return NormalizedPropertyType.Number
+  }
+  if (t === NormalizedPropertyType.Boolean || t === Boolean) {
+    return NormalizedPropertyType.Boolean
+  }
+  if (t === NormalizedPropertyType.Object || t === Object) {
+    return NormalizedPropertyType.Object
+  }
+  if (t === NormalizedPropertyType.Array || t === Array) {
+    return NormalizedPropertyType.Array
+  }
+  if (t === NormalizedPropertyType.Function || t === Function) {
+    return NormalizedPropertyType.Function
+  }
+  if (t === NormalizedPropertyType.Any || t === null || t === undefined) {
+    return NormalizedPropertyType.Any
+  }
+  return NormalizedPropertyType.Invalid
+}
+
+export const convertValueToType = (
+  value: unknown,
+  propName: string,
+  prop: PropertyDefinition,
+  component: GeneralComponent | null,
+): unknown => {
+  const type = prop.type
+  const defaultFn =
+    prop.default === undefined
+      ? undefined
+      : () =>
+          safeCallback(
+            `Property "${propName}" Default`,
+            prop.default!,
+            null,
+            [],
+            component || undefined,
+          )
+  // try match optional types
+  const optionalTypes = prop.optionalTypes
+  if (optionalTypes) {
+    for (let i = 0; i < optionalTypes.length; i += 1) {
+      if (matchTypeWithValue(optionalTypes[i]!, value)) {
+        return value
+      }
+    }
+  }
+  // for string
+  if (type === NormalizedPropertyType.String) {
+    if (value === null || value === undefined) {
+      triggerWarning(
+        `property "${propName}" received type-incompatible value: expected <String> but get null value. Used default value instead.`,
+      )
+      return defaultFn === undefined ? '' : defaultFn()
+    }
+    if (typeof value === 'object') {
+      triggerWarning(
+        `property "${propName}" received type-incompatible value: expected <String> but got object-typed value. Force converted.`,
+      )
+    }
+    return String(value)
+  }
+  // for number
+  if (type === NormalizedPropertyType.Number) {
+    // eslint-disable-next-line no-restricted-globals
+    if (isFinite(value as number)) return Number(value)
+    if (typeof value === 'number') {
+      triggerWarning(
+        `property "${propName}" received type-incompatible value: expected <Number> but got NaN or Infinity. Used default value instead.`,
+      )
+    } else {
+      triggerWarning(
+        `property "${propName}" received type-incompatible value: expected <Number> but got non-number value. Used default value instead.`,
+      )
+    }
+    return defaultFn === undefined ? 0 : defaultFn()
+  }
+  // for boolean
+  if (type === NormalizedPropertyType.Boolean) {
+    return !!value
+  }
+  // for array
+  if (type === NormalizedPropertyType.Array) {
+    if (Array.isArray(value)) return value as unknown
+    triggerWarning(
+      `property "${propName}" received type-incompatible value: expected <Array> but got non-array value. Used default value instead.`,
+    )
+    return defaultFn === undefined ? [] : defaultFn()
+  }
+  // for object
+  if (type === NormalizedPropertyType.Object) {
+    if (typeof value === 'object') return value
+    triggerWarning(
+      `property "${propName}" received type-incompatible value: expected <Object> but got non-object value. Used default value instead.`,
+    )
+    return defaultFn === undefined ? null : defaultFn()
+  }
+  // for function
+  if (type === NormalizedPropertyType.Function) {
+    if (typeof value === 'function') return value
+    triggerWarning(
+      `property "${propName}" received type-incompatible value: expected <Function> but got non-function value. Used default value instead.`,
+    )
+    // eslint-disable-next-line func-names
+    return defaultFn === undefined
+      ? function () {
+          /* empty */
+        }
+      : defaultFn()
+  }
+  // for any-typed, just return the value and avoid undefined
+  if (value === undefined) return defaultFn === undefined ? null : defaultFn()
+  return value
+}
+
+export const matchTypeWithValue = (type: NormalizedPropertyType, value: any) => {
+  if (type === NormalizedPropertyType.String) {
+    if (typeof value !== 'string') return false
+  } else if (type === NormalizedPropertyType.Number) {
+    if (!Number.isFinite(value)) return false
+  } else if (type === NormalizedPropertyType.Boolean) {
+    if (typeof value !== 'boolean') return false
+  } else if (type === NormalizedPropertyType.Object) {
+    if (typeof value !== 'object' || Array.isArray(value)) return false
+  } else if (type === NormalizedPropertyType.Array) {
+    if (typeof value !== 'object' || !Array.isArray(value)) return false
+  } else if (type === NormalizedPropertyType.Function) {
+    if (typeof value !== 'function') return false
+  } else if (value === undefined) {
+    return false
+  }
+  return true
+}
 
 export const enum DeepCopyStrategy {
   None,

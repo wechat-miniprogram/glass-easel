@@ -1,23 +1,31 @@
-import * as backend from './backend/backend_protocol'
-import * as composedBackend from './backend/composed_backend_protocol'
-import * as domlikeBackend from './backend/domlike_backend_protocol'
-import { globalOptions } from './global_options'
+import {
+  BM,
+  BackendMode,
+  type GeneralBackendElement,
+  type backend,
+  type composedBackend,
+  type domlikeBackend,
+} from './backend'
 import { ClassList, StyleScopeManager } from './class_list'
+import { type DataValue, type ModelBindingListener } from './data_proxy'
 import { Element } from './element'
-import { ShadowRoot } from './shadow_root'
-import { GeneralBackendElement } from '.'
-import { BM, BackendMode } from './backend/mode'
-import { DataValue, ModelBindingListener } from './data_proxy'
+import { globalOptions } from './global_options'
+import { type ShadowRoot } from './shadow_root'
+import { NATIVE_NODE_SYMBOL, isNativeNode } from './type_symbol'
 
 export class NativeNode extends Element {
+  [NATIVE_NODE_SYMBOL]: true
   is: string
   private _$modelBindingListeners?: { [name: string]: ModelBindingListener }
 
+  /* istanbul ignore next */
   constructor() {
     throw new Error('Element cannot be constructed directly')
     // eslint-disable-next-line no-unreachable
     super()
   }
+
+  static isNativeNode = isNativeNode
 
   static create(
     tagName: string,
@@ -41,7 +49,7 @@ export class NativeNode extends Element {
     }
     node._$initialize(false, backendElement, owner, nodeTreeContext)
     const ownerOptions = owner.getHostNode().getComponentOptions()
-    const styleScope = owner ? ownerOptions.styleScope : StyleScopeManager.globalScope()
+    const styleScope = ownerOptions.styleScope ?? StyleScopeManager.globalScope()
     const extraStyleScope = owner ? ownerOptions.extraStyleScope ?? undefined : undefined
     node.classList = new ClassList(
       node,
@@ -51,7 +59,8 @@ export class NativeNode extends Element {
       extraStyleScope,
     )
     if (owner && backendElement) {
-      const styleScope = owner.getHostNode()._$definition._$options.styleScope
+      const styleScope =
+        owner.getHostNode()._$definition._$options.styleScope ?? StyleScopeManager.globalScope()
       if (styleScope) {
         if (!(BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike))) {
           ;(backendElement as backend.Element | composedBackend.Element).setStyleScope(styleScope)
@@ -109,3 +118,5 @@ export class NativeNode extends Element {
     this._$modelBindingListeners[propName] = listener
   }
 }
+
+NativeNode.prototype[NATIVE_NODE_SYMBOL] = true

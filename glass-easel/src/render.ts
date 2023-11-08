@@ -1,6 +1,6 @@
+import { type GeneralBackendContext } from './backend'
+import { type Element } from './element'
 import { safeCallback } from './func_arr'
-import { Element } from './element'
-import { GeneralBackendContext } from './node'
 
 const triggerRenderOnContext = (
   context: GeneralBackendContext,

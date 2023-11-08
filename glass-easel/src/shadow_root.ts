@@ -1,20 +1,20 @@
-import * as backend from './backend/backend_protocol'
-import { VirtualNode } from './virtual_node'
+import { BM, BackendMode, type backend } from './backend'
+import { type ComponentDefinitionWithPlaceholder } from './behavior'
 import {
   Component,
-  GeneralComponentDefinition,
-  GeneralComponent,
   convertGenerics,
   resolvePlaceholder,
+  type GeneralComponent,
+  type GeneralComponentDefinition,
 } from './component'
-import { TextNode } from './text_node'
-import { NativeNode } from './native_node'
-import { DoubleLinkedList, Element } from './element'
-import { Node } from './node'
-import { ComponentDefinitionWithPlaceholder } from './behavior'
-import { BM, BackendMode } from './backend/mode'
 import { DeepCopyStrategy, getDeepCopyStrategy } from './data_proxy'
 import { deepCopy, simpleDeepCopy } from './data_utils'
+import { Element, type DoubleLinkedList } from './element'
+import { NativeNode } from './native_node'
+import { type Node } from './node'
+import { TextNode } from './text_node'
+import { SHADOW_ROOT_SYMBOL, isElement, isShadowRoot } from './type_symbol'
+import { VirtualNode } from './virtual_node'
 
 export const enum SlotMode {
   Direct = 0,
@@ -28,6 +28,7 @@ type AppliedSlotMeta = {
 }
 
 export class ShadowRoot extends VirtualNode {
+  [SHADOW_ROOT_SYMBOL]: true
   private _$host: GeneralComponent
   /** @internal */
   _$backendShadowRoot: backend.ShadowRootContext | null
@@ -54,12 +55,14 @@ export class ShadowRoot extends VirtualNode {
     updatePathTree: { [name: string]: true },
   ) => void
 
+  /* istanbul ignore next */
   constructor() {
     throw new Error('Element cannot be constructed directly')
     // eslint-disable-next-line no-unreachable
-    /* istanbul ignore next */
     super()
   }
+
+  static isShadowRoot = isShadowRoot
 
   static createShadowRoot(host: GeneralComponent): ShadowRoot {
     const node = Object.create(ShadowRoot.prototype) as ShadowRoot
@@ -345,7 +348,7 @@ export class ShadowRoot extends VirtualNode {
     }
     if (slotMode === SlotMode.Multiple) {
       let name: string
-      if (elem instanceof Element) {
+      if (isElement(elem)) {
         name = elem._$nodeSlot
       } else {
         name = ''
@@ -806,154 +809,6 @@ export class ShadowRoot extends VirtualNode {
   getSlotMode(): SlotMode {
     return this._$slotMode
   }
-
-  /** @internal */
-  static _$updateSubtreeSlotNodes(
-    parentNode: Element,
-    elements: Node[],
-    shadowRoot: ShadowRoot | null,
-    oldShadowRoot: ShadowRoot | null,
-    posIndex: number,
-  ):
-    | { updateContainingSlot: () => void; removeSlotNodes: () => void; insertSlotNodes: () => void }
-    | undefined {
-    if (!shadowRoot && !oldShadowRoot) return undefined
-
-    const slotMode = shadowRoot?.getSlotMode()
-    const oldSlotMode = oldShadowRoot?.getSlotMode()
-
-    if (
-      (slotMode === undefined || slotMode === SlotMode.Direct) &&
-      (oldSlotMode === undefined || oldSlotMode === SlotMode.Direct)
-    ) {
-      return undefined
-    }
-
-    if (
-      (slotMode === undefined || slotMode === SlotMode.Single) &&
-      (oldSlotMode === undefined || oldSlotMode === SlotMode.Single)
-    ) {
-      let removeStart = -1
-      let removeCount = 0
-      let insertPos = -1
-      const slotNodesToUpdate: Node[] = []
-      const oldContainingSlot = elements[0]!.containingSlot
-      const containingSlot = shadowRoot?.getContainingSlot(elements[0]!)
-
-      for (let i = 0; i < elements.length; i += 1) {
-        const elem = elements[i]!
-        // eslint-disable-next-line no-loop-func
-        Element.forEachNodeInSlot(elem, (node) => {
-          if (oldContainingSlot) {
-            if (removeCount) {
-              removeCount += 1
-            } else {
-              removeStart = node.slotIndex!
-              removeCount = 1
-            }
-          }
-
-          slotNodesToUpdate.push(node)
-        })
-      }
-
-      if (containingSlot && slotNodesToUpdate.length) {
-        const firstSlotNode = slotNodesToUpdate[0]!
-        insertPos = Element._$findSlotNodeInsertPosition(containingSlot, firstSlotNode, posIndex)
-      }
-
-      return {
-        updateContainingSlot: () => {
-          for (let i = slotNodesToUpdate.length - 1; i >= 0; i -= 1) {
-            const node = slotNodesToUpdate[i]!
-            Element._$updateContainingSlot(node, containingSlot)
-          }
-        },
-        removeSlotNodes: () => {
-          if (oldShadowRoot && oldContainingSlot && removeCount) {
-            Element._$spliceSlotNodes(oldContainingSlot, removeStart, removeCount, undefined)
-          }
-        },
-        insertSlotNodes: () => {
-          if (shadowRoot && containingSlot && slotNodesToUpdate.length) {
-            Element._$spliceSlotNodes(containingSlot, insertPos, 0, slotNodesToUpdate)
-          }
-        },
-      }
-    }
-    const slotNodesToInsertMap = new Map<Element, { nodes: Node[]; insertPos: number }>()
-    const slotNodesToRemoveMap = new Map<Element, { start: number; count: number }>()
-
-    const slotNodesWithContainingSlot: [Node, Element | undefined | null][] = []
-
-    for (let i = 0; i < elements.length; i += 1) {
-      const elem = elements[i]!
-      Element.forEachNodeInSlot(elem, (node, oldContainingSlot) => {
-        const containingSlot =
-          slotMode !== SlotMode.Direct ? shadowRoot?.getContainingSlot(node) : undefined
-
-        if (oldContainingSlot) {
-          const slotNodesToRemove = slotNodesToRemoveMap.get(oldContainingSlot)
-          if (slotNodesToRemove) {
-            slotNodesToRemove.count += 1
-          } else {
-            slotNodesToRemoveMap.set(oldContainingSlot, { start: node.slotIndex!, count: 1 })
-          }
-        }
-
-        if (containingSlot) {
-          const slotNodesToInsert = slotNodesToInsertMap.get(containingSlot)
-          if (slotNodesToInsert) {
-            slotNodesToInsert.nodes.push(node)
-          } else {
-            slotNodesToInsertMap.set(containingSlot, { nodes: [node], insertPos: -1 })
-          }
-        }
-
-        slotNodesWithContainingSlot.push([node, containingSlot])
-      })
-    }
-
-    if (shadowRoot && slotNodesToInsertMap.size) {
-      const iter = slotNodesToInsertMap.entries()
-
-      for (let it = iter.next(); !it.done; it = iter.next()) {
-        const [slot, { nodes: slotNodesToInsert }] = it.value
-        const firstSlotNodeToInsert = slotNodesToInsert[0]!
-        it.value[1].insertPos = Element._$findSlotNodeInsertPosition(
-          slot,
-          firstSlotNodeToInsert,
-          posIndex,
-        )
-      }
-    }
-
-    return {
-      updateContainingSlot: () => {
-        for (let i = slotNodesWithContainingSlot.length - 1; i >= 0; i -= 1) {
-          const [node, containingSlot] = slotNodesWithContainingSlot[i]!
-          Element._$updateContainingSlot(node, containingSlot)
-        }
-      },
-      removeSlotNodes: () => {
-        if (oldShadowRoot && slotNodesToRemoveMap.size) {
-          const iter = slotNodesToRemoveMap.entries()
-          for (let it = iter.next(); !it.done; it = iter.next()) {
-            const [slot, { start, count }] = it.value
-            Element._$spliceSlotNodes(slot, start, count, undefined)
-          }
-        }
-      },
-      insertSlotNodes: () => {
-        if (shadowRoot && slotNodesToInsertMap.size) {
-          const iter = slotNodesToInsertMap.entries()
-
-          for (let it = iter.next(); !it.done; it = iter.next()) {
-            const [slot, { nodes: slotNodesToInsert, insertPos }] = it.value
-            Element._$spliceSlotNodes(slot, insertPos, 0, slotNodesToInsert)
-          }
-        }
-      },
-    }
-  }
 }
+
+ShadowRoot.prototype[SHADOW_ROOT_SYMBOL] = true

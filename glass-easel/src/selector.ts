@@ -1,4 +1,6 @@
-import { Element, Component, VirtualNode, ShadowRoot, ComponentSpace } from '.'
+import { type ComponentSpace } from './component_space'
+import { type Element } from './element'
+import { isComponent, isElement, isShadowRoot, isVirtualNode } from './type_symbol'
 
 const enum SegmentRelation {
   Child,
@@ -106,10 +108,10 @@ export class ParsedSelector {
     do {
       if (!nextNode.parentNode) {
         if (nextRelation === SegmentRelation.CrossShadowDescendant) {
-          nextNode = nextNode instanceof ShadowRoot ? nextNode.getHostNode() : null
+          nextNode = isShadowRoot(nextNode) ? nextNode.getHostNode() : null
         } else if (relation === SegmentRelation.CrossShadowDescendant) {
           match = false
-          nextNode = nextNode instanceof ShadowRoot ? nextNode.getHostNode() : null
+          nextNode = isShadowRoot(nextNode) ? nextNode.getHostNode() : null
         } else {
           nextNode = null
         }
@@ -117,7 +119,7 @@ export class ParsedSelector {
         nextNode = nextNode.parentNode
       }
       if (nextNode === root) nextNode = null
-    } while (nextNode instanceof VirtualNode)
+    } while (isVirtualNode(nextNode))
     if (!nextNode) return false
     if (match) {
       // if matches, try match ancestors
@@ -149,7 +151,7 @@ export class ParsedSelector {
    * otherwise it match in the whole tree.
    */
   testSelector(root: Element | null, node: Element): boolean {
-    if (node instanceof VirtualNode) return false
+    if (isVirtualNode(node)) return false
     const union = this.unions
     let ownerSpace: ComponentSpace | undefined
     if (root !== null) {
@@ -181,7 +183,7 @@ export class ParsedSelector {
         if (findOne) return node
         ret.push(node)
       }
-      if (node instanceof Component) {
+      if (isComponent(node)) {
         const shadowRoot = node.getShadowRoot()
         if (shadowRoot) {
           const r = rec(root, shadowRoot, findOne)
@@ -193,7 +195,7 @@ export class ParsedSelector {
       const children = node.childNodes
       for (let i = 0; i < children.length; i += 1) {
         const child = children[i]
-        if (child instanceof Element) {
+        if (isElement(child)) {
           const r = rec(root, child, findOne)
           if (r && findOne) {
             return r

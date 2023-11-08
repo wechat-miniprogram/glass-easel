@@ -1,13 +1,8 @@
-import * as backend from './backend/backend_protocol'
-import * as composedBackend from './backend/composed_backend_protocol'
-import * as domlikeBackend from './backend/domlike_backend_protocol'
-import { StyleScopeId, StyleScopeManager } from './class_list'
-import { Context as BackendContext } from './backend/backend_protocol'
-import { TemplateEngine } from './template_engine'
-import { ComponentSpace } from './component_space'
-import { GlassEaselTemplateEngine } from './tmpl'
-import { GeneralComponent, GeneralBackendContext } from '.'
-import { BM } from './backend/mode'
+import { type GeneralBackendContext } from './backend'
+import { type StyleScopeId } from './class_list'
+import { type GeneralComponent } from './component'
+import { type ComponentSpace } from './component_space'
+import { type TemplateEngine } from './template_engine'
 
 /**
  * The deep copy strategy
@@ -38,33 +33,6 @@ export enum DeepCopyKind {
    * Everything in prototypes is ignored.
    */
   SimpleWithRecursion = 'simple-recursion',
-}
-
-let defaultComponentSpace: ComponentSpace | null = null
-
-export const getDefaultComponentSpace = (): ComponentSpace => {
-  if (defaultComponentSpace) {
-    return defaultComponentSpace
-  }
-  const cs = new ComponentSpace()
-  defaultComponentSpace = cs
-  return cs
-}
-
-let defaultBackendContext: GeneralBackendContext | null = null
-
-export const getDefaultBackendContext = (): GeneralBackendContext => {
-  if (defaultBackendContext) return defaultBackendContext
-  let c: GeneralBackendContext
-  if (BM.DOMLIKE) {
-    c = new domlikeBackend.CurrentWindowBackendContext()
-  } else if (BM.COMPOSED) {
-    c = new composedBackend.EmptyComposedBackendContext()
-  } else {
-    c = new backend.EmptyBackendContext()
-  }
-  defaultBackendContext = c
-  return c
 }
 
 /**
@@ -114,8 +82,8 @@ export type ComponentOptions = {
 export type NormalizedComponentOptions = {
   externalComponent: boolean
   hostNodeTagName: string
-  templateEngine: TemplateEngine
-  styleScope: StyleScopeId
+  templateEngine: TemplateEngine | null
+  styleScope: StyleScopeId | null
   extraStyleScope: StyleScopeId | null
   multipleSlots: boolean
   dynamicSlots: boolean
@@ -144,7 +112,7 @@ export type EnvironmentOptions = {
   /** Write some extra attributes to DOM backend (for testing) */
   writeExtraInfoToAttr: boolean
   /** The default backend context */
-  backendContext: BackendContext | null
+  backendContext: GeneralBackendContext | null
 }
 
 /**
@@ -153,8 +121,8 @@ export type EnvironmentOptions = {
 export const globalOptions: NormalizedComponentOptions & EnvironmentOptions = {
   defaultComponentSpace: null,
   externalComponent: false,
-  templateEngine: new GlassEaselTemplateEngine(),
-  styleScope: StyleScopeManager.globalScope(),
+  templateEngine: null,
+  styleScope: null,
   extraStyleScope: null,
   hostNodeTagName: 'wx-x',
   multipleSlots: false,

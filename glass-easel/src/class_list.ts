@@ -1,9 +1,15 @@
-import * as backend from './backend/backend_protocol'
-import * as composedBackend from './backend/composed_backend_protocol'
-import * as domlikeBackend from './backend/domlike_backend_protocol'
-import { BM, BackendMode } from './backend/mode'
-import { Element, GeneralComponent, GeneralBackendElement, StyleSegmentIndex } from '.'
+import {
+  BM,
+  BackendMode,
+  type GeneralBackendElement,
+  type backend,
+  type composedBackend,
+  type domlikeBackend,
+} from './backend'
+import { type GeneralComponent } from './component'
+import { type Element, StyleSegmentIndex } from './element'
 import { MutationObserverTarget } from './mutation_observer'
+import { isElement } from './type_symbol'
 
 const CLASS_NAME_REG_EXP = /\s+/
 
@@ -195,7 +201,7 @@ export class ClassList {
       }
       const children = elem.childNodes
       children.forEach((child) => {
-        if (child instanceof Element) callClassListUpdate(child)
+        if (isElement(child)) callClassListUpdate(child)
       })
     }
     const comp = this._$elem as GeneralComponent

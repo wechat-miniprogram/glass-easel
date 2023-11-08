@@ -1,5 +1,6 @@
-import { Component, GeneralComponent } from '.'
+import { type GeneralComponent } from './component'
 import { globalOptions } from './global_options'
+import { isComponent } from './type_symbol'
 
 export type GeneralFuncType = (this: any, ...args: any[]) => any
 
@@ -89,8 +90,8 @@ export class FuncArr<F extends GeneralFuncType> {
       return method.apply(caller, args)
     } catch (e) {
       let msg = `[Error] [Component] ${type || 'Error Listener'} Error @ `
-      if ((caller as any) instanceof Component) msg += (caller as GeneralComponent).is
-      else if (relatedComponent instanceof Component) msg += relatedComponent.is
+      if (isComponent(caller)) msg += caller.is
+      else if (isComponent(relatedComponent)) msg += relatedComponent.is
       msg += `#${method.name || '(anonymous)'}`
       if (relatedComponent) {
         relatedComponent.triggerLifetime('error', [e])

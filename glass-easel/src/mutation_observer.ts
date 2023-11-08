@@ -1,5 +1,8 @@
-import { Element, Node, TextNode } from '.'
+import { type Element } from './element'
 import { FuncArr } from './func_arr'
+import { type Node } from './node'
+import { type TextNode } from './text_node'
+import { isElement } from './type_symbol'
 
 /**
  * What the observer will listen
@@ -81,7 +84,7 @@ export class MutationObserverTarget {
     this._$subtreeObserversCount += diff
     const children = this._$boundElement.childNodes
     children.forEach((child) => {
-      if (child instanceof Element) {
+      if (isElement(child)) {
         if (!child._$mutationObserverTarget) {
           child._$mutationObserverTarget = new MutationObserverTarget(child)
         }

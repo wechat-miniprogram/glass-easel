@@ -78,7 +78,10 @@ export class Root {
       const { styleScope } = comp.getComponentOptions()
       const path = codeSpace.getStyleSheet(comp.is)
       if (path !== undefined) {
-        backendContext.appendStyleSheetPath(path, styleScope)
+        backendContext.appendStyleSheetPath(
+          path,
+          styleScope ?? glassEasel.StyleScopeManager.globalScope(),
+        )
       }
     }
     this._$comp.getRootBehavior().getComponentDependencies().forEach(addStyleSheet)

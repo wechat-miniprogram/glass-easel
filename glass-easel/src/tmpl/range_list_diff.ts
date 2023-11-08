@@ -1,7 +1,8 @@
-import { Element, VirtualNode } from '..'
-import { DataValue } from '../data_proxy'
-import { UpdatePathTreeNode, UpdatePathTreeRoot } from './proc_gen_wrapper'
+import { type DataValue } from '../data_proxy'
+import { type Element } from '../element'
 import { triggerWarning } from '../func_arr'
+import { type VirtualNode } from '../virtual_node'
+import { type UpdatePathTreeNode, type UpdatePathTreeRoot } from './proc_gen_wrapper'
 
 export class RangeListManager {
   keyName: string | null

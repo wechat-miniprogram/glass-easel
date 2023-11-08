@@ -1,12 +1,9 @@
+import { type GeneralBackendElement } from './backend'
+import { type GeneralComponent } from './component'
+import { type Element } from './element'
+import { type ExternalShadowRoot } from './external_shadow_tree'
 import { FuncArrWithMeta } from './func_arr'
-import {
-  Element,
-  Component,
-  GeneralComponent,
-  ShadowRoot,
-  GeneralBackendElement,
-  ExternalShadowRoot,
-} from '.'
+import { isComponent, isShadowRoot } from './type_symbol'
 
 /**
  * Options for an event
@@ -270,18 +267,17 @@ export class Event<TDetail> {
     if (!efa) return
     const skipMut = this.mutatedMarked()
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const targetCaller = target instanceof Component ? target.getMethodCaller() || target : target
+    const targetCaller = isComponent(target) ? target.getMethodCaller() || target : target
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const currentTargetCaller =
-      currentTarget instanceof Component
-        ? currentTarget.getMethodCaller() || currentTarget
-        : currentTarget
+    const currentTargetCaller = isComponent(currentTarget)
+      ? currentTarget.getMethodCaller() || currentTarget
+      : currentTarget
     const ev = this.wrapShadowedEvent(targetCaller, mark, currentTargetCaller)
     const ret = efa.funcArr.call(
       currentTargetCaller,
       [ev],
       (mulLevel) => !skipMut || mulLevel !== MutLevel.Mut,
-      target instanceof Component ? (target as GeneralComponent) : undefined,
+      isComponent(target) ? target : undefined,
     )
     if (ret === false || efa.finalCount > 0) {
       ev.stopPropagation()
@@ -312,7 +308,7 @@ export class Event<TDetail> {
           if (f(currentTarget, target, mark) === false) return null
           let next
           if (crossShadow) {
-            if (currentTarget instanceof ShadowRoot) return currentTarget.getHostNode()
+            if (isShadowRoot(currentTarget)) return currentTarget.getHostNode()
             if (currentTarget.containingSlot === null) return null
             if (currentTarget.containingSlot) {
               next = recShadow(currentTarget.containingSlot)
@@ -354,7 +350,7 @@ export class Event<TDetail> {
 
     // bubble phase in external component
     if (!eventBubblingControl.stopped && externalTarget) {
-      if (target instanceof Component && target._$external) {
+      if (isComponent(target) && target._$external) {
         ;(target.shadowRoot as ExternalShadowRoot).handleEvent(externalTarget, this)
       }
     }
@@ -363,7 +359,7 @@ export class Event<TDetail> {
     if (!eventBubblingControl.stopped && !inExternalOnly) {
       let atTarget = true
       forEachBubblePath(target, (currentTarget, target, mark) => {
-        if (!atTarget && currentTarget instanceof Component && currentTarget._$external) {
+        if (!atTarget && isComponent(currentTarget) && currentTarget._$external) {
           const sr = currentTarget.shadowRoot as ExternalShadowRoot
           sr.handleEvent(sr.slot, this)
         }

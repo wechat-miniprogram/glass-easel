@@ -1,74 +1,60 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 
 import {
-  ComponentParams,
-  DataList,
-  PropertyList,
-  MethodList,
-  ComponentInstance,
-  PropertyListItem,
-  ComponentMethod,
-  RelationParams,
-  PropertyType,
-  TraitRelationParams,
-  DataWithPropertyValues,
-  PropertyOption,
-  PropertyTypeToValueType,
-  TaggedMethod,
-  UnTaggedMethod,
-  ChainingFilterFunc,
-  ChainingFilterType,
-  SetDataSetter,
-  DeepReadonly,
-  Empty,
-  NewFieldList,
-  ObserverDataPathStrings,
-  GetFromObserverPathString,
-  IsNever,
-} from './component_params'
-import { FuncArr, safeCallback, triggerWarning } from './func_arr'
-import { ComponentOptions, getDefaultComponentSpace } from './global_options'
-import { MultiPaths, parseMultiPaths } from './data_path'
-import { DataValue, DataGroupObserverTree } from './data_proxy'
-import {
   ComponentDefinition,
-  GeneralComponent,
-  GeneralComponentDefinition,
-  LifetimeFuncs,
-  Lifetimes,
-  PageLifetimeFuncs,
+  type GeneralComponent,
+  type GeneralComponentDefinition,
+  type LifetimeFuncs,
+  type Lifetimes,
+  type PageLifetimeFuncs,
 } from './component'
 import {
-  RelationDefinition,
-  RelationType,
-  RelationListener,
-  RelationFailedListener,
-} from './relation'
-import { ComponentSpace, ComponentWaitingList } from './component_space'
-import { TraitBehavior } from './trait_behaviors'
+  type ChainingFilterFunc,
+  type ChainingFilterType,
+  type ComponentInstance,
+  type ComponentMethod,
+  type ComponentParams,
+  type DataList,
+  type DataWithPropertyValues,
+  type DeepReadonly,
+  type Empty,
+  type GetFromObserverPathString,
+  type IsNever,
+  type MethodList,
+  type NewFieldList,
+  type ObserverDataPathStrings,
+  type PropertyList,
+  type PropertyListItem,
+  type PropertyOption,
+  type PropertyType,
+  type PropertyTypeToValueType,
+  type RelationParams,
+  type SetDataSetter,
+  type TaggedMethod,
+  type TraitRelationParams,
+  type UnTaggedMethod,
+} from './component_params'
+import {
+  getDefaultComponentSpace,
+  type ComponentSpace,
+  type ComponentWaitingList,
+} from './component_space'
+import { parseMultiPaths, type MultiPaths } from './data_path'
+import {
+  DataGroupObserverTree,
+  NormalizedPropertyType,
+  normalizePropertyType,
+  normalizePropertyTypeShortHand,
+  shallowMerge,
+  type DataValue,
+  type PropertyDefinition,
+} from './data_proxy'
 import { simpleDeepCopy } from './data_utils'
-import { EventListener } from './event'
-
-export const enum NormalizedPropertyType {
-  Invalid = 'invalid',
-  Any = 'any',
-  String = 'string',
-  Number = 'number',
-  Boolean = 'boolean',
-  Object = 'object',
-  Array = 'array',
-  Function = 'function',
-}
-
-export type PropertyDefinition = {
-  type: NormalizedPropertyType
-  optionalTypes: NormalizedPropertyType[] | null
-  value: unknown
-  default: (() => unknown) | undefined
-  observer: ((newValue: unknown, oldValue: unknown) => void) | null
-  comparer: ((newValue: unknown, oldValue: unknown) => boolean) | null
-  reflectIdPrefix: boolean
-}
+import { type EventListener } from './event'
+import { FuncArr, safeCallback, triggerWarning } from './func_arr'
+import { type ComponentOptions } from './global_options'
+import { normalizeRelation, type RelationDefinition, type RelationHandler } from './relation'
+import { type TraitBehavior } from './trait_behaviors'
 
 export type ComponentDefinitionWithPlaceholder =
   | {
@@ -89,353 +75,6 @@ type ResolveBehaviorBuilder<
     ? Omit<B, TChainingFilter['remove']> & TChainingFilter['add']
     : B
   : B
-
-const shallowMerge = (dest: { [key: string]: unknown }, src: { [key: string]: unknown }) => {
-  const keys = Object.keys(src)
-  for (let i = 0; i < keys.length; i += 1) {
-    const key = keys[i]!
-    if (Object.prototype.hasOwnProperty.call(dest, key)) {
-      if (key[0] === '_') {
-        triggerWarning(`data field "${key}" from different behaviors is overriding or merging.`)
-      }
-      if (
-        typeof dest[key] === 'object' &&
-        typeof src[key] === 'object' &&
-        src[key] !== null &&
-        !Array.isArray(src[key])
-      ) {
-        if (Array.isArray(dest[key])) {
-          dest[key] = (dest[key] as DataValue[]).slice()
-        } else {
-          const oldDest = dest[key] as { [key: string]: DataValue }
-          const newDest = {} as { [key: string]: DataValue }
-          const subKeys = Object.keys(oldDest)
-          for (let i = 0; i < subKeys.length; i += 1) {
-            const subKey = subKeys[i]!
-            newDest[subKey] = oldDest[subKey]
-          }
-          dest[key] = newDest
-        }
-        shallowMerge(
-          dest[key] as { [key: string]: unknown },
-          src[key] as { [key: string]: unknown },
-        )
-      } else {
-        dest[key] = src[key]
-      }
-    } else {
-      dest[key] = src[key]
-    }
-  }
-}
-
-const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefinition | null => {
-  if (propDef === NormalizedPropertyType.String || propDef === String) {
-    return {
-      type: NormalizedPropertyType.String,
-      optionalTypes: null,
-      value: '',
-      default: undefined,
-      observer: null,
-      comparer: null,
-      reflectIdPrefix: false,
-    }
-  }
-  if (propDef === NormalizedPropertyType.Number || propDef === Number) {
-    return {
-      type: NormalizedPropertyType.Number,
-      optionalTypes: null,
-      value: 0,
-      default: undefined,
-      observer: null,
-      comparer: null,
-      reflectIdPrefix: false,
-    }
-  }
-  if (propDef === NormalizedPropertyType.Boolean || propDef === Boolean) {
-    return {
-      type: NormalizedPropertyType.Boolean,
-      optionalTypes: null,
-      value: false,
-      default: undefined,
-      observer: null,
-      comparer: null,
-      reflectIdPrefix: false,
-    }
-  }
-  if (propDef === NormalizedPropertyType.Object || propDef === Object) {
-    return {
-      type: NormalizedPropertyType.Object,
-      optionalTypes: null,
-      value: null,
-      default: undefined,
-      observer: null,
-      comparer: null,
-      reflectIdPrefix: false,
-    }
-  }
-  if (propDef === NormalizedPropertyType.Array || propDef === Array) {
-    return {
-      type: NormalizedPropertyType.Array,
-      optionalTypes: null,
-      value: [],
-      default: undefined,
-      observer: null,
-      comparer: null,
-      reflectIdPrefix: false,
-    }
-  }
-  if (propDef === NormalizedPropertyType.Function || propDef === Function) {
-    return {
-      type: NormalizedPropertyType.Function,
-      optionalTypes: null,
-      value() {
-        /* empty */
-      },
-      default: undefined,
-      observer: null,
-      comparer: null,
-      reflectIdPrefix: false,
-    }
-  }
-  if (propDef === NormalizedPropertyType.Any || propDef === null || propDef === undefined) {
-    return {
-      type: NormalizedPropertyType.Any,
-      optionalTypes: null,
-      value: null,
-      default: undefined,
-      observer: null,
-      comparer: null,
-      reflectIdPrefix: false,
-    }
-  }
-  return null
-}
-
-const normalizePropertyType = (t: unknown): NormalizedPropertyType => {
-  if (t === NormalizedPropertyType.String || t === String) {
-    return NormalizedPropertyType.String
-  }
-  if (t === NormalizedPropertyType.Number || t === Number) {
-    return NormalizedPropertyType.Number
-  }
-  if (t === NormalizedPropertyType.Boolean || t === Boolean) {
-    return NormalizedPropertyType.Boolean
-  }
-  if (t === NormalizedPropertyType.Object || t === Object) {
-    return NormalizedPropertyType.Object
-  }
-  if (t === NormalizedPropertyType.Array || t === Array) {
-    return NormalizedPropertyType.Array
-  }
-  if (t === NormalizedPropertyType.Function || t === Function) {
-    return NormalizedPropertyType.Function
-  }
-  if (t === NormalizedPropertyType.Any || t === null || t === undefined) {
-    return NormalizedPropertyType.Any
-  }
-  return NormalizedPropertyType.Invalid
-}
-
-export const convertValueToType = (
-  value: unknown,
-  propName: string,
-  prop: PropertyDefinition,
-  component: GeneralComponent | null,
-): unknown => {
-  const type = prop.type
-  const defaultFn =
-    prop.default === undefined
-      ? undefined
-      : () =>
-          safeCallback(
-            `Property "${propName}" Default`,
-            prop.default!,
-            null,
-            [],
-            component || undefined,
-          )
-  // try match optional types
-  const optionalTypes = prop.optionalTypes
-  if (optionalTypes) {
-    for (let i = 0; i < optionalTypes.length; i += 1) {
-      if (matchTypeWithValue(optionalTypes[i]!, value)) {
-        return value
-      }
-    }
-  }
-  // for string
-  if (type === NormalizedPropertyType.String) {
-    if (value === null || value === undefined) {
-      triggerWarning(
-        `property "${propName}" received type-incompatible value: expected <String> but get null value. Used default value instead.`,
-      )
-      return defaultFn === undefined ? '' : defaultFn()
-    }
-    if (typeof value === 'object') {
-      triggerWarning(
-        `property "${propName}" received type-incompatible value: expected <String> but got object-typed value. Force converted.`,
-      )
-    }
-    return String(value)
-  }
-  // for number
-  if (type === NormalizedPropertyType.Number) {
-    // eslint-disable-next-line no-restricted-globals
-    if (isFinite(value as number)) return Number(value)
-    if (typeof value === 'number') {
-      triggerWarning(
-        `property "${propName}" received type-incompatible value: expected <Number> but got NaN or Infinity. Used default value instead.`,
-      )
-    } else {
-      triggerWarning(
-        `property "${propName}" received type-incompatible value: expected <Number> but got non-number value. Used default value instead.`,
-      )
-    }
-    return defaultFn === undefined ? 0 : defaultFn()
-  }
-  // for boolean
-  if (type === NormalizedPropertyType.Boolean) {
-    return !!value
-  }
-  // for array
-  if (type === NormalizedPropertyType.Array) {
-    if (Array.isArray(value)) return value as unknown
-    triggerWarning(
-      `property "${propName}" received type-incompatible value: expected <Array> but got non-array value. Used default value instead.`,
-    )
-    return defaultFn === undefined ? [] : defaultFn()
-  }
-  // for object
-  if (type === NormalizedPropertyType.Object) {
-    if (typeof value === 'object') return value
-    triggerWarning(
-      `property "${propName}" received type-incompatible value: expected <Object> but got non-object value. Used default value instead.`,
-    )
-    return defaultFn === undefined ? null : defaultFn()
-  }
-  // for function
-  if (type === NormalizedPropertyType.Function) {
-    if (typeof value === 'function') return value
-    triggerWarning(
-      `property "${propName}" received type-incompatible value: expected <Function> but got non-function value. Used default value instead.`,
-    )
-    // eslint-disable-next-line func-names
-    return defaultFn === undefined
-      ? function () {
-          /* empty */
-        }
-      : defaultFn()
-  }
-  // for any-typed, just return the value and avoid undefined
-  if (value === undefined) return defaultFn === undefined ? null : defaultFn()
-  return value
-}
-
-export const matchTypeWithValue = (type: NormalizedPropertyType, value: any) => {
-  if (type === NormalizedPropertyType.String) {
-    if (typeof value !== 'string') return false
-  } else if (type === NormalizedPropertyType.Number) {
-    if (!Number.isFinite(value)) return false
-  } else if (type === NormalizedPropertyType.Boolean) {
-    if (typeof value !== 'boolean') return false
-  } else if (type === NormalizedPropertyType.Object) {
-    if (typeof value !== 'object' || Array.isArray(value)) return false
-  } else if (type === NormalizedPropertyType.Array) {
-    if (typeof value !== 'object' || !Array.isArray(value)) return false
-  } else if (type === NormalizedPropertyType.Function) {
-    if (typeof value !== 'function') return false
-  } else if (value === undefined) {
-    return false
-  }
-  return true
-}
-
-export const normalizeRelation = <TOut extends { [key: string]: any }>(
-  ownerSpace: ComponentSpace,
-  is: string,
-  key: string,
-  relation: RelationParams | TraitRelationParams<TOut>,
-): RelationDefinition | null => {
-  const checkRelationFunc = (f: unknown): RelationListener | null => {
-    if (typeof f === 'function') {
-      return f as RelationListener
-    }
-    if (f !== undefined) {
-      triggerWarning(
-        `the "${key}" relation listener is not a function (when preparing behavior "${is}").`,
-      )
-    }
-    return null
-  }
-  let type: RelationType
-  if (relation.type === 'parent') {
-    type = RelationType.ParentComponent
-  } else if (relation.type === 'child') {
-    type = RelationType.ChildComponent
-  } else if (relation.type === 'parent-common-node') {
-    type = RelationType.ParentNonVirtualNode
-  } else if (relation.type === 'child-common-node') {
-    type = RelationType.ChildNonVirtualNode
-  } else if (relation.type === 'ancestor') {
-    type = RelationType.Ancestor
-  } else if (relation.type === 'descendant') {
-    type = RelationType.Descendant
-  } else {
-    const type = relation.type as string
-    triggerWarning(
-      `the "${key}" relation has an invalid relation type "${type}" (when preparing behavior "${is}").`,
-    )
-    return null
-  }
-  let target:
-    | GeneralBehavior
-    | TraitBehavior<{ [key: string]: unknown }, { [key: string]: unknown }>
-    | null = null
-  if (relation.target instanceof ComponentDefinition) {
-    target = relation.target.behavior as GeneralBehavior
-  } else if (relation.target instanceof Behavior || relation.target instanceof TraitBehavior) {
-    target = relation.target
-  } else {
-    const path = String(relation.target || key)
-    const usingTarget = ownerSpace.getComponentByUrlWithoutDefault(path, is)
-    if (usingTarget) {
-      target = usingTarget.behavior
-    } else {
-      const globalTarget = ownerSpace.getGlobalUsingComponent(path)
-      if (typeof globalTarget === 'object' && globalTarget !== null) {
-        target = globalTarget.behavior
-      }
-    }
-  }
-  if (!target) {
-    triggerWarning(
-      `the target of relation "${key}" is not a valid behavior or component (when preparing behavior "${is}").`,
-    )
-    return null
-  }
-  return {
-    target,
-    type,
-    linked: checkRelationFunc(relation.linked),
-    linkChanged: checkRelationFunc(relation.linkChanged),
-    unlinked: checkRelationFunc(relation.unlinked),
-    linkFailed: checkRelationFunc(relation.linkFailed) as RelationFailedListener,
-  }
-}
-
-export interface RelationHandler<TTarget, TOut> {
-  list(): TTarget[]
-  listAsTrait: TOut extends never ? undefined : () => TOut[]
-}
-
-export interface RelationInit {
-  (def: RelationParams): RelationHandler<any, never>
-  <TOut extends { [key: string]: any }>(def: TraitRelationParams<TOut>): RelationHandler<
-    unknown,
-    TOut
-  >
-}
 
 export interface BuilderContext<
   TPrevData extends DataList,

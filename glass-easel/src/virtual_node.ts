@@ -1,12 +1,19 @@
+import {
+  BM,
+  BackendMode,
+  type GeneralBackendContext,
+  type GeneralBackendElement,
+  type backend,
+} from './backend'
 import { Element } from './element'
-import { ShadowRoot } from './shadow_root'
-import { BM, BackendMode } from './backend/mode'
-import { GeneralBackendContext, GeneralBackendElement } from './node'
-import * as backend from './backend/backend_protocol'
+import { type ShadowRoot } from './shadow_root'
+import { VIRTUAL_NODE_SYMBOL, isVirtualNode } from './type_symbol'
 
 export class VirtualNode extends Element {
+  [VIRTUAL_NODE_SYMBOL]: true
   is: string
 
+  /* istanbul ignore next */
   constructor() {
     throw new Error('Element cannot be constructed directly')
     // eslint-disable-next-line no-unreachable
@@ -31,9 +38,13 @@ export class VirtualNode extends Element {
     }
   }
 
+  static isVirtualNode = isVirtualNode
+
   static create(virtualName: string, owner: ShadowRoot): VirtualNode {
     const node = Object.create(VirtualNode.prototype) as VirtualNode
     node._$initializeVirtual(virtualName, owner, owner._$nodeTreeContext, null)
     return node
   }
 }
+
+VirtualNode.prototype[VIRTUAL_NODE_SYMBOL] = true

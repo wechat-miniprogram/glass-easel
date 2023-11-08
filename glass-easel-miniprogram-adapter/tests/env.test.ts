@@ -45,7 +45,7 @@ describe('env', () => {
       Component().register()
     })
 
-    const backend = new glassEasel.domlikeBackend.CurrentWindowBackendContext()
+    const backend = new glassEasel.CurrentWindowBackendContext()
     const ab = env.associateBackend(backend)
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     expect(domHtml(root.getComponent())).toBe(
@@ -71,7 +71,7 @@ describe('env', () => {
       Component().behavior(beh).register()
     })
 
-    const backend = new glassEasel.domlikeBackend.CurrentWindowBackendContext()
+    const backend = new glassEasel.CurrentWindowBackendContext()
     const ab = env.associateBackend(backend)
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     expect(domHtml(root.getComponent())).toBe('<div>123</div>')
@@ -131,7 +131,7 @@ describe('env', () => {
       Component().register()
     })
 
-    const backend = new glassEasel.domlikeBackend.CurrentWindowBackendContext()
+    const backend = new glassEasel.CurrentWindowBackendContext()
     const ab = env.associateBackend(backend)
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     expect(domHtml(root.getComponent())).toBe(
