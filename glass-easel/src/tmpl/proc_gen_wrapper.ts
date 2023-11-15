@@ -5,6 +5,7 @@ import { type DataPath } from '../data_path'
 import { type DataValue } from '../data_proxy'
 import { Element, StyleSegmentIndex } from '../element'
 import { type ShadowedEvent } from '../event'
+import { ENV } from '../global_options'
 import { type NativeNode } from '../native_node'
 import { type Node } from '../node'
 import { SlotMode, type ShadowRoot } from '../shadow_root'
@@ -12,6 +13,7 @@ import { type TextNode } from '../text_node'
 import { type ProcGenGroupList } from '../tmpl'
 import { isComponent, isNativeNode } from '../type_symbol'
 import { type VirtualNode } from '../virtual_node'
+import { dispatchError } from '../warning'
 import { RangeListManager } from './range_list_diff'
 
 export type UpdatePathTreeNode = true | { [key: string]: UpdatePathTreeNode } | UpdatePathTreeNode[]
@@ -308,6 +310,7 @@ export class ProcGenWrapper {
           key,
           list,
           elem,
+          shadowRoot,
           (item: DataValue, index: number | string): VirtualNode => {
             const childNode = shadowRoot.createVirtualNode('wx:for-item')
             childNode.destroyBackendElementOnDetach()
@@ -806,19 +809,17 @@ export class ProcGenWrapper {
       const elemShadowRoot = isComponent(elem) ? elem.getShadowRoot() : null
       const isElemDynamicSlots = elemShadowRoot?.getSlotMode() === SlotMode.Dynamic
       const isReplacerDynamicSlots = replacerShadowRoot?.getSlotMode() === SlotMode.Dynamic
-      if (isReplacerDynamicSlots) {
-        if (!isElemDynamicSlots) {
-          throw new Error(
-            'The "dynamicSlots" option of the component and its placeholder should be the same.',
-          )
-        }
+      if (isReplacerDynamicSlots !== isElemDynamicSlots) {
+        dispatchError(
+          new Error(
+            `The "dynamicSlots" option of component <${replacer.is}> and its placeholder <${elem.is}> should be the same.`,
+          ),
+          '[render]',
+          isComponent(replacer) ? replacer : replacer.is,
+        )
+      } else if (isReplacerDynamicSlots) {
         elem.parentNode?.replaceChild(replacer, elem)
       } else {
-        if (isElemDynamicSlots) {
-          throw new Error(
-            'The "dynamicSlots" option of the component and its placeholder should be the same.',
-          )
-        }
         elem.selfReplaceWith(replacer)
       }
     }
@@ -908,6 +909,11 @@ export class ProcGenWrapper {
         )
       }
       return ret
+    }
+    if (ENV.DEV) {
+      Object.defineProperty(listener, 'name', {
+        value: typeof handler === 'string' ? handler : handler.name,
+      })
     }
     const evOptions = {
       final,

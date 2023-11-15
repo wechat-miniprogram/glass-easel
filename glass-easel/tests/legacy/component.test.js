@@ -854,7 +854,10 @@ const testCases = function (testBackend) {
       template: '<div></div>',
       lifetimes: {
         created: function (e) {
-          throw new Error('test')
+          throw new Error('created')
+        },
+        attached: function (e) {
+          throw new Error('attached')
         },
         error: function (e) {
           errorCalled++
@@ -862,12 +865,15 @@ const testCases = function (testBackend) {
         },
       },
     })
-    createElem('component-error-lifetimes-a')
+    const elem = createElem('component-error-lifetimes-a')
 
-    glassEasel.globalOptions.throwGlobalError = true
-    console.error = oldConsoleError
     expect(errorCalled).toBe(1)
-    expect(errorObj.message).toBe('test')
+    expect(errorObj.message).toBe('created')
+    glassEasel.Element.pretendAttached(elem)
+    expect(errorCalled).toBe(2)
+    expect(errorObj.message).toBe('attached')
+    console.error = oldConsoleError
+    glassEasel.globalOptions.throwGlobalError = true
   })
 
   describe('#ownerShadowRoot', function () {

@@ -51,10 +51,11 @@ import {
 } from './data_proxy'
 import { simpleDeepCopy } from './data_utils'
 import { type EventListener } from './event'
-import { FuncArr, safeCallback, triggerWarning } from './func_arr'
+import { FuncArr, safeCallback } from './func_arr'
 import { type ComponentOptions } from './global_options'
 import { normalizeRelation, type RelationDefinition, type RelationHandler } from './relation'
 import { type TraitBehavior } from './trait_behaviors'
+import { dispatchError, triggerWarning } from './warning'
 
 export type ComponentDefinitionWithPlaceholder =
   | {
@@ -456,7 +457,12 @@ export class BehaviorBuilder<
     once = false,
   ): ResolveBehaviorBuilder<this, TChainingFilter> {
     if (!this._$observers) this._$observers = []
-    this._$observers.push({ dataPaths: parseMultiPaths(paths as string | string[]), func, once })
+    try {
+      this._$observers.push({ dataPaths: parseMultiPaths(paths as string | string[]), func, once })
+    } catch (e) {
+      // parse multi paths my throw errors
+      dispatchError(e, `observer`, this._$is)
+    }
     return this as any
   }
 
@@ -600,18 +606,32 @@ export class BehaviorBuilder<
       if (Array.isArray(rawObservers)) {
         for (let i = 0; i < rawObservers.length; i += 1) {
           const { fields, observer } = rawObservers[i]!
-          this._$observers.push({
-            dataPaths: parseMultiPaths(fields ?? '**'),
-            func: observer,
-            once: false,
-          })
+          try {
+            this._$observers.push({
+              dataPaths: parseMultiPaths(fields ?? '**'),
+              func: observer,
+              once: false,
+            })
+          } catch (e) {
+            // parse multi paths may throw errors
+            dispatchError(e, `definition`, this._$is)
+          }
         }
       } else {
         const keys = Object.keys(rawObservers)
         for (let i = 0; i < keys.length; i += 1) {
           const fields = keys[i]!
           const observer = rawObservers[fields]!
-          this._$observers.push({ dataPaths: parseMultiPaths(fields), func: observer, once: false })
+          try {
+            this._$observers.push({
+              dataPaths: parseMultiPaths(fields),
+              func: observer,
+              once: false,
+            })
+          } catch (e) {
+            // parse multi paths may throw errors
+            dispatchError(e, `definition`, this._$is)
+          }
         }
       }
     }
@@ -872,9 +892,7 @@ export class Behavior<
             parent = space.getBehaviorByUrl(parentNameStr, is)
           }
           if (!parent) {
-            triggerWarning(
-              `behavior "${parentNameStr}" is not found (when preparing behavior "${is}").`,
-            )
+            dispatchError(new Error(`behavior "${parentNameStr}" is not found.`), `[prepare]`, is)
           }
         }
         if (!parent) continue
@@ -1032,7 +1050,7 @@ export class Behavior<
             }
           }
         } else {
-          triggerWarning(`cannot find component "${String(v)}" (when preparing behavior "${is}").`)
+          dispatchError(new Error(`cannot find component "${String(v)}"`), `[prepare]`, is)
         }
       }
     }
@@ -1059,8 +1077,10 @@ export class Behavior<
               space.getComponentByUrlWithoutDefault(tagName, is) ||
               space.getGlobalUsingComponent(tagName)
           } else {
-            triggerWarning(
-              `cannot define generic "${k}" without a default implementor (when preparing behavior "${is}").`,
+            dispatchError(
+              new Error(`cannot define generic "${k}" without a default implementor.`),
+              `[prepare]`,
+              is,
             )
           }
         }
@@ -1109,9 +1129,7 @@ export class Behavior<
             }
           }
           if (type === NormalizedPropertyType.Invalid) {
-            triggerWarning(
-              `the type of property "${name}" is illegal (when preparing behavior "${is}").`,
-            )
+            dispatchError(new Error(`the type of property "${name}" is illegal`), `[prepare]`, is)
           }
           let value: DataValue = propDef.value
           if (propDef.value === undefined) {
@@ -1122,19 +1140,33 @@ export class Behavior<
             else value = null
           } else if (propDef.default !== undefined) {
             triggerWarning(
-              `the initial value of property "${name}" is not used when its default is provided (when preparing behavior "${is}").`,
+              `the initial value of property "${name}" is not used when its default is provided.`,
+              is,
             )
           }
           let observer: ((newValue: any, oldValue: any) => void) | null
           if (typeof propDef.observer === 'function') {
             observer = propDef.observer
-          } else if (propDef.observer) {
+          } else if (typeof propDef.observer === 'string') {
             observer = this._$methodMap[propDef.observer] || null
+            if (!observer) {
+              dispatchError(
+                new Error(
+                  `Cannot find method "${propDef.observer}" for observer of property "${name}".`,
+                ),
+                `[prepare]`,
+                is,
+              )
+            }
           } else {
             observer = null
             if (propDef.observer !== undefined) {
-              triggerWarning(
-                `the observer of property "${name}" is not a function (when preparing behavior "${is}").`,
+              dispatchError(
+                new Error(
+                  `The observer of property "${name}" is not a function, got "${typeof propDef.observer}".`,
+                ),
+                `[prepare]`,
+                is,
               )
             }
           }
@@ -1144,8 +1176,10 @@ export class Behavior<
           } else {
             comparer = null
             if (propDef.comparer !== undefined) {
-              triggerWarning(
-                `the comparer of property "${name}" is not a function (when preparing behavior "${is}").`,
+              dispatchError(
+                new Error(`the comparer of property "${name}" is not a function.`),
+                `[prepare]`,
+                is,
               )
             }
           }
@@ -1188,10 +1222,10 @@ export class Behavior<
         if (typeof observer === 'function') {
           this._$observers.push({ dataPaths, observer, once })
         } else {
-          triggerWarning(
-            `the "${String(
-              observer,
-            )}" observer is not a function (when preparing behavior "${is}").`,
+          dispatchError(
+            new Error(`the "${String(observer)}" observer is not a function.`),
+            `[prepare]`,
+            is,
           )
         }
       }
@@ -1231,8 +1265,10 @@ export class Behavior<
             }
             this._$listeners.push({ id, ev, listener })
           } else {
-            triggerWarning(
-              `the "${k}" listener is not a function or a method name (when preparing behavior "${is}").`,
+            dispatchError(
+              new Error(`the "${k}" listener is not a function or a method name`),
+              `[prepare]`,
+              is,
             )
           }
         }
@@ -1294,7 +1330,7 @@ export class Behavior<
    * Only valid after `prepare` .
    */
   getMethods(): TMethod {
-    return this._$methodMap as TMethod
+    return this._$methodMap as any as TMethod
   }
 
   /** @internal */
@@ -1317,7 +1353,7 @@ export class Behavior<
       if (ret[name]) {
         ret[name]!.add(func)
       } else {
-        const fa = (ret[name] = new FuncArr())
+        const fa = (ret[name] = new FuncArr('lifetime'))
         fa.add(func)
       }
     }
@@ -1334,7 +1370,7 @@ export class Behavior<
       if (ret[name]) {
         ret[name]!.add(func)
       } else {
-        const fa = (ret[name] = new FuncArr())
+        const fa = (ret[name] = new FuncArr('pageLifetime'))
         fa.add(func)
       }
     }

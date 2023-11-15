@@ -3,9 +3,10 @@ import { ComponentDefinition, type GeneralComponent } from './component'
 import { type RelationParams, type TraitRelationParams } from './component_params'
 import { type ComponentSpace } from './component_space'
 import { type Element } from './element'
-import { safeCallback, triggerWarning } from './func_arr'
+import { safeCallback } from './func_arr'
 import { TraitBehavior } from './trait_behaviors'
 import { isComponent, isElement, isVirtualNode } from './type_symbol'
+import { triggerWarning } from './warning'
 
 export const enum RelationType {
   Ancestor = 0,

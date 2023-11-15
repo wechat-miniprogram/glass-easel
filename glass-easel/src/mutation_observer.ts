@@ -193,7 +193,7 @@ export class MutationObserver {
     this._$normalizedListener = cb
     this._$boundTarget = target
     if (options.properties) {
-      if (!target.attrObservers) target.attrObservers = new FuncArr()
+      if (!target.attrObservers) target.attrObservers = new FuncArr('attributeObserver')
       target.attrObservers.add(cb)
       this._$boundFuncArrs.push(
         target.attrObservers as FuncArr<MutationObserverListener<MutationObserverEvent>>,
@@ -201,7 +201,7 @@ export class MutationObserver {
       this._$subtreeListenersCount += 1
     }
     if (options.childList) {
-      if (!target.childObservers) target.childObservers = new FuncArr()
+      if (!target.childObservers) target.childObservers = new FuncArr('childObserver')
       target.childObservers.add(cb)
       this._$boundFuncArrs.push(
         target.childObservers as FuncArr<MutationObserverListener<MutationObserverEvent>>,
@@ -209,7 +209,7 @@ export class MutationObserver {
       this._$subtreeListenersCount += 1
     }
     if (options.characterData) {
-      if (!target.textObservers) target.textObservers = new FuncArr()
+      if (!target.textObservers) target.textObservers = new FuncArr('textObserver')
       target.textObservers.add(cb)
       this._$boundFuncArrs.push(
         target.textObservers as FuncArr<MutationObserverListener<MutationObserverEvent>>,
@@ -220,7 +220,7 @@ export class MutationObserver {
       target.updateSubtreeCount(this._$subtreeListenersCount)
     }
     if (options.attachStatus) {
-      if (!target.attachObservers) target.attachObservers = new FuncArr()
+      if (!target.attachObservers) target.attachObservers = new FuncArr('attachObserver')
       target.attachObservers.add(cb)
       this._$boundFuncArrs.push(
         target.attachObservers as FuncArr<MutationObserverListener<MutationObserverEvent>>,

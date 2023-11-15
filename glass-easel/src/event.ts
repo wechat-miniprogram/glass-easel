@@ -113,7 +113,7 @@ export class EventTarget<TEvents extends { [type: string]: unknown }> {
       efa = listeners[name] = {
         mutCount: 0,
         finalCount: 0,
-        funcArr: new FuncArrWithMeta(),
+        funcArr: new FuncArrWithMeta('listener'),
       }
     }
     efa.funcArr.add(func, mutLevel)

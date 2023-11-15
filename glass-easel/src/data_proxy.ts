@@ -8,9 +8,10 @@ import {
 } from './component_params'
 import { type DataPath, type MultiPaths } from './data_path'
 import { deepCopy, simpleDeepCopy } from './data_utils'
-import { safeCallback, triggerWarning } from './func_arr'
+import { safeCallback } from './func_arr'
 import { DeepCopyKind } from './global_options'
 import { MutationObserverTarget } from './mutation_observer'
+import { triggerWarning } from './warning'
 
 // eslint-disable-next-line @typescript-eslint/unbound-method
 const hasOwnProperty = Object.prototype.hasOwnProperty

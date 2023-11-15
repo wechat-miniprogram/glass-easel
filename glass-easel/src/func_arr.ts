@@ -1,32 +1,16 @@
-import { type GeneralComponent } from './component'
-import { globalOptions } from './global_options'
-import { isComponent } from './type_symbol'
+import { type AnyComponent, type GeneralComponent } from './component'
+import { type Node } from './node'
 
 export type GeneralFuncType = (this: any, ...args: any[]) => any
 
-type ErrorInfo = {
-  message: string
-  type: string
-  element: unknown
-  method: unknown
-  args: unknown[]
-}
-
-function dispatchError(err: unknown, info: ErrorInfo, avoidErrorHandler?: boolean) {
-  if (!avoidErrorHandler && errorFuncArr.call(err as any, [err, info]) === false) return
-  if (globalOptions.throwGlobalError) {
-    throw err
-  } else {
-    // eslint-disable-next-line no-console
-    console.error(err instanceof Error ? `${err.message}\n${err.stack || ''}` : String(err))
-  }
-}
-
 export class FuncArr<F extends GeneralFuncType> {
   empty = true
-  private _$type = ''
+  private _$type: string
   private _$arr: F[] | null = null
-  _$avoidErrorHandler = false
+
+  constructor(type: string) {
+    this._$type = type
+  }
 
   add(func: F) {
     if (!this._$arr) this._$arr = [func]
@@ -56,94 +40,28 @@ export class FuncArr<F extends GeneralFuncType> {
   call(
     caller: ThisParameterType<F>,
     args: Parameters<F>,
-    relatedComponent?: GeneralComponent,
+    relatedComponent?: AnyComponent,
   ): boolean {
     const arr = this._$arr
     let ret = true
     if (arr) {
       for (let i = 0; i < arr.length; i += 1) {
-        const r = safeCallback(
-          this._$type,
-          arr[i]!,
-          caller,
-          args,
-          relatedComponent,
-          this._$avoidErrorHandler,
-        )
+        const r = safeCallback<F>(this._$type, arr[i]!, caller, args, relatedComponent)
         if (r === false) ret = false
       }
     }
     return ret
   }
-
-  static safeCallback<F extends GeneralFuncType>(
-    this: void,
-    type: string,
-    method: F,
-    caller: ThisParameterType<F>,
-    args: Parameters<F>,
-    relatedComponent?: GeneralComponent,
-    avoidErrorHandler = false,
-  ): ReturnType<F> | undefined {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      return method.apply(caller, args)
-    } catch (e) {
-      let msg = `[Error] [Component] ${type || 'Error Listener'} Error @ `
-      if (isComponent(caller)) msg += caller.is
-      else if (isComponent(relatedComponent)) msg += relatedComponent.is
-      msg += `#${method.name || '(anonymous)'}`
-      if (relatedComponent) {
-        relatedComponent.triggerLifetime('error', [e])
-      }
-      dispatchError(
-        e,
-        {
-          message: msg,
-          type,
-          element: caller,
-          method,
-          args,
-        },
-        avoidErrorHandler,
-      )
-      return undefined
-    }
-  }
-
-  static addGlobalErrorListener(this: void, func: (err: Error, info: ErrorInfo) => boolean) {
-    errorFuncArr.add(func)
-  }
-
-  static removeGlobalErrorListener(this: void, func: (err: Error, info: ErrorInfo) => boolean) {
-    errorFuncArr.remove(func)
-  }
-
-  static addGlobalWarningListener(this: void, func: (msg: string) => void) {
-    warningFuncArr.add(func)
-  }
-
-  static removeGlobalWarningListener(this: void, func: (msg: string) => void) {
-    warningFuncArr.remove(func)
-  }
 }
-
-export function triggerWarning(msg: string) {
-  const message = `[Warning] [Component] ${msg}`
-  if (warningFuncArr.call(message, [message])) {
-    // eslint-disable-next-line no-console
-    console.warn(message)
-  }
-}
-
-const errorFuncArr = new FuncArr()
-errorFuncArr._$avoidErrorHandler = true
-const warningFuncArr = new FuncArr()
 
 export class FuncArrWithMeta<F extends GeneralFuncType, T> {
   empty = true
-  private _$type = ''
+  private _$type: string
   private _$arr: { f: F; data: T }[] | null = null
+
+  constructor(type: string) {
+    this._$type = type
+  }
 
   add(func: F, data: T) {
     const item = { f: func, data }
@@ -184,7 +102,7 @@ export class FuncArrWithMeta<F extends GeneralFuncType, T> {
       for (let i = 0; i < arr.length; i += 1) {
         const { f, data } = arr[i]!
         if (!retainFn(data)) continue
-        const r = FuncArr.safeCallback(this._$type, f, caller, args, relatedComponent)
+        const r = safeCallback(this._$type, f, caller, args, relatedComponent)
         if (r === false) ret = false
       }
     }
@@ -192,8 +110,30 @@ export class FuncArrWithMeta<F extends GeneralFuncType, T> {
   }
 }
 
-export const safeCallback = FuncArr.safeCallback
-export const addGlobalErrorListener = FuncArr.addGlobalErrorListener
-export const removeGlobalErrorListener = FuncArr.removeGlobalErrorListener
-export const addGlobalWarningListener = FuncArr.addGlobalWarningListener
-export const removeGlobalWarningListener = FuncArr.removeGlobalWarningListener
+let dispatchError: (
+  err: unknown,
+  method?: string,
+  relatedComponent?: AnyComponent | string,
+  element?: Node,
+) => void = () => {}
+
+export function _setErrorDispatcher(dispatcher: typeof dispatchError) {
+  dispatchError = dispatcher
+}
+
+export function safeCallback<F extends GeneralFuncType>(
+  this: void,
+  type: string,
+  method: F,
+  caller: ThisParameterType<F>,
+  args: Parameters<F>,
+  relatedComponent?: AnyComponent,
+): ReturnType<F> | undefined {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    return method.apply(caller, args)
+  } catch (e) {
+    dispatchError(e, `${type || 'Listener'} ${method.name || '(anonymous)'}`, relatedComponent)
+    return undefined
+  }
+}

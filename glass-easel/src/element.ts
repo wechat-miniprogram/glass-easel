@@ -29,7 +29,6 @@ import {
   type EventOptions,
 } from './event'
 import { type ExternalShadowRoot } from './external_shadow_tree'
-import { triggerWarning } from './func_arr'
 import { globalOptions } from './global_options'
 import { MutationObserverTarget, type MutationObserverChildEvent } from './mutation_observer'
 import { type NativeNode } from './native_node'
@@ -226,8 +225,7 @@ export class Element implements NodeCast {
     if (oldSlot === newSlot) return
     /* istanbul ignore if  */
     if (this._$inheritSlots) {
-      triggerWarning('slots-inherited nodes do not support "slot" attribute.')
-      return
+      throw new Error('slots-inherited nodes do not support "slot" attribute.')
     }
     this._$nodeSlot = newSlot
     const slotParentShadowRoot = Element._$getParentHostShadowRoot(this.parentNode)
@@ -236,16 +234,14 @@ export class Element implements NodeCast {
 
       /* istanbul ignore if  */
       if (slotMode === SlotMode.Dynamic) {
-        triggerWarning(
+        throw new Error(
           'nodes inside dynamic slots should change binding slots through Element#setSlotElement.',
         )
-        return
       }
 
       /* istanbul ignore if  */
       if (slotMode === SlotMode.Direct) {
-        triggerWarning('nodes inside direct slots should not change slot name.')
-        return
+        throw new Error('nodes inside direct slots should not change slot name.')
       }
 
       const slotUpdater = Element._$updateSubtreeSlotNodes(

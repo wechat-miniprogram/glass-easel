@@ -15,6 +15,7 @@ import { type Node } from './node'
 import { TextNode } from './text_node'
 import { SHADOW_ROOT_SYMBOL, isElement, isShadowRoot } from './type_symbol'
 import { VirtualNode } from './virtual_node'
+import { ThirdError, triggerWarning } from './warning'
 
 export const enum SlotMode {
   Direct = 0,
@@ -201,10 +202,13 @@ export class ShadowRoot extends VirtualNode {
     if (comp === null && space._$allowUnusedNativeNode && compName !== '') {
       comp = compName
     }
-    if (!comp) comp = space.getDefaultComponent()
-    /* istanbul ignore if */
     if (!comp) {
-      throw new Error(`Cannot find component "${compName}"`)
+      comp = space.getDefaultComponent()
+      /* istanbul ignore if */
+      if (!comp) {
+        throw new ThirdError(`Cannot find component "${compName}"`, undefined, this._$host)
+      }
+      triggerWarning(`Cannot find component "${compName}", using default component.`, this._$host)
     }
     if (typeof comp === 'string') {
       return this.createNativeNodeWithInit(comp, tagName, undefined, initPropValues)
@@ -259,7 +263,7 @@ export class ShadowRoot extends VirtualNode {
       initPropValues?.(node)
       return node
     }
-    throw new Error(`Unknown tag name ${tagName}`)
+    throw new ThirdError(`Unknown tag name ${tagName}`, '[render]', host)
   }
 
   /**

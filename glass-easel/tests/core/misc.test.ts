@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { tmpl, domBackend } from '../base/env'
 import * as glassEasel from '../../src'
 import { Context } from '../base/composed_backend'
@@ -214,6 +215,34 @@ describe('event', () => {
       [true, 'testEv', listener],
       [false, 'testEv', listener],
     ])
+  })
+
+  test('error lifetimes stack overflow', () => {
+    const oldConsoleError = console.error
+    console.error = function () {}
+    glassEasel.globalOptions.throwGlobalError = false
+
+    let errorCalled = 0
+    let errorObj: Error | null = null
+    const compDef = glassEasel.Component.register({
+      is: 'component-error-lifetimes-a',
+      template: tmpl('<div></div>'),
+      lifetimes: {
+        created() {
+          throw new Error('test')
+        },
+        error(e: Error) {
+          errorCalled += 1
+          errorObj = e
+          throw new Error('error in error')
+        },
+      },
+    })
+    glassEasel.createElement('root', compDef)
+    glassEasel.globalOptions.throwGlobalError = true
+    console.error = oldConsoleError
+    expect(errorCalled).toBe(1)
+    expect(errorObj!.message).toBe('test')
   })
 })
 

@@ -49,7 +49,7 @@ import { simpleDeepCopy } from './data_utils'
 import { Element } from './element'
 import { type EventListener, type EventListenerOptions } from './event'
 import { type ExternalShadowRoot } from './external_shadow_tree'
-import { FuncArr, safeCallback, triggerWarning, type GeneralFuncType } from './func_arr'
+import { FuncArr, safeCallback, type GeneralFuncType } from './func_arr'
 import {
   globalOptions,
   normalizeComponentOptions,
@@ -67,6 +67,7 @@ import { type Template, type TemplateEngine, type TemplateInstance } from './tem
 import { getDefaultTemplateEngine } from './tmpl'
 import { TraitBehavior, TraitGroup } from './trait_behaviors'
 import { COMPONENT_SYMBOL, isComponent, isElement } from './type_symbol'
+import { ThirdError, dispatchError, triggerWarning } from './warning'
 
 export const convertGenerics = (
   compDef: GeneralComponentDefinition,
@@ -105,13 +106,13 @@ export const convertGenerics = (
                 waiting: null,
               }
             } else {
-              triggerWarning(
-                `Generic "${key}" value "${target}" is not valid (on component "${compDef.is}").`,
-              )
+              triggerWarning(`Generic "${key}" value "${target}" is not valid`, compDef.is)
               const defaultComp = space.getDefaultComponent()
               if (!defaultComp) {
-                throw new Error(
-                  `Cannot find default component for generic "${key}" (on component "${compDef.is}")`,
+                throw new ThirdError(
+                  `Cannot find default component for generic "${key}"`,
+                  '[prepare]',
+                  compDef.is,
                 )
               }
               genericImpls[key] = {
@@ -128,8 +129,10 @@ export const convertGenerics = (
       } else {
         const defaultComp = genericDefaults[key] || space.getDefaultComponent()
         if (!defaultComp) {
-          throw new Error(
-            `Cannot find default component for generic "${key}" (on component "${compDef.is}")`,
+          throw new ThirdError(
+            `Cannot find default component for generic "${key}"`,
+            '[prepare]',
+            compDef.is,
           )
         }
         genericImpls[key] =
@@ -164,9 +167,7 @@ export const resolvePlaceholder = (
     } else if (usingTarget.placeholder === null) {
       ret = usingTarget.final
     } else {
-      triggerWarning(
-        `Placeholder on generic implementation is not valid (on component "${behavior.is}")`,
-      )
+      triggerWarning(`Placeholder on generic implementation is not valid`, behavior.is)
     }
   }
   if (ret) return ret
@@ -174,10 +175,18 @@ export const resolvePlaceholder = (
   if (comp === null && space._$allowUnusedNativeNode && placeholder !== '') {
     comp = placeholder
   }
-  if (!comp) comp = space.getDefaultComponent()
   if (!comp) {
-    throw new Error(
-      `Cannot find default component for placeholder target "${placeholder}" (on component "${behavior.is}")`,
+    comp = space.getDefaultComponent()
+    if (!comp) {
+      throw new ThirdError(
+        `Cannot find placeholder target "${placeholder}"`,
+        '[prepare]',
+        behavior.is,
+      )
+    }
+    triggerWarning(
+      `Cannot find placeholder target "${placeholder}", using default component.`,
+      behavior.is,
     )
   }
   return comp
@@ -268,17 +277,16 @@ export class ComponentDefinition<
   /**
    * Update the template field
    *
-   * This method has no effect if the template engine does not support template update.
+   * This method throws error if the template engine does not support template update.
    */
   updateTemplate(template: { [key: string]: unknown }) {
-    this.behavior._$updateTemplate(template)
-    if (this._$detail?.template.updateTemplate) {
-      this._$detail.template.updateTemplate(this.behavior as unknown as GeneralBehavior)
-    } else {
-      triggerWarning(
+    if (!this._$detail?.template.updateTemplate) {
+      throw new Error(
         `The template engine of component "${this.is}" does not support template update`,
       )
     }
+    this.behavior._$updateTemplate(template)
+    this._$detail.template.updateTemplate(this.behavior as unknown as GeneralBehavior)
   }
 
   isPrepared(): boolean {
@@ -685,7 +693,12 @@ export class Component<
     function relationInit<TOut extends { [x: string]: unknown }>(
       relationDef: RelationParams | TraitRelationParams<TOut>,
     ): RelationHandler<unknown, unknown> {
-      if (initDone) throw new Error('Cannot execute init-time functions after initialization')
+      if (initDone)
+        throw new ThirdError(
+          'Cannot execute init-time functions after initialization',
+          '[implement]',
+          behavior.is,
+        )
       const target = relationDef.target
       const normalizedRel = normalizeRelation(
         behavior.ownerSpace,
@@ -726,20 +739,40 @@ export class Component<
           traitBehavior: TraitBehavior<TIn, { [x: string]: unknown }>,
           impl: TIn,
         ): void => {
-          if (initDone) throw new Error('Cannot execute init-time functions after initialization')
+          if (initDone)
+            throw new ThirdError(
+              'Cannot execute init-time functions after initialization',
+              '[implement]',
+              behavior.is,
+            )
           comp._$traitGroup.implement(traitBehavior, impl)
         },
         relation: relationInit,
         observer: (dataPaths: string | readonly string[], func: (...args: any[]) => void): void => {
-          if (initDone) throw new Error('Cannot execute init-time functions after initialization')
+          if (initDone)
+            throw new ThirdError(
+              'Cannot execute init-time functions after initialization',
+              '[implement]',
+              behavior.is,
+            )
           if (cowObserver) {
             cowObserver = false
             dataGroupObserverTree = dataGroupObserverTree.cloneSub()
           }
-          dataGroupObserverTree.addObserver(func, parseMultiPaths(dataPaths as string | string[]))
+          try {
+            dataGroupObserverTree.addObserver(func, parseMultiPaths(dataPaths))
+          } catch (e) {
+            // parse multi paths may throw errors
+            dispatchError(e, `observer`, behavior.is)
+          }
         },
         lifetime: <T extends keyof Lifetimes>(name: T, func: Lifetimes[T]): void => {
-          if (initDone) throw new Error('Cannot execute init-time functions after initialization')
+          if (initDone)
+            throw new ThirdError(
+              'Cannot execute init-time functions after initialization',
+              '[implement]',
+              behavior.is,
+            )
           if (cowLifetime) {
             cowLifetime = false
             comp._$lifetimeFuncs = behavior._$getAllLifetimeFuncs()
@@ -748,12 +781,17 @@ export class Component<
           if (fag[name]) {
             fag[name]!.add(func as GeneralFuncType)
           } else {
-            const fa = (fag[name] = new FuncArr() as LifetimeFuncs[T])
+            const fa = (fag[name] = new FuncArr('lifetime') as LifetimeFuncs[T])
             fa!.add(func as GeneralFuncType)
           }
         },
         pageLifetime: (name: string, func: (...args: unknown[]) => void): void => {
-          if (initDone) throw new Error('Cannot execute init-time functions after initialization')
+          if (initDone)
+            throw new ThirdError(
+              'Cannot execute init-time functions after initialization',
+              '[implement]',
+              behavior.is,
+            )
           if (cowPageLifetime) {
             cowPageLifetime = false
             comp._$pageLifetimeFuncs = behavior._$getAllPageLifetimeFuncs()
@@ -762,7 +800,7 @@ export class Component<
           if (fag[name]) {
             fag[name]!.add(func)
           } else {
-            const fa = (fag[name] = new FuncArr())
+            const fa = (fag[name] = new FuncArr('pageLifetime'))
             fa.add(func)
           }
         },
@@ -846,11 +884,7 @@ export class Component<
     }
 
     // trigger created lifetimes
-    comp._$lifetimeFuncs.created?.call(
-      comp._$methodCaller as any,
-      [],
-      comp as unknown as GeneralComponent,
-    )
+    comp.triggerLifetime('created', [])
     if (!propEarlyInit && initPropValues !== undefined) initPropValues(comp)
 
     return comp
@@ -981,6 +1015,9 @@ export class Component<
 
   set data(newData: Partial<DataWithPropertyValues<TData, TProperty>>) {
     const dataGroup = this._$dataGroup
+    if (dataGroup === undefined) {
+      throw new ThirdError('Cannot update data before component created', `data setter`, this)
+    }
     Object.entries(newData).forEach(([key, value]) => dataGroup.replaceDataOnPath([key], value))
     dataGroup.applyDataUpdates()
   }
@@ -1007,20 +1044,19 @@ export class Component<
   /**
    * Apply the template updates to this component instance
    *
-   * This method has no effect if the template engine does not support template update.
+   * This method throws error if the template engine does not support template update.
    */
   applyTemplateUpdates(): void {
-    if (this._$tmplInst?.updateTemplate) {
+    if (!this._$tmplInst?.updateTemplate) {
+      throw new Error(
+        `The template engine of component "${this.is}" does not support template update`,
+      )
+    }
       const dataGroup = this._$dataGroup
       this._$tmplInst.updateTemplate(
         this._$definition._$detail!.template,
         dataGroup.innerData || dataGroup.data,
       )
-    } else {
-      triggerWarning(
-        `The template engine of component "${this.is}" does not support template update`,
-      )
-    }
   }
 
   static listProperties<
@@ -1266,7 +1302,7 @@ export class Component<
   replaceDataOnPath(path: DataPath, data: unknown) {
     const dataProxy = this._$dataGroup
     if (dataProxy === undefined) {
-      throw new Error('Cannot update data before component created')
+      throw new ThirdError('Cannot update data before component created', `replaceDataOnPath`, this)
     }
     dataProxy.replaceDataOnPath(path, data)
   }
@@ -1302,7 +1338,11 @@ export class Component<
   ) {
     const dataProxy = this._$dataGroup
     if (dataProxy === undefined) {
-      throw new Error('Cannot update data before component created')
+      throw new ThirdError(
+        'Cannot update data before component created',
+        `spliceArrayDataOnPath`,
+        this,
+      )
     }
     dataProxy.spliceArrayDataOnPath(path, index, del, inserts)
   }
@@ -1324,7 +1364,7 @@ export class Component<
   applyDataUpdates() {
     const dataProxy = this._$dataGroup
     if (dataProxy === undefined) {
-      throw new Error('Cannot update data before component created')
+      throw new ThirdError('Cannot update data before component created', `applyDataUpdates`, this)
     }
     dataProxy.applyDataUpdates()
   }
@@ -1339,7 +1379,7 @@ export class Component<
   groupUpdates<T>(callback: () => T): T {
     const dataProxy = this._$dataGroup
     if (dataProxy === undefined) {
-      throw new Error('Cannot update data before component created')
+      throw new ThirdError('Cannot update data before component created', `groupUpdates`, this)
     }
     const ret = callback()
     dataProxy.applyDataUpdates()
@@ -1358,15 +1398,18 @@ export class Component<
   updateData(newData?: Record<string, any>): void {
     const dataProxy = this._$dataGroup
     if (dataProxy === undefined) {
-      throw new Error('Cannot update data before component created')
+      throw new ThirdError('Cannot update data before component created', `updateData`, this)
     }
     if (typeof newData === 'object' && newData !== null) {
       const keys = Object.keys(newData)
       for (let i = 0; i < keys.length; i += 1) {
         const key = keys[i]!
+        try {
         const p = parseSinglePath(key)
-        if (p) {
           dataProxy.replaceDataOnPath(p, newData[key])
+        } catch (e) {
+          // parse single path may throw errors
+          dispatchError(e, `updateData`, this)
         }
       }
     }
@@ -1383,15 +1426,18 @@ export class Component<
   setData(newData?: Record<string, any> | undefined): void {
     const dataProxy = this._$dataGroup
     if (dataProxy === undefined) {
-      throw new Error('Cannot update data before component created')
+      throw new ThirdError('Cannot update data before component created', `setData`, this)
     }
     if (typeof newData === 'object' && newData !== null) {
       const keys = Object.keys(newData)
       for (let i = 0; i < keys.length; i += 1) {
         const key = keys[i]!
+        try {
         const p = parseSinglePath(key)
-        if (p) {
           dataProxy.replaceDataOnPath(p, newData[key])
+        } catch (e) {
+          // parse single path may throw errors
+          dispatchError(e, `setData`, this)
         }
       }
     }

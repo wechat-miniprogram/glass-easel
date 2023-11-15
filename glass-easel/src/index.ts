@@ -77,7 +77,7 @@ export {
   addGlobalWarningListener,
   removeGlobalErrorListener,
   removeGlobalWarningListener,
-} from './func_arr'
+} from './warning'
 
 import { type Behavior } from './behavior'
 import {
