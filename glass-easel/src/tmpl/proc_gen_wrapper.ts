@@ -871,7 +871,13 @@ export class ProcGenWrapper {
 
   // set style or property named `style`
   y(elem: Element, v: string) {
-    elem.setNodeStyle(dataValueToString(v), StyleSegmentIndex.MAIN)
+    if (elem instanceof Component && Component.hasProperty(elem, 'style')) {
+      const nodeDataProxy = Component.getDataProxy(elem)
+      const camelName = dashToCamelCase('style')
+      nodeDataProxy.replaceProperty(camelName, v)
+    } else {
+      elem.setNodeStyle(dataValueToString(v), StyleSegmentIndex.MAIN)
+    }
   }
 
   // set dataset

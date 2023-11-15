@@ -1462,6 +1462,32 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     ops = []
   })
 
+  test('setting properties', () => {
+    const cs = new glassEasel.ComponentSpace()
+    const subComp = cs.defineComponent({
+      template: tmpl(`
+        <div class="{{style}} a-{{propA + 1}}"></div>
+      `),
+      properties: {
+        style: String,
+        propA: Number,
+      },
+    })
+    const def = cs
+      .defineComponent({
+        using: {
+          'sub-comp': subComp.general(),
+        },
+        template: tmpl(`
+          <sub-comp style="abc" prop-a="3" />
+        `),
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe('<sub-comp><div class="abc a-4"></div></sub-comp>')
+  })
+
   test('setting external classes', () => {
     const cs = new glassEasel.ComponentSpace()
     const ssm = cs.styleScopeManager
