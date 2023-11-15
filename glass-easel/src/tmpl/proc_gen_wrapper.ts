@@ -131,7 +131,11 @@ type DefineForLoop = (
   ) => void,
 ) => void
 
-type DefineSlot = (name: string | undefined, slotValueInit?: (elem: Element) => void) => void
+type DefineSlot = (
+  name: string | undefined,
+  slotValueInit?: (elem: Element) => void,
+  slot?: string,
+) => void
 
 type DefinePureVirtualNode = (children: DefineChildren, slot: string | undefined) => void
 
@@ -352,11 +356,19 @@ export class ProcGenWrapper {
       },
 
       // slot node
-      (slotName: string | undefined, slotValueInit?: (elem: Element) => void) => {
+      (
+        slotName: string | undefined,
+        slotValueInit?: (elem: Element) => void,
+        slot?: string,
+      ) => {
         const elem = this.shadowRoot.createVirtualNode('slot')
         elem.destroyBackendElementOnDetach()
         Element.setSlotName(elem, dataValueToString(slotName))
-        if (slotElement) Element.setSlotElement(elem, slotElement)
+        if (slotElement) {
+          Element.setSlotElement(elem, slotElement)
+        } else if (slot !== undefined) {
+          elem.slot = slot
+        }
         if (slotValueInit) slotValueInit(elem)
         childNodes.push(elem)
       },
@@ -618,11 +630,18 @@ export class ProcGenWrapper {
       },
 
       // slot node
-      (slotName: string | undefined, slotValueInit?: (elem: Element) => void) => {
+      (
+        slotName: string | undefined,
+        slotValueInit?: (elem: Element) => void,
+        slot?: string,
+      ) => {
         const elem = childNodes[index] as Element
         index += 1
         if (slotName !== undefined) {
           Element.setSlotName(elem, dataValueToString(slotName))
+        }
+        if (!slotElement) {
+          if (slot !== undefined) elem.slot = slot
         }
         if (slotValueInit) slotValueInit(elem)
         this.shadowRoot.applySlotValueUpdates(elem)

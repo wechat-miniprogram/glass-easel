@@ -725,19 +725,7 @@ impl TmplElement {
     ) -> Result<(), TmplError> {
         match &self.virtual_type {
             TmplVirtualType::None => {
-                enum SlotKind<'a> {
-                    None,
-                    Static(&'a str),
-                    Dynamic(TmplExprProcGen),
-                }
-                let slot_kind = match &self.slot {
-                    None => SlotKind::None,
-                    Some(TmplAttrValue::Static(v)) => SlotKind::Static(v.as_str()),
-                    Some(TmplAttrValue::Dynamic { expr, .. }) => {
-                        let p = expr.to_proc_gen_prepare(w, scopes)?;
-                        SlotKind::Dynamic(p)
-                    }
-                };
+                let slot_kind = SlotKind::new(&self.slot, w, scopes)?;
                 w.expr_stmt(|w| {
                     write!(w, "E({},{{", gen_lit_str(&self.tag_name),)?;
                     if let Some(generics) = self.generics.as_ref() {
@@ -816,23 +804,7 @@ impl TmplElement {
                 })?;
             }
             TmplVirtualType::Pure => {
-                enum SlotKind<'a> {
-                    None,
-                    Static(&'a str),
-                    Dynamic(TmplExprProcGen),
-                }
-                let mut slot_kind = SlotKind::None;
-                if let Some(slot) = &self.slot {
-                    match &slot {
-                        TmplAttrValue::Static(x) => {
-                            slot_kind = SlotKind::Static(x.as_str());
-                        }
-                        TmplAttrValue::Dynamic { expr, .. } => {
-                            let p = expr.to_proc_gen_prepare(w, scopes)?;
-                            slot_kind = SlotKind::Dynamic(p);
-                        }
-                    }
-                }
+                let slot_kind = SlotKind::new(&self.slot, w, scopes)?;
                 w.expr_stmt(|w| {
                     write!(w, "J(")?;
                     TmplNode::to_proc_gen_define_children(
@@ -843,17 +815,7 @@ impl TmplElement {
                         group,
                         cur_path,
                     )?;
-                    match slot_kind {
-                        SlotKind::None => {}
-                        SlotKind::Static(x) => {
-                            write!(w, r#",{}"#, gen_lit_str(x))?;
-                        }
-                        SlotKind::Dynamic(p) => {
-                            write!(w, r#",Y("#)?;
-                            p.value_expr(w)?;
-                            write!(w, r#")"#)?;
-                        }
-                    }
+                    slot_kind.write_as_extra_argument(w)?;
                     write!(w, ")")?;
                     Ok(())
                 })?;
@@ -1153,6 +1115,7 @@ impl TmplElement {
                 })?;
             }
             TmplVirtualType::Slot { name, props } => {
+                let slot_kind = SlotKind::new(&self.slot, w, scopes)?;
                 let slot_value_init = if let Some(props) = props {
                     let var_slot_value_init = w.gen_ident();
                     w.expr_stmt(|w| {
@@ -1200,38 +1163,33 @@ impl TmplElement {
                 } else {
                     String::new()
                 };
-                match name {
-                    TmplAttrValue::Static(x) => {
-                        w.expr_stmt(|w| {
-                            if slot_value_init.len() > 0 {
-                                write!(
-                                    w,
-                                    r#"C?S({},{init}):S(undefined,{init})"#,
-                                    gen_lit_str(&x),
-                                    init = slot_value_init
-                                )?;
-                            } else {
-                                write!(w, r#"C?S({}):S()"#, gen_lit_str(&x))?;
-                            }
-                            Ok(())
-                        })?;
-                    }
-                    TmplAttrValue::Dynamic { expr, .. } => {
-                        let p = expr.to_proc_gen_prepare(w, scopes)?;
-                        w.expr_stmt(|w| {
+                let name = StaticStrOrProcGen::new(name, w, scopes)?;
+                w.expr_stmt(|w| {
+                    write!(w, "S(")?;
+                    match name {
+                        StaticStrOrProcGen::Static(s) => {
+                            write!(w, "{}", gen_lit_str(s))?;
+                        },
+                        StaticStrOrProcGen::Dynamic(p) => {
                             write!(w, r#"C||K||"#)?;
                             p.lvalue_state_expr(w, scopes)?;
-                            write!(w, r#"?S(Y("#)?;
+                            write!(w, r#"?Y("#)?;
                             p.value_expr(w)?;
-                            if slot_value_init.len() > 0 {
-                                write!(w, r#"),{init}):S({init})"#, init = slot_value_init)?;
-                            } else {
-                                write!(w, r#")):S()"#)?;
-                            }
-                            Ok(())
-                        })?;
+                            write!(w, "):undefined")?;
+                        },
                     }
-                }
+                    if slot_value_init.len() > 0 {
+                        write!(w, r#",{}"#, slot_value_init)?;
+                    }
+                    if !slot_kind.is_none() {
+                        if slot_value_init.len() == 0 {
+                            write!(w, r#",undefined"#)?;
+                        }
+                        slot_kind.write_as_extra_argument(w)?;
+                    }
+                    write!(w, ")")?;
+                    Ok(())
+                })?;
             }
         }
         Ok(())
@@ -1814,5 +1772,74 @@ impl fmt::Display for TmplTextNode {
                 write!(f, "{{{{{}}}}}", expr)
             }
         }
+    }
+}
+
+enum SlotKind<'a> {
+    None,
+    Static(&'a str),
+    Dynamic(TmplExprProcGen),
+}
+
+impl<'a> SlotKind<'a> {
+    fn new<W: Write>(
+        slot: &'a Option<TmplAttrValue>,
+        w: &mut JsFunctionScopeWriter<W>,
+        scopes: &mut Vec<ScopeVar>,
+    ) -> Result<Self, TmplError> {
+        let this = match slot {
+            None => SlotKind::None,
+            Some(TmplAttrValue::Static(v)) => SlotKind::Static(v.as_str()),
+            Some(TmplAttrValue::Dynamic { expr, .. }) => {
+                let p = expr.to_proc_gen_prepare(w, scopes)?;
+                SlotKind::Dynamic(p)
+            }
+        };
+        Ok(this)
+    }
+
+    fn is_none(&self) -> bool {
+        match self {
+            SlotKind::None => true,
+            SlotKind::Static(_) => false,
+            SlotKind::Dynamic(_) => false,
+        }
+    }
+
+    fn write_as_extra_argument<W: Write>(&self, w: &mut JsExprWriter<W>) -> Result<(), TmplError> {
+        match self {
+            SlotKind::None => {}
+            SlotKind::Static(x) => {
+                write!(w, r#",{}"#, gen_lit_str(x))?;
+            }
+            SlotKind::Dynamic(p) => {
+                write!(w, r#",Y("#)?;
+                p.value_expr(w)?;
+                write!(w, r#")"#)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+enum StaticStrOrProcGen<'a> {
+    Static(&'a str),
+    Dynamic(TmplExprProcGen),
+}
+
+impl<'a> StaticStrOrProcGen<'a> {
+    fn new<W: Write>(
+        v: &'a TmplAttrValue,
+        w: &mut JsFunctionScopeWriter<W>,
+        scopes: &mut Vec<ScopeVar>,
+    ) -> Result<Self, TmplError> {
+        let this = match v {
+            TmplAttrValue::Static(s) => Self::Static(s.as_str()),
+            TmplAttrValue::Dynamic { expr, .. } => {
+                let p = expr.to_proc_gen_prepare(w, scopes)?;
+                Self::Dynamic(p)
+            }
+        };
+        Ok(this)
     }
 }
