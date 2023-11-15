@@ -4,6 +4,10 @@ import { type GeneralComponent } from './component'
 import { type ComponentSpace } from './component_space'
 import { type TemplateEngine } from './template_engine'
 
+export const ENV = {
+  DEV: !(typeof process && process.env.NODE_ENV === 'production'),
+}
+
 /**
  * The deep copy strategy
  *

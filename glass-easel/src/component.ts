@@ -1182,7 +1182,7 @@ export class Component<
    */
   triggerLifetime(name: string, args: Parameters<GeneralFuncType>) {
     const f = this._$lifetimeFuncs[name]
-    if (f) f.call(this._$methodCaller as any, args)
+    if (f) f.call(this._$methodCaller as any, args, this)
   }
 
   /**
@@ -1201,7 +1201,7 @@ export class Component<
       if (isComponent(node)) {
         if (node._$pageLifetimeFuncs) {
           const f = node._$pageLifetimeFuncs[name]
-          if (f) f.call(node._$methodCaller, args)
+          if (f) f.call(node._$methodCaller, args, this)
         }
         if (!node._$external) rec(node.shadowRoot as ShadowRoot)
       }

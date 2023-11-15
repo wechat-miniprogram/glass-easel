@@ -2,8 +2,9 @@
 /* global window, document */
 
 import { type Element as GlassEaselElement } from '../element'
-import { EventBubbleStatus, type EventOptions, MutLevel } from '../event'
-import { safeCallback, triggerWarning } from '../func_arr'
+import { EventBubbleStatus, MutLevel, type EventOptions } from '../event'
+import { safeCallback } from '../func_arr'
+import { triggerWarning } from '../warning'
 import { type Context, type Element } from './domlike_backend_protocol'
 import {
   BackendMode,

@@ -9,12 +9,14 @@ import dts from 'rollup-plugin-dts'
 const jobs: string[] = []
 let minimize = true
 let sourcemap = true
+let dev = false
 const args = (process.env as { GLASS_EASEL_ARGS?: string }).GLASS_EASEL_ARGS || ''
 args.split(' ').forEach((arg) => {
   if (!arg) return
   if (arg[0] === '-') {
     if (arg === '--no-minimize') minimize = false
     else if (arg === '--dev') {
+      dev = true
       minimize = false
       sourcemap = false
     }
@@ -49,6 +51,7 @@ const genConfig = (
   plugins: [
     replace({
       values: {
+        'ENV.DEV': JSON.stringify(dev),
         'BM.DYNAMIC': JSON.stringify(type === 'dynamic'),
         'BM.SHADOW': JSON.stringify(type === 'shadow'),
         'BM.COMPOSED': JSON.stringify(type === 'composed'),
