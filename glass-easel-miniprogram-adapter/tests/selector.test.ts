@@ -79,48 +79,79 @@ describe('selector query', () => {
     const env = new MiniProgramEnv()
     const codeSpace = env.createCodeSpace('', true)
 
-    codeSpace.addComponentStaticConfig('child/comp', {
-      component: true,
-    })
-    codeSpace.addCompiledTemplate('child/comp', tmpl('{{a}}'))
-    // eslint-disable-next-line arrow-body-style
-    const childDef = codeSpace.componentEnv('child/comp', ({ Component }) => {
-      return Component()
+    codeSpace.addComponentStaticConfig('child1/comp', { component: true })
+    codeSpace.addComponentStaticConfig('child2/comp', { component: true })
+    codeSpace.addCompiledTemplate('child1/comp', tmpl('{{a}}'))
+    codeSpace.addCompiledTemplate('child2/comp', tmpl('{{a}}'))
+
+    const child1Def = codeSpace.componentEnv('child1/comp', ({ Component }) =>
+      Component()
         .data(() => ({
           a: 123,
         }))
         .export(function () {
           return {
+            id: 1,
             set: (d: { a: number }) => {
               this.setData(d)
             },
           }
         })
-        .register()
-    })
+        .register(),
+    )
+
+    const child2Def = codeSpace.componentEnv('child2/comp', ({ Component }) =>
+      Component()
+        .definition({
+          data: () => ({
+            a: 123,
+          }),
+          export() {
+            return {
+              id: 2,
+              set: (d: { a: number }) => {
+                this.setData(d)
+              },
+            }
+          },
+        })
+        .register(),
+    )
 
     codeSpace.addComponentStaticConfig('path/to/comp', {
       usingComponents: {
-        child: '/child/comp',
+        child1: '/child1/comp',
+        child2: '/child2/comp',
       },
     })
     codeSpace.addCompiledTemplate(
       'path/to/comp',
       tmpl(`
       <div id="d">
-        <child id="c1" />
-        <child id="c2" />
+        <child1 id="c1" />
+        <child2 id="c2" />
       </div>
     `),
     )
     codeSpace.componentEnv('path/to/comp', ({ Component }) => {
       const selfDef = Component()
         .lifetime('attached', function () {
-          // eslint-disable-next-line
-          this.selectComponent('#c1').set({ a: 456 })
-          this.selectComponent('#c2', childDef)!.set({ a: 789 })
-          expect(this.selectComponent('#c2', selfDef)).toBe(null)
           expect(this.selectComponent('#d')).toBe(null)
+          expect(this.selectComponent('#c1', child2Def)).toBe(null)
+          expect(this.selectComponent('#c1', selfDef)).toBe(null)
+          expect(this.selectComponent('#c2', child1Def)).toBe(null)
+          expect(this.selectComponent('#c2', selfDef)).toBe(null)
+
+          const c1any = this.selectComponent('#c1') as { id: number }
+          const c1 = this.selectComponent('#c1', child1Def)!
+          const c2any = this.selectComponent('#c2') as { id: number }
+          const c2 = this.selectComponent('#c2', child2Def)!
+
+          expect(c1any.id).toBe(c1.id)
+          expect(c2any.id).toBe(c2.id)
+
+          c1.set({ a: 456 })
+          c2.set({ a: 789 })
         })
         .register()
     })
@@ -128,7 +159,99 @@ describe('selector query', () => {
     const ab = env.associateBackend()
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
-    expect(domHtml(root.getComponent())).toBe('<div><child>456</child><child>789</child></div>')
+    expect(domHtml(root.getComponent())).toBe('<div><child1>456</child1><child2>789</child2></div>')
+  })
+
+  test('select single component (with custom export on behavior)', () => {
+    const env = new MiniProgramEnv()
+    const codeSpace = env.createCodeSpace('', true)
+
+    codeSpace.addComponentStaticConfig('child1/comp', { component: true })
+    codeSpace.addComponentStaticConfig('child2/comp', { component: true })
+    codeSpace.addCompiledTemplate('child1/comp', tmpl('{{a}}'))
+    codeSpace.addCompiledTemplate('child2/comp', tmpl('{{a}}'))
+
+    // eslint-disable-next-line arrow-body-style
+    const child1Def = codeSpace.componentEnv('child1/comp', ({ Behavior, Component }) => {
+      const beh = Behavior()
+        .data(() => ({
+          a: 123,
+        }))
+        .export(function () {
+          return {
+            id: 1,
+            set: (d: { a: number }) => {
+              this.setData(d)
+            },
+          }
+        })
+        .register()
+
+      return Component().behavior(beh).register()
+    })
+
+    const child2Def = codeSpace.componentEnv('child2/comp', ({ Behavior, Component }) => {
+      const beh = Behavior()
+        .definition({
+          data: () => ({
+            a: 123,
+          }),
+          export() {
+            return {
+              id: 2,
+              set: (d: { a: number }) => {
+                this.setData(d)
+              },
+            }
+          },
+        })
+        .register()
+
+      return Component().behavior(beh).register()
+    })
+
+    codeSpace.addComponentStaticConfig('path/to/comp', {
+      usingComponents: {
+        child1: '/child1/comp',
+        child2: '/child2/comp',
+      },
+    })
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
+      <div id="d">
+        <child1 id="c1" />
+        <child2 id="c2" />
+      </div>
+    `),
+    )
+    codeSpace.componentEnv('path/to/comp', ({ Component }) => {
+      const selfDef = Component()
+        .lifetime('attached', function () {
+          expect(this.selectComponent('#d')).toBe(null)
+          expect(this.selectComponent('#c1', child2Def)).toBe(null)
+          expect(this.selectComponent('#c1', selfDef)).toBe(null)
+          expect(this.selectComponent('#c2', child1Def)).toBe(null)
+          expect(this.selectComponent('#c2', selfDef)).toBe(null)
+
+          const c1any = this.selectComponent('#c1') as { id: number }
+          const c1 = this.selectComponent('#c1', child1Def)!
+          const c2any = this.selectComponent('#c2') as { id: number }
+          const c2 = this.selectComponent('#c2', child2Def)!
+
+          expect(c1any.id).toBe(c1.id)
+          expect(c2any.id).toBe(c2.id)
+
+          c1.set({ a: 456 })
+          c2.set({ a: 789 })
+        })
+        .register()
+    })
+
+    const ab = env.associateBackend()
+    const root = ab.createRoot('body', codeSpace, 'path/to/comp')
+    glassEasel.Element.pretendAttached(root.getComponent())
+    expect(domHtml(root.getComponent())).toBe('<div><child1>456</child1><child2>789</child2></div>')
   })
 
   test('select all components', () => {

@@ -18,7 +18,7 @@ type ExportType<
   UProperty extends PropertyList,
   UMethod extends MethodList,
   UComponentExport,
-> = UComponentExport extends undefined
+> = [UComponentExport] extends [never]
   ? Component<UData, UProperty, UMethod, UComponentExport>
   : UComponentExport
 
@@ -52,7 +52,7 @@ const filterComponentExport = (
   source: ComponentCaller<any, any, any, any>,
   elem: glassEasel.Element,
 ): any => {
-  if (elem instanceof glassEasel.Component) {
+  if (glassEasel.Component.isComponent(elem)) {
     const selectedSpace = elem.getRootBehavior().ownerSpace
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const uncheckedCaller = elem.getMethodCaller()
@@ -477,7 +477,10 @@ export class ComponentProto<
 > {
   private proto: Component<TData, TProperty, TMethod, TComponentExport>
 
-  constructor(methods: TMethod, componentExport?: () => TComponentExport) {
+  constructor(
+    methods: TMethod,
+    componentExport?: (source: GeneralComponent | null) => TComponentExport,
+  ) {
     this.proto = Object.create(ComponentCaller.prototype) as Component<
       TData,
       TProperty,
