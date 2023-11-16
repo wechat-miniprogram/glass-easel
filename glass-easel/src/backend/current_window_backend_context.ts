@@ -218,97 +218,88 @@ export class CurrentWindowBackendContext implements Context {
       }
     }
 
-    document.body.addEventListener(
-      'touchstart',
-      (ev) => {
-        this._$trigger(ev, 'touchstart', this._$getEventDetail(ev), ev.bubbles, ev.composed)
-        disableMouseEvents = true
-        const changedTouches = ev.changedTouches
-        for (let i = 0; i < changedTouches.length; i += 1) {
-          handleTapStart(ev, changedTouches[i]!)
-        }
-      },
-      { capture: true },
-    )
-    document.body.addEventListener(
-      'touchmove',
-      (ev) => {
-        this._$trigger(ev, 'touchmove', this._$getEventDetail(ev), ev.bubbles, ev.composed)
-        const changedTouches = ev.changedTouches
-        for (let i = 0; i < changedTouches.length; i += 1) {
-          handleTapMove(ev, changedTouches[i]!)
-        }
-      },
-      { capture: true },
-    )
-    document.body.addEventListener(
-      'touchend',
-      (ev) => {
-        this._$trigger(ev, 'touchend', this._$getEventDetail(ev), ev.bubbles, ev.composed)
-        const changedTouches = ev.changedTouches
-        for (let i = 0; i < changedTouches.length; i += 1) {
-          handleTapEnd(ev, changedTouches[i]!)
-        }
-      },
-      { capture: true },
-    )
-    document.body.addEventListener(
-      'touchcancel',
-      (ev) => {
-        this._$trigger(ev, 'touchcancel', this._$getEventDetail(ev), ev.bubbles, ev.composed)
-        const changedTouches = ev.changedTouches
-        for (let i = 0; i < changedTouches.length; i += 1) {
-          handleTapCancel(ev, changedTouches[i]!)
-        }
-      },
-      { capture: true },
-    )
-    document.body.addEventListener(
-      'mousedown',
-      (ev) => {
-        this._$trigger(ev, 'mousedown', this._$getEventDetail(ev), ev.bubbles, ev.composed)
-        if (disableMouseEvents) return
-        handleTapStart(ev, {
-          identifier: SIMULATED_MOUSE_ID,
-          clientX: ev.clientX,
-          clientY: ev.clientY,
-        })
-      },
-      { capture: true },
-    )
-    document.body.addEventListener(
-      'mousemove',
-      (ev) => {
-        this._$trigger(ev, 'mousemove', this._$getEventDetail(ev), ev.bubbles, ev.composed)
-        if (disableMouseEvents) return
-        handleTapMove(ev, {
-          identifier: SIMULATED_MOUSE_ID,
-          clientX: ev.clientX,
-          clientY: ev.clientY,
-        })
-      },
-      { capture: true },
-    )
-    document.body.addEventListener(
-      'mouseup',
-      (ev) => {
-        this._$trigger(ev, 'mouseup', this._$getEventDetail(ev), ev.bubbles, ev.composed)
-        if (disableMouseEvents) return
-        handleTapEnd(ev, {
-          identifier: SIMULATED_MOUSE_ID,
-          clientX: ev.clientX,
-          clientY: ev.clientY,
-        })
-      },
-      { capture: true },
-    )
-    const listeners = this._$delegatedEventListeners
-    listeners.touchstart = true
-    listeners.touchmove = true
-    listeners.touchend = true
-    listeners.mousedown = true
-    listeners.mousemove = true
-    listeners.mouseup = true
+    const handleTouchStart = (ev: TouchEvent) => {
+      disableMouseEvents = true
+      const changedTouches = ev.changedTouches
+      for (let i = 0; i < changedTouches.length; i += 1) {
+        handleTapStart(ev, changedTouches[i]!)
+      }
+      const target = ev.target as unknown as HTMLElement & { __touchCount?: number }
+      if (!target.__touchCount) {
+        target.__touchCount = 0
+        target.addEventListener('touchend', handleTouchEnd)
+        target.addEventListener('touchcancel', handleTouchCancel)
+      }
+      target.__touchCount += changedTouches.length
+    }
+
+    const handleTouchMove = (ev: TouchEvent) => {
+      const changedTouches = ev.changedTouches
+      for (let i = 0; i < changedTouches.length; i += 1) {
+        handleTapMove(ev, changedTouches[i]!)
+      }
+    }
+
+    const handleTouchEnd = (ev: TouchEvent) => {
+      const changedTouches = ev.changedTouches
+      for (let i = 0; i < changedTouches.length; i += 1) {
+        handleTapEnd(ev, changedTouches[i]!)
+      }
+      const target = ev.target as unknown as HTMLElement & { __touchCount?: number }
+      target.__touchCount! -= changedTouches.length
+      if (target.__touchCount! <= 0) {
+        target.__touchCount = 0
+        target.removeEventListener('touchend', handleTouchEnd)
+        target.removeEventListener('touchcancel', handleTouchCancel)
+      }
+    }
+
+    const handleTouchCancel = (ev: TouchEvent) => {
+      const changedTouches = ev.changedTouches
+      for (let i = 0; i < changedTouches.length; i += 1) {
+        handleTapCancel(ev, changedTouches[i]!)
+      }
+      const target = ev.target as unknown as HTMLElement & { __touchCount?: number }
+      target.__touchCount! -= changedTouches.length
+      if (target.__touchCount! <= 0) {
+        target.__touchCount = 0
+        target.removeEventListener('touchend', handleTouchEnd)
+        target.removeEventListener('touchcancel', handleTouchCancel)
+      }
+    }
+
+    const handleMouseDown = (ev: MouseEvent) => {
+      if (disableMouseEvents) return
+      handleTapStart(ev, {
+        identifier: SIMULATED_MOUSE_ID,
+        clientX: ev.clientX,
+        clientY: ev.clientY,
+      })
+    }
+
+    const handleMouseOver = (ev: MouseEvent) => {
+      if (disableMouseEvents) return
+      handleTapMove(ev, {
+        identifier: SIMULATED_MOUSE_ID,
+        clientX: ev.clientX,
+        clientY: ev.clientY,
+      })
+    }
+
+    const handleMouseUp = (ev: MouseEvent) => {
+      if (disableMouseEvents) return
+      handleTapEnd(ev, {
+        identifier: SIMULATED_MOUSE_ID,
+        clientX: ev.clientX,
+        clientY: ev.clientY,
+      })
+    }
+
+    document.body.addEventListener('touchstart', handleTouchStart, { capture: true })
+    document.body.addEventListener('touchmove', handleTouchMove, { capture: true })
+    document.body.addEventListener('mousedown', handleMouseDown, { capture: true })
+    document.body.addEventListener('mousemove', handleMouseOver, { capture: true })
+    document.body.addEventListener('mouseup', handleMouseUp, { capture: true })
   }
 
   setListenerStats(element: Element, type: string, capture: boolean, mutLevel: MutLevel): void {
