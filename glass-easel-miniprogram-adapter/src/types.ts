@@ -1,6 +1,6 @@
-import { DeepCopyKind, typeUtils as utils } from 'glass-easel'
-import type { DefinitionFilter, GeneralBehavior, Behavior } from './behavior'
-import { GeneralComponent } from './component'
+import { type DeepCopyKind, type typeUtils as utils } from 'glass-easel'
+import type { Behavior, DefinitionFilter, GeneralBehavior } from './behavior'
+import { type GeneralComponent } from './component'
 
 export { typeUtils as utils } from 'glass-easel'
 

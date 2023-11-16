@@ -1,6 +1,7 @@
 import * as glassEasel from 'glass-easel'
-import { MiniProgramEnv, StyleIsolation } from '.'
-import { CodeSpace } from './space'
+import { type MiniProgramEnv } from './env'
+import { type CodeSpace } from './space'
+import { StyleIsolation } from './types'
 
 /**
  * A backend context that has been associated to an environment

@@ -1,25 +1,25 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 
 import * as glassEasel from 'glass-easel'
-import { MiniProgramEnv } from '.'
-import {
-  ComponentStaticConfig,
-  ComponentDefinitionOptions,
-  StyleIsolation,
-  BehaviorDefinition,
-  ComponentDefinition,
-  PageDefinition,
-  utils as typeUtils,
-} from './types'
-import { guid } from './utils'
 import {
   Behavior,
   ComponentType,
-  DefinitionFilter,
-  GeneralBehavior,
   TraitBehavior,
+  type DefinitionFilter,
+  type GeneralBehavior,
 } from './behavior'
-import { AllData, Component, ComponentProto, GeneralComponent } from './component'
+import { ComponentProto, type AllData, type Component, type GeneralComponent } from './component'
+import { type MiniProgramEnv } from './env'
+import {
+  StyleIsolation,
+  type BehaviorDefinition,
+  type ComponentDefinition,
+  type ComponentDefinitionOptions,
+  type ComponentStaticConfig,
+  type PageDefinition,
+  type utils as typeUtils,
+} from './types'
+import { guid } from './utils'
 
 // The page constructor
 export interface PageConstructor {
@@ -1123,7 +1123,7 @@ export class BehaviorBuilder<
     TNewData extends DataList = Empty,
     TNewProperty extends PropertyList = Empty,
     TNewMethod extends MethodList = Empty,
-    TNewComponentExport = never
+    TNewComponentExport = never,
   >(
     def: BehaviorDefinition<TNewData, TNewProperty, TNewMethod, TNewComponentExport> &
       ThisType<

@@ -1,5 +1,5 @@
-import * as glassEasel from 'glass-easel'
-import { GeneralComponent } from './component'
+import type * as glassEasel from 'glass-easel'
+import { type GeneralComponent } from './component'
 
 export class MediaQueryObserver {
   private _$comp: GeneralComponent

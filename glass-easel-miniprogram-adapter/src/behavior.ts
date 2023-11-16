@@ -1,6 +1,6 @@
-import * as glassEasel from 'glass-easel'
-import { GeneralComponentDefinition, utils as typeUtils } from './types'
-import { GeneralComponent } from './component'
+import type * as glassEasel from 'glass-easel'
+import { type GeneralComponentDefinition, type utils as typeUtils } from './types'
+import { type GeneralComponent } from './component'
 
 type DataList = typeUtils.DataList
 type PropertyList = typeUtils.PropertyList

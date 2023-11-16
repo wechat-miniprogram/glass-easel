@@ -301,7 +301,7 @@ export class SelectorQuery {
               ],
               () => {
                 if (fields.properties) {
-                  if (elem instanceof glassEasel.Component) {
+                  if (glassEasel.Component.isComponent(elem)) {
                     fields.properties.forEach((propName) => {
                       if (glassEasel.Component.hasProperty(elem, propName)) {
                         const ds = elem.getComponentOptions().propertyPassingDeepCopy

@@ -1,6 +1,6 @@
 import * as glassEasel from 'glass-easel'
-import { utils as typeUtils } from './types'
-import { ComponentType, GeneralBehavior, TraitBehavior } from './behavior'
+import { type utils as typeUtils } from './types'
+import { type ComponentType, type GeneralBehavior, type TraitBehavior } from './behavior'
 import { SelectorQuery } from './selector_query'
 import { IntersectionObserver } from './intersection'
 import { MediaQueryObserver } from './media_query'
