@@ -1,8 +1,10 @@
 import { type GeneralBackendElement } from './backend'
 import { type GeneralComponent } from './component'
+import { addTimelineEvent, performanceMeasureEnd, performanceMeasureStart } from './devtool'
 import { type Element } from './element'
 import { type ExternalShadowRoot } from './external_shadow_tree'
 import { FuncArrWithMeta } from './func_arr'
+import { ENV } from './global_options'
 import { isComponent, isShadowRoot } from './type_symbol'
 
 /**
@@ -291,6 +293,10 @@ export class Event<TDetail> {
     if (this._$dispatched) {
       throw new Error('Event cannot be dispatched twice')
     }
+    if (ENV.DEV) {
+      addTimelineEvent(this.type, { event: this })
+      performanceMeasureStart('event.dispatch')
+    }
     this._$dispatched = true
     const crossShadow = this.composed
     const bubbles = this.bubbles
@@ -370,6 +376,8 @@ export class Event<TDetail> {
         return bubbles && !eventBubblingControl.stopped
       })
     }
+
+    if (ENV.DEV) performanceMeasureEnd()
   }
 
   static dispatchEvent<TDetail>(target: Element, event: Event<TDetail>) {

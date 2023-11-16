@@ -46,15 +46,22 @@ import {
   type DeepCopyStrategy,
 } from './data_proxy'
 import { simpleDeepCopy } from './data_utils'
+import {
+  performanceMeasureEnd,
+  performanceMeasureRenderWaterfall,
+  performanceMeasureStart,
+} from './devtool'
 import { Element } from './element'
 import { type EventListener, type EventListenerOptions } from './event'
 import { type ExternalShadowRoot } from './external_shadow_tree'
 import { FuncArr, safeCallback, type GeneralFuncType } from './func_arr'
 import {
+  ENV,
   globalOptions,
   normalizeComponentOptions,
   type NormalizedComponentOptions,
 } from './global_options'
+import { type Node } from './node'
 import {
   Relation,
   generateRelationDefinitionGroup,
@@ -513,7 +520,11 @@ export class Component<
     placeholderHandlerRemover: (() => void) | undefined,
     initPropValues?: (comp: ComponentInstance<TData, TProperty, TMethod>) => void,
   ): ComponentInstance<TData, TProperty, TMethod> {
-    if (!def._$detail) def.prepare()
+    if (!def._$detail) {
+      if (ENV.DEV) performanceMeasureStart('component.prepare')
+      def.prepare()
+      if (ENV.DEV) performanceMeasureEnd()
+    }
     const { proto, template, dataDeepCopy, propertyPassingDeepCopy, relationDefinitionGroup } =
       def._$detail!
     let dataGroupObserverTree = def._$detail!.dataGroupObserverTree
@@ -529,6 +540,7 @@ export class Component<
 
     // initialize component instance object
     const comp = Object.create(proto) as ComponentInstance<TData, TProperty, TMethod>
+    if (ENV.DEV) performanceMeasureStart('component.create', comp)
     comp._$genericImpls = genericImpls
     comp._$placeholderHandlerRemover = placeholderHandlerRemover
     comp._$external = external
@@ -537,64 +549,49 @@ export class Component<
 
     // create backend element
     let backendElement: GeneralBackendElement | null = null
-    if (owner) {
-      if (
-        !virtualHost &&
-        (BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike))
-      ) {
-        backendElement = (owner._$nodeTreeContext as domlikeBackend.Context).document.createElement(
-          tagName,
-        )
-      } else if (
-        !virtualHost &&
-        (BM.COMPOSED || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Composed))
-      ) {
-        const backend = owner._$nodeTreeContext as composedBackend.Context
-        backendElement = backend.createElement(options.hostNodeTagName, tagName)
-      } else if (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Shadow)) {
-        const backend = owner._$backendShadowRoot
-        backendElement = backend?.createComponent(tagName) || null
+    if (BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike)) {
+      if (!virtualHost) {
+        if (ENV.DEV) performanceMeasureStart('backend.createElement')
+        backendElement = (
+          (owner ? owner._$nodeTreeContext : nodeTreeContext) as domlikeBackend.Context
+        ).document.createElement(tagName)
+        if (ENV.DEV) performanceMeasureEnd()
       }
-    } else {
-      if (
-        !virtualHost &&
-        (BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike))
-      ) {
-        backendElement = (nodeTreeContext as domlikeBackend.Context).document.createElement(tagName)
-      } else if (
-        !virtualHost &&
-        (BM.COMPOSED || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Composed))
-      ) {
-        backendElement =
-          (nodeTreeContext as composedBackend.Context).createElement(
-            options.hostNodeTagName,
-            tagName,
-          ) || null
-      } else if (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Shadow)) {
-        const sr = (nodeTreeContext as backend.Context).getRootNode()
-        if (!sr) throw new Error('Failed getting backend shadow tree')
-        backendElement = sr.createComponent(tagName) || null
+    } else if (BM.COMPOSED || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Composed)) {
+      if (!virtualHost) {
+        if (ENV.DEV) performanceMeasureStart('backend.createElement')
+        backendElement = (
+          (owner ? owner._$nodeTreeContext : nodeTreeContext) as composedBackend.Context
+        ).createElement(options.hostNodeTagName, tagName)
+        if (ENV.DEV) performanceMeasureEnd()
       }
+    } else if (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Shadow)) {
+      if (ENV.DEV) performanceMeasureStart('component.createComponent')
+      backendElement = (
+        owner ? owner._$backendShadowRoot! : (nodeTreeContext as backend.Context).getRootNode()
+      ).createComponent(tagName)
+      if (ENV.DEV) performanceMeasureEnd()
     }
     comp._$initialize(virtualHost, backendElement, owner, nodeTreeContext)
 
+    const ownerHost = owner ? owner.getHostNode() : undefined
+    const ownerComponentOptions = ownerHost?.getComponentOptions()
+
     // init class list
-    const styleScope =
-      owner?.getHostNode().getComponentOptions().styleScope ?? StyleScopeManager.globalScope()
-    const extraStyleScope = owner
-      ? owner.getHostNode().getComponentOptions().extraStyleScope ?? undefined
-      : undefined
+    const styleScope = ownerComponentOptions?.styleScope ?? StyleScopeManager.globalScope()
+    const extraStyleScope = ownerComponentOptions?.extraStyleScope ?? undefined
+
+    const styleScopeManager = ownerHost?._$behavior.ownerSpace.styleScopeManager
     comp.classList = new ClassList(
-      comp,
+      backendElement,
+      nodeTreeContext.mode,
       behavior._$externalClasses || null,
-      owner ? owner.getHostNode().classList : null,
+      ownerHost ? ownerHost.classList : null,
       styleScope,
       extraStyleScope,
+      styleScopeManager,
     )
     if (backendElement) {
-      const styleScope = owner
-        ? owner.getHostNode()._$definition._$options.styleScope
-        : options.styleScope
       if (styleScope) {
         if (!(BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike))) {
           ;(backendElement as backend.Element | composedBackend.Element).setStyleScope(
@@ -603,12 +600,8 @@ export class Component<
           )
         }
       }
-      if (owner && writeExtraInfoToAttr) {
-        const prefix = owner
-          .getHostNode()
-          ._$behavior.ownerSpace?.styleScopeManager.queryName(
-            styleScope ?? StyleScopeManager.globalScope(),
-          )
+      if (styleScopeManager && writeExtraInfoToAttr) {
+        const prefix = styleScopeManager.queryName(styleScope)
         if (prefix) {
           backendElement.setAttribute('exparser:info-class-prefix', `${prefix}--`)
         }
@@ -617,6 +610,7 @@ export class Component<
 
     // associate in backend
     if (backendElement) {
+      if (ENV.DEV) performanceMeasureStart('backend.associateValue')
       if (!(BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike))) {
         ;(backendElement as backend.Element | composedBackend.Element).associateValue(comp)
       } else {
@@ -625,6 +619,7 @@ export class Component<
           comp,
         )
       }
+      if (ENV.DEV) performanceMeasureEnd()
     }
 
     // write attr
@@ -810,6 +805,7 @@ export class Component<
       const initFuncs = behavior._$init
       for (let i = 0; i < initFuncs.length; i += 1) {
         const init = initFuncs[i]!
+        if (ENV.DEV) performanceMeasureStart('component.init', comp)
         const exported = safeCallback(
           'Component Init',
           init,
@@ -817,6 +813,7 @@ export class Component<
           [builderContext],
           undefined,
         ) as { [x: string]: unknown } | undefined
+        if (ENV.DEV) performanceMeasureEnd()
         if (exported) {
           const exportedKeys = Object.keys(exported)
           for (let j = 0; j < exportedKeys.length; j += 1) {
@@ -855,9 +852,23 @@ export class Component<
 
     // init template with init data
     if (propEarlyInit && initPropValues !== undefined) initPropValues(comp)
-    tmplInst.initValues(dataGroup.innerData || dataGroup.data)
+    if (ENV.DEV) {
+      performanceMeasureRenderWaterfall('component.render', 'backend.render', comp, () => {
+        tmplInst.initValues(dataGroup.innerData || dataGroup.data)
+      })
+    } else {
+      tmplInst.initValues(dataGroup.innerData || dataGroup.data)
+    }
     comp._$tmplInst = tmplInst
-    dataGroup.setUpdateListener(tmplInst.updateValues.bind(tmplInst))
+    dataGroup.setUpdateListener((data, combinedChanges) => {
+      if (ENV.DEV) {
+        performanceMeasureRenderWaterfall('component.render', 'backend.render', comp, () => {
+          tmplInst.updateValues(data, combinedChanges)
+        })
+      } else {
+        tmplInst.updateValues(data, combinedChanges)
+      }
+    })
 
     // bind behavior listeners
     const listeners = behavior._$listeners
@@ -887,6 +898,7 @@ export class Component<
     comp.triggerLifetime('created', [])
     if (!propEarlyInit && initPropValues !== undefined) initPropValues(comp)
 
+    if (ENV.DEV) performanceMeasureEnd()
     return comp
   }
 
@@ -1052,11 +1064,11 @@ export class Component<
         `The template engine of component "${this.is}" does not support template update`,
       )
     }
-      const dataGroup = this._$dataGroup
-      this._$tmplInst.updateTemplate(
-        this._$definition._$detail!.template,
-        dataGroup.innerData || dataGroup.data,
-      )
+    const dataGroup = this._$dataGroup
+    this._$tmplInst.updateTemplate(
+      this._$definition._$detail!.template,
+      dataGroup.innerData || dataGroup.data,
+    )
   }
 
   static listProperties<
@@ -1238,20 +1250,31 @@ export class Component<
 
   /** Update an external class value */
   setExternalClass(name: string, target: string) {
-    const cl = this.classList as ClassList
-    cl._$setAlias(name, target)
-    cl._$spreadAliasUpdate()
+    this.scheduleExternalClassChange(name, target)
+    this.applyExternalClassChanges()
   }
 
   /** Schedule an update for an external class value */
   scheduleExternalClassChange(name: string, target: string) {
-    const cl = this.classList as ClassList
-    cl._$setAlias(name, target)
+    this.classList!._$setAlias(name, target)
   }
 
   /** Update multiple external class values */
   applyExternalClassChanges() {
-    ;(this.classList as ClassList)._$spreadAliasUpdate()
+    if (this._$external) return
+    const recv = (node: Node) => {
+      if (!isElement(node)) return
+      const classList = node.classList
+      if (classList?._$spreadExternalClassUpdate() && isComponent(node)) {
+        node.applyExternalClassChanges()
+      }
+      const childNodes = node.childNodes
+      for (let i = 0, l = childNodes.length; i < l; i += 1) {
+        recv(childNodes[i]!)
+      }
+      classList?._$markExternalClassUpdated()
+    }
+    recv(this.shadowRoot as ShadowRoot)
   }
 
   /** Triggers a worklet change lifetime */
@@ -1304,7 +1327,9 @@ export class Component<
     if (dataProxy === undefined) {
       throw new ThirdError('Cannot update data before component created', `replaceDataOnPath`, this)
     }
+    if (ENV.DEV) performanceMeasureStart('component.replaceDataOnPath', this)
     dataProxy.replaceDataOnPath(path, data)
+    if (ENV.DEV) performanceMeasureEnd()
   }
 
   /**
@@ -1344,7 +1369,9 @@ export class Component<
         this,
       )
     }
+    if (ENV.DEV) performanceMeasureStart('component.spliceArrayDataOnPath', this)
     dataProxy.spliceArrayDataOnPath(path, index, del, inserts)
+    if (ENV.DEV) performanceMeasureEnd()
   }
 
   /**
@@ -1366,7 +1393,9 @@ export class Component<
     if (dataProxy === undefined) {
       throw new ThirdError('Cannot update data before component created', `applyDataUpdates`, this)
     }
+    if (ENV.DEV) performanceMeasureStart('component.applyDataUpdates', this)
     dataProxy.applyDataUpdates()
+    if (ENV.DEV) performanceMeasureEnd()
   }
 
   /**
@@ -1381,8 +1410,10 @@ export class Component<
     if (dataProxy === undefined) {
       throw new ThirdError('Cannot update data before component created', `groupUpdates`, this)
     }
+    if (ENV.DEV) performanceMeasureStart('component.groupUpdates', this)
     const ret = callback()
     dataProxy.applyDataUpdates()
+    if (ENV.DEV) performanceMeasureEnd()
     return ret
   }
 
@@ -1400,12 +1431,13 @@ export class Component<
     if (dataProxy === undefined) {
       throw new ThirdError('Cannot update data before component created', `updateData`, this)
     }
+    if (ENV.DEV) performanceMeasureStart('component.updateData', this)
     if (typeof newData === 'object' && newData !== null) {
       const keys = Object.keys(newData)
       for (let i = 0; i < keys.length; i += 1) {
         const key = keys[i]!
         try {
-        const p = parseSinglePath(key)
+          const p = parseSinglePath(key)
           dataProxy.replaceDataOnPath(p, newData[key])
         } catch (e) {
           // parse single path may throw errors
@@ -1413,6 +1445,7 @@ export class Component<
         }
       }
     }
+    if (ENV.DEV) performanceMeasureEnd()
   }
 
   /**
@@ -1428,12 +1461,13 @@ export class Component<
     if (dataProxy === undefined) {
       throw new ThirdError('Cannot update data before component created', `setData`, this)
     }
+    if (ENV.DEV) performanceMeasureStart('component.setData', this)
     if (typeof newData === 'object' && newData !== null) {
       const keys = Object.keys(newData)
       for (let i = 0; i < keys.length; i += 1) {
         const key = keys[i]!
         try {
-        const p = parseSinglePath(key)
+          const p = parseSinglePath(key)
           dataProxy.replaceDataOnPath(p, newData[key])
         } catch (e) {
           // parse single path may throw errors
@@ -1442,6 +1476,7 @@ export class Component<
       }
     }
     dataProxy.applyDataUpdates()
+    if (ENV.DEV) performanceMeasureEnd()
   }
 }
 

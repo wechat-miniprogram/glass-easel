@@ -80,4 +80,9 @@ export interface Context<Ctx> {
     inlineStyle: string,
     callback: (propertyIndex: number | null) => void,
   ): void
+  performanceTraceStart(): number
+  performanceTraceEnd(
+    id: number,
+    cb: (stats: { startTimestamp: number; endTimestamp: number }) => void,
+  ): void
 }

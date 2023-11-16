@@ -9,7 +9,8 @@ import {
 import { ClassList, StyleScopeManager } from './class_list'
 import { type DataValue, type ModelBindingListener } from './data_proxy'
 import { Element } from './element'
-import { globalOptions } from './global_options'
+import { ENV, globalOptions } from './global_options'
+import { performanceMeasureEnd, performanceMeasureStart } from './devtool'
 import { type ShadowRoot } from './shadow_root'
 import { NATIVE_NODE_SYMBOL, isNativeNode } from './type_symbol'
 
@@ -37,54 +38,55 @@ export class NativeNode extends Element {
     node.is = tagName
     node._$placeholderHandlerRemover = placeholderHandlerRemover
     const nodeTreeContext = owner._$nodeTreeContext
-    let backendElement: GeneralBackendElement | null
+    let backendElement: GeneralBackendElement
+    if (ENV.DEV) performanceMeasureStart('backend.createElement')
     if (BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike)) {
       backendElement = (nodeTreeContext as domlikeBackend.Context).document.createElement(tagName)
     } else if (BM.SHADOW || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Shadow)) {
-      const backend = owner._$backendShadowRoot
-      backendElement = backend?.createElement(tagName, stylingName ?? tagName) || null
+      backendElement = owner._$backendShadowRoot!.createElement(tagName, stylingName ?? tagName)
     } else {
       const backend = nodeTreeContext as composedBackend.Context
       backendElement = backend.createElement(tagName, stylingName ?? tagName)
     }
+    if (ENV.DEV) performanceMeasureEnd()
     node._$initialize(false, backendElement, owner, nodeTreeContext)
-    const ownerOptions = owner.getHostNode().getComponentOptions()
-    const styleScope = ownerOptions.styleScope ?? StyleScopeManager.globalScope()
-    const extraStyleScope = owner ? ownerOptions.extraStyleScope ?? undefined : undefined
+    const ownerHost = owner.getHostNode()
+    const ownerComponentOptions = ownerHost.getComponentOptions()
+    const styleScope = ownerComponentOptions.styleScope ?? StyleScopeManager.globalScope()
+    const extraStyleScope = ownerComponentOptions.extraStyleScope ?? undefined
+    const styleScopeManager = ownerHost._$behavior.ownerSpace.styleScopeManager
     node.classList = new ClassList(
-      node,
+      backendElement,
+      owner.getBackendMode(),
       null,
-      owner ? owner.getHostNode().classList : null,
+      ownerHost.classList,
       styleScope,
       extraStyleScope,
+      styleScopeManager,
     )
-    if (owner && backendElement) {
-      const styleScope =
-        owner.getHostNode()._$definition._$options.styleScope ?? StyleScopeManager.globalScope()
-      if (styleScope) {
-        if (!(BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike))) {
-          ;(backendElement as backend.Element | composedBackend.Element).setStyleScope(styleScope)
-        }
-      }
-      if (globalOptions.writeExtraInfoToAttr) {
-        const prefix = owner
-          .getHostNode()
-          ._$behavior.ownerSpace?.styleScopeManager.queryName(styleScope)
-        if (prefix) {
-          backendElement.setAttribute('exparser:info-class-prefix', `${prefix}--`)
-        }
-      }
-    }
-    if (backendElement) {
+    if (styleScope) {
       if (!(BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike))) {
-        ;(backendElement as backend.Element | composedBackend.Element).associateValue(node)
-      } else {
-        ;(owner._$nodeTreeContext as domlikeBackend.Context).associateValue(
-          backendElement as domlikeBackend.Element,
-          node,
-        )
+        if (ENV.DEV) performanceMeasureStart('backend.setStyleScope')
+        ;(backendElement as backend.Element | composedBackend.Element).setStyleScope(styleScope)
+        if (ENV.DEV) performanceMeasureEnd()
       }
     }
+    if (globalOptions.writeExtraInfoToAttr) {
+      const prefix = styleScopeManager.queryName(styleScope)
+      if (prefix) {
+        backendElement.setAttribute('exparser:info-class-prefix', `${prefix}--`)
+      }
+    }
+    if (ENV.DEV) performanceMeasureStart('backend.associateValue')
+    if (!(BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike))) {
+      ;(backendElement as backend.Element | composedBackend.Element).associateValue(node)
+    } else {
+      ;(owner._$nodeTreeContext as domlikeBackend.Context).associateValue(
+        backendElement as domlikeBackend.Element,
+        node,
+      )
+    }
+    if (ENV.DEV) performanceMeasureEnd()
     return node
   }
 
@@ -101,6 +103,7 @@ export class NativeNode extends Element {
             listener.call(this, value)
           }
         }
+        if (ENV.DEV) performanceMeasureStart('backend.setModelBindingStat')
         if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
           ;(this.getBackendContext() as domlikeBackend.Context).setModelBindingStat(
             backendElement as domlikeBackend.Element,
@@ -113,6 +116,7 @@ export class NativeNode extends Element {
             listener,
           )
         }
+        if (ENV.DEV) performanceMeasureEnd()
       }
     }
     this._$modelBindingListeners[propName] = listener

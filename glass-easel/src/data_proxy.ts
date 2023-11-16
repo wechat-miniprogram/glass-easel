@@ -937,7 +937,7 @@ export class DataGroup<
             prop.observer,
             comp.getMethodCaller() as any,
             [newValue, oldValue],
-            comp as unknown as GeneralComponent,
+            comp,
           )
         }
         if (comp._$mutationObserverTarget) {

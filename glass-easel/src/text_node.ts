@@ -7,6 +7,8 @@ import {
   type domlikeBackend,
 } from './backend'
 import { type Element } from './element'
+import { ENV } from './global_options'
+import { performanceMeasureEnd, performanceMeasureStart } from './devtool'
 import { MutationObserverTarget } from './mutation_observer'
 import { type NodeCast } from './node'
 import { type ShadowRoot } from './shadow_root'
@@ -38,6 +40,7 @@ export class TextNode implements NodeCast {
   constructor(text: string, owner: ShadowRoot) {
     this._$text = String(text)
     let backendElement: GeneralBackendElement | null
+    if (ENV.DEV) performanceMeasureStart('backend.createTextNode')
     if (BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike)) {
       backendElement = (owner._$nodeTreeContext as domlikeBackend.Context).document.createTextNode(
         text,
@@ -49,6 +52,7 @@ export class TextNode implements NodeCast {
       const backend = owner._$nodeTreeContext as composedBackend.Context
       backendElement = backend.createTextNode(text)
     }
+    if (ENV.DEV) performanceMeasureEnd()
     this._$backendElement = backendElement
     this.ownerShadowRoot = owner
     this.parentNode = null
@@ -95,7 +99,9 @@ export class TextNode implements NodeCast {
           (BM.DYNAMIC && this.ownerShadowRoot.getBackendMode() === BackendMode.Domlike)
         )
       ) {
+        if (ENV.DEV) performanceMeasureStart('backend.release')
         ;(this._$backendElement as backend.Element | composedBackend.Element).release()
+        if (ENV.DEV) performanceMeasureEnd()
       }
       this._$backendElement = null
     }
@@ -132,6 +138,7 @@ export class TextNode implements NodeCast {
   set textContent(text: string) {
     this._$text = String(text)
     if (this._$backendElement) {
+      if (ENV.DEV) performanceMeasureStart('backend.setText')
       if (
         BM.DOMLIKE ||
         (BM.DYNAMIC && this.ownerShadowRoot.getBackendMode() === BackendMode.Domlike)
@@ -140,6 +147,7 @@ export class TextNode implements NodeCast {
       } else {
         ;(this._$backendElement as backend.Element | composedBackend.Element).setText(this._$text)
       }
+      if (ENV.DEV) performanceMeasureEnd()
     }
     MutationObserverTarget.callTextObservers(this, {
       type: 'characterData',

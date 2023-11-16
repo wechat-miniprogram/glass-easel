@@ -1,4 +1,6 @@
 import { type AnyComponent, type GeneralComponent } from './component'
+import { performanceMeasureEnd, performanceMeasureStart } from './devtool'
+import { ENV } from './global_options'
 import { type Node } from './node'
 
 export type GeneralFuncType = (this: any, ...args: any[]) => any
@@ -130,10 +132,14 @@ export function safeCallback<F extends GeneralFuncType>(
   relatedComponent?: AnyComponent,
 ): ReturnType<F> | undefined {
   try {
+    if (ENV.DEV)
+      performanceMeasureStart(`${type}.${method.name || '(anonymous)'}`, relatedComponent, { args })
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return method.apply(caller, args)
   } catch (e) {
     dispatchError(e, `${type || 'Listener'} ${method.name || '(anonymous)'}`, relatedComponent)
     return undefined
+  } finally {
+    if (ENV.DEV) performanceMeasureEnd()
   }
 }

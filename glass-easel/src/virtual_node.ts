@@ -5,7 +5,9 @@ import {
   type GeneralBackendElement,
   type backend,
 } from './backend'
+import { performanceMeasureEnd, performanceMeasureStart } from './devtool'
 import { Element } from './element'
+import { ENV } from './global_options'
 import { type ShadowRoot } from './shadow_root'
 import { VIRTUAL_NODE_SYMBOL, isVirtualNode } from './type_symbol'
 
@@ -28,11 +30,14 @@ export class VirtualNode extends Element {
   ) {
     this.is = String(virtualName)
     if (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Shadow)) {
-      const shadowRoot = owner._$backendShadowRoot
-      const be =
-        (backendElement as backend.Element) || shadowRoot?.createVirtualNode(virtualName) || null
+      const shadowRoot = owner._$backendShadowRoot!
+      if (ENV.DEV) performanceMeasureStart('backend.createVirtualNode')
+      const be = (backendElement as backend.Element) || shadowRoot.createVirtualNode(virtualName)
+      if (ENV.DEV) performanceMeasureEnd()
       this._$initialize(true, be, owner, nodeTreeContext)
-      be?.associateValue(this)
+      if (ENV.DEV) performanceMeasureStart('backend.associateValue')
+      be.associateValue(this)
+      if (ENV.DEV) performanceMeasureEnd()
     } else {
       this._$initialize(true, backendElement, owner, nodeTreeContext)
     }

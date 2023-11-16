@@ -98,21 +98,23 @@ describe('Observer', function () {
   it('should be able to observe core property changes', function () {
     var elem = createElem('observer-a')
     var expectPropertyNameList = ['id', 'slot', 'class', 'class', 'class', 'class', 'style']
+    var expectPropertyValueList = ['a', 'b', 'c', '', 'c', 'c d', 'd']
     var observer = glassEasel.MutationObserver.create(function (e) {
       expect(this).toBe(e.target)
       expect(e.type).toBe('properties')
       expect(e.target).toBe(elem)
       expect(e.attributeName).toBe(expectPropertyNameList.shift())
+      expect(e.target[e.attributeName]).toBe(expectPropertyValueList.shift())
     })
     observer.observe(elem, { properties: true })
     elem.id = 'a'
     elem.slot = 'b'
     elem.class = 'c'
-    elem.classList.toggle('c')
-    elem.classList.toggle('c')
-    elem.classList.toggle('c', true)
-    elem.classList.toggle('d', false)
-    elem.classList.toggle('d', true)
+    elem.toggleNodeClass('c')
+    elem.toggleNodeClass('c')
+    elem.toggleNodeClass('c', true)
+    elem.toggleNodeClass('d', false)
+    elem.toggleNodeClass('d', true)
     elem.style = 'd'
     expect(expectPropertyNameList.length).toBe(0)
   })

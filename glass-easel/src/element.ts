@@ -19,6 +19,7 @@ import {
   type MethodList,
   type PropertyList,
 } from './component_params'
+import { performanceMeasureEnd, performanceMeasureStart } from './devtool'
 import {
   Event,
   EventTarget,
@@ -29,7 +30,7 @@ import {
   type EventOptions,
 } from './event'
 import { type ExternalShadowRoot } from './external_shadow_tree'
-import { globalOptions } from './global_options'
+import { ENV, globalOptions } from './global_options'
 import { MutationObserverTarget, type MutationObserverChildEvent } from './mutation_observer'
 import { type NativeNode } from './native_node'
 import { type Node, type NodeCast } from './node'
@@ -195,11 +196,15 @@ export class Element implements NodeCast {
       if (host.getComponentOptions().writeIdToDOM) {
         const idPrefix = host._$idPrefix
         const val = idPrefix ? `${idPrefix}--${newId}` : newId
-        if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
-          const e = this._$backendElement as domlikeBackend.Element | null
-          if (e) e.id = val
-        } else {
-          ;(this._$backendElement as backend.Element | composedBackend.Element | null)?.setId(val)
+        const be = this._$backendElement
+        if (be) {
+          if (ENV.DEV) performanceMeasureStart('backend.setId')
+          if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
+            ;(be as domlikeBackend.Element).id = val
+          } else {
+            ;(be as backend.Element | composedBackend.Element).setId(val)
+          }
+          if (ENV.DEV) performanceMeasureEnd()
         }
       }
     }
@@ -287,15 +292,13 @@ export class Element implements NodeCast {
 
   get class(): string {
     if (this.classList) {
-      return this.classList.getClassNames()
+      return this.classList.getClassNames(StyleSegmentIndex.MAIN)
     }
     return ''
   }
 
   set class(classNames) {
-    if (this.classList) {
-      this.classList.setClassNames(classNames)
-    }
+    this.setNodeClass(classNames, StyleSegmentIndex.MAIN)
   }
 
   get style(): string {
@@ -359,7 +362,9 @@ export class Element implements NodeCast {
   destroyBackendElement() {
     if (this._$backendElement) {
       if (!(BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike))) {
+        if (ENV.DEV) performanceMeasureStart('backend.release')
         ;(this._$backendElement as backend.Element | composedBackend.Element).release()
+        if (ENV.DEV) performanceMeasureEnd()
       }
       this._$backendElement = null
     }
@@ -381,8 +386,35 @@ export class Element implements NodeCast {
   }
 
   /** Set the node class */
-  setNodeClass(classNames: string, index: StyleSegmentIndex = 0) {
-    this.classList?.setClassNames(classNames, index)
+  setNodeClass(classNames: string, index: StyleSegmentIndex = StyleSegmentIndex.MAIN) {
+    if (ENV.DEV) performanceMeasureStart('backend.setClass')
+    const changed = this.classList?.setClassNames(classNames, index)
+    if (ENV.DEV) performanceMeasureEnd()
+    if (changed && this._$mutationObserverTarget) {
+      MutationObserverTarget.callAttrObservers(this, {
+        type: 'properties',
+        target: this,
+        attributeName: 'class',
+      })
+    }
+  }
+
+  /** Toggle the node class */
+  toggleNodeClass(
+    classNames: string,
+    force?: boolean,
+    index: StyleSegmentIndex = StyleSegmentIndex.MAIN,
+  ) {
+    if (ENV.DEV) performanceMeasureStart('backend.setClass')
+    const changed = this.classList?.toggle(classNames, force, index)
+    if (ENV.DEV) performanceMeasureEnd()
+    if (changed && this._$mutationObserverTarget) {
+      MutationObserverTarget.callAttrObservers(this, {
+        type: 'properties',
+        target: this,
+        attributeName: 'class',
+      })
+    }
   }
 
   /** Set the node style */
@@ -390,6 +422,7 @@ export class Element implements NodeCast {
     if (this._$styleSegments[index] === styleSegment) return
     this._$styleSegments[index] = styleSegment
     const style = this._$styleSegments.join(';')
+    if (ENV.DEV) performanceMeasureStart('backend.setStyle')
     if (this._$backendElement) {
       if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
         ;(this._$backendElement as domlikeBackend.Element).setAttribute('style', style)
@@ -397,6 +430,7 @@ export class Element implements NodeCast {
         ;(this._$backendElement as backend.Element | composedBackend.Element).setStyle(style)
       }
     }
+    if (ENV.DEV) performanceMeasureEnd()
     if (this._$mutationObserverTarget) {
       MutationObserverTarget.callAttrObservers(this, {
         type: 'properties',
@@ -590,10 +624,12 @@ export class Element implements NodeCast {
     ideaPosIndex: number,
   ) {
     if (BM.SHADOW || (BM.DYNAMIC && shadowParent.getBackendMode() === BackendMode.Shadow)) {
+      if (ENV.DEV) performanceMeasureStart('backend.reassignContainingSlot')
       ;(child._$backendElement as backend.Element).reassignContainingSlot(
         oldSlot ? (oldSlot._$backendElement as backend.Element) : null,
         newSlot ? (newSlot._$backendElement as backend.Element) : null,
       )
+      if (ENV.DEV) performanceMeasureEnd()
       return
     }
     if (oldSlot) {
@@ -613,17 +649,27 @@ export class Element implements NodeCast {
               BM.DOMLIKE ||
               (BM.DYNAMIC && shadowParent.getBackendContext().mode === BackendMode.Domlike)
             ) {
-              const rel = (before as Element)._$backendElement as domlikeBackend.Element
+              const rel = before._$backendElement as domlikeBackend.Element
               for (let i = 1; i < removeCount; i += 1) {
                 const next = rel.nextSibling
-                if (next) (backendParent as domlikeBackend.Element).removeChild(next)
+                if (next) {
+                  if (ENV.DEV) performanceMeasureStart('backend.removeChild')
+                  ;(backendParent as domlikeBackend.Element).removeChild(next)
+                  if (ENV.DEV) performanceMeasureEnd()
+                }
               }
-              if (removeCount > 0) (backendParent as domlikeBackend.Element).removeChild(rel)
+              if (removeCount > 0) {
+                if (ENV.DEV) performanceMeasureStart('backend.removeChild')
+                ;(backendParent as domlikeBackend.Element).removeChild(rel)
+                if (ENV.DEV) performanceMeasureEnd()
+              }
             } else {
+              if (ENV.DEV) performanceMeasureStart('backend.spliceRemove')
               ;(backendParent as composedBackend.Element).spliceRemove(
-                (before as Element)._$backendElement as composedBackend.Element,
+                before._$backendElement as composedBackend.Element,
                 removeCount,
               )
+              if (ENV.DEV) performanceMeasureEnd()
             }
           }
         }
@@ -902,11 +948,9 @@ export class Element implements NodeCast {
         sharedFrag = f
 
         const recNonVirtual = (c: Node) => {
-          // since `TextNode` also has `backendElement` private field, just make it as `Element`
-          // domlike backend also
-          ;(f as composedBackend.Element).appendChild(
-            (c as Element)._$backendElement as composedBackend.Element,
-          )
+          if (ENV.DEV) performanceMeasureStart('backend.appendChild')
+          ;(f as composedBackend.Element).appendChild(c._$backendElement as composedBackend.Element)
+          if (ENV.DEV) performanceMeasureEnd()
           frag = f
         }
 
@@ -960,47 +1004,71 @@ export class Element implements NodeCast {
       if (frag) {
         if (before) {
           if (BM.DOMLIKE || (BM.DYNAMIC && context.mode === BackendMode.Domlike)) {
-            const rel = (before as Element)._$backendElement as domlikeBackend.Element
+            const rel = before._$backendElement as domlikeBackend.Element
+            if (ENV.DEV) performanceMeasureStart('backend.insertBefore')
             ;(backendParent as domlikeBackend.Element).insertBefore(
               frag as domlikeBackend.Element,
               rel,
             )
+            if (ENV.DEV) performanceMeasureEnd()
             for (let i = 1; i < removeCount; i += 1) {
               const next = rel.nextSibling
-              if (next) (backendParent as domlikeBackend.Element).removeChild(next)
+              if (next) {
+                if (ENV.DEV) performanceMeasureStart('backend.removeChild')
+                ;(backendParent as domlikeBackend.Element).removeChild(next)
+                if (ENV.DEV) performanceMeasureEnd()
+              }
             }
-            if (removeCount > 0) (backendParent as domlikeBackend.Element).removeChild(rel)
+            if (removeCount > 0) {
+              if (ENV.DEV) performanceMeasureStart('backend.removeChild')
+              ;(backendParent as domlikeBackend.Element).removeChild(rel)
+              if (ENV.DEV) performanceMeasureEnd()
+            }
           } else {
+            if (ENV.DEV) performanceMeasureStart('backend.spliceBefore')
             ;(backendParent as composedBackend.Element).spliceBefore(
-              // since `TextNode` also has `backendElement` private field, just make it as `Element`
-              (before as Element)._$backendElement as composedBackend.Element,
+              before._$backendElement as composedBackend.Element,
               removeCount,
               frag as composedBackend.Element,
             )
+            if (ENV.DEV) performanceMeasureEnd()
           }
         } else {
           if (BM.DOMLIKE || (BM.DYNAMIC && context.mode === BackendMode.Domlike)) {
+            if (ENV.DEV) performanceMeasureStart('backend.appendChild')
             ;(backendParent as domlikeBackend.Element).appendChild(frag as domlikeBackend.Element)
+            if (ENV.DEV) performanceMeasureEnd()
           } else {
+            if (ENV.DEV) performanceMeasureStart('backend.spliceAppend')
             ;(backendParent as composedBackend.Element).spliceAppend(
               frag as composedBackend.Element,
             )
+            if (ENV.DEV) performanceMeasureEnd()
           }
         }
       } else if (removeCount > 0) {
         if (BM.DOMLIKE || (BM.DYNAMIC && context.mode === BackendMode.Domlike)) {
-          const rel = (before as Element)._$backendElement as domlikeBackend.Element
+          const rel = before!._$backendElement as domlikeBackend.Element
           for (let i = 1; i < removeCount; i += 1) {
             const next = rel.nextSibling
-            if (next) (backendParent as domlikeBackend.Element).removeChild(next)
+            if (next) {
+              if (ENV.DEV) performanceMeasureStart('backend.removeChild')
+              ;(backendParent as domlikeBackend.Element).removeChild(next)
+              if (ENV.DEV) performanceMeasureEnd()
+            }
           }
-          if (removeCount > 0) (backendParent as domlikeBackend.Element).removeChild(rel)
+          if (removeCount > 0) {
+            if (ENV.DEV) performanceMeasureStart('backend.removeChild')
+            ;(backendParent as domlikeBackend.Element).removeChild(rel)
+            if (ENV.DEV) performanceMeasureEnd()
+          }
         } else {
+          if (ENV.DEV) performanceMeasureStart('backend.spliceRemove')
           ;(backendParent as composedBackend.Element).spliceRemove(
-            // since `TextNode` also has `backendElement` private field, just make it as `Element`
-            (before as Element)._$backendElement as composedBackend.Element,
+            before!._$backendElement as composedBackend.Element,
             removeCount,
           )
+          if (ENV.DEV) performanceMeasureEnd()
         }
       }
     }
@@ -1017,32 +1085,32 @@ export class Element implements NodeCast {
         // for non-virtual children, use single child operation
         if (removal) {
           if (newChild) {
+            if (ENV.DEV) performanceMeasureStart('backend.replaceChild')
             ;(sharedNonVirtualParent as composedBackend.Element).replaceChild(
-              // since `TextNode` also has `backendElement` private field, just make it as `Element`
-              // domlike backend also
-              (newChild as Element)._$backendElement as composedBackend.Element,
-              (relChild as Element)._$backendElement as composedBackend.Element,
+              newChild._$backendElement as composedBackend.Element,
+              relChild!._$backendElement as composedBackend.Element,
             )
+            if (ENV.DEV) performanceMeasureEnd()
           } else {
+            if (ENV.DEV) performanceMeasureStart('backend.removeChild')
             ;(sharedNonVirtualParent as composedBackend.Element).removeChild(
-              // since `TextNode` also has `backendElement` private field, just make it as `Element`
-              // domlike backend also
-              (relChild as Element)._$backendElement as composedBackend.Element,
+              relChild!._$backendElement as composedBackend.Element,
             )
+            if (ENV.DEV) performanceMeasureEnd()
           }
         } else if (relChild) {
+          if (ENV.DEV) performanceMeasureStart('backend.insertBefore')
           ;(sharedNonVirtualParent as composedBackend.Element).insertBefore(
-            // since `TextNode` also has `backendElement` private field, just make it as `Element`
-            // domlike backend also
-            (newChild as Element)._$backendElement as composedBackend.Element,
-            (relChild as Element)._$backendElement as composedBackend.Element,
+            newChild!._$backendElement as composedBackend.Element,
+            relChild._$backendElement as composedBackend.Element,
           )
+          if (ENV.DEV) performanceMeasureEnd()
         } else {
+          if (ENV.DEV) performanceMeasureStart('backend.appendChild')
           ;(sharedNonVirtualParent as composedBackend.Element).appendChild(
-            // since `TextNode` also has `backendElement` private field, just make it as `Element`
-            // domlike backend also
-            (newChild as Element)._$backendElement as composedBackend.Element,
+            newChild!._$backendElement as composedBackend.Element,
           )
+          if (ENV.DEV) performanceMeasureEnd()
         }
       } else {
         // for node isn't a slot content, simply update
@@ -1076,7 +1144,11 @@ export class Element implements NodeCast {
       slotNodesSet.forEach((slot) => groupUpdate(null, slot))
     }
     if (!(BM.DOMLIKE || (BM.DYNAMIC && context.mode === BackendMode.Domlike))) {
-      if (sharedFrag) (sharedFrag as composedBackend.Element).release()
+      if (sharedFrag) {
+        if (ENV.DEV) performanceMeasureStart('backend.release')
+        ;(sharedFrag as composedBackend.Element).release()
+        if (ENV.DEV) performanceMeasureEnd()
+      }
     }
 
     // write extra info if needed
@@ -1512,11 +1584,12 @@ export class Element implements NodeCast {
           // removal of in-tree elements are not needed for DOM backend
           // do nothing
         } else if (BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) {
+          if (ENV.DEV) performanceMeasureStart('backend.removeChild')
           ;(oldParent._$backendElement as backend.Element | null)?.removeChild(
-            // since `TextNode` also has `backendElement` private field, just make it as `Element`
-            (newChild as Element)._$backendElement as backend.Element,
+            newChild._$backendElement as backend.Element,
             oldPosIndex,
           )
+          if (ENV.DEV) performanceMeasureEnd()
         } else {
           Element.insertChildComposed(oldParent, null, newChild, true, oldPosIndex)
         }
@@ -1562,31 +1635,35 @@ export class Element implements NodeCast {
       if (parent._$backendElement) {
         if (removal) {
           if (newChild) {
+            if (ENV.DEV) performanceMeasureStart('backend.replaceChild')
             ;(parent._$backendElement as backend.Element).replaceChild(
-              // since `TextNode` also has `backendElement` private field, just make it as `Element`
-              (newChild as Element)._$backendElement as backend.Element,
-              (relChild as Element)._$backendElement as backend.Element,
+              newChild._$backendElement as backend.Element,
+              relChild!._$backendElement as backend.Element,
               posIndex,
             )
+            if (ENV.DEV) performanceMeasureEnd()
           } else {
+            if (ENV.DEV) performanceMeasureStart('backend.removeChild')
             ;(parent._$backendElement as backend.Element).removeChild(
-              // since `TextNode` also has `backendElement` private field, just make it as `Element`
-              (relChild as Element)._$backendElement as backend.Element,
+              relChild!._$backendElement as backend.Element,
               posIndex,
             )
+            if (ENV.DEV) performanceMeasureEnd()
           }
         } else if (relChild) {
+          if (ENV.DEV) performanceMeasureStart('backend.insertBefore')
           ;(parent._$backendElement as backend.Element).insertBefore(
-            // since `TextNode` also has `backendElement` private field, just make it as `Element`
-            (newChild as Element)._$backendElement as backend.Element,
-            (relChild as Element)._$backendElement as backend.Element,
+            newChild!._$backendElement as backend.Element,
+            relChild._$backendElement as backend.Element,
             posIndex,
           )
+          if (ENV.DEV) performanceMeasureEnd()
         } else {
+          if (ENV.DEV) performanceMeasureStart('backend.appendChild')
           ;(parent._$backendElement as backend.Element).appendChild(
-            // since `TextNode` also has `backendElement` private field, just make it as `Element`
-            (newChild as Element)._$backendElement as backend.Element,
+            newChild!._$backendElement as backend.Element,
           )
+          if (ENV.DEV) performanceMeasureEnd()
         }
       }
     } else {
@@ -1728,10 +1805,12 @@ export class Element implements NodeCast {
     // spread in composed tree
     if (BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) {
       if (parent._$backendElement) {
+        if (ENV.DEV) performanceMeasureStart('backend.spliceRemove')
         ;(parent._$backendElement as backend.Element).spliceRemove(
-          (relChild as Element)._$backendElement as backend.Element,
+          relChild!._$backendElement as backend.Element,
           count,
         )
+        if (ENV.DEV) performanceMeasureEnd()
       }
     } else {
       for (let i = count - 1; i >= 0; i -= 1) {
@@ -1813,9 +1892,10 @@ export class Element implements NodeCast {
         parent._$mutationObserverTarget?.attachChild(newChild)
       }
       if ((BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) && frag) {
-        // since `TextNode` also has `backendElement` private field, just make it as `Element`
-        const be = (newChild as Element)._$backendElement as backend.Element
+        const be = newChild._$backendElement as backend.Element
+        if (ENV.DEV) performanceMeasureStart('backend.appendChild')
         frag.appendChild(be)
+        if (ENV.DEV) performanceMeasureEnd()
       }
     }
 
@@ -1835,33 +1915,38 @@ export class Element implements NodeCast {
       if (parent._$backendElement) {
         if (frag) {
           if (relChild) {
+            if (ENV.DEV) performanceMeasureStart('backend.spliceBefore')
             ;(parent._$backendElement as backend.Element).spliceBefore(
-              // since `TextNode` also has `backendElement` private field, just make it as `Element`
-              (relChild as Element)._$backendElement as backend.Element,
+              relChild._$backendElement as backend.Element,
               0,
               frag,
             )
+            if (ENV.DEV) performanceMeasureEnd()
           } else {
+            if (ENV.DEV) performanceMeasureStart('backend.spliceAppend')
             ;(parent._$backendElement as backend.Element).spliceAppend(frag)
+            if (ENV.DEV) performanceMeasureEnd()
           }
           frag.release()
         } else {
           if (relChild) {
             for (let i = 0; i < newChildList.length; i += 1) {
               const newChild = newChildList[i]!
+              if (ENV.DEV) performanceMeasureStart('backend.insertBefore')
               ;(parent._$backendElement as backend.Element).insertBefore(
-                // since `TextNode` also has `backendElement` private field, just make it as `Element`
-                (newChild as Element)._$backendElement as backend.Element,
-                (relChild as Element)._$backendElement as backend.Element,
+                newChild._$backendElement as backend.Element,
+                relChild._$backendElement as backend.Element,
               )
+              if (ENV.DEV) performanceMeasureEnd()
             }
           } else {
             for (let i = 0; i < newChildList.length; i += 1) {
               const newChild = newChildList[i]!
+              if (ENV.DEV) performanceMeasureStart('backend.appendChild')
               ;(parent._$backendElement as backend.Element).appendChild(
-                // since `TextNode` also has `backendElement` private field, just make it as `Element`
-                (newChild as Element)._$backendElement as backend.Element,
+                newChild._$backendElement as backend.Element,
               )
+              if (ENV.DEV) performanceMeasureEnd()
             }
           }
         }
@@ -1957,18 +2042,24 @@ export class Element implements NodeCast {
     let frag: backend.Element | null
     if (BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) {
       const backendContext = parent.getBackendContext() as backend.Context
+      if (ENV.DEV) performanceMeasureStart('backend.createFragment')
       frag = backendContext.createFragment()
+      if (ENV.DEV) performanceMeasureEnd()
     } else {
       frag = null
     }
     const replacedChildren = placeholder.childNodes
     if (BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) {
       if (replacedChildren.length > 0) {
-        ;(placeholder._$backendElement as backend.Element | null)?.spliceRemove(
-          // since `TextNode` also has `backendElement` private field, just make it as `Element`
-          (replacedChildren[0] as Element)._$backendElement as backend.Element,
-          replacedChildren.length,
-        )
+        const be = placeholder._$backendElement as backend.Element | null
+        if (be) {
+          if (ENV.DEV) performanceMeasureStart('backend.spliceRemove')
+          be.spliceRemove(
+            replacedChildren[0]!._$backendElement as backend.Element,
+            replacedChildren.length,
+          )
+          if (ENV.DEV) performanceMeasureEnd()
+        }
       }
     }
     for (let i = 0; i < replacedChildren.length; i += 1) {
@@ -1977,9 +2068,10 @@ export class Element implements NodeCast {
         // removal of in-tree elements are not needed for DOM backend
         // do nothing
       } else if (BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) {
-        // since `TextNode` also has `backendElement` private field, just make it as `Element`
-        const be = (child as Element)._$backendElement as backend.Element
+        const be = child._$backendElement as backend.Element
+        if (ENV.DEV) performanceMeasureStart('backend.appendChild')
         ;(frag as backend.Element).appendChild(be)
+        if (ENV.DEV) performanceMeasureEnd()
       } else {
         Element.insertChildComposed(placeholder, null, child, true, i)
       }
@@ -2027,17 +2119,22 @@ export class Element implements NodeCast {
     // spread in composed tree
     if (BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) {
       if (parent._$backendElement) {
+        if (ENV.DEV) performanceMeasureStart('backend.replaceChild')
         ;(parent._$backendElement as backend.Element).replaceChild(
           replacer._$backendElement as backend.Element,
           placeholder._$backendElement as backend.Element,
           posIndex,
         )
-        // eslint-disable-next-line arrow-body-style
+        if (ENV.DEV) performanceMeasureEnd()
+        if (ENV.DEV) performanceMeasureStart('backend.spliceAppend')
         ;(replacer._$backendElement as backend.Element | null)?.spliceAppend(
           frag as backend.Element,
         )
+        if (ENV.DEV) performanceMeasureEnd()
       }
+      if (ENV.DEV) performanceMeasureStart('backend.release')
       ;(frag as backend.Element).release()
+      if (ENV.DEV) performanceMeasureEnd()
     } else {
       Element.insertChildComposed(parent, replacer, placeholder, true, posIndex)
       for (let i = 0; i < replacedChildren.length; i += 1) {
@@ -2184,6 +2281,7 @@ export class Element implements NodeCast {
       default:
         return
     }
+    if (ENV.DEV) performanceMeasureStart('backend.setListenerStats')
     if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
       ;(this._$nodeTreeContext as domlikeBackend.Context).setListenerStats(
         this._$backendElement as domlikeBackend.Element,
@@ -2198,6 +2296,7 @@ export class Element implements NodeCast {
         mutLevel,
       )
     }
+    if (ENV.DEV) performanceMeasureEnd()
   }
 
   /** Add an event listener on the element */
@@ -2243,6 +2342,7 @@ export class Element implements NodeCast {
     attrs[name] = value
     const be = this._$backendElement
     if (be) {
+      if (ENV.DEV) performanceMeasureStart('backend.setAttribute')
       if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
         if (value === false) {
           be.removeAttribute(name)
@@ -2255,6 +2355,7 @@ export class Element implements NodeCast {
       } else {
         be.setAttribute(name, value)
       }
+      if (ENV.DEV) performanceMeasureEnd()
     }
   }
 
@@ -2263,7 +2364,12 @@ export class Element implements NodeCast {
     if (this._$nodeAttributes) {
       delete this._$nodeAttributes[name]
     }
-    if (this._$backendElement) this._$backendElement.removeAttribute(name)
+    const be = this._$backendElement
+    if (be) {
+      if (ENV.DEV) performanceMeasureStart('backend.removeAttribute')
+      be.removeAttribute(name)
+      if (ENV.DEV) performanceMeasureEnd()
+    }
   }
 
   /** Set a dataset on the element */
@@ -2271,7 +2377,9 @@ export class Element implements NodeCast {
     this.dataset[name] = value
 
     if (BM.SHADOW || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Shadow)) {
+      if (ENV.DEV) performanceMeasureStart('backend.setDataset')
       ;(this._$backendElement as backend.Element).setDataset(name, value)
+      if (ENV.DEV) performanceMeasureEnd()
     }
   }
 
@@ -2328,10 +2436,12 @@ export class Element implements NodeCast {
       throw new Error('An attached element cannot be attached again')
     }
     if (element._$backendElement) {
+      if (ENV.DEV) performanceMeasureStart('backend.replaceChild')
       ;(targetParent as backend.Element).replaceChild(
         element._$backendElement as backend.Element,
         targetNode as backend.Element,
       )
+      if (ENV.DEV) performanceMeasureEnd()
     }
     Element.checkAndCallAttached(element)
   }
@@ -2390,7 +2500,9 @@ export class Element implements NodeCast {
       }
     }
     if (BM.SHADOW || (BM.DYNAMIC && element.getBackendMode() === BackendMode.Shadow)) {
+      if (ENV.DEV) performanceMeasureStart('backend.setSlotName')
       ;(element._$backendElement as backend.Element | null)?.setSlotName(slotName)
+      if (ENV.DEV) performanceMeasureEnd()
     }
     const owner = element.ownerShadowRoot
     if (owner) {
@@ -2438,7 +2550,12 @@ export class Element implements NodeCast {
       throw new Error('Slot-inherit mode cannot be set when the element has any child node')
     }
     if (BM.SHADOW || (BM.DYNAMIC && element.getBackendMode() === BackendMode.Shadow)) {
-      ;(element._$backendElement as backend.Element | null)?.setInheritSlots()
+      const be = element._$backendElement as backend.Element | null
+      if (be) {
+        if (ENV.DEV) performanceMeasureStart('backend.setInheritSlots')
+        be.setInheritSlots()
+        if (ENV.DEV) performanceMeasureEnd()
+      }
     }
     element._$inheritSlots = true
   }
@@ -2499,9 +2616,11 @@ export class Element implements NodeCast {
       BM.SHADOW ||
       (BM.DYNAMIC && node.ownerShadowRoot?.getBackendMode() === BackendMode.Shadow)
     ) {
-      ;(node.getBackendElement() as backend.Element).setContainingSlot(
-        containingSlot ? (containingSlot.getBackendElement() as backend.Element) : containingSlot,
+      if (ENV.DEV) performanceMeasureStart('backend.setContainingSlot')
+      ;(node._$backendElement as backend.Element).setContainingSlot(
+        containingSlot ? (containingSlot._$backendElement as backend.Element) : containingSlot,
       )
+      if (ENV.DEV) performanceMeasureEnd()
     }
   }
 
@@ -2542,22 +2661,32 @@ export class Element implements NodeCast {
 
     if (BM.SHADOW || (BM.DYNAMIC && slot._$nodeTreeContext.mode === BackendMode.Shadow)) {
       if (insertion?.length) {
+        if (ENV.DEV) performanceMeasureStart('backend.createFragment')
         const frag = (slot._$nodeTreeContext as backend.Context).createFragment()
+        if (ENV.DEV) performanceMeasureEnd()
         for (let i = 0; i < insertion.length; i += 1) {
+          if (ENV.DEV) performanceMeasureStart('backend.appendChild')
           frag.appendChild(insertion[i]!._$backendElement as backend.Element)
+          if (ENV.DEV) performanceMeasureEnd()
         }
         if (spliceBefore) {
+          if (ENV.DEV) performanceMeasureStart('backend.spliceBeforeSlotNodes')
           ;(slot._$backendElement as backend.Element).spliceBeforeSlotNodes(
             before,
             deleteCount,
             frag,
           )
+          if (ENV.DEV) performanceMeasureEnd()
         } else {
+          if (ENV.DEV) performanceMeasureStart('backend.spliceAppendSlotNodes')
           ;(slot._$backendElement as backend.Element).spliceAppendSlotNodes(frag)
+          if (ENV.DEV) performanceMeasureEnd()
         }
         frag.release()
       } else if (deleteCount) {
+        if (ENV.DEV) performanceMeasureStart('backend.spliceRemoveSlotNodes')
         ;(slot._$backendElement as backend.Element).spliceRemoveSlotNodes(before, deleteCount)
+        if (ENV.DEV) performanceMeasureEnd()
       }
     }
   }
