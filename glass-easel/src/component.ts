@@ -1249,13 +1249,13 @@ export class Component<
   }
 
   /** Update an external class value */
-  setExternalClass(name: string, target: string) {
+  setExternalClass(name: string, target: string | string[]) {
     this.scheduleExternalClassChange(name, target)
     this.applyExternalClassChanges()
   }
 
   /** Schedule an update for an external class value */
-  scheduleExternalClassChange(name: string, target: string) {
+  scheduleExternalClassChange(name: string, target: string | string[]) {
     this.classList!._$setAlias(name, target)
   }
 

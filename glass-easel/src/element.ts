@@ -297,7 +297,7 @@ export class Element implements NodeCast {
     return ''
   }
 
-  set class(classNames) {
+  set class(classNames: string) {
     this.setNodeClass(classNames, StyleSegmentIndex.MAIN)
   }
 
@@ -386,7 +386,7 @@ export class Element implements NodeCast {
   }
 
   /** Set the node class */
-  setNodeClass(classNames: string, index: StyleSegmentIndex = StyleSegmentIndex.MAIN) {
+  setNodeClass(classNames: string | string[], index: StyleSegmentIndex = StyleSegmentIndex.MAIN) {
     if (ENV.DEV) performanceMeasureStart('backend.setClass')
     const changed = this.classList?.setClassNames(classNames, index)
     if (ENV.DEV) performanceMeasureEnd()

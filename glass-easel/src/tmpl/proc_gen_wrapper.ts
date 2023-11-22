@@ -875,22 +875,20 @@ export class ProcGenWrapper {
   }
 
   // set class or external classes named `class`
-  c(elem: Element, v: string) {
+  c(elem: Element, v: string | string[]) {
     if (isComponent(elem)) {
       // "class" itself can also be an external class
       const hasExternalClass = elem.hasExternalClass('class')
       if (hasExternalClass) {
-        elem.setExternalClass('class', dataValueToString(v))
+        elem.setExternalClass('class', v)
       }
-      elem.class = dataValueToString(v)
-    } else {
-      elem.class = dataValueToString(v)
     }
+    elem.setNodeClass(v)
   }
 
   // set style or property named `style`
   y(elem: Element, v: string) {
-    if (elem instanceof Component && Component.hasProperty(elem, 'style')) {
+    if (isComponent(elem) && Component.hasProperty(elem, 'style')) {
       const nodeDataProxy = Component.getDataProxy(elem)
       const camelName = dashToCamelCase('style')
       nodeDataProxy.replaceProperty(camelName, v)
@@ -1049,7 +1047,7 @@ export class ProcGenWrapper {
           }
         }
       } else if (elem.hasExternalClass(name)) {
-        elem.setExternalClass(name, dataValueToString(v))
+        elem.setExternalClass(name, v as string)
       } else {
         // compatibilities for legacy event binding syntax
         checkFallbackEventListener(camelName)

@@ -1488,6 +1488,56 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect(domHtml(elem)).toBe('<sub-comp><div class="abc a-4"></div></sub-comp>')
   })
 
+  test('setting array as classNames', () => {
+    const cs = new glassEasel.ComponentSpace()
+    const ssm = cs.styleScopeManager
+    const subComp = cs.defineComponent({
+      externalClasses: ['ext-class'],
+      template: tmpl(`
+        <div class="inner ext-class"></div>
+      `),
+    })
+    const def = cs
+      .defineComponent({
+        options: {
+          styleScope: ssm.register('p'),
+        },
+        using: {
+          'sub-comp': subComp.general(),
+        },
+        data: () => ({
+          classes: 'static',
+          extClass: 'a-class',
+        }),
+        template: tmpl(`
+        <sub-comp class="{{classes}}" ext-class="{{extClass}}" />
+      `),
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe(
+      '<sub-comp class="p--static"><div class="inner p--a-class"></div></sub-comp>',
+    )
+    elem.setData({
+      classes: ['static', 'dynamic'],
+    })
+    expect(domHtml(elem)).toBe(
+      '<sub-comp class="p--static p--dynamic"><div class="inner p--a-class"></div></sub-comp>',
+    )
+    elem.setData({
+      classes: '',
+      extClass: ['a-class', 'dynamic'],
+    })
+    expect(domHtml(elem)).toBe(
+      '<sub-comp class=""><div class="inner p--a-class p--dynamic"></div></sub-comp>',
+    )
+    elem.setData({
+      extClass: 'static',
+    })
+    expect(domHtml(elem)).toBe('<sub-comp class=""><div class="inner p--static"></div></sub-comp>')
+  })
+
   test('setting external classes', () => {
     const cs = new glassEasel.ComponentSpace()
     const ssm = cs.styleScopeManager

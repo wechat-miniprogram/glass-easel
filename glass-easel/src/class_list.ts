@@ -147,11 +147,21 @@ export class ClassList {
   }
 
   /** @internal */
-  _$setAlias(name: string, target: string) {
+  _$setAlias(name: string, target: string | string[]) {
     if (!this._$externalNames) return
-    const slices = String(target)
-      .split(CLASS_NAME_REG_EXP)
-      .filter((s) => s !== '') // split result could be [ '' ]
+    let slices: string[]
+    if (target === undefined || target === null) {
+      slices = []
+    } else if (Array.isArray(target)) {
+      slices = Array<string>(target.length)
+      for (let i = 0, l = target.length; i < l; i += 1) {
+        slices[i] = String(target[i])
+      }
+    } else {
+      slices = String(target)
+        .split(CLASS_NAME_REG_EXP)
+        .filter((s) => s !== '') // split result could be [ '' ]
+    }
     const externalIndex = this._$externalNames.indexOf(name)
     if (externalIndex === -1) return
     this._$dirtyExternalNames = this._$dirtyExternalNames || []
@@ -213,8 +223,11 @@ export class ClassList {
 
     this._$hasAliasNames = false
 
-    rawNames.forEach((names) =>
-      names.forEach((rawName) => {
+    for (let i = 0, l = rawNames.length; i < l; i += 1) {
+      const names = rawNames[i]
+      if (!names) continue
+      for (let j = 0, ll = names.length; j < ll; j += 1) {
+        const rawName = names[j]!
         this._$resolvePrefixes(rawName, (scopeId, className) => {
           for (let i = 0; i < newBackendNames.length; i += 1) {
             if (className === newBackendNames[i] && scopeId === newBackendNameScopes[i]) {
@@ -226,8 +239,8 @@ export class ClassList {
           newBackendNameScopes.push(scopeId)
           newBackendNamesCount.push(1)
         })
-      }),
-    )
+      }
+    }
 
     let changed = false
 
@@ -406,12 +419,24 @@ export class ClassList {
   }
 
   /** Set class string */
-  setClassNames(names: string, segmentIndex: StyleSegmentIndex = StyleSegmentIndex.MAIN): boolean {
-    let n: string
-    if (names === undefined || names === null) n = ''
-    else n = String(names)
-
-    this._$rawNames[segmentIndex] = n.split(CLASS_NAME_REG_EXP).filter((s) => s !== '') // split result could be [ '' ]
+  setClassNames(
+    names: string | string[],
+    segmentIndex: StyleSegmentIndex = StyleSegmentIndex.MAIN,
+  ): boolean {
+    let n: string[]
+    if (names === undefined || names === null) {
+      n = []
+    } else if (Array.isArray(names)) {
+      n = Array<string>(names.length)
+      for (let i = 0, l = names.length; i < l; i += 1) {
+        n[i] = String(names[i])
+      }
+    } else {
+      n = String(names)
+        .split(CLASS_NAME_REG_EXP)
+        .filter((s) => s !== '') // split result could be [ '' ]
+    }
+    this._$rawNames[segmentIndex] = n
 
     return this._$updateResolvedNames()
   }

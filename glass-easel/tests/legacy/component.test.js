@@ -962,6 +962,11 @@ const testCases = function (testBackend) {
       expect(elem.$.a.classList.contains('aa')).toBe(false)
       expect(elem.$.a.classList.contains('a-a')).toBe(true)
       expect(elem.$.a.$$.getAttribute('class')).toBe('component-class-a--a-a')
+      elem.$.a.classList.setClassNames(['aa', 'a-a'])
+      expect(elem.$.a.class).toBe('aa a-a')
+      expect(elem.$.a.classList.contains('aa')).toBe(true)
+      expect(elem.$.a.classList.contains('a-a')).toBe(true)
+      expect(elem.$.a.$$.getAttribute('class')).toBe('component-class-a--a-a component-class-a--aa')
     })
 
     it('should allow setting classes with extra global style scope', function () {
