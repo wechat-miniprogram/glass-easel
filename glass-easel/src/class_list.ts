@@ -5,7 +5,7 @@ import { BM, BackendMode } from './backend/mode'
 import { Element, GeneralComponent, GeneralBackendElement, StyleSegmentIndex } from '.'
 import { MutationObserverTarget } from './mutation_observer'
 
-const CLASS_NAME_REG_EXP = /[\s.]+/
+const CLASS_NAME_REG_EXP = /[\s.,]+/
 
 /**
  * The style scope identifier
