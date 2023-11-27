@@ -8,7 +8,18 @@ import {
 } from './backend'
 import { StyleSegmentIndex } from './element'
 
-const CLASS_NAME_REG_EXP = /[\s.,]+/
+const CLASS_NAME_REG_EXP = /[^\s.,]+/g
+
+const matchClassName = (str: string) => {
+  const result: string[] = []
+  let m: RegExpExecArray | null | undefined
+  CLASS_NAME_REG_EXP.lastIndex = 0
+  // eslint-disable-next-line no-cond-assign
+  while ((m = CLASS_NAME_REG_EXP.exec(str)) !== null) {
+    result.push(String(m[0]))
+  }
+  return result
+}
 
 /**
  * The style scope identifier
@@ -158,9 +169,7 @@ export class ClassList {
         slices[i] = String(target[i])
       }
     } else {
-      slices = String(target)
-        .split(CLASS_NAME_REG_EXP)
-        .filter((s) => s !== '') // split result could be [ '' ]
+      slices = matchClassName(String(target))
     }
     const externalIndex = this._$externalNames.indexOf(name)
     if (externalIndex === -1) return
@@ -209,6 +218,26 @@ export class ClassList {
   }
 
   /** @internal */
+  private _$fasterAddUpdateResolvedNames(): boolean {
+    const backendElement = this._$backendElement
+    if (!backendElement) return false
+    const rawNames = this._$rawNames
+
+    this._$hasAliasNames = false
+    for (let i = 0, l = rawNames.length; i < l; i += 1) {
+      const names = rawNames[i]
+      if (!names) continue
+      for (let j = 0, ll = names.length; j < ll; j += 1) {
+        const rawName = names[j]!
+        this._$resolvePrefixes(rawName, (scopeId, className) => {
+          this._$addClass(className, scopeId, backendElement)
+        })
+      }
+    }
+    return true
+  }
+
+  /** @internal */
   private _$updateResolvedNames(): boolean {
     const backendElement = this._$backendElement
     if (!backendElement) return false
@@ -229,10 +258,12 @@ export class ClassList {
       for (let j = 0, ll = names.length; j < ll; j += 1) {
         const rawName = names[j]!
         this._$resolvePrefixes(rawName, (scopeId, className) => {
-          for (let i = 0; i < newBackendNames.length; i += 1) {
-            if (className === newBackendNames[i] && scopeId === newBackendNameScopes[i]) {
-              newBackendNamesCount[i] += 1
-              return
+          if (this._$hasAliasNames) {
+            for (let i = 0; i < newBackendNames.length; i += 1) {
+              if (className === newBackendNames[i] && scopeId === newBackendNameScopes[i]) {
+                newBackendNamesCount[i] += 1
+                return
+              }
             }
           }
           newBackendNames.push(className)
@@ -316,11 +347,13 @@ export class ClassList {
     const oldScopeIds = this._$backendNameScopes
     const classNamesCount = this._$backendNamesCount
     let found = false
-    for (let j = 0; j < oldClassNames.length; j += 1) {
-      if (name === oldClassNames[j] && scopeId === oldScopeIds[j]) {
-        found = true
-        classNamesCount[j] += 1
-        break
+    if (this._$hasAliasNames) {
+      for (let j = 0; j < oldClassNames.length; j += 1) {
+        if (name === oldClassNames[j] && scopeId === oldScopeIds[j]) {
+          found = true
+          classNamesCount[j] += 1
+          break
+        }
       }
     }
     if (!found) {
@@ -340,18 +373,19 @@ export class ClassList {
     const oldClassNames = this._$backendNames
     const oldScopeIds = this._$backendNameScopes
     const classNamesCount = this._$backendNamesCount
-    for (let j = 0; j < oldClassNames.length; j += 1) {
-      if (name === oldClassNames[j] && scopeId === oldScopeIds[j]) {
-        if (classNamesCount[j]! <= 1) {
-          oldClassNames.splice(j, 1)
-          oldScopeIds.splice(j, 1)
-          classNamesCount.splice(j, 1)
-          this._$removeClassFromBackend(name, scopeId, backendElement)
-        } else {
-          classNamesCount[j] -= 1
-        }
+    let index: number
+    for (index = 0; index < oldClassNames.length; index += 1) {
+      if (name === oldClassNames[index] && scopeId === oldScopeIds[index]) {
         break
       }
+    }
+    if (classNamesCount[index]! <= 1) {
+      oldClassNames.splice(index, 1)
+      oldScopeIds.splice(index, 1)
+      classNamesCount.splice(index, 1)
+      this._$removeClassFromBackend(name, scopeId, backendElement)
+    } else {
+      classNamesCount[index] -= 1
     }
   }
 
@@ -360,9 +394,6 @@ export class ClassList {
     force?: boolean,
     segmentIndex: StyleSegmentIndex = StyleSegmentIndex.MAIN,
   ): boolean {
-    /* istanbul ignore if */
-    if (CLASS_NAME_REG_EXP.test(name)) throw new Error('Class name contains space characters.')
-
     const backendElement = this._$backendElement
     const rawClassIndex = this._$rawNames[segmentIndex]
       ? this._$rawNames[segmentIndex]!.indexOf(name)
@@ -432,11 +463,12 @@ export class ClassList {
         n[i] = String(names[i])
       }
     } else {
-      n = String(names)
-        .split(CLASS_NAME_REG_EXP)
-        .filter((s) => s !== '') // split result could be [ '' ]
+      n = matchClassName(String(names))
     }
+    const useFasterAdd = this._$rawNames.length === 0
     this._$rawNames[segmentIndex] = n
+
+    if (useFasterAdd) return this._$fasterAddUpdateResolvedNames()
 
     return this._$updateResolvedNames()
   }
