@@ -361,6 +361,7 @@ export class CodeSpace {
       dataDeepCopy: options?.dataDeepCopy,
       propertyPassingDeepCopy: options?.propertyPassingDeepCopy,
       propertyEarlyInit: options?.propertyEarlyInit,
+      externalComponent: options?.externalComponent,
     }
     return [ret, styleIsolation]
   }

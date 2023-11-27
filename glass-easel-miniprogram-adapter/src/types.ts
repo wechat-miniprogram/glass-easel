@@ -33,6 +33,7 @@ export type ComponentDefinitionOptions = {
   dataDeepCopy?: DeepCopyKind
   propertyPassingDeepCopy?: DeepCopyKind
   propertyEarlyInit?: boolean
+  externalComponent?: boolean
 }
 
 type ComponentMethod = utils.ComponentMethod
