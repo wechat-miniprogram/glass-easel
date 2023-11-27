@@ -81,6 +81,8 @@ export type DoubleLinkedList<T> = {
   next: DoubleLinkedList<T> | null
 }
 
+const emptyContext = new composedBackend.EmptyComposedBackendContext()
+
 /**
  * A general element
  *
@@ -381,6 +383,8 @@ export class Element implements NodeCast {
         if (ENV.DEV) performanceMeasureEnd()
       }
       this._$backendElement = null
+      // FIXME: dirty fix to release backendContext, for memory leak
+      this._$nodeTreeContext = emptyContext
     }
   }
 
