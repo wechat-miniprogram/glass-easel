@@ -1,4 +1,4 @@
-import { ComponentSpace } from '.'
+import { type ComponentSpace } from './component_space'
 
 /**
  * Interface that can be implement dynamically

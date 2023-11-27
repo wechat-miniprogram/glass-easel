@@ -1,7 +1,7 @@
 /* eslint-disable no-new-func */
 /* eslint-disable @typescript-eslint/no-implied-eval */
 
-import * as glassEasel from 'glass-easel'
+import type * as glassEasel from 'glass-easel'
 import { TmplGroup } from 'glass-easel-template-compiler'
 
 export const tmpl = (src: string): glassEasel.template.ComponentTemplate => {

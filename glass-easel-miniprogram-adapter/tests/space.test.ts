@@ -1,12 +1,6 @@
 import * as glassEasel from 'glass-easel'
+import { type BehaviorConstructor, type ComponentConstructor, MiniProgramEnv, types } from '../src'
 import { tmpl } from './base/env'
-import {
-  MiniProgramEnv,
-  StyleIsolation,
-  BehaviorConstructor,
-  ComponentConstructor,
-  types,
-} from '../src'
 
 const domHtml = (elem: glassEasel.Element): string => {
   const domElem = elem.getBackendElement() as unknown as Element
@@ -430,7 +424,7 @@ describe('define', () => {
     codeSpace.addStyleSheet('child/comp', 'empty-style-sheet', 'child-comp')
     codeSpace.addComponentStaticConfig('child/comp', {
       component: true,
-      styleIsolation: StyleIsolation.Shared,
+      styleIsolation: types.StyleIsolation.Shared,
     })
     codeSpace.addCompiledTemplate(
       'child/comp',
@@ -451,7 +445,7 @@ describe('define', () => {
       usingComponents: {
         child: '/child/comp',
       },
-      styleIsolation: StyleIsolation.PageShared,
+      styleIsolation: types.StyleIsolation.PageShared,
     })
     codeSpace.addCompiledTemplate(
       'path/to/comp',
@@ -478,7 +472,7 @@ describe('define', () => {
     codeSpace.addStyleSheet('child/comp', 'empty-style-sheet', 'child-comp')
     codeSpace.addComponentStaticConfig('child/comp', {
       component: true,
-      styleIsolation: StyleIsolation.ApplyShared,
+      styleIsolation: types.StyleIsolation.ApplyShared,
     })
     codeSpace.addCompiledTemplate(
       'child/comp',
@@ -499,7 +493,7 @@ describe('define', () => {
       usingComponents: {
         child: '/child/comp',
       },
-      styleIsolation: StyleIsolation.PageApplyShared,
+      styleIsolation: types.StyleIsolation.PageApplyShared,
     })
     codeSpace.addCompiledTemplate(
       'path/to/comp',
@@ -528,7 +522,7 @@ describe('define', () => {
     codeSpace.addStyleSheet('child/comp', 'empty-style-sheet', 'child-comp')
     codeSpace.addComponentStaticConfig('child/comp', {
       component: true,
-      styleIsolation: StyleIsolation.Isolated,
+      styleIsolation: types.StyleIsolation.Isolated,
     })
     codeSpace.addCompiledTemplate(
       'child/comp',
@@ -549,7 +543,7 @@ describe('define', () => {
       usingComponents: {
         child: '/child/comp',
       },
-      styleIsolation: StyleIsolation.PageIsolated,
+      styleIsolation: types.StyleIsolation.PageIsolated,
     })
     codeSpace.addCompiledTemplate(
       'path/to/comp',
@@ -627,7 +621,7 @@ describe('define', () => {
       usingComponents: {
         child: '/child/comp',
       },
-      styleIsolation: StyleIsolation.PageIsolated,
+      styleIsolation: types.StyleIsolation.PageIsolated,
     })
     codeSpace.addCompiledTemplate(
       'path/to/comp',

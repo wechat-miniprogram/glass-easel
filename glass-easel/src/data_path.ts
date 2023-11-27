@@ -1,5 +1,3 @@
-import { triggerWarning } from './func_arr'
-
 export type DataPath = Array<string | number>
 
 export type MultiPaths = DataPath[]
@@ -194,40 +192,30 @@ const parseCommaSepPaths = (state: ParseState): MultiPaths => {
   return ret
 }
 
-export const parseSinglePath = (str: string): DataPath | null => {
-  try {
-    const parseState: ParseState = {
-      str,
-      cur: 0,
-    }
-    const ret = parsePathWithSpecialChars(parseState)
-    // NOTE currently the end check is not required here, because prev calls always eats all chars
-    // if (parseState.cur !== str.length) {
-    //   throw new Error(`data path descriptor "${str}" is illegal at char ${parseState.cur}`)
-    // }
-    return ret
-  } catch (err) {
-    triggerWarning((err as Error).message)
-    return null
+export const parseSinglePath = (str: string): DataPath => {
+  const parseState: ParseState = {
+    str,
+    cur: 0,
   }
+  const ret = parsePathWithSpecialChars(parseState)
+  // NOTE currently the end check is not required here, because prev calls always eats all chars
+  // if (parseState.cur !== str.length) {
+  //   throw new Error(`data path descriptor "${str}" is illegal at char ${parseState.cur}`)
+  // }
+  return ret
 }
 
-export const parseMultiPaths = (str: string | string[]): MultiPaths => {
-  try {
-    if (Array.isArray(str)) {
-      return str.map((str) => parsePath({ str, cur: 0 }))
-    }
-    const parseState: ParseState = {
-      str,
-      cur: 0,
-    }
-    const ret = parseCommaSepPaths(parseState)
-    if (parseState.cur !== str.length) {
-      throw new Error(`data path descriptor "${str}" is illegal at char ${parseState.cur}`)
-    }
-    return ret
-  } catch (err) {
-    triggerWarning((err as Error).message)
-    return []
+export const parseMultiPaths = (str: string | readonly string[]): MultiPaths => {
+  if (typeof str !== 'string') {
+    return str.map((str) => parsePath({ str, cur: 0 }))
   }
+  const parseState: ParseState = {
+    str,
+    cur: 0,
+  }
+  const ret = parseCommaSepPaths(parseState)
+  if (parseState.cur !== str.length) {
+    throw new Error(`data path descriptor "${str}" is illegal at char ${parseState.cur}`)
+  }
+  return ret
 }

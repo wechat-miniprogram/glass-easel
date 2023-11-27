@@ -1,21 +1,16 @@
 /* global document: false */
 
-import {
-  ExternalShadowRoot,
-  DataValue,
-  templateEngine,
-  GeneralFuncType,
-  GeneralBehavior,
-  Event,
-  ShadowedEvent,
-  GeneralBackendElement,
-  BackendMode,
-  GeneralComponent,
-} from '..'
-import { DataChange } from '../data_proxy'
-import { ProcGenEnv, ProcGen, BindingMapGen } from './proc_gen_wrapper'
+import { BackendMode, type GeneralBackendElement } from '../backend'
+import { type GeneralBehavior } from '../behavior'
+import { type GeneralComponent } from '../component'
+import { type DataChange, type DataValue } from '../data_proxy'
+import { type Event, type ShadowedEvent } from '../event'
+import { type ExternalShadowRoot } from '../external_shadow_tree'
+import { type GeneralFuncType } from '../func_arr'
+import { type Template, type TemplateInstance } from '../template_engine'
+import { type ComponentTemplate, type ProcGenGroupList } from './index'
+import { type BindingMapGen, type ProcGen, type ProcGenEnv } from './proc_gen_wrapper'
 import { ProcGenWrapperDom } from './proc_gen_wrapper_dom'
-import { ComponentTemplate, ProcGenGroupList } from './index'
 
 type ElementWithEvent = Element & {
   _$wxTmplEv: { [ev: string]: (event: ShadowedEvent<unknown>) => unknown }
@@ -30,7 +25,7 @@ const DEFAULT_PROC_GEN_DOM: ProcGen = () => ({
 })
 export const DEFAULT_PROC_GEN_GROUP_DOM: (name: string) => ProcGen = () => DEFAULT_PROC_GEN_DOM
 
-export class GlassEaselTemplateDOM implements templateEngine.Template {
+export class GlassEaselTemplateDOM implements Template {
   data: DataValue
   innerData: DataValue
   genObjectGroupEnv: ProcGenEnv
@@ -55,14 +50,12 @@ export class GlassEaselTemplateDOM implements templateEngine.Template {
     this.methods = behavior._$methodMap
   }
 
-  createInstance(comp: GeneralComponent): templateEngine.TemplateInstance {
+  createInstance(comp: GeneralComponent): TemplateInstance {
     return new GlassEaselTemplateDOMInstance(this, comp)
   }
 }
 
-export class GlassEaselTemplateDOMInstance
-  implements templateEngine.TemplateInstance, ExternalShadowRoot
-{
+export class GlassEaselTemplateDOMInstance implements TemplateInstance, ExternalShadowRoot {
   template: GlassEaselTemplateDOM
   comp: GeneralComponent
   shadowRoot: ExternalShadowRoot

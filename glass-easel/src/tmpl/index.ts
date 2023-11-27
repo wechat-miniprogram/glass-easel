@@ -1,23 +1,20 @@
 /* eslint-disable class-methods-use-this */
 
-import {
-  ShadowRoot,
-  ExternalShadowRoot,
-  DataValue,
-  templateEngine,
-  GeneralBehavior,
-  NormalizedComponentOptions,
-  ShadowedEvent,
-  GeneralComponent,
-} from '..'
-import { DataChange } from '../data_proxy'
+import { type GeneralBehavior } from '../behavior'
+import { type GeneralComponent } from '../component'
+import { type DataValue, type DataChange } from '../data_proxy'
+import { type ShadowedEvent } from '../event'
+import { type ExternalShadowRoot } from '../external_shadow_tree'
+import { type NormalizedComponentOptions } from '../global_options'
+import { ShadowRoot } from '../shadow_root'
+import { type Template, type TemplateInstance, type TemplateEngine } from '../template_engine'
 import { GlassEaselTemplateDOM } from './native_rendering'
 import {
   ProcGenWrapper,
-  ProcGenEnv,
-  ProcGen,
-  BindingMapGen,
-  UpdatePathTreeNode,
+  type BindingMapGen,
+  type ProcGen,
+  type ProcGenEnv,
+  type UpdatePathTreeNode,
 } from './proc_gen_wrapper'
 
 const DEFAULT_PROC_GEN: ProcGen = () => ({
@@ -47,11 +44,8 @@ const enum BindingMapUpdateEnabled {
   Forced,
 }
 
-export class GlassEaselTemplateEngine implements templateEngine.TemplateEngine {
-  create(
-    behavior: GeneralBehavior,
-    componentOptions: NormalizedComponentOptions,
-  ): templateEngine.Template {
+export class GlassEaselTemplateEngine implements TemplateEngine {
+  create(behavior: GeneralBehavior, componentOptions: NormalizedComponentOptions): Template {
     if (componentOptions.externalComponent) {
       return new GlassEaselTemplateDOM(behavior)
     }
@@ -59,7 +53,7 @@ export class GlassEaselTemplateEngine implements templateEngine.TemplateEngine {
   }
 }
 
-class GlassEaselTemplate implements templateEngine.Template {
+class GlassEaselTemplate implements Template {
   genObjectGroupEnv!: ProcGenEnv
   updateMode!: string
   fallbackListenerOnNativeNode!: boolean
@@ -93,12 +87,12 @@ class GlassEaselTemplate implements templateEngine.Template {
     this.eventObjectFilter = c.eventObjectFilter
   }
 
-  createInstance(comp: GeneralComponent): templateEngine.TemplateInstance {
+  createInstance(comp: GeneralComponent): TemplateInstance {
     return new GlassEaselTemplateInstance(this, comp)
   }
 }
 
-class GlassEaselTemplateInstance implements templateEngine.TemplateInstance {
+class GlassEaselTemplateInstance implements TemplateInstance {
   comp: GeneralComponent
   shadowRoot: ShadowRoot
   procGenWrapper!: ProcGenWrapper
@@ -214,4 +208,15 @@ class GlassEaselTemplateInstance implements templateEngine.TemplateInstance {
     if (path.length !== 1) return false
     return this.procGenWrapper.bindingMapUpdate(path[0] as string, data, bindingMapGen)
   }
+}
+
+let defaultTemplateEngine: TemplateEngine | null = null
+
+export const getDefaultTemplateEngine = (): TemplateEngine => {
+  if (defaultTemplateEngine) {
+    return defaultTemplateEngine
+  }
+  const tmpl = new GlassEaselTemplateEngine()
+  defaultTemplateEngine = tmpl
+  return tmpl
 }

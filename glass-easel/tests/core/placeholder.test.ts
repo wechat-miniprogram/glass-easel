@@ -29,9 +29,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       writeFieldsToNode: true,
       writeIdToDOM: true,
     })
-    componentSpace.defineComponent({
-      is: '',
-    })
+    componentSpace.setGlobalUsingComponent('', componentSpace.defineComponent({ is: '' }))
 
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     const listener = jest.fn((() => {}) as ComponentWaitingListener)
@@ -103,7 +101,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
 
   test('group register other components as placeholders', () => {
     const componentSpace = new glassEasel.ComponentSpace()
-    componentSpace.define('').registerComponent()
+    componentSpace.setGlobalUsingComponent('', componentSpace.defineComponent({ is: '' }))
 
     const def = componentSpace
       .define()
@@ -139,7 +137,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
 
   test('using placeholder across component spaces and waiting', () => {
     const mainCs = new glassEasel.ComponentSpace()
-    mainCs.defineComponent({ is: '' })
+    mainCs.setGlobalUsingComponent('', mainCs.defineComponent({ is: '' }))
     const extraCs = new glassEasel.ComponentSpace()
     mainCs.importSpace('space://extra', extraCs, false)
     mainCs.importSpace('space-private://extra', extraCs, true)

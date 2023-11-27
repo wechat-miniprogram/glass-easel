@@ -1,7 +1,9 @@
-import { Element, VirtualNode } from '..'
-import { DataValue } from '../data_proxy'
-import { UpdatePathTreeNode, UpdatePathTreeRoot } from './proc_gen_wrapper'
-import { triggerWarning } from '../func_arr'
+import { type DataValue } from '../data_proxy'
+import { type Element } from '../element'
+import { type ShadowRoot } from '../shadow_root'
+import { type VirtualNode } from '../virtual_node'
+import { dispatchError, triggerWarning } from '../warning'
+import { type UpdatePathTreeNode, type UpdatePathTreeRoot } from './proc_gen_wrapper'
 
 export class RangeListManager {
   keyName: string | null
@@ -10,13 +12,18 @@ export class RangeListManager {
   sharedKeyMap!: { [key: string]: number[] } | undefined
   items!: DataValue[]
   indexes!: (string | number)[] | null
+  ownerShadowRoot: ShadowRoot
+  elem: Element
 
   constructor(
     keyName: string | null,
     dataList: DataValue,
     elem: Element,
+    shadowRoot: ShadowRoot,
     newListItem: (item: DataValue, index: number | string) => VirtualNode,
   ) {
+    this.ownerShadowRoot = shadowRoot
+    this.elem = elem
     this.keyName = keyName
     this.updateKeys(dataList)
     const items = this.items
@@ -50,6 +57,8 @@ export class RangeListManager {
     } else if (typeof dataList === 'string') {
       triggerWarning(
         'Use string as for-list is generally for testing. Each character is treated as an item.',
+        this.ownerShadowRoot.getHostNode(),
+        this.elem,
       )
       items = new Array<string>(dataList.length)
       indexes = null
@@ -59,6 +68,8 @@ export class RangeListManager {
     } else if (typeof dataList === 'number') {
       triggerWarning(
         'Use number as for-list is generally for testing. The number is used as the repeated times of the item.',
+        this.ownerShadowRoot.getHostNode(),
+        this.elem,
       )
       items = new Array<string>(dataList)
       indexes = null
@@ -66,7 +77,12 @@ export class RangeListManager {
         items[i] = i
       }
     } else {
-      triggerWarning('The for-list data is invalid. Use empty array instead.')
+      dispatchError(
+        new Error(`The for-list data is neither Array nor Object, got type "${typeof dataList}".`),
+        undefined,
+        this.ownerShadowRoot.getHostNode(),
+        this.elem,
+      )
       items = []
       indexes = null
     }
@@ -100,7 +116,11 @@ export class RangeListManager {
       // convert shared keys to unique keys
       if (sharedKeyMap) {
         const keys = Object.keys(sharedKeyMap)
-        triggerWarning(`Some keys are not unique while list updates: "${keys.join('", "')}".`)
+        triggerWarning(
+          `Some keys are not unique while list updates: "${keys.join('", "')}".`,
+          this.ownerShadowRoot.getHostNode(),
+          this.elem,
+        )
         for (let i = 0; i < keys.length; i += 1) {
           const key = keys[i]!
           const items = sharedKeyMap[key]!
