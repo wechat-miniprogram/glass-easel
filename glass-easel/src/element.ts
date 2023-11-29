@@ -384,9 +384,9 @@ export class Element implements NodeCast {
         if (ENV.DEV) performanceMeasureEnd()
       }
       this._$backendElement = null
-      // FIXME: dirty fix to release backendContext, for memory leak
-      this._$nodeTreeContext = emptyContext
     }
+    // FIXME: dirty fix to release backendContext, for memory leak
+    this._$nodeTreeContext = emptyContext
   }
 
   /** Destroy the backend element on next detach */
