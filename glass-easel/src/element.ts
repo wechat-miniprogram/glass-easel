@@ -147,9 +147,6 @@ export class Element implements NodeCast {
   /** @internal */
   _$eventTarget: EventTarget<{ [name: string]: unknown }>
 
-  private _$originalClasses: string
-  private _$extraClasses: Record<string, boolean> | null
-
   /* istanbul ignore next */
   constructor() {
     throw new Error('Element cannot be constructed directly')
@@ -187,8 +184,6 @@ export class Element implements NodeCast {
     this.ownerShadowRoot = owner
     this._$mutationObserverTarget = null
     this._$eventTarget = new EventTarget()
-    this._$extraClasses = null
-    this._$originalClasses = ''
   }
 
   get $$(): GeneralBackendElement | null {
@@ -312,10 +307,6 @@ export class Element implements NodeCast {
 
   set class(classNames: string) {
     this.setNodeClass(classNames, StyleSegmentIndex.MAIN)
-  }
-
-  setExtraClass(className: string, value: boolean) {
-    this.toggleNodeClass(className, value, StyleSegmentIndex.TEMPLATE_EXTRA)
   }
 
   get style(): string {
