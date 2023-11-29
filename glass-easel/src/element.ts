@@ -11,6 +11,7 @@ import {
   type composedBackend,
   type domlikeBackend,
 } from './backend'
+import { EmptyComposedBackendContext } from './backend/empty_composed_backend'
 import { type ClassList } from './class_list'
 import { type ComponentDefinition } from './component'
 import {
@@ -81,7 +82,7 @@ export type DoubleLinkedList<T> = {
   next: DoubleLinkedList<T> | null
 }
 
-const emptyContext = new composedBackend.EmptyComposedBackendContext()
+const emptyContext = new EmptyComposedBackendContext()
 
 /**
  * A general element
