@@ -91,11 +91,26 @@ multi = { "*" }
 div = { "/" }
 rem = { "%" }
 
-unary = { (reverse | bit_reverse | positive | negative) ~ unary | member }
+unary = _{ unary_positive | unary_negative | unary_base }
+unary_base = { (void | type_of | reverse | bit_reverse) ~ unary | member }
+unary_positive = { positive ~ (unary_negative | unary_base) }
+unary_negative = { negative ~ (unary_positive | unary_base) }
 reverse = { "!" }
 bit_reverse = { "~" }
 positive = { "+" }
 negative = { "-" }
+void = ${
+    &"void " ~ "void"
+    | &"void\r" ~ "void"
+    | &"void\n" ~ "void"
+    | &"void\t" ~ "void"
+}
+type_of = ${
+    &"typeof " ~ "typeof"
+    | &"typeof\r" ~ "typeof"
+    | &"typeof\n" ~ "typeof"
+    | &"typeof\t" ~ "typeof"
+}
 member = { value ~ (static_member | dynamic_member | func_call)* }
 static_member = { "." ~ ident }
 dynamic_member = { "[" ~ cond ~ "]" }

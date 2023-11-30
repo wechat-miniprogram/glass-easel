@@ -4,7 +4,7 @@ import { BaseBehaviorBuilder } from './base_behavior_builder'
 import { Behavior } from '../behavior'
 import type { BehaviorDefinition, utils as typeUtils } from '../types'
 import type { DefinitionFilter, GeneralBehavior } from '../behavior'
-import type { AllData, Component } from '../component'
+import type { AllData, Component, GeneralComponent } from '../component'
 import type { CodeSpace } from '../space'
 import type { ResolveBehaviorBuilder, BuilderContext } from './type_utils'
 
@@ -29,7 +29,7 @@ export class BehaviorBuilder<
   TMethod extends MethodList = Empty,
   TChainingFilter extends ChainingFilterType = never,
   TPendingChainingFilter extends ChainingFilterType = never,
-  TComponentExport = undefined,
+  TComponentExport = never,
 > extends BaseBehaviorBuilder<
   TPrevData,
   TData,
@@ -98,6 +98,24 @@ export class BehaviorBuilder<
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     this._$ = this._$.behavior(behavior._$)
     return this as any
+  }
+
+  /** Set the export value when the component is being selected */
+  override export<TNewComponentExport>(
+    f: (this: GeneralComponent, source: GeneralComponent | null) => TNewComponentExport,
+  ): ResolveBehaviorBuilder<
+    BehaviorBuilder<
+      TPrevData,
+      TData,
+      TProperty,
+      TMethod,
+      TChainingFilter,
+      TPendingChainingFilter,
+      TNewComponentExport
+    >,
+    TChainingFilter
+  > {
+    return super.export(f) as any
   }
 
   /**
@@ -205,14 +223,15 @@ export class BehaviorBuilder<
     TNewData extends DataList = Empty,
     TNewProperty extends PropertyList = Empty,
     TNewMethod extends MethodList = Empty,
+    TNewComponentExport = never,
   >(
-    def: BehaviorDefinition<TNewData, TNewProperty, TNewMethod> &
+    def: BehaviorDefinition<TNewData, TNewProperty, TNewMethod, TNewComponentExport> &
       ThisType<
         Component<
           TData & TNewData,
           TProperty & TNewProperty,
           TMethod & TNewMethod,
-          TComponentExport
+          TNewComponentExport
         >
       >,
   ): ResolveBehaviorBuilder<
@@ -223,7 +242,7 @@ export class BehaviorBuilder<
       TMethod & TNewMethod,
       TChainingFilter,
       TPendingChainingFilter,
-      TComponentExport
+      TNewComponentExport
     >,
     TChainingFilter
   > {
@@ -235,7 +254,12 @@ export class BehaviorBuilder<
   /**
    * Finish the behavior definition process
    */
-  register(): Behavior<TData, TProperty, TMethod, TPendingChainingFilter> {
-    return new Behavior(this._$.registerBehavior(), this._$parents, this._$definitionFilter)
+  register(): Behavior<TData, TProperty, TMethod, TPendingChainingFilter, TComponentExport> {
+    return new Behavior(
+      this._$.registerBehavior(),
+      this._$parents,
+      this._$definitionFilter,
+      this._$export,
+    )
   }
 }

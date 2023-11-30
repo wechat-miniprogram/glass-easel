@@ -46,10 +46,9 @@ export interface BehaviorConstructor {
     TData extends DataList,
     TProperty extends PropertyList,
     TMethod extends MethodList,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     TComponentExport,
   >(
-    definition: BehaviorDefinition<TData, TProperty, TMethod>,
+    definition: BehaviorDefinition<TData, TProperty, TMethod, TComponentExport>,
   ): Behavior<TData, TProperty, TMethod, never>
   trait<TIn extends { [key: string]: any }>(): TraitBehavior<TIn, TIn>
   trait<TIn extends { [key: string]: any }, TOut extends { [key: string]: any }>(
@@ -349,18 +348,16 @@ export class CodeSpace {
       TData extends DataList,
       TProperty extends PropertyList,
       TMethod extends MethodList,
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       TComponentExport,
     >(
-      definition: BehaviorDefinition<TData, TProperty, TMethod>,
+      definition: BehaviorDefinition<TData, TProperty, TMethod, TComponentExport>,
     ): Behavior<TData, TProperty, TMethod, never>
     function behaviorConstructor<
       TData extends DataList,
       TProperty extends PropertyList,
       TMethod extends MethodList,
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       TComponentExport,
-    >(definition?: BehaviorDefinition<TData, TProperty, TMethod>) {
+    >(definition?: BehaviorDefinition<TData, TProperty, TMethod, TComponentExport>) {
       if (definition !== undefined) {
         return self.behavior().definition(definition).register()
       }

@@ -1,9 +1,12 @@
-import { VirtualNode } from './virtual_node'
-import { GeneralBehavior } from './behavior'
-import { Component, GeneralComponent } from './component'
-import { Element } from './element'
-import { safeCallback, triggerWarning } from './func_arr'
+import { Behavior, type GeneralBehavior } from './behavior'
+import { ComponentDefinition, type GeneralComponent } from './component'
+import { type RelationParams, type TraitRelationParams } from './component_params'
+import { type ComponentSpace } from './component_space'
+import { type Element } from './element'
+import { safeCallback } from './func_arr'
 import { TraitBehavior } from './trait_behaviors'
+import { isComponent, isElement, isVirtualNode } from './type_symbol'
+import { triggerWarning } from './warning'
 
 export const enum RelationType {
   Ancestor = 0,
@@ -15,6 +18,92 @@ export const enum RelationType {
 }
 
 const RELATION_TYPE_COUNT = 6
+
+export const normalizeRelation = <TOut extends { [key: string]: any }>(
+  ownerSpace: ComponentSpace,
+  is: string,
+  key: string,
+  relation: RelationParams | TraitRelationParams<TOut>,
+): RelationDefinition | null => {
+  const checkRelationFunc = (f: unknown): RelationListener | null => {
+    if (typeof f === 'function') {
+      return f as RelationListener
+    }
+    if (f !== undefined) {
+      triggerWarning(
+        `the "${key}" relation listener is not a function (when preparing behavior "${is}").`,
+      )
+    }
+    return null
+  }
+  let type: RelationType
+  if (relation.type === 'parent') {
+    type = RelationType.ParentComponent
+  } else if (relation.type === 'child') {
+    type = RelationType.ChildComponent
+  } else if (relation.type === 'parent-common-node') {
+    type = RelationType.ParentNonVirtualNode
+  } else if (relation.type === 'child-common-node') {
+    type = RelationType.ChildNonVirtualNode
+  } else if (relation.type === 'ancestor') {
+    type = RelationType.Ancestor
+  } else if (relation.type === 'descendant') {
+    type = RelationType.Descendant
+  } else {
+    const type = relation.type as string
+    triggerWarning(
+      `the "${key}" relation has an invalid relation type "${type}" (when preparing behavior "${is}").`,
+    )
+    return null
+  }
+  let target:
+    | GeneralBehavior
+    | TraitBehavior<{ [key: string]: unknown }, { [key: string]: unknown }>
+    | null = null
+  if (relation.target instanceof ComponentDefinition) {
+    target = relation.target.behavior as GeneralBehavior
+  } else if (relation.target instanceof Behavior || relation.target instanceof TraitBehavior) {
+    target = relation.target
+  } else {
+    const path = String(relation.target || key)
+    const usingTarget = ownerSpace.getComponentByUrlWithoutDefault(path, is)
+    if (usingTarget) {
+      target = usingTarget.behavior
+    } else {
+      const globalTarget = ownerSpace.getGlobalUsingComponent(path)
+      if (typeof globalTarget === 'object' && globalTarget !== null) {
+        target = globalTarget.behavior
+      }
+    }
+  }
+  if (!target) {
+    triggerWarning(
+      `the target of relation "${key}" is not a valid behavior or component (when preparing behavior "${is}").`,
+    )
+    return null
+  }
+  return {
+    target,
+    type,
+    linked: checkRelationFunc(relation.linked),
+    linkChanged: checkRelationFunc(relation.linkChanged),
+    unlinked: checkRelationFunc(relation.unlinked),
+    linkFailed: checkRelationFunc(relation.linkFailed) as RelationFailedListener,
+  }
+}
+
+export interface RelationHandler<TTarget, TOut> {
+  list(): TTarget[]
+  listAsTrait: TOut extends never ? undefined : () => TOut[]
+}
+
+export interface RelationInit {
+  (def: RelationParams): RelationHandler<any, never>
+  <TOut extends { [key: string]: any }>(def: TraitRelationParams<TOut>): RelationHandler<
+    unknown,
+    TOut
+  >
+}
 
 export type RelationListener = (target: unknown) => void
 
@@ -165,10 +254,10 @@ export class Relation {
           const next = cur.parentNode
           if (!next) break
           cur = next
-          if (cur instanceof VirtualNode) {
+          if (isVirtualNode(cur)) {
             continue
           }
-          if (cur instanceof Component) {
+          if (isComponent(cur)) {
             if (cur.hasBehavior(parentBehavior)) {
               const parentRelation = cur._$relation
               if (parentRelation) {
@@ -186,7 +275,7 @@ export class Relation {
                     const def = parentDefs[j]!
                     if (def.target && this._$comp.hasBehavior(def.target)) {
                       newLink = {
-                        target: cur as GeneralComponent,
+                        target: cur,
                         def,
                       }
                       break
@@ -304,12 +393,12 @@ export class Relation {
       const children = node.childNodes
       for (let i = 0; i < children.length; i += 1) {
         const child = children[i]!
-        if (!(child instanceof Element)) continue
-        if (child instanceof VirtualNode) {
+        if (!isElement(child)) continue
+        if (isVirtualNode(child)) {
           dfs(child)
           continue
         }
-        if (child instanceof Component) {
+        if (isComponent(child)) {
           if (child._$relation) {
             let links
             if (type === RelationType.ChildComponent) {
@@ -323,7 +412,7 @@ export class Relation {
               for (let i = 0; i < links.length; i += 1) {
                 const link = links[i]!
                 if (link && link.target === comp && link.def === def) {
-                  ret.push(child as GeneralComponent)
+                  ret.push(child)
                   break
                 }
               }

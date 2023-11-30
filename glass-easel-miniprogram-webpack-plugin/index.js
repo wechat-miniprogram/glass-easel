@@ -353,12 +353,9 @@ class GlassEaselMiniprogramWebpackPlugin {
         var glassEasel = adapter.glassEasel
         var env = new adapter.MiniProgramEnv()
         exports.env = env
-        var backend = new glassEasel.domlikeBackend.CurrentWindowBackendContext()
+        var backend = new glassEasel.CurrentWindowBackendContext()
         backend.onEvent((target, type, detail, options) => {
-          let cur = target
-          while (cur && !cur.__wxElement) cur = cur.parentNode
-          if (!cur) return
-          glassEasel.triggerEvent(target.__wxElement, type, detail, options)
+          glassEasel.triggerEvent(target, type, detail, options)
         })
         var ab = env.associateBackend(backend)
         ;(${params.styleSheetManager.toCodeString()})(ab)

@@ -35,7 +35,7 @@ export class ComponentBuilder<
   TMethod extends MethodList = Empty,
   TChainingFilter extends ChainingFilterType = never,
   TPendingChainingFilter extends ChainingFilterType = never,
-  TComponentExport = undefined,
+  TComponentExport = never,
 > extends BaseBehaviorBuilder<
   TPrevData,
   TData,
@@ -48,7 +48,6 @@ export class ComponentBuilder<
   private _$is!: string
   private _$alias?: string[]
   private _$options?: ComponentDefinitionOptions
-  private _$export?: (source: GeneralComponent | null) => TComponentExport
   private _$proto?: ComponentProto<TData, TProperty, TMethod, TComponentExport>
 
   /** @internal */
@@ -65,12 +64,11 @@ export class ComponentBuilder<
       if (proto === undefined) {
         const methods = originalCaller.getComponentDefinition().behavior.getMethods()
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        proto = ret._$proto = new ComponentProto(methods) as any
+        proto = ret._$proto = new ComponentProto(methods, ret._$export) as any
       }
       const caller = proto!.derive()
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       caller._$ = originalCaller as any
-      caller._$export = ret._$export
       return caller
     })
     if (overallBehavior) ret._$.behavior(overallBehavior)
@@ -93,8 +91,9 @@ export class ComponentBuilder<
     UProperty extends PropertyList,
     UMethod extends MethodList,
     UChainingFilter extends ChainingFilterType,
+    UComponentExport,
   >(
-    behavior: Behavior<UData, UProperty, UMethod, UChainingFilter>,
+    behavior: Behavior<UData, UProperty, UMethod, UChainingFilter, UComponentExport>,
   ): ResolveBehaviorBuilder<
     ComponentBuilder<
       TPrevData,
@@ -103,22 +102,23 @@ export class ComponentBuilder<
       TMethod & UMethod,
       UChainingFilter,
       TPendingChainingFilter,
-      TComponentExport
+      UComponentExport
     >,
     UChainingFilter
   > {
     this._$parents.push(behavior as GeneralBehavior)
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     this._$ = this._$.behavior(behavior._$)
+    if (behavior._$export) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      this._$export = behavior._$export as any
+    }
     return this as any
   }
 
   /** Set the export value when the component is being selected */
-  export<TNewComponentExport>(
-    f: (
-      this: Component<TData, TProperty, TMethod, TComponentExport>,
-      source: GeneralComponent | null,
-    ) => TNewComponentExport,
+  override export<TNewComponentExport>(
+    f: (this: GeneralComponent, source: GeneralComponent | null) => TNewComponentExport,
   ): ResolveBehaviorBuilder<
     ComponentBuilder<
       TPrevData,
@@ -241,7 +241,7 @@ export class ComponentBuilder<
     TNewData extends DataList = Empty,
     TNewProperty extends PropertyList = Empty,
     TNewMethod extends MethodList = Empty,
-    TNewComponentExport = undefined,
+    TNewComponentExport = never,
   >(
     def: ComponentDefinition<TNewData, TNewProperty, TNewMethod, TNewComponentExport> &
       ThisType<

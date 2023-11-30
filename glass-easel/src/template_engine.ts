@@ -1,9 +1,9 @@
-import { GeneralBehavior } from './behavior'
-import { ShadowRoot } from './shadow_root'
-import { DataChange, DataValue } from './data_proxy'
-import { NormalizedComponentOptions } from './global_options'
-import { ExternalShadowRoot } from './external_shadow_tree'
-import { GeneralComponent } from './component'
+import { type GeneralBehavior } from './behavior'
+import { type ShadowRoot } from './shadow_root'
+import { type DataChange, type DataValue } from './data_proxy'
+import { type NormalizedComponentOptions } from './global_options'
+import { type ExternalShadowRoot } from './external_shadow_tree'
+import { type GeneralComponent } from './component'
 
 /**
  * A template engine that handles the template part of a component

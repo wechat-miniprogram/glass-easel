@@ -1,26 +1,32 @@
+import { type GeneralBackendContext } from './backend'
 import {
-  ComponentParams,
-  DataList,
-  PropertyList,
-  MethodList,
-  ComponentInstance,
-  Empty,
-} from './component_params'
-import { Behavior, BehaviorBuilder, GeneralBehavior, NativeNodeDefinition } from './behavior'
+  type Behavior,
+  BehaviorBuilder,
+  type GeneralBehavior,
+  type NativeNodeDefinition,
+} from './behavior'
+import { StyleScopeManager } from './class_list'
 import {
-  ComponentDefinition,
-  GeneralComponentDefinition,
   Component,
-  GeneralComponent,
+  type ComponentDefinition,
+  type GeneralComponent,
+  type GeneralComponentDefinition,
 } from './component'
 import {
-  ComponentOptions,
+  type ComponentInstance,
+  type ComponentParams,
+  type DataList,
+  type Empty,
+  type MethodList,
+  type PropertyList,
+} from './component_params'
+import {
+  type ComponentOptions,
+  type NormalizedComponentOptions,
   normalizeComponentOptions,
-  NormalizedComponentOptions,
 } from './global_options'
-import { StyleScopeManager } from './class_list'
-import { GeneralBackendContext, safeCallback } from '.'
 import { TraitBehavior } from './trait_behaviors'
+import { safeCallback } from './func_arr'
 
 const normalizePath = (path: string, basePath: string): string => {
   let slices: string[]
@@ -153,6 +159,8 @@ export class ComponentSpace {
   _$componentWaitingListener:
     | ((isPub: boolean, alias: string, owner: GeneralComponent) => void)
     | null = null
+  /** @internal */
+  _$allowUnusedNativeNode = true
 
   /**
    * Create a new component space
@@ -168,6 +176,7 @@ export class ComponentSpace {
     defaultComponent?: string,
     baseSpace?: ComponentSpace,
     styleScopeManager?: StyleScopeManager,
+    allowUnusedNativeNode = true,
   ) {
     if (baseSpace) {
       Object.assign(this._$list, baseSpace._$pubList)
@@ -176,6 +185,7 @@ export class ComponentSpace {
     this._$defaultComponent = defaultComponent ?? ''
     this._$componentOptions = normalizeComponentOptions({}, baseSpace?._$componentOptions)
     this.styleScopeManager = styleScopeManager || new StyleScopeManager()
+    this._$allowUnusedNativeNode = allowUnusedNativeNode
   }
 
   /**
@@ -609,4 +619,15 @@ export class ComponentSpace {
   ): TraitBehavior<TIn, TOut> {
     return new TraitBehavior<TIn, TOut>(this, trans)
   }
+}
+
+let defaultComponentSpace: ComponentSpace | null = null
+
+export const getDefaultComponentSpace = (): ComponentSpace => {
+  if (defaultComponentSpace) {
+    return defaultComponentSpace
+  }
+  const cs = new ComponentSpace()
+  defaultComponentSpace = cs
+  return cs
 }

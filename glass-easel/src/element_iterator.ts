@@ -1,6 +1,6 @@
 import { Element } from './element'
-import { TextNode } from './text_node'
-import { Node } from './node'
+import { type Node } from './node'
+import { isElement, isTextNode } from './type_symbol'
 
 /** The iterator direction and order */
 export const enum ElementIteratorType {
@@ -41,7 +41,7 @@ export class ElementIterator {
    * Specify `Component` will only return components.
    */
   constructor(node: Node, type: ElementIteratorType, nodeTypeLimit: unknown = Element) {
-    if (!(node instanceof Element) && !(node instanceof TextNode)) {
+    if (!isElement(node) && !isTextNode(node)) {
       throw new Error('Element iterators can only be used in elements or text nodes')
     }
     this._$node = node
@@ -110,7 +110,7 @@ export class ElementIterator {
             if (f(node) === false) return false
           }
         }
-        if (node instanceof Element) {
+        if (isElement(node)) {
           let interrupted = false
           const childFn = (child: Node) => {
             if (rec(child) === false) {

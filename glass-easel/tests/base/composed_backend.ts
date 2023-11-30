@@ -193,7 +193,7 @@ abstract class Node implements glassEasel.composedBackend.Element {
 
   private _$style = ''
   private _$styleScope = 0
-  private _$classes: Array<[string, number | undefined]> = []
+  private _$classes: Array<[string, number | undefined]> | undefined
   private _$attributes: Array<[string, unknown]> = []
   private _$styleScopeManager: glassEasel.StyleScopeManager | undefined
 
@@ -277,7 +277,7 @@ abstract class Node implements glassEasel.composedBackend.Element {
       ret.push(`<${tagName}`)
       if (this.id) props.id = this.getAttribute('id')!
       if (this._$style) props.style = this.getAttribute('style')!
-      if (this._$classes.length) props.class = this.getAttribute('class')!
+      if (this._$classes) props.class = this.getAttribute('class')!
       const propsStr = Object.entries(props)
         .map(([key, value]) => `${key}="${value}"`)
         .join(' ')
@@ -295,7 +295,7 @@ abstract class Node implements glassEasel.composedBackend.Element {
     if (name === 'id') return this.id
     if (name === 'style') return this._$style
     if (name === 'class')
-      return this._$classes.length
+      return this._$classes
         ? this._$classes
             .map(([name, styleScope]) => {
               let prefix = ''
@@ -438,17 +438,20 @@ abstract class Node implements glassEasel.composedBackend.Element {
 
   addClass(elementClass: string, styleScope?: number): void {
     const scope = ensureNonNegativeInteger(styleScope)
+    if (!this._$classes) this._$classes = []
     const index = this._$classes.findIndex((c) => c[0] === elementClass && c[1] === scope)
     if (index === -1) this._$classes.push([elementClass, scope])
   }
 
   removeClass(elementClass: string, styleScope?: number): void {
     const scope = ensureNonNegativeInteger(styleScope)
+    if (!this._$classes) return
     const index = this._$classes.findIndex((c) => c[0] === elementClass && c[1] === scope)
     if (index !== -1) this._$classes.splice(index, 1)
   }
 
   clearClasses(): void {
+    if (!this._$classes) return
     this._$classes = []
   }
 

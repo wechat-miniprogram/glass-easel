@@ -35,6 +35,27 @@ export const execWithWarn = <T>(expectCount: number, func: () => T): T => {
   return ret
 }
 
+export const execWithError = <R>(func: () => R, ...errors: string[]): R | void => {
+  let count = 0
+  const errorListener = (err: unknown) => {
+    if (count >= errors.length) return true // will throw
+    expect(err).toBeInstanceOf(Error)
+    expect((err as Error).message).toBe(errors[count])
+    count += 1
+    return false
+  }
+  glassEasel.addGlobalErrorListener(errorListener)
+  try {
+    return func()
+  } catch (e) {
+    errorListener(e)
+    return undefined
+  } finally {
+    glassEasel.removeGlobalErrorListener(errorListener)
+    expect(count).toBe(errors.length)
+  }
+}
+
 type TemplateOptions = {
   updateMode?: string
   fallbackListenerOnNativeNode?: boolean
@@ -78,6 +99,6 @@ export const multiTmpl = (src: { [path: string]: string }, options?: TemplateOpt
   }
 }
 
-export const domBackend = new glassEasel.domlikeBackend.CurrentWindowBackendContext()
-export const shadowBackend = new glassEasel.backend.EmptyBackendContext()
+export const domBackend = new glassEasel.CurrentWindowBackendContext()
+export const shadowBackend = new glassEasel.EmptyBackendContext()
 export const composedBackend = new ComposedBackend.Context()

@@ -1,13 +1,8 @@
-import {
-  GeneralBehavior,
-  Component,
-  ComponentDefinition,
-  ComponentOptions,
-  GeneralComponent,
-  GeneralBehaviorBuilder,
-} from '.'
-import { NormalizedPropertyType } from './behavior'
-import { TraitBehavior } from './trait_behaviors'
+import { type GeneralBehavior, type GeneralBehaviorBuilder } from './behavior'
+import { type Component, type ComponentDefinition, type GeneralComponent } from './component'
+import { type NormalizedPropertyType } from './data_proxy'
+import { type ComponentOptions } from './global_options'
+import { type TraitBehavior } from './trait_behaviors'
 
 export type Empty = Record<never, never>
 

@@ -1394,6 +1394,144 @@ componentSpace.defineComponent({
         expect(domHtml(parentElem)).toBe('<impl><span><div>456</div></span></impl>')
         matchElementWithDom(parentElem)
       })
+
+      test('should support slot as slot content', () => {
+        const comp = componentSpace
+          .define()
+          .options({
+            multipleSlots: true,
+          })
+          .template(
+            tmpl(`
+              <div>comp</div>
+              <slot name="comp-slot"></slot>
+            `),
+          )
+          .registerComponent()
+      
+        const child = componentSpace
+          .define()
+          .options({
+            multipleSlots: true,
+          })
+          .usingComponents({ comp })
+          .template(
+            tmpl(`
+              <comp>
+                <div>child</div>
+                <slot name="child-slot" slot="{{s}}" />
+              </comp>
+            `),
+          )
+          .property('s', String)
+          .registerComponent()
+      
+        const parent = componentSpace
+          .define()
+          .usingComponents({ child })
+          .template(
+            tmpl(`
+              <child s="{{s}}">
+                <div slot="child-slot">content</div>
+              </child>
+            `),
+          )
+          .data(() => ({
+            s: '',
+          }))
+          .registerComponent()
+      
+        const parentElem = glassEasel.Component.createWithContext(
+          'root',
+          parent.general(),
+          testBackend,
+        )
+        expect(domHtml(parentElem)).toBe(
+          '<child><comp><div>comp</div></comp></child>',
+        )
+
+        parentElem.setData({
+          s: 'comp-slot',
+        })
+        expect(domHtml(parentElem)).toBe(
+          '<child><comp><div>comp</div><div>content</div></comp></child>',
+        )
+
+        parentElem.setData({
+          s: 'invalid',
+        })
+        expect(domHtml(parentElem)).toBe(
+          '<child><comp><div>comp</div></comp></child>',
+        )
+      })
+      
+      test('should support slot as slot content with virtual host and placeholder', () => {
+        const placeholder = componentSpace
+          .define()
+          .options({
+            multipleSlots: true,
+            virtualHost: true,
+          })
+          .template(
+            tmpl(`
+              <div>placeholder</div>
+              <slot name="content"></slot>
+            `),
+          )
+          .registerComponent()
+      
+        const child = componentSpace
+          .define()
+          .options({
+            multipleSlots: true,
+            virtualHost: true,
+          })
+          .usingComponents({ comp: 'comp', placeholder })
+          .placeholders({ comp: 'placeholder' })
+          .template(
+            tmpl(`
+              <comp>
+                <div>child</div>
+                <slot name="content" slot="content" />
+              </comp>
+            `),
+          )
+          .registerComponent()
+      
+        const parent = componentSpace
+          .define()
+          .usingComponents({ child })
+          .template(
+            tmpl(`
+              <child>
+                <div slot="content">content</div>
+              </child>
+            `),
+          )
+          .registerComponent()
+      
+        const parentElem = glassEasel.Component.createWithContext(
+          'root',
+          parent.general(),
+          testBackend,
+        )
+        expect(domHtml(parentElem)).toBe('<div>placeholder</div><div>content</div>')
+      
+        componentSpace
+          .define('comp')
+          .options({
+            multipleSlots: true,
+          })
+          .template(
+            tmpl(`
+              <div>comp</div>
+              <slot name="content"></slot>
+            `),
+          )
+          .registerComponent()
+      
+        expect(domHtml(parentElem)).toBe('<comp><div>comp</div><div>content</div></comp>')
+      })
     })
   })
 

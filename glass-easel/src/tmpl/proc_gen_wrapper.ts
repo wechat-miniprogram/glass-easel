@@ -1,21 +1,19 @@
 /* eslint-disable class-methods-use-this */
 
-import { ProcGenGroupList } from '.'
-import {
-  DataValue,
-  Element,
-  ShadowRoot,
-  VirtualNode,
-  TextNode,
-  Component,
-  GeneralComponent,
-  Node,
-  ShadowedEvent,
-  StyleSegmentIndex,
-  NativeNode,
-} from '..'
-import { DataPath } from '../data_path'
-import { SlotMode } from '../shadow_root'
+import { Component, type GeneralComponent } from '../component'
+import { type DataPath } from '../data_path'
+import { type DataValue } from '../data_proxy'
+import { Element, StyleSegmentIndex } from '../element'
+import { type ShadowedEvent } from '../event'
+import { ENV } from '../global_options'
+import { type NativeNode } from '../native_node'
+import { type Node } from '../node'
+import { SlotMode, type ShadowRoot } from '../shadow_root'
+import { type TextNode } from '../text_node'
+import { type ProcGenGroupList } from '../tmpl'
+import { isComponent, isNativeNode } from '../type_symbol'
+import { type VirtualNode } from '../virtual_node'
+import { dispatchError } from '../warning'
 import { RangeListManager } from './range_list_diff'
 
 export type UpdatePathTreeNode = true | { [key: string]: UpdatePathTreeNode } | UpdatePathTreeNode[]
@@ -133,7 +131,11 @@ type DefineForLoop = (
   ) => void,
 ) => void
 
-type DefineSlot = (name: string | undefined, slotValueInit?: (elem: Element) => void) => void
+type DefineSlot = (
+  name: string | undefined,
+  slotValueInit?: (elem: Element) => void,
+  slot?: string,
+) => void
 
 type DefinePureVirtualNode = (children: DefineChildren, slot: string | undefined) => void
 
@@ -189,7 +191,7 @@ export class ProcGenWrapper {
         // eslint-disable-next-line no-loop-func
         (elem: Element) => {
           if (prevElement !== null && elem !== prevElement) {
-            if (prevElement instanceof Component) {
+            if (isComponent(prevElement)) {
               if (prevElement.hasPendingChanges()) {
                 const nodeDataProxy = Component.getDataProxy(prevElement)
                 nodeDataProxy.applyDataUpdates(true)
@@ -205,7 +207,7 @@ export class ProcGenWrapper {
     }
     const elem = prevElement as Element | null
     if (elem !== null) {
-      if (elem instanceof Component) {
+      if (isComponent(elem)) {
         if (elem.hasPendingChanges()) {
           const nodeDataProxy = Component.getDataProxy(elem)
           nodeDataProxy.applyDataUpdates(true)
@@ -312,6 +314,7 @@ export class ProcGenWrapper {
           key,
           list,
           elem,
+          shadowRoot,
           (item: DataValue, index: number | string): VirtualNode => {
             const childNode = shadowRoot.createVirtualNode('wx:for-item')
             childNode.destroyBackendElementOnDetach()
@@ -353,11 +356,19 @@ export class ProcGenWrapper {
       },
 
       // slot node
-      (slotName: string | undefined, slotValueInit?: (elem: Element) => void) => {
+      (
+        slotName: string | undefined,
+        slotValueInit?: (elem: Element) => void,
+        slot?: string,
+      ) => {
         const elem = this.shadowRoot.createVirtualNode('slot')
         elem.destroyBackendElementOnDetach()
         Element.setSlotName(elem, dataValueToString(slotName))
-        if (slotElement) Element.setSlotElement(elem, slotElement)
+        if (slotElement) {
+          Element.setSlotElement(elem, slotElement)
+        } else if (slot !== undefined) {
+          elem.slot = slot
+        }
         if (slotValueInit) slotValueInit(elem)
         childNodes.push(elem)
       },
@@ -476,7 +487,7 @@ export class ProcGenWrapper {
         }
         propertyInit(elem, false)
         let dynSlot = false
-        if (elem instanceof Component) {
+        if (isComponent(elem)) {
           const sr = this.dynamicSlotUpdate(elem, dynamicSlotValueNames, children)
           if (sr) dynSlot = true
           if (elem.hasPendingChanges()) {
@@ -619,11 +630,18 @@ export class ProcGenWrapper {
       },
 
       // slot node
-      (slotName: string | undefined, slotValueInit?: (elem: Element) => void) => {
+      (
+        slotName: string | undefined,
+        slotValueInit?: (elem: Element) => void,
+        slot?: string,
+      ) => {
         const elem = childNodes[index] as Element
         index += 1
         if (slotName !== undefined) {
           Element.setSlotName(elem, dataValueToString(slotName))
+        }
+        if (!slotElement) {
+          if (slot !== undefined) elem.slot = slot
         }
         if (slotValueInit) slotValueInit(elem)
         this.shadowRoot.applySlotValueUpdates(elem)
@@ -782,17 +800,14 @@ export class ProcGenWrapper {
     children: DefineChildren,
     dynamicSlotValueNames: string[] | undefined,
   ): Element {
-    const placeholding = this.shadowRoot.checkComponentPlaceholder(tagName)
-    let elem: Element
     let dynSlot = false
     const initPropValues = (elem: GeneralComponent | NativeNode) => {
-      const sr =
-        elem instanceof Component
-          ? this.dynamicSlotUpdate(elem, dynamicSlotValueNames, children)
-          : null
+      const sr = isComponent(elem)
+        ? this.dynamicSlotUpdate(elem, dynamicSlotValueNames, children)
+        : null
       if (sr) dynSlot = true
       propertyInit(elem, true)
-      if (elem instanceof Component) {
+      if (isComponent(elem)) {
         if (elem.hasPendingChanges()) {
           const nodeDataProxy = Component.getDataProxy(elem)
           nodeDataProxy.applyDataUpdates(true)
@@ -800,55 +815,41 @@ export class ProcGenWrapper {
         sr?.applySlotUpdates()
       }
     }
-    if (typeof placeholding === 'boolean') {
-      let placeholderCb: (() => void) | undefined
-      if (placeholding) {
-        placeholderCb = () => {
-          const replacer = this.shadowRoot.createComponent(
-            tagName,
-            tagName,
-            genericImpls,
-            undefined,
-            initPropValues,
-          )
-          replacer.destroyBackendElementOnDetach()
-          const replacerShadowRoot = (replacer as GeneralComponent).getShadowRoot()
-          const elemShadowRoot = elem instanceof Component ? elem.getShadowRoot() : null
-          const isElemDynamicSlots = elemShadowRoot?.getSlotMode() === SlotMode.Dynamic
-          const isReplacerDynamicSlots = replacerShadowRoot?.getSlotMode() === SlotMode.Dynamic
-          if (isReplacerDynamicSlots) {
-            if (!isElemDynamicSlots) {
-              throw new Error(
-                'The "dynamicSlots" option of the component and its placeholder should be the same.',
-              )
-            }
-            elem.parentNode?.replaceChild(replacer, elem)
-          } else {
-            if (isElemDynamicSlots) {
-              throw new Error(
-                'The "dynamicSlots" option of the component and its placeholder should be the same.',
-              )
-            }
-            elem.selfReplaceWith(replacer)
-          }
-        }
+    const placeholderCallback = () => {
+      const replacer = this.shadowRoot.createComponent(
+        tagName,
+        tagName,
+        genericImpls,
+        undefined,
+        initPropValues,
+      )
+      replacer.destroyBackendElementOnDetach()
+      const replacerShadowRoot = (replacer as GeneralComponent).getShadowRoot()
+      const elemShadowRoot = isComponent(elem) ? elem.getShadowRoot() : null
+      const isElemDynamicSlots = elemShadowRoot?.getSlotMode() === SlotMode.Dynamic
+      const isReplacerDynamicSlots = replacerShadowRoot?.getSlotMode() === SlotMode.Dynamic
+      if (isReplacerDynamicSlots !== isElemDynamicSlots) {
+        dispatchError(
+          new Error(
+            `The "dynamicSlots" option of component <${replacer.is}> and its placeholder <${elem.is}> should be the same.`,
+          ),
+          '[render]',
+          isComponent(replacer) ? replacer : replacer.is,
+        )
+      } else if (isReplacerDynamicSlots) {
+        elem.parentNode?.replaceChild(replacer, elem)
+      } else {
+        elem.selfReplaceWith(replacer)
       }
-      elem = this.shadowRoot.createComponent(
-        tagName,
-        tagName,
-        genericImpls,
-        placeholderCb,
-        initPropValues,
-      )
-      elem.destroyBackendElementOnDetach()
-    } else {
-      elem = this.shadowRoot.createComponentOrNativeNode(
-        placeholding ?? tagName,
-        genericImpls,
-        initPropValues,
-      )
-      elem.destroyBackendElementOnDetach()
     }
+    const elem = this.shadowRoot.createComponent(
+      tagName,
+      tagName,
+      genericImpls,
+      placeholderCallback,
+      initPropValues,
+    )
+    elem.destroyBackendElementOnDetach()
     if (dynSlot) {
       this.bindingMapDisabled = true // IDEA better binding map disable detection
     } else {
@@ -874,22 +875,26 @@ export class ProcGenWrapper {
   }
 
   // set class or external classes named `class`
-  c(elem: Element, v: string) {
-    if (elem instanceof Component) {
+  c(elem: Element, v: string | string[]) {
+    if (isComponent(elem)) {
       // "class" itself can also be an external class
-      const hasExternalClass = (elem as GeneralComponent).hasExternalClass('class')
+      const hasExternalClass = elem.hasExternalClass('class')
       if (hasExternalClass) {
-        ;(elem as GeneralComponent).setExternalClass('class', dataValueToString(v))
+        elem.setExternalClass('class', v)
       }
-      elem.class = dataValueToString(v)
-    } else {
-      elem.class = dataValueToString(v)
     }
+    elem.setNodeClass(v)
   }
 
   // set style or property named `style`
   y(elem: Element, v: string) {
-    elem.setNodeStyle(dataValueToString(v), StyleSegmentIndex.MAIN)
+    if (isComponent(elem) && Component.hasProperty(elem, 'style')) {
+      const nodeDataProxy = Component.getDataProxy(elem)
+      const camelName = dashToCamelCase('style')
+      nodeDataProxy.replaceProperty(camelName, v)
+    } else {
+      elem.setNodeStyle(dataValueToString(v), StyleSegmentIndex.MAIN)
+    }
   }
 
   // set dataset
@@ -927,6 +932,11 @@ export class ProcGenWrapper {
         )
       }
       return ret
+    }
+    if (ENV.DEV) {
+      Object.defineProperty(listener, 'name', {
+        value: typeof handler === 'string' ? handler : handler.name,
+      })
     }
     const evOptions = {
       final,
@@ -1014,7 +1024,7 @@ export class ProcGenWrapper {
       }
       return true
     }
-    if (elem instanceof Component) {
+    if (isComponent(elem)) {
       const nodeDataProxy = Component.getDataProxy(elem)
       const camelName = dashToCamelCase(name)
       if (nodeDataProxy.replaceProperty(camelName, v)) {
@@ -1037,12 +1047,12 @@ export class ProcGenWrapper {
           }
         }
       } else if (elem.hasExternalClass(name)) {
-        elem.setExternalClass(name, dataValueToString(v))
+        elem.setExternalClass(name, v as string)
       } else {
         // compatibilities for legacy event binding syntax
         checkFallbackEventListener(camelName)
       }
-    } else if (elem instanceof NativeNode) {
+    } else if (isNativeNode(elem)) {
       if (this.fallbackListenerOnNativeNode) {
         // compatibilities for legacy event binding syntax
         const camelName = dashToCamelCase(name)
@@ -1065,7 +1075,7 @@ export class ProcGenWrapper {
 
   // set a worklet directive value
   wl(elem: Element, name: string, value: unknown) {
-    if (elem instanceof Component) {
+    if (isComponent(elem)) {
       elem.triggerWorkletChangeLifetime(name, value)
     } else {
       // TODO warn unused worklet
@@ -1074,7 +1084,7 @@ export class ProcGenWrapper {
 
   // add a change property binding
   p(elem: Element, name: string, v: ChangePropListener, _generalLvaluePath?: DataPath | null) {
-    if (elem instanceof Component) {
+    if (isComponent(elem)) {
       if (Component.hasProperty(elem, name)) {
         const tmplArgs = getTmplArgs(elem)
         if (!tmplArgs.changeProp) {

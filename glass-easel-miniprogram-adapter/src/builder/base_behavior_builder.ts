@@ -4,7 +4,7 @@ import * as glassEasel from 'glass-easel'
 import { Behavior, ComponentType, TraitBehavior } from '../behavior'
 import type { BehaviorDefinition, utils as typeUtils } from '../types'
 import type { GeneralBehavior } from '../behavior'
-import type { AllData, Component } from '../component'
+import type { AllData, Component, GeneralComponent } from '../component'
 import type { CodeSpace } from '../space'
 import type {
   ResolveBehaviorBuilder,
@@ -31,7 +31,7 @@ export class BaseBehaviorBuilder<
   TMethod extends MethodList = Empty,
   TChainingFilter extends ChainingFilterType = never,
   TPendingChainingFilter extends ChainingFilterType = never,
-  TComponentExport = undefined,
+  TComponentExport = never,
 > {
   protected _$codeSpace!: CodeSpace
   protected _$!: glassEasel.BehaviorBuilder<
@@ -43,6 +43,7 @@ export class BaseBehaviorBuilder<
     TPendingChainingFilter
   >
   protected _$parents: GeneralBehavior[] = []
+  protected _$export?: (source: GeneralComponent | null) => TComponentExport
 
   /** Implement a trait behavior */
   implement<TIn extends { [key: string]: any }>(
@@ -57,6 +58,26 @@ export class BaseBehaviorBuilder<
   externalClasses(list: string[]): this {
     this._$.externalClasses(list)
     return this
+  }
+
+  /** Set the export value when the component is being selected */
+  export<TNewComponentExport>(
+    f: (this: GeneralComponent, source: GeneralComponent | null) => TNewComponentExport,
+  ): ResolveBehaviorBuilder<
+    BaseBehaviorBuilder<
+      TPrevData,
+      TData,
+      TProperty,
+      TMethod,
+      TChainingFilter,
+      TPendingChainingFilter,
+      TNewComponentExport
+    >,
+    TChainingFilter
+  > {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    this._$export = f as any
+    return this as any
   }
 
   data<T extends DataList>(
@@ -301,14 +322,15 @@ export class BaseBehaviorBuilder<
     TNewData extends DataList = Empty,
     TNewProperty extends PropertyList = Empty,
     TNewMethod extends MethodList = Empty,
+    TNewComponentExport = never,
   >(
-    def: BehaviorDefinition<TNewData, TNewProperty, TNewMethod> &
+    def: BehaviorDefinition<TNewData, TNewProperty, TNewMethod, TNewComponentExport> &
       ThisType<
         Component<
           TData & TNewData,
           TProperty & TNewProperty,
           TMethod & TNewMethod,
-          TComponentExport
+          TNewComponentExport
         >
       >,
   ): ResolveBehaviorBuilder<
@@ -319,7 +341,7 @@ export class BaseBehaviorBuilder<
       TMethod & TNewMethod,
       TChainingFilter,
       TPendingChainingFilter,
-      TComponentExport
+      TNewComponentExport
     >,
     TChainingFilter
   > {
@@ -340,6 +362,7 @@ export class BaseBehaviorBuilder<
       pageLifetimes: rawPageLifetimes,
       relations: rawRelations,
       externalClasses,
+      export: exports,
     } = def
     behaviors?.forEach((beh) => {
       this._$parents.push(beh as GeneralBehavior)
@@ -406,6 +429,8 @@ export class BaseBehaviorBuilder<
       }
     }
     if (externalClasses) inner.externalClasses(externalClasses)
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    if (exports) this._$export = exports as any
     return this as any
   }
 }

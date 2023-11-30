@@ -55,6 +55,12 @@ impl TmplGroup {
         Ok(convert_str_arr(&dependencies))
     }
 
+    #[wasm_bindgen(js_name = "getScriptDependencies")]
+    pub fn get_script_dependencies(&self, path: &str) -> Result<js_sys::Array, JsError> {
+        let dependencies = self.group.get_script_dependencies(&path)?;
+        Ok(convert_str_arr(&dependencies))
+    }
+
     #[wasm_bindgen(js_name = "getInlineScriptModuleNames")]
     pub fn get_inline_script_module_names(&self, path: &str) -> Result<js_sys::Array, JsError> {
         let names = self.group.get_inline_script_module_names(path)?;
@@ -117,6 +123,11 @@ impl TmplGroup {
     #[wasm_bindgen(js_name = "exportAllScripts")]
     pub fn export_all_scripts(&self) -> Result<String, JsError> {
         Ok(self.group.export_all_scripts()?)
+    }
+
+    #[wasm_bindgen(js_name = "importGroup")]
+    pub fn import_group(&mut self, group: &TmplGroup) {
+        self.group.import_group(&group.group)
     }
 }
 

@@ -1,10 +1,10 @@
-import { GeneralBackendContext, Node } from '../node'
+import { type Node } from '../node'
 import {
-  BoundingClientRect,
-  GetAllComputedStylesResponses,
-  GetMatchedRulesResponses,
-  ScrollOffset,
-} from './mode'
+  type BoundingClientRect,
+  type GetAllComputedStylesResponses,
+  type GetMatchedRulesResponses,
+  type ScrollOffset,
+} from './shared'
 
 interface GetWrapper<T> {
   get(): T
@@ -19,10 +19,10 @@ export interface Element {
   setScrollPosition(scrollLeft: number, scrollTop: number, duration: number): void
 }
 
-export interface Context {
+export interface Context<Ctx> {
   createContext(
     options: unknown,
-    cb: (ContextWrapper: GetWrapper<Partial<Context> & GeneralBackendContext>) => void,
+    cb: (ContextWrapper: GetWrapper<Partial<Context<Ctx> & Ctx>>) => void,
   ): void
 
   setFocusedNode(target: Node): void
@@ -79,5 +79,10 @@ export interface Context {
     propertyIndex: number,
     inlineStyle: string,
     callback: (propertyIndex: number | null) => void,
+  ): void
+  performanceTraceStart(): number
+  performanceTraceEnd(
+    id: number,
+    cb: (stats: { startTimestamp: number; endTimestamp: number }) => void,
   ): void
 }

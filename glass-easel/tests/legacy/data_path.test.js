@@ -1,6 +1,6 @@
 /* eslint-disable */
 
-const { execWithWarn } = require('../base/env')
+const { execWithWarn, execWithError } = require('../base/env')
 const glassEasel = require('../../src')
 
 describe('DataPath', function () {
@@ -30,17 +30,17 @@ describe('DataPath', function () {
     })
 
     it('fails at illegal integers', function () {
-      execWithWarn(1, function () {
+      execWithError(function () {
         var str = 'a[b]'
         expect(glassEasel.dataPath.parseSinglePath(str)).toStrictEqual(null)
-      })
+      }, 'data path descriptor "a[b]" is illegal at char 2 (illegal index)')
     })
 
     it('fails at illegal integer suffixes', function () {
-      execWithWarn(1, function () {
+      execWithError(function () {
         var str = 'a[1e]'
         expect(glassEasel.dataPath.parseSinglePath(str)).toStrictEqual(null)
-      })
+      }, 'data path descriptor "a[1e]" is illegal at char 3 (illegal index)')
     })
 
     it('should parse empty str', function () {
@@ -96,52 +96,52 @@ describe('DataPath', function () {
     })
 
     it('fails at illegal integers', function () {
-      execWithWarn(1, function () {
+      execWithError(function () {
         var str = 'a[b]'
         expect(glassEasel.dataPath.parseMultiPaths(str)).toStrictEqual([])
-      })
+      }, 'data path descriptor "a[b]" is illegal at char 2 (illegal index)')
     })
 
     it('fails at illegal integer suffixes', function () {
-      execWithWarn(1, function () {
+      execWithError(function () {
         var str = 'a[1e]'
         expect(glassEasel.dataPath.parseMultiPaths(str)).toStrictEqual([])
-      })
+      }, 'data path descriptor "a[1e]" is illegal at char 3 (illegal index)')
     })
 
     it('fails at number-started fields', function () {
-      execWithWarn(1, function () {
+      execWithError(function () {
         var str = '1a'
         expect(glassEasel.dataPath.parseMultiPaths(str)).toStrictEqual([])
-      })
+      }, 'data path descriptor "1a" is illegal at char 0 (field name cannot start with digits)')
     })
 
     it('fails at number-started subfields', function () {
-      execWithWarn(1, function () {
+      execWithError(function () {
         var str = 'b.1a'
         expect(glassEasel.dataPath.parseMultiPaths(str)).toStrictEqual([])
-      })
+      }, 'data path descriptor "b.1a" is illegal at char 2 (field name cannot start with digits)')
     })
 
     it('fails at empty str', function () {
-      execWithWarn(1, function () {
+      execWithError(function () {
         var str = ''
         expect(glassEasel.dataPath.parseMultiPaths(str)).toStrictEqual([])
-      })
+      }, 'data path descriptor "" is illegal at char 0 (first field name illegal)')
     })
 
     it('fails at empty subfields', function () {
-      execWithWarn(1, function () {
+      execWithError(function () {
         var str = 'a.'
         expect(glassEasel.dataPath.parseMultiPaths(str)).toStrictEqual([])
-      })
+      }, 'data path descriptor "a." is illegal at char 2 (field name illegal)')
     })
 
     it('fails at extra chars', function () {
-      execWithWarn(1, function () {
+      execWithError(function () {
         var str = 'a.b*'
         expect(glassEasel.dataPath.parseMultiPaths(str)).toStrictEqual([])
-      })
+      }, 'data path descriptor "a.b*" is illegal at char 3')
     })
   })
 })

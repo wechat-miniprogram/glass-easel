@@ -16,6 +16,7 @@ struct TmplParser;
 /// Template parsing error object.
 pub struct TmplParseError {
     pub message: String,
+    pub filename: String,
     pub start_pos: (usize, usize),
     pub end_pos: (usize, usize),
 }
@@ -24,8 +25,8 @@ impl fmt::Debug for TmplParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "Template parsing error (from line {} column {} to line {} column {}) : {}",
-            self.start_pos.0, self.start_pos.1, self.end_pos.0, self.end_pos.1, self.message
+            "Template parsing error (at {}:{}:{}): {}",
+            self.filename, self.start_pos.0, self.start_pos.1, self.message
         )
     }
 }
@@ -39,21 +40,30 @@ impl fmt::Display for TmplParseError {
 impl std::error::Error for TmplParseError {}
 
 /// Parse a template string, returning a `TmplTree` if success.
-pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
+pub fn parse_tmpl(tmpl_str: &str, path: &str) -> Result<TmplTree, TmplParseError> {
     let mut pairs = TmplParser::parse(Rule::main, tmpl_str).map_err(|e| {
         use pest::error::*;
         let (start_pos, end_pos) = match e.line_col {
             LineColLocation::Pos(p) => (p, p),
             LineColLocation::Span(start, end) => (start, end),
         };
+        let (start_location, end_location) = match e.location {
+            InputLocation::Pos(p) => (p, p),
+            InputLocation::Span(p) => p,
+        };
         let message = match e.variant {
             ErrorVariant::ParsingError {
                 positives: _,
                 negatives: _,
-            } => String::from("Unexpected character"),
+            } => {
+                let mut message = String::from("Unexpected character ");
+                message.push_str(&tmpl_str[start_location..end_location+1]);
+                message
+            },
             ErrorVariant::CustomError { message: msg } => msg,
         };
         TmplParseError {
+            filename: String::from(path),
             message,
             start_pos,
             end_pos,
@@ -200,6 +210,8 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
                 Rule::bit_reverse => TmplExpr::BitReverse(next),
                 Rule::positive => TmplExpr::Positive(next),
                 Rule::negative => TmplExpr::Negative(next),
+                Rule::type_of => TmplExpr::TypeOf(next),
+                Rule::void => TmplExpr::Void(next),
                 _ => unreachable!(),
             });
             ret
@@ -1008,6 +1020,7 @@ pub fn parse_tmpl(tmpl_str: &str) -> Result<TmplTree, TmplParseError> {
     if let Some(pair) = segment.peek() {
         let span = pair.as_span();
         return Err(TmplParseError {
+            filename: String::from(tree.path),
             message: String::from("Unexpected segment"),
             start_pos: span.start_pos().line_col(),
             end_pos: span.end_pos().line_col(),

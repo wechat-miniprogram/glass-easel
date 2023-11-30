@@ -1,61 +1,80 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 
-import * as backend from './backend/backend_protocol'
-import * as composedBackend from './backend/composed_backend_protocol'
-import * as domlikeBackend from './backend/domlike_backend_protocol'
-import { FuncArr, GeneralFuncType, safeCallback, triggerWarning } from './func_arr'
-import { Element } from './element'
 import {
-  globalOptions,
-  normalizeComponentOptions,
-  NormalizedComponentOptions,
-  getDefaultComponentSpace,
-  getDefaultBackendContext,
-} from './global_options'
-import { ShadowRoot } from './shadow_root'
+  BM,
+  BackendMode,
+  type GeneralBackendContext,
+  type GeneralBackendElement,
+  type backend,
+  type composedBackend,
+  type domlikeBackend,
+} from './backend'
+import { CurrentWindowBackendContext } from './backend/current_window_backend_context'
+import { EmptyBackendContext } from './backend/empty_backend'
+import { EmptyComposedBackendContext } from './backend/empty_composed_backend'
 import {
-  ComponentInstance,
-  ComponentParams,
-  DataList,
-  PropertyList,
-  MethodList,
-  DataWithPropertyValues,
-  RelationParams,
-  TraitRelationParams,
-  ComponentMethod,
-  TaggedMethod,
-  METHOD_TAG,
-  DeepReadonly,
-  GetFromDataPath,
-  SetDataSetter,
-} from './component_params'
-import {
-  Behavior,
-  GeneralBehavior,
-  ComponentDefinitionWithPlaceholder,
-  RelationHandler,
-  normalizeRelation,
-  BuilderContext,
-  NativeNodeDefinition,
+  type Behavior,
+  type BuilderContext,
+  type ComponentDefinitionWithPlaceholder,
+  type GeneralBehavior,
+  type NativeNodeDefinition,
 } from './behavior'
-import { ComponentSpace } from './component_space'
-import { simpleDeepCopy } from './data_utils'
+import { ClassList, StyleScopeManager } from './class_list'
+import {
+  METHOD_TAG,
+  type ComponentInstance,
+  type ComponentMethod,
+  type ComponentParams,
+  type DataList,
+  type DataWithPropertyValues,
+  type DeepReadonly,
+  type GetFromDataPath,
+  type MethodList,
+  type PropertyList,
+  type RelationParams,
+  type SetDataSetter,
+  type TaggedMethod,
+  type TraitRelationParams,
+} from './component_params'
+import { getDefaultComponentSpace, type ComponentSpace } from './component_space'
+import { parseMultiPaths, parseSinglePath, type DataPath } from './data_path'
 import {
   DataGroup,
-  DataGroupObserverTree,
-  DataValue,
-  DeepCopyStrategy,
   getDeepCopyStrategy,
+  type DataGroupObserverTree,
+  type DataValue,
+  type DeepCopyStrategy,
 } from './data_proxy'
-import { Relation, generateRelationDefinitionGroup, RelationDefinitionGroup } from './relation'
-import { Template, TemplateEngine, TemplateInstance } from './template_engine'
-import { ClassList, StyleScopeManager } from './class_list'
-import { GeneralBackendContext, GeneralBackendElement } from './node'
-import { DataPath, parseSinglePath, parseMultiPaths } from './data_path'
-import { ExternalShadowRoot } from './external_shadow_tree'
-import { BM, BackendMode } from './backend/mode'
-import { EventListener, EventListenerOptions } from './event'
+import { simpleDeepCopy } from './data_utils'
+import {
+  performanceMeasureEnd,
+  performanceMeasureRenderWaterfall,
+  performanceMeasureStart,
+} from './devtool'
+import { Element } from './element'
+import { type EventListener, type EventListenerOptions } from './event'
+import { type ExternalShadowRoot } from './external_shadow_tree'
+import { FuncArr, safeCallback, type GeneralFuncType } from './func_arr'
+import {
+  ENV,
+  globalOptions,
+  normalizeComponentOptions,
+  type NormalizedComponentOptions,
+} from './global_options'
+import { type Node } from './node'
+import {
+  Relation,
+  generateRelationDefinitionGroup,
+  normalizeRelation,
+  type RelationDefinitionGroup,
+  type RelationHandler,
+} from './relation'
+import { type ShadowRoot } from './shadow_root'
+import { type Template, type TemplateEngine, type TemplateInstance } from './template_engine'
+import { getDefaultTemplateEngine } from './tmpl'
 import { TraitBehavior, TraitGroup } from './trait_behaviors'
+import { COMPONENT_SYMBOL, isComponent, isElement } from './type_symbol'
+import { ThirdError, dispatchError, triggerWarning } from './warning'
 
 export const convertGenerics = (
   compDef: GeneralComponentDefinition,
@@ -94,13 +113,13 @@ export const convertGenerics = (
                 waiting: null,
               }
             } else {
-              triggerWarning(
-                `Generic "${key}" value "${target}" is not valid (on component "${compDef.is}").`,
-              )
+              triggerWarning(`Generic "${key}" value "${target}" is not valid`, compDef.is)
               const defaultComp = space.getDefaultComponent()
               if (!defaultComp) {
-                throw new Error(
-                  `Cannot find default component for generic "${key}" (on component "${compDef.is}")`,
+                throw new ThirdError(
+                  `Cannot find default component for generic "${key}"`,
+                  '[prepare]',
+                  compDef.is,
                 )
               }
               genericImpls[key] = {
@@ -117,8 +136,10 @@ export const convertGenerics = (
       } else {
         const defaultComp = genericDefaults[key] || space.getDefaultComponent()
         if (!defaultComp) {
-          throw new Error(
-            `Cannot find default component for generic "${key}" (on component "${compDef.is}")`,
+          throw new ThirdError(
+            `Cannot find default component for generic "${key}"`,
+            '[prepare]',
+            compDef.is,
           )
         }
         genericImpls[key] =
@@ -153,16 +174,26 @@ export const resolvePlaceholder = (
     } else if (usingTarget.placeholder === null) {
       ret = usingTarget.final
     } else {
-      triggerWarning(
-        `Placeholder on generic implementation is not valid (on component "${behavior.is}")`,
-      )
+      triggerWarning(`Placeholder on generic implementation is not valid`, behavior.is)
     }
   }
   if (ret) return ret
-  const comp = space.getGlobalUsingComponent(placeholder) ?? space.getDefaultComponent()
+  let comp = space.getGlobalUsingComponent(placeholder)
+  if (comp === null && space._$allowUnusedNativeNode && placeholder !== '') {
+    comp = placeholder
+  }
   if (!comp) {
-    throw new Error(
-      `Cannot find default component for placeholder target "${placeholder}" (on component "${behavior.is}")`,
+    comp = space.getDefaultComponent()
+    if (!comp) {
+      throw new ThirdError(
+        `Cannot find placeholder target "${placeholder}"`,
+        '[prepare]',
+        behavior.is,
+      )
+    }
+    triggerWarning(
+      `Cannot find placeholder target "${placeholder}", using default component.`,
+      behavior.is,
     )
   }
   return comp
@@ -228,7 +259,7 @@ export class ComponentDefinition<
       behavior.ownerSpace.getComponentOptions(),
     )
     const templateEngine = this._$options.templateEngine
-    this._$templateEngine = templateEngine
+    this._$templateEngine = templateEngine ?? getDefaultTemplateEngine()
   }
 
   general(): GeneralComponentDefinition {
@@ -253,17 +284,16 @@ export class ComponentDefinition<
   /**
    * Update the template field
    *
-   * This method has no effect if the template engine does not support template update.
+   * This method throws error if the template engine does not support template update.
    */
   updateTemplate(template: { [key: string]: unknown }) {
-    this.behavior._$updateTemplate(template)
-    if (this._$detail?.template.updateTemplate) {
-      this._$detail.template.updateTemplate(this.behavior as unknown as GeneralBehavior)
-    } else {
-      triggerWarning(
+    if (!this._$detail?.template.updateTemplate) {
+      throw new Error(
         `The template engine of component "${this.is}" does not support template update`,
       )
     }
+    this.behavior._$updateTemplate(template)
+    this._$detail.template.updateTemplate(this.behavior as unknown as GeneralBehavior)
   }
 
   isPrepared(): boolean {
@@ -365,6 +395,22 @@ export class ComponentDefinition<
 
 let componentInstanceIdInc = 1
 
+let defaultBackendContext: GeneralBackendContext | null = null
+
+export const getDefaultBackendContext = (): GeneralBackendContext => {
+  if (defaultBackendContext) return defaultBackendContext
+  let c: GeneralBackendContext
+  if (BM.DOMLIKE) {
+    c = new CurrentWindowBackendContext()
+  } else if (BM.COMPOSED) {
+    c = new EmptyComposedBackendContext()
+  } else {
+    c = new EmptyBackendContext()
+  }
+  defaultBackendContext = c
+  return c
+}
+
 /**
  * A node that has a shadow tree attached to it
  */
@@ -373,6 +419,7 @@ export class Component<
   TProperty extends PropertyList,
   TMethod extends MethodList,
 > extends Element {
+  [COMPONENT_SYMBOL]: true
   /** @internal */
   _$behavior: Behavior<TData, TProperty, TMethod, any>
   /** @internal */
@@ -404,6 +451,7 @@ export class Component<
   /** @internal */
   private _$methodCaller: ComponentInstance<TData, TProperty, TMethod>
 
+  /* istanbul ignore next */
   constructor() {
     throw new Error('Element cannot be constructed directly')
     // eslint-disable-next-line no-unreachable
@@ -413,6 +461,8 @@ export class Component<
   general(): GeneralComponent {
     return this as unknown as GeneralComponent
   }
+
+  static isComponent = isComponent
 
   /**
    * Cast a general component node to the instance of the specified component
@@ -467,10 +517,14 @@ export class Component<
     owner: ShadowRoot | null,
     backendContext: GeneralBackendContext | null,
     genericImpls: { [name: string]: ComponentDefinitionWithPlaceholder } | null,
-    placeholderHandler: (() => void) | undefined,
+    placeholderHandlerRemover: (() => void) | undefined,
     initPropValues?: (comp: ComponentInstance<TData, TProperty, TMethod>) => void,
   ): ComponentInstance<TData, TProperty, TMethod> {
-    if (!def._$detail) def.prepare()
+    if (!def._$detail) {
+      if (ENV.DEV) performanceMeasureStart('component.prepare')
+      def.prepare()
+      if (ENV.DEV) performanceMeasureEnd()
+    }
     const { proto, template, dataDeepCopy, propertyPassingDeepCopy, relationDefinitionGroup } =
       def._$detail!
     let dataGroupObserverTree = def._$detail!.dataGroupObserverTree
@@ -486,92 +540,68 @@ export class Component<
 
     // initialize component instance object
     const comp = Object.create(proto) as ComponentInstance<TData, TProperty, TMethod>
+    if (ENV.DEV) performanceMeasureStart('component.create', comp)
     comp._$genericImpls = genericImpls
-    comp._$placeholderHandler = placeholderHandler
+    comp._$placeholderHandlerRemover = placeholderHandlerRemover
     comp._$external = external
     comp.tagName = tagName
     comp._$methodCaller = comp
 
     // create backend element
     let backendElement: GeneralBackendElement | null = null
-    if (owner) {
-      if (
-        !virtualHost &&
-        (BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike))
-      ) {
-        backendElement = (owner._$nodeTreeContext as domlikeBackend.Context).document.createElement(
-          tagName,
-        )
-      } else if (
-        !virtualHost &&
-        (BM.COMPOSED || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Composed))
-      ) {
-        const backend = owner._$nodeTreeContext as composedBackend.Context
-        backendElement = backend.createElement(options.hostNodeTagName, tagName)
-      } else if (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Shadow)) {
-        const backend = owner._$backendShadowRoot
-        backendElement = backend?.createComponent(tagName) || null
+    if (BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike)) {
+      if (!virtualHost) {
+        if (ENV.DEV) performanceMeasureStart('backend.createElement')
+        backendElement = (
+          (owner ? owner._$nodeTreeContext : nodeTreeContext) as domlikeBackend.Context
+        ).document.createElement(tagName)
+        if (ENV.DEV) performanceMeasureEnd()
       }
-    } else {
-      if (
-        !virtualHost &&
-        (BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike))
-      ) {
-        backendElement = (nodeTreeContext as domlikeBackend.Context).document.createElement(tagName)
-      } else if (
-        !virtualHost &&
-        (BM.COMPOSED || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Composed))
-      ) {
-        backendElement =
-          (nodeTreeContext as composedBackend.Context).createElement(
-            options.hostNodeTagName,
-            tagName,
-          ) || null
-      } else if (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Shadow)) {
-        const sr = (nodeTreeContext as backend.Context).getRootNode()
-        if (!sr) throw new Error('Failed getting backend shadow tree')
-        backendElement = sr.createComponent(tagName) || null
+    } else if (BM.COMPOSED || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Composed)) {
+      if (!virtualHost) {
+        if (ENV.DEV) performanceMeasureStart('backend.createElement')
+        backendElement = (
+          (owner ? owner._$nodeTreeContext : nodeTreeContext) as composedBackend.Context
+        ).createElement(options.hostNodeTagName, tagName)
+        if (ENV.DEV) performanceMeasureEnd()
       }
+    } else if (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Shadow)) {
+      if (ENV.DEV) performanceMeasureStart('component.createComponent')
+      backendElement = (
+        owner ? owner._$backendShadowRoot! : (nodeTreeContext as backend.Context).getRootNode()
+      ).createComponent(tagName)
+      if (ENV.DEV) performanceMeasureEnd()
     }
     comp._$initialize(virtualHost, backendElement, owner, nodeTreeContext)
 
+    const ownerHost = owner ? owner.getHostNode() : undefined
+    const ownerComponentOptions = ownerHost?.getComponentOptions()
+
     // init class list
-    const externalClassAlias = {} as { [externalName: string]: string[] | null }
-    if (behavior._$externalClasses) {
-      const externalClasses = behavior._$externalClasses
-      for (let i = 0; i < externalClasses.length; i += 1) {
-        externalClassAlias[externalClasses[i]!] = null
-      }
-    }
-    const styleScope = owner
-      ? owner.getHostNode().getComponentOptions().styleScope
-      : StyleScopeManager.globalScope()
-    const extraStyleScope = owner
-      ? owner.getHostNode().getComponentOptions().extraStyleScope ?? undefined
-      : undefined
+    const styleScope = ownerComponentOptions?.styleScope ?? StyleScopeManager.globalScope()
+    const extraStyleScope = ownerComponentOptions?.extraStyleScope ?? undefined
+
+    const styleScopeManager = ownerHost?._$behavior.ownerSpace.styleScopeManager
     comp.classList = new ClassList(
-      comp,
-      externalClassAlias,
-      owner ? owner.getHostNode().classList : null,
+      backendElement,
+      nodeTreeContext.mode,
+      behavior._$externalClasses || null,
+      ownerHost ? ownerHost.classList : null,
       styleScope,
       extraStyleScope,
+      styleScopeManager,
     )
     if (backendElement) {
-      const styleScope = owner
-        ? owner.getHostNode()._$definition._$options.styleScope
-        : options.styleScope
       if (styleScope) {
         if (!(BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike))) {
           ;(backendElement as backend.Element | composedBackend.Element).setStyleScope(
             styleScope,
-            options.styleScope,
+            options.styleScope ?? StyleScopeManager.globalScope(),
           )
         }
       }
-      if (owner && writeExtraInfoToAttr) {
-        const prefix = owner
-          .getHostNode()
-          ._$behavior.ownerSpace?.styleScopeManager.queryName(styleScope)
+      if (styleScopeManager && writeExtraInfoToAttr) {
+        const prefix = styleScopeManager.queryName(styleScope)
         if (prefix) {
           backendElement.setAttribute('exparser:info-class-prefix', `${prefix}--`)
         }
@@ -580,6 +610,7 @@ export class Component<
 
     // associate in backend
     if (backendElement) {
+      if (ENV.DEV) performanceMeasureStart('backend.associateValue')
       if (!(BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike))) {
         ;(backendElement as backend.Element | composedBackend.Element).associateValue(comp)
       } else {
@@ -588,6 +619,7 @@ export class Component<
           comp,
         )
       }
+      if (ENV.DEV) performanceMeasureEnd()
     }
 
     // write attr
@@ -656,7 +688,12 @@ export class Component<
     function relationInit<TOut extends { [x: string]: unknown }>(
       relationDef: RelationParams | TraitRelationParams<TOut>,
     ): RelationHandler<unknown, unknown> {
-      if (initDone) throw new Error('Cannot execute init-time functions after initialization')
+      if (initDone)
+        throw new ThirdError(
+          'Cannot execute init-time functions after initialization',
+          '[implement]',
+          behavior.is,
+        )
       const target = relationDef.target
       const normalizedRel = normalizeRelation(
         behavior.ownerSpace,
@@ -697,20 +734,40 @@ export class Component<
           traitBehavior: TraitBehavior<TIn, { [x: string]: unknown }>,
           impl: TIn,
         ): void => {
-          if (initDone) throw new Error('Cannot execute init-time functions after initialization')
+          if (initDone)
+            throw new ThirdError(
+              'Cannot execute init-time functions after initialization',
+              '[implement]',
+              behavior.is,
+            )
           comp._$traitGroup.implement(traitBehavior, impl)
         },
         relation: relationInit,
         observer: (dataPaths: string | readonly string[], func: (...args: any[]) => void): void => {
-          if (initDone) throw new Error('Cannot execute init-time functions after initialization')
+          if (initDone)
+            throw new ThirdError(
+              'Cannot execute init-time functions after initialization',
+              '[implement]',
+              behavior.is,
+            )
           if (cowObserver) {
             cowObserver = false
             dataGroupObserverTree = dataGroupObserverTree.cloneSub()
           }
-          dataGroupObserverTree.addObserver(func, parseMultiPaths(dataPaths as string | string[]))
+          try {
+            dataGroupObserverTree.addObserver(func, parseMultiPaths(dataPaths))
+          } catch (e) {
+            // parse multi paths may throw errors
+            dispatchError(e, `observer`, behavior.is)
+          }
         },
         lifetime: <T extends keyof Lifetimes>(name: T, func: Lifetimes[T]): void => {
-          if (initDone) throw new Error('Cannot execute init-time functions after initialization')
+          if (initDone)
+            throw new ThirdError(
+              'Cannot execute init-time functions after initialization',
+              '[implement]',
+              behavior.is,
+            )
           if (cowLifetime) {
             cowLifetime = false
             comp._$lifetimeFuncs = behavior._$getAllLifetimeFuncs()
@@ -719,12 +776,17 @@ export class Component<
           if (fag[name]) {
             fag[name]!.add(func as GeneralFuncType)
           } else {
-            const fa = (fag[name] = new FuncArr() as LifetimeFuncs[T])
+            const fa = (fag[name] = new FuncArr('lifetime') as LifetimeFuncs[T])
             fa!.add(func as GeneralFuncType)
           }
         },
         pageLifetime: (name: string, func: (...args: unknown[]) => void): void => {
-          if (initDone) throw new Error('Cannot execute init-time functions after initialization')
+          if (initDone)
+            throw new ThirdError(
+              'Cannot execute init-time functions after initialization',
+              '[implement]',
+              behavior.is,
+            )
           if (cowPageLifetime) {
             cowPageLifetime = false
             comp._$pageLifetimeFuncs = behavior._$getAllPageLifetimeFuncs()
@@ -733,7 +795,7 @@ export class Component<
           if (fag[name]) {
             fag[name]!.add(func)
           } else {
-            const fa = (fag[name] = new FuncArr())
+            const fa = (fag[name] = new FuncArr('pageLifetime'))
             fa.add(func)
           }
         },
@@ -743,6 +805,7 @@ export class Component<
       const initFuncs = behavior._$init
       for (let i = 0; i < initFuncs.length; i += 1) {
         const init = initFuncs[i]!
+        if (ENV.DEV) performanceMeasureStart('component.init', comp)
         const exported = safeCallback(
           'Component Init',
           init,
@@ -750,6 +813,7 @@ export class Component<
           [builderContext],
           undefined,
         ) as { [x: string]: unknown } | undefined
+        if (ENV.DEV) performanceMeasureEnd()
         if (exported) {
           const exportedKeys = Object.keys(exported)
           for (let j = 0; j < exportedKeys.length; j += 1) {
@@ -788,9 +852,23 @@ export class Component<
 
     // init template with init data
     if (propEarlyInit && initPropValues !== undefined) initPropValues(comp)
-    tmplInst.initValues(dataGroup.innerData || dataGroup.data)
+    if (ENV.DEV) {
+      performanceMeasureRenderWaterfall('component.render', 'backend.render', comp, () => {
+        tmplInst.initValues(dataGroup.innerData || dataGroup.data)
+      })
+    } else {
+      tmplInst.initValues(dataGroup.innerData || dataGroup.data)
+    }
     comp._$tmplInst = tmplInst
-    dataGroup.setUpdateListener(tmplInst.updateValues.bind(tmplInst))
+    dataGroup.setUpdateListener((data, combinedChanges) => {
+      if (ENV.DEV) {
+        performanceMeasureRenderWaterfall('component.render', 'backend.render', comp, () => {
+          tmplInst.updateValues(data, combinedChanges)
+        })
+      } else {
+        tmplInst.updateValues(data, combinedChanges)
+      }
+    })
 
     // bind behavior listeners
     const listeners = behavior._$listeners
@@ -817,13 +895,10 @@ export class Component<
     }
 
     // trigger created lifetimes
-    comp._$lifetimeFuncs.created?.call(
-      comp._$methodCaller as any,
-      [],
-      comp as unknown as GeneralComponent,
-    )
+    comp.triggerLifetime('created', [])
     if (!propEarlyInit && initPropValues !== undefined) initPropValues(comp)
 
+    if (ENV.DEV) performanceMeasureEnd()
     return comp
   }
 
@@ -952,6 +1027,9 @@ export class Component<
 
   set data(newData: Partial<DataWithPropertyValues<TData, TProperty>>) {
     const dataGroup = this._$dataGroup
+    if (dataGroup === undefined) {
+      throw new ThirdError('Cannot update data before component created', `data setter`, this)
+    }
     Object.entries(newData).forEach(([key, value]) => dataGroup.replaceDataOnPath([key], value))
     dataGroup.applyDataUpdates()
   }
@@ -978,20 +1056,19 @@ export class Component<
   /**
    * Apply the template updates to this component instance
    *
-   * This method has no effect if the template engine does not support template update.
+   * This method throws error if the template engine does not support template update.
    */
   applyTemplateUpdates(): void {
-    if (this._$tmplInst?.updateTemplate) {
-      const dataGroup = this._$dataGroup
-      this._$tmplInst.updateTemplate(
-        this._$definition._$detail!.template,
-        dataGroup.innerData || dataGroup.data,
-      )
-    } else {
-      triggerWarning(
+    if (!this._$tmplInst?.updateTemplate) {
+      throw new Error(
         `The template engine of component "${this.is}" does not support template update`,
       )
     }
+    const dataGroup = this._$dataGroup
+    this._$tmplInst.updateTemplate(
+      this._$definition._$detail!.template,
+      dataGroup.innerData || dataGroup.data,
+    )
   }
 
   static listProperties<
@@ -1047,7 +1124,7 @@ export class Component<
   callMethod<T extends string>(
     methodName: T,
     ...args: Parameters<MethodList[T]>
-  ): ReturnType<MethodList[T]> | undefined {
+  ): ReturnType<MethodList[T]> {
     const func = Component.getMethod(this, methodName)
     return func?.call(this, ...args)
   }
@@ -1117,7 +1194,7 @@ export class Component<
    */
   triggerLifetime(name: string, args: Parameters<GeneralFuncType>) {
     const f = this._$lifetimeFuncs[name]
-    if (f) f.call(this._$methodCaller as any, args)
+    if (f) f.call(this._$methodCaller as any, args, this)
   }
 
   /**
@@ -1133,17 +1210,17 @@ export class Component<
    */
   triggerPageLifetime(name: string, args: Parameters<GeneralFuncType>) {
     const rec = (node: Element) => {
-      if (node instanceof Component) {
+      if (isComponent(node)) {
         if (node._$pageLifetimeFuncs) {
           const f = node._$pageLifetimeFuncs[name]
-          if (f) f.call(node._$methodCaller, args)
+          if (f) f.call(node._$methodCaller, args, this)
         }
         if (!node._$external) rec(node.shadowRoot as ShadowRoot)
       }
       const children = node.childNodes
       for (let i = 0; i < children.length; i += 1) {
         const child = children[i]
-        if (child instanceof Element) {
+        if (isElement(child)) {
           rec(child)
         }
       }
@@ -1172,21 +1249,32 @@ export class Component<
   }
 
   /** Update an external class value */
-  setExternalClass(name: string, target: string) {
-    const cl = this.classList as ClassList
-    cl._$setAlias(name, target)
-    cl._$spreadAliasUpdate()
+  setExternalClass(name: string, target: string | string[]) {
+    this.scheduleExternalClassChange(name, target)
+    this.applyExternalClassChanges()
   }
 
   /** Schedule an update for an external class value */
-  scheduleExternalClassChange(name: string, target: string) {
-    const cl = this.classList as ClassList
-    cl._$setAlias(name, target)
+  scheduleExternalClassChange(name: string, target: string | string[]) {
+    this.classList!._$setAlias(name, target)
   }
 
   /** Update multiple external class values */
   applyExternalClassChanges() {
-    ;(this.classList as ClassList)._$spreadAliasUpdate()
+    if (this._$external) return
+    const recv = (node: Node) => {
+      if (!isElement(node)) return
+      const classList = node.classList
+      if (classList?._$spreadExternalClassUpdate() && isComponent(node)) {
+        node.applyExternalClassChanges()
+      }
+      const childNodes = node.childNodes
+      for (let i = 0, l = childNodes.length; i < l; i += 1) {
+        recv(childNodes[i]!)
+      }
+      classList?._$markExternalClassUpdated()
+    }
+    recv(this.shadowRoot as ShadowRoot)
   }
 
   /** Triggers a worklet change lifetime */
@@ -1237,9 +1325,11 @@ export class Component<
   replaceDataOnPath(path: DataPath, data: unknown) {
     const dataProxy = this._$dataGroup
     if (dataProxy === undefined) {
-      throw new Error('Cannot update data before component created')
+      throw new ThirdError('Cannot update data before component created', `replaceDataOnPath`, this)
     }
+    if (ENV.DEV) performanceMeasureStart('component.replaceDataOnPath', this)
     dataProxy.replaceDataOnPath(path, data)
+    if (ENV.DEV) performanceMeasureEnd()
   }
 
   /**
@@ -1273,9 +1363,15 @@ export class Component<
   ) {
     const dataProxy = this._$dataGroup
     if (dataProxy === undefined) {
-      throw new Error('Cannot update data before component created')
+      throw new ThirdError(
+        'Cannot update data before component created',
+        `spliceArrayDataOnPath`,
+        this,
+      )
     }
+    if (ENV.DEV) performanceMeasureStart('component.spliceArrayDataOnPath', this)
     dataProxy.spliceArrayDataOnPath(path, index, del, inserts)
+    if (ENV.DEV) performanceMeasureEnd()
   }
 
   /**
@@ -1295,9 +1391,11 @@ export class Component<
   applyDataUpdates() {
     const dataProxy = this._$dataGroup
     if (dataProxy === undefined) {
-      throw new Error('Cannot update data before component created')
+      throw new ThirdError('Cannot update data before component created', `applyDataUpdates`, this)
     }
+    if (ENV.DEV) performanceMeasureStart('component.applyDataUpdates', this)
     dataProxy.applyDataUpdates()
+    if (ENV.DEV) performanceMeasureEnd()
   }
 
   /**
@@ -1310,10 +1408,12 @@ export class Component<
   groupUpdates<T>(callback: () => T): T {
     const dataProxy = this._$dataGroup
     if (dataProxy === undefined) {
-      throw new Error('Cannot update data before component created')
+      throw new ThirdError('Cannot update data before component created', `groupUpdates`, this)
     }
+    if (ENV.DEV) performanceMeasureStart('component.groupUpdates', this)
     const ret = callback()
     dataProxy.applyDataUpdates()
+    if (ENV.DEV) performanceMeasureEnd()
     return ret
   }
 
@@ -1329,18 +1429,23 @@ export class Component<
   updateData(newData?: Record<string, any>): void {
     const dataProxy = this._$dataGroup
     if (dataProxy === undefined) {
-      throw new Error('Cannot update data before component created')
+      throw new ThirdError('Cannot update data before component created', `updateData`, this)
     }
+    if (ENV.DEV) performanceMeasureStart('component.updateData', this)
     if (typeof newData === 'object' && newData !== null) {
       const keys = Object.keys(newData)
       for (let i = 0; i < keys.length; i += 1) {
         const key = keys[i]!
-        const p = parseSinglePath(key)
-        if (p) {
+        try {
+          const p = parseSinglePath(key)
           dataProxy.replaceDataOnPath(p, newData[key])
+        } catch (e) {
+          // parse single path may throw errors
+          dispatchError(e, `updateData`, this)
         }
       }
     }
+    if (ENV.DEV) performanceMeasureEnd()
   }
 
   /**
@@ -1354,21 +1459,28 @@ export class Component<
   setData(newData?: Record<string, any> | undefined): void {
     const dataProxy = this._$dataGroup
     if (dataProxy === undefined) {
-      throw new Error('Cannot update data before component created')
+      throw new ThirdError('Cannot update data before component created', `setData`, this)
     }
+    if (ENV.DEV) performanceMeasureStart('component.setData', this)
     if (typeof newData === 'object' && newData !== null) {
       const keys = Object.keys(newData)
       for (let i = 0; i < keys.length; i += 1) {
         const key = keys[i]!
-        const p = parseSinglePath(key)
-        if (p) {
+        try {
+          const p = parseSinglePath(key)
           dataProxy.replaceDataOnPath(p, newData[key])
+        } catch (e) {
+          // parse single path may throw errors
+          dispatchError(e, `setData`, this)
         }
       }
     }
     dataProxy.applyDataUpdates()
+    if (ENV.DEV) performanceMeasureEnd()
   }
 }
+
+Component.prototype[COMPONENT_SYMBOL] = true
 
 export type GeneralComponentDefinition = ComponentDefinition<
   Record<string, any>,
@@ -1381,6 +1493,8 @@ export type GeneralComponent = Component<
   Record<string, any>,
   Record<string, any>
 >
+
+export type AnyComponent = Component<any, any, any>
 
 type ComponentInstProto<
   TData extends DataList,
