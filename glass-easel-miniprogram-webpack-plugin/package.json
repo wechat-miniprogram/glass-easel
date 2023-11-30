@@ -17,12 +17,13 @@
   "homepage": "https://github.com/wechat-miniprogram/glass-easel",
   "main": "index.js",
   "scripts": {
+    "build": "tsc -p .",
     "lint": "eslint src/**/*.ts"
   },
   "peerDependencies": {
     "glass-easel": "0.2.1",
     "glass-easel-miniprogram-adapter": "0.2.1",
-    "webpack": "^5.52.1"
+    "webpack": "^5.85.0"
   },
   "dependencies": {
     "chokidar": "^3.5.3",
