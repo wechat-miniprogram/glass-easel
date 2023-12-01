@@ -276,22 +276,12 @@ impl TmplTree {
                     write!(w, "var I=")?;
                     w.function_args("P", |w| {
                         w.expr_stmt(|w| {
-                            write!(w, "if(!S)")?;
-                            w.brace_block(|w| {
-                                w.expr_stmt(|w| {
-                                    write!(w, "S={{}}")?;
-                                    Ok(())
-                                })?;
-                                w.expr_stmt(|w| {
-                                    write!(w, "Object.assign(S")?;
-                                    for target_path in self.imports.iter() {
-                                        let p = path::resolve(&self.path, target_path);
-                                        write!(w, ",G[{}]._", gen_lit_str(&p))?;
-                                    }
-                                    write!(w, ",H)")?;
-                                    Ok(())
-                                })
-                            })?;
+                            write!(w, "if(!S)S=Object.assign({{}}")?;
+                            for target_path in self.imports.iter() {
+                                let p = path::resolve(&self.path, target_path);
+                                write!(w, ",G[{}]._", gen_lit_str(&p))?;
+                            }
+                            write!(w, ",H)")?;
                             Ok(())
                         })?;
                         w.expr_stmt(|w| {
