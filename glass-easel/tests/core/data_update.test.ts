@@ -617,6 +617,7 @@ describe('partial update', () => {
       }))
       .registerComponent()
     const comp = glassEasel.Component.createWithContext('root', compDef, domBackend)
+    const child = comp.getShadowRoot()!.childNodes[0]!.asInstanceOf(childCompDef)!
     expect(execArr).toStrictEqual(['A', 'B'])
     execArr = []
     glassEasel.Element.pretendAttached(comp)
@@ -634,6 +635,9 @@ describe('partial update', () => {
     execArr = []
     comp.setData({ p: 'ghi' })
     expect(execArr).toStrictEqual(['A', 'B', 'C'])
+    execArr = []
+    child.setData({ p: 'ghi' })
+    expect(execArr).toStrictEqual(['B'])
   })
 
   test('should not allow updates before init done', () => {

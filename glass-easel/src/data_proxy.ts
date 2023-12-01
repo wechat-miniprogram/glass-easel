@@ -310,7 +310,8 @@ export type DataObserver = (...values: unknown[]) => void
 
 export type DataChange = DataReplace | DataSplice
 // for replace
-export type DataReplace = [DataPath, DataValue, undefined, undefined]
+export type DataReplace = [DataPath, DataValue, RequireComparer, undefined]
+export type RequireComparer = true | undefined
 // for splice, numbers are index, removal count
 export type DataSplice = [DataPath, DataValue[], number, number]
 
@@ -628,7 +629,7 @@ export class DataGroup<
         data = simpleDeepCopy(newData)
       }
     }
-    this._$pendingChanges.push([[propName], data, undefined, undefined])
+    this._$pendingChanges.push([[propName], data, true, undefined])
     return true
   }
 
@@ -694,8 +695,8 @@ export class DataGroup<
     // apply changes and collect changing information
     for (let i = 0; i < changes.length; i += 1) {
       const change = changes[i]!
-      const [path, newData, spliceIndex, spliceDel] = change
-      const isSplice = spliceDel !== undefined
+      const [path, newData, maybeSpliceIndex, maybeSpliceDel] = change
+      const isSplice = maybeSpliceDel !== undefined
       const propName = String(path[0])
       const excluded = pureDataPattern ? pureDataPattern.test(propName) : false
       const prop: PropertyDefinition | undefined = propFields[propName]
@@ -708,10 +709,11 @@ export class DataGroup<
         if (isSplice) {
           if (Array.isArray(oldData)) {
             const c = change as DataSplice
+            const spliceIndex = maybeSpliceIndex as number
             normalizedSpliceIndex =
-              spliceIndex! >= 0 && spliceIndex! < oldData.length ? spliceIndex! : oldData.length
+              spliceIndex >= 0 && spliceIndex < oldData.length ? spliceIndex : oldData.length
             c[2] = normalizedSpliceIndex
-            oldData.splice(normalizedSpliceIndex, spliceDel, ...(newData as typeof oldData))
+            oldData.splice(normalizedSpliceIndex, maybeSpliceDel, ...(newData as typeof oldData))
           } else {
             triggerWarning(
               `An array splice change cannot be applied to a non-array value (on path "${path.join(
@@ -741,7 +743,11 @@ export class DataGroup<
               } else {
                 change[1] = inserts = simpleDeepCopy(newData as unknown[])
               }
-              ;(innerNewData as DataValue[]).splice(normalizedSpliceIndex, spliceDel!, ...inserts)
+              ;(innerNewData as DataValue[]).splice(
+                normalizedSpliceIndex,
+                maybeSpliceDel!,
+                ...inserts,
+              )
             } else if (dataDeepCopy === DeepCopyStrategy.SimpleWithRecursion) {
               change[1] = innerNewData = deepCopy(filteredData, true)
             } else {
@@ -776,15 +782,18 @@ export class DataGroup<
             }
           }
         }
-        changed = prop.comparer
-          ? !!safeCallback(
-              'Property Comparer',
-              prop.comparer,
-              comp!,
-              [newData, oldData],
-              comp?.general(),
-            )
-          : oldData !== filteredData
+        if (!isSplice && maybeSpliceIndex === true && prop.comparer) {
+          change[2] = undefined
+          changed = !!safeCallback(
+            'Property Comparer',
+            prop.comparer,
+            comp!,
+            [newData, oldData],
+            comp?.general(),
+          )
+        } else {
+          changed = oldData !== filteredData
+        }
         if (!excluded && changed) {
           propChanges.push({
             propName,
@@ -827,10 +836,11 @@ export class DataGroup<
           const oldData = (curData as DataList)[curSlice as string]
           if (Array.isArray(oldData)) {
             const c = change as DataSplice
+            const spliceIndex = maybeSpliceIndex as number
             normalizedSpliceIndex =
-              spliceIndex! >= 0 && spliceIndex! < oldData.length ? spliceIndex! : oldData.length
+              spliceIndex >= 0 && spliceIndex < oldData.length ? spliceIndex : oldData.length
             c[2] = normalizedSpliceIndex
-            oldData.splice(normalizedSpliceIndex, spliceDel, ...(newData as typeof oldData))
+            oldData.splice(normalizedSpliceIndex, maybeSpliceDel, ...(newData as typeof oldData))
           } else {
             triggerWarning(
               `An array splice change cannot be applied to a non-array value (on path "${path.join(
@@ -881,7 +891,11 @@ export class DataGroup<
             } else {
               change[1] = inserts = simpleDeepCopy(newData as unknown[])
             }
-            ;(innerNewData as DataValue[]).splice(normalizedSpliceIndex, spliceDel!, ...inserts)
+            ;(innerNewData as DataValue[]).splice(
+              normalizedSpliceIndex,
+              maybeSpliceDel!,
+              ...inserts,
+            )
           } else if (dataDeepCopy === DeepCopyStrategy.SimpleWithRecursion) {
             change[1] = innerNewData = deepCopy(newData, true)
           } else {
