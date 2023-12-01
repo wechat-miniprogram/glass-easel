@@ -517,7 +517,7 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
         const entries = Object.values(compInfoMap).map((compInfo) => compInfo.main)
         if (appEntry) entries.unshift(appEntry)
         virtualModules.writeModule(
-          `${codeRoot}/index.js`,
+          path.join(codeRoot, 'index.js'),
           entryHeader +
             entries.map((p) => `require('./${escapeJsString(p)}')\n`).join('') +
             entryFooter,
