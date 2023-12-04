@@ -782,19 +782,25 @@ export class DataGroup<
             }
           }
         }
-        if (!isSplice && maybeSpliceIndex === true && prop.comparer) {
-          change[2] = undefined
-          changed = !!safeCallback(
-            'Property Comparer',
-            prop.comparer,
-            comp!,
-            [newData, oldData],
-            comp?.general(),
-          )
+        let comparerResult: boolean
+        if (!isSplice && maybeSpliceIndex === true) {
+          if (prop.comparer) {
+            change[2] = undefined
+            comparerResult = !!safeCallback(
+              'Property Comparer',
+              prop.comparer,
+              comp!,
+              [newData, oldData],
+              comp?.general(),
+            )
+          } else {
+            comparerResult = oldData !== filteredData
+          }
+          changed = comparerResult
         } else {
-          changed = oldData !== filteredData
+          comparerResult = oldData !== filteredData
         }
-        if (!excluded && changed) {
+        if (!excluded && comparerResult) {
           propChanges.push({
             propName,
             prop,
