@@ -42,7 +42,10 @@ module.exports = [
             MiniCssExtractPlugin.loader,
             'css-loader',
             GlassEaselMiniprogramWxssLoader,
-            // add more loaders here if you work with less, sass, Stylus, etc.
+            // Add more loaders here if you work with less, sass, Stylus, etc.
+            // Currently `@import` does not work well without a preprocessor (such as `less`).
+            // This is a bug (#113) and will be fixed in future.
+            'less-loader',
           ],
           exclude: /node_modules/,
         },

@@ -269,29 +269,27 @@ impl TmplTree {
                     Ok(())
                 })?;
                 w.expr_stmt(|w| {
-                    write!(w, "var I={{}}")?;
+                    write!(w, "var S")?;
                     Ok(())
                 })?;
-                for target_path in self.imports.iter() {
-                    let p = path::resolve(&self.path, target_path);
-                    if let Ok(target_tree) = group.get_tree(&p) {
-                        for k in target_tree.sub_templates.keys() {
-                            let k = gen_lit_str(k);
-                            w.expr_stmt(|w| {
-                                write!(
-                                    w,
-                                    r#"I[{}]=function(R,C,D,U){{return G[{}]({})(R,C,D,U)}}"#,
-                                    k,
-                                    gen_lit_str(&p),
-                                    k
-                                )?;
-                                Ok(())
-                            })?;
-                        }
-                    } else {
-                        // FIXME warn no target file
-                    }
-                }
+                w.expr_stmt(|w| {
+                    write!(w, "var I=")?;
+                    w.function_args("P", |w| {
+                        w.expr_stmt(|w| {
+                            write!(w, "if(!S)S=Object.assign({{}}")?;
+                            for target_path in self.imports.iter() {
+                                let p = path::resolve(&self.path, target_path);
+                                write!(w, ",G[{}]._", gen_lit_str(&p))?;
+                            }
+                            write!(w, ",H)")?;
+                            Ok(())
+                        })?;
+                        w.expr_stmt(|w| {
+                            write!(w, "return S[P]")?;
+                            Ok(())
+                        })
+                    })
+                })?;
                 let write_template_item = |
                     key,
                     w: &mut JsFunctionScopeWriter<W>,
@@ -301,7 +299,7 @@ impl TmplTree {
                     has_scripts: bool,
                 | {
                     w.expr_stmt(|w| {
-                        write!(w, "H[{key}]=I[{key}]=", key = gen_lit_str(key))?;
+                        write!(w, "H[{key}]=", key = gen_lit_str(key))?;
                         w.function_args("R,C,D,U", |w| {
                             if has_scripts {
                                 w.expr_stmt(|w| {
@@ -392,7 +390,7 @@ impl TmplTree {
                     has_scripts,
                 )?;
                 w.expr_stmt(|w| {
-                    write!(w, "return function(R){{return H[R]}}")?;
+                    write!(w, "return Object.assign(function(R){{return H[R]}},{{_:H}})")?;
                     Ok(())
                 })?;
                 Ok(())
@@ -1054,7 +1052,7 @@ impl TmplElement {
                     w.function_args("C,T,E,B,F,S,J", |w| {
                         let var_target = w.gen_ident();
                         w.expr_stmt(|w| {
-                            write!(w, "var {}=I[{}]", var_target, var_key)?;
+                            write!(w, "var {}=I({})", var_target, var_key)?;
                             Ok(())
                         })?;
                         match data {

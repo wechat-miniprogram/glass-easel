@@ -136,6 +136,17 @@ if (
   throw new Error('failed to compile glass-easel-miniprogram-adapter')
 }
 
+// compile glass-easel-miniprogram-webpack-plugin
+console.info('Compile glass-easel-miniprogram-webpack-plugin')
+if (
+  childProcess.spawnSync('npm', ['run', 'build'], {
+    cwd: 'glass-easel-miniprogram-webpack-plugin',
+    stdio: 'inherit',
+  }).status !== 0
+) {
+  throw new Error('failed to compile glass-easel-miniprogram-webpack-plugin')
+}
+
 // compile glass-easel-miniprogram-template
 console.info('Compile glass-easel-miniprogram-template')
 if (

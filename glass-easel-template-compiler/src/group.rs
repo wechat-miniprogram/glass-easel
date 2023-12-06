@@ -27,7 +27,7 @@ use super::*;
 // P (preserved for runtime)
 // Q (extra runtime helpers)
 // R: the global script module / the `ProcGenWrapper` object
-// S: the `DefineSlot` function
+// S: the `DefineSlot` function / the imported group cache
 // T: the `DefineTextNode` function / the `updateText` function
 // U: the update path tree
 // V: the current slot values

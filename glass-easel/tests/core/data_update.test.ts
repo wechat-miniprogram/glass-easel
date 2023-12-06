@@ -10,6 +10,11 @@ componentSpace.defineComponent({
   is: '',
 })
 
+const domHtml = (elem: glassEasel.Element): string => {
+  const domElem = elem.getBackendElement() as unknown as Element
+  return domElem.innerHTML
+}
+
 describe('partial update', () => {
   test('should be able to merge updates', () => {
     const compDef = componentSpace
@@ -30,6 +35,77 @@ describe('partial update', () => {
       comp.updateData({ a: 789 })
     })
     expect(comp.data).toStrictEqual({ a: 789, b: 'def' })
+  })
+
+  test('should be able to set self properties or receive properties', () => {
+    let execArr = [] as string[]
+    const itemComp = glassEasel
+      .registerElement({
+        options: {
+          propertyEarlyInit: true,
+        },
+        properties: {
+          s: {
+            type: String,
+            observer() {
+              execArr.push('A')
+            },
+          },
+        },
+        observers: {
+          s() {
+            execArr.push('B')
+          },
+        },
+        template: tmpl(`{{s}}`),
+      })
+      .general()
+    const def = glassEasel.registerElement({
+      options: {
+        propertyEarlyInit: true,
+      },
+      using: {
+        'x-c': itemComp,
+      },
+      properties: {
+        list: {
+          type: Array,
+          default: () => [
+            { k: 'a', v: 10 },
+            { k: 'b', v: 20 },
+          ],
+          observer() {
+            execArr.push('C')
+          },
+        },
+      },
+      observers: {
+        list() {
+          execArr.push('D')
+        },
+      },
+      template: tmpl(`
+        <block wx:for="{{list}}" wx:key="k">
+          <x-c s="{{item.v}}" />
+        </block>
+      `),
+    })
+    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe('<x-c>10</x-c><x-c>20</x-c>')
+    expect(execArr).toStrictEqual(['B', 'A', 'B', 'A'])
+    execArr = []
+    ;(elem.data.list[0]!.v as any) = 30
+    elem.setData({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      list: elem.data.list as any,
+    })
+    expect(domHtml(elem)).toBe('<x-c>30</x-c><x-c>20</x-c>')
+    expect(execArr).toStrictEqual(['D', 'B', 'A', 'B'])
+    execArr = []
+    elem.setData({ list: [] })
+    expect(domHtml(elem)).toBe('')
+    expect(execArr).toStrictEqual(['D', 'C'])
   })
 
   test('should be able to replace subfields', () => {
@@ -617,6 +693,7 @@ describe('partial update', () => {
       }))
       .registerComponent()
     const comp = glassEasel.Component.createWithContext('root', compDef, domBackend)
+    const child = comp.getShadowRoot()!.childNodes[0]!.asInstanceOf(childCompDef)!
     expect(execArr).toStrictEqual(['A', 'B'])
     execArr = []
     glassEasel.Element.pretendAttached(comp)
@@ -634,6 +711,9 @@ describe('partial update', () => {
     execArr = []
     comp.setData({ p: 'ghi' })
     expect(execArr).toStrictEqual(['A', 'B', 'C'])
+    execArr = []
+    child.setData({ p: 'ghi' })
+    expect(execArr).toStrictEqual(['B'])
   })
 
   test('should not allow updates before init done', () => {
