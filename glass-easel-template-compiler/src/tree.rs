@@ -974,13 +974,14 @@ impl TmplElement {
                             p.lvalue_state_expr(w, scopes)?;
                             write!(w, ":undefined,")?;
                             let has_model_lvalue_path = p.is_model_lvalue_path(scopes);
-                            if p.is_general_lvalue_path(scopes) {
+                            let has_lvalue_path = p.is_general_lvalue_path(scopes);
+                            if has_lvalue_path {
                                 p.lvalue_path(w, scopes, false)?;
                             } else {
                                 write!(w, "null")?;
                             }
                             write!(w, ",")?;
-                            Some(has_model_lvalue_path)
+                            has_lvalue_path.then_some(has_model_lvalue_path)
                         }
                     };
                     let args = TmplNode::to_proc_gen_function_args(&self.children, false)
