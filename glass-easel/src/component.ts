@@ -140,8 +140,8 @@ export const convertGenerics = (
           if (!defaultComp) {
             throw new ThirdError(
               `Cannot find default component for generic "${key}"`,
-            '[prepare]',
-            compDef.is,
+              '[prepare]',
+              compDef.is,
             )
           } else {
             triggerWarning(
@@ -599,10 +599,13 @@ export class Component<
       styleScopeManager,
     )
     if (backendElement) {
-      if (styleScope) {
+      const hostStyleScope = ownerComponentOptions?.styleScope ?? options.styleScope
+      if (hostStyleScope) {
         if (!(BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike))) {
           // FIXME: backend two param compat
-          ;(backendElement as backend.Element | composedBackend.Element).setStyleScope(styleScope)
+          ;(backendElement as backend.Element | composedBackend.Element).setStyleScope(
+            hostStyleScope,
+          )
           // ;(backendElement as backend.Element | composedBackend.Element).setStyleScope(
           //   styleScope,
           //   options.styleScope ?? StyleScopeManager.globalScope(),
