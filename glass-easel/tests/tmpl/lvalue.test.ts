@@ -115,6 +115,36 @@ describe('model value binding', () => {
     expect(domHtml(elem)).toBe('<comp>789:Z</comp>')
   })
 
+  test('invalid model value binding for items', () => {
+    const subComp = glassEasel.registerElement({
+      template: tmpl('{{propA}}'),
+      properties: {
+        propA: Number,
+      },
+    })
+    const def = glassEasel.registerElement({
+      using: {
+        comp: subComp.general(),
+      },
+      template: tmpl(`
+        <block wx:for="{{list || []}}" wx:for-item="sublist">
+          <block wx:for="{{sublist.a}}">
+            <comp id="comp" model:prop-a="{{item}}"></comp>
+          </block>
+        </block>
+      `),
+      data: {
+        list: [{ a: [123] }],
+      },
+    })
+    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const comp = elem.getShadowRoot()!.getElementById('comp')! as glassEasel.GeneralComponent
+    expect(domHtml(elem)).toBe('<comp>123</comp>')
+    comp.setData({ propA: 456 })
+    expect(domHtml(elem)).toBe('<comp>456</comp>')
+    expect(elem.data.list).toEqual([{ a: [123] }])
+  })
+
   test('invalidate model value binding for non-lvalue', () => {
     const subComp = glassEasel.registerElement({
       template: tmpl('{{propA}}'),
