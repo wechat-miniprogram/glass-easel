@@ -458,10 +458,7 @@ export class ClassList {
     if (names === undefined || names === null) {
       n = []
     } else if (Array.isArray(names)) {
-      n = Array<string>(names.length)
-      for (let i = 0, l = names.length; i < l; i += 1) {
-        n[i] = String(names[i])
-      }
+      n = matchClassName(names.join(' '))
     } else {
       n = matchClassName(String(names))
     }
