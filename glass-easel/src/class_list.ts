@@ -6,7 +6,7 @@ import {
   type composedBackend,
   type domlikeBackend,
 } from './backend'
-import { StyleSegmentIndex } from './element'
+import { type Element, StyleSegmentIndex } from './element'
 
 const CLASS_NAME_REG_EXP = /\s+/
 
@@ -52,7 +52,7 @@ export type AliasTarget = {
  */
 export class ClassList {
   /** @internal */
-  private _$backendElement: GeneralBackendElement | null
+  private _$element: Element
   /** @internal */
   private _$backendMode: BackendMode
   /** @internal */
@@ -83,7 +83,7 @@ export class ClassList {
   private _$prefixManager: StyleScopeManager | undefined
 
   constructor(
-    backendElement: GeneralBackendElement | null,
+    element: Element,
     backendMode: BackendMode,
     externalNames: string[] | null,
     owner: ClassList | null,
@@ -91,7 +91,7 @@ export class ClassList {
     extraStyleScope: number | undefined,
     styleScopeManager: StyleScopeManager | undefined,
   ) {
-    this._$backendElement = backendElement
+    this._$element = element
     this._$backendMode = backendMode
     this._$owner = owner
     this._$defaultScope = styleScope
@@ -210,7 +210,7 @@ export class ClassList {
 
   /** @internal */
   private _$updateResolvedNames(): boolean {
-    const backendElement = this._$backendElement
+    const backendElement = this._$element._$backendElement
     if (!backendElement) return false
     const rawNames = this._$rawNames
     const oldBackendNames = this._$backendNames
@@ -363,7 +363,7 @@ export class ClassList {
     /* istanbul ignore if */
     if (CLASS_NAME_REG_EXP.test(name)) throw new Error('Class name contains space characters.')
 
-    const backendElement = this._$backendElement
+    const backendElement = this._$element._$backendElement
     const rawClassIndex = this._$rawNames[segmentIndex]
       ? this._$rawNames[segmentIndex]!.indexOf(name)
       : -1
