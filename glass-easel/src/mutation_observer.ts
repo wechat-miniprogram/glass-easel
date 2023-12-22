@@ -164,7 +164,7 @@ export class MutationObserver {
   /** Start observation */
   observe(
     targetElement: Element,
-    options: MutationObserverOptions = {
+    options: Partial<MutationObserverOptions> = {
       properties: false,
       childList: false,
       characterData: false,
