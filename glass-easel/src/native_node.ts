@@ -96,7 +96,7 @@ export class NativeNode extends Element {
     const extraStyleScope = ownerComponentOptions.extraStyleScope ?? undefined
     const styleScopeManager = ownerHost._$behavior.ownerSpace.styleScopeManager
     node.classList = new ClassList(
-      backendElement,
+      node,
       owner.getBackendMode(),
       null,
       ownerHost.classList,

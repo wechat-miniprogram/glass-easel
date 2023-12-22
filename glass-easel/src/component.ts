@@ -590,7 +590,7 @@ export class Component<
 
     const styleScopeManager = ownerHost?._$behavior.ownerSpace.styleScopeManager
     comp.classList = new ClassList(
-      backendElement,
+      comp,
       nodeTreeContext.mode,
       behavior._$externalClasses || null,
       ownerHost ? ownerHost.classList : null,
