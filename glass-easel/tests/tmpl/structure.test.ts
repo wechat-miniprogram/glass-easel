@@ -111,6 +111,32 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect(domHtml(elem)).toBe('<div>789</div>')
   })
 
+  test('if blocks in include', () => {
+    const def = glassEasel
+      .registerElement({
+        template: multiTmpl({
+          '': '<include wx:if="{{!cond}}" src="./a.wxml" />',
+          a: '<div>{{a}}</div>',
+        }),
+        data: {
+          cond: false,
+          a: 123,
+        },
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    expect(domHtml(elem)).toBe('<div>123</div>')
+    elem.setData({
+      cond: true,
+    })
+    expect(domHtml(elem)).toBe('')
+    elem.setData({
+      cond: false,
+      a: 456,
+    })
+    expect(domHtml(elem)).toBe('<div>456</div>')
+  })
+
   test('if blocks in slot', () => {
     const childComp = glassEasel
       .registerElement({
