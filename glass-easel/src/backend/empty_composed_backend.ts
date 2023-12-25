@@ -246,4 +246,31 @@ export class EmptyComposedBackendElement implements Element {
   getContext(cb: (res: unknown) => void): void {
     cb(null)
   }
+
+  addEventListener() {}
+  appendStyle() {}
+  blur() {}
+  onChangeEvent() {}
+  onEndEvent() {}
+  onErrorEvent() {}
+  onKeyboardComplete() {}
+  onKeyboardCompositionEnd() {}
+  onKeyboardCompositionStart() {}
+  onKeyboardCompositionUpdate() {}
+  onKeyboardConfirm() {}
+  onKeyboardHeightChange() {}
+  onKeyboardLineChange() {}
+  onKeyboardSelectionChange() {}
+  onKeyboardShow() {}
+  onKeyboardValueChange() {}
+  onLoadEvent() {}
+  onScrollEndEvent() {}
+  onScrollEvent() {}
+  onStartEvent() {}
+  scrollTo() {}
+  setAttributes() {}
+  setCurrent() {}
+  setImmediateChangeChanged() {}
+  setLayoutCallback() {}
+  updateStyle() {}
 }
