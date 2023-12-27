@@ -1,7 +1,7 @@
 //! The template group for cross references
 
 use crate::escape::gen_lit_str;
-use crate::proc_gen::{JsFunctionScopeWriter, JsWriter};
+use crate::proc_gen::{JsFunctionScopeWriter, JsTopScopeWriter};
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Write;
@@ -286,7 +286,7 @@ impl TmplGroup {
 
     /// Output js runtime environment js code string.
     pub fn get_runtime_string(&self) -> String {
-        let mut w = JsWriter::new(String::new());
+        let mut w = JsTopScopeWriter::new(String::new());
         w.function_scope(|w| {
             runtime_fns(w, self.has_scripts)?;
             Ok(())
@@ -340,7 +340,7 @@ impl TmplGroup {
     /// Convert to WXML GenObject js string.
     pub fn get_tmpl_gen_object(&self, path: &str) -> Result<String, TmplError> {
         let tree = self.get_tree(path)?;
-        let mut w = JsWriter::new(String::new());
+        let mut w = JsTopScopeWriter::new(String::new());
         w.expr_scope(|w| {
             tree.to_proc_gen(w, self)?;
             Ok(())
@@ -371,7 +371,7 @@ impl TmplGroup {
 
     /// Convert all to WXML GenObject js string
     pub fn get_tmpl_gen_object_groups(&self) -> Result<String, TmplError> {
-        let mut w = JsWriter::new(String::new());
+        let mut w = JsTopScopeWriter::new(String::new());
         w.expr_scope(|w| {
             w.paren(|w| {
                 w.function(|w| {
@@ -406,7 +406,7 @@ impl TmplGroup {
 
     /// Convert all to WXML GenObject js string, with wx environment support
     pub fn get_wx_gen_object_groups(&self) -> Result<String, TmplError> {
-        let mut w = JsWriter::new(String::new());
+        let mut w = JsTopScopeWriter::new(String::new());
         w.expr_scope(|w| {
             w.paren(|w| {
                 w.function(|w| {
@@ -437,7 +437,7 @@ impl TmplGroup {
     }
 
     pub fn export_globals(&self) -> Result<String, TmplError> {
-        let mut w = JsWriter::new(String::new());
+        let mut w = JsTopScopeWriter::new(String::new());
         w.function_scope(|w| {
             runtime_fns(w, self.has_scripts)?;
             if self.extra_runtime_string.len() > 0 {
@@ -449,7 +449,7 @@ impl TmplGroup {
     }
 
     pub fn export_all_scripts(&self) -> Result<String, TmplError> {
-        let mut w = JsWriter::new(String::new());
+        let mut w = JsTopScopeWriter::new(String::new());
         w.function_scope(|w| {
             self.write_all_scripts(w)?;
             Ok(())
