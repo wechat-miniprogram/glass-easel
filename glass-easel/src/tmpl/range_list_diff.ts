@@ -2,7 +2,7 @@ import { type DataValue } from '../data_proxy'
 import { type Element } from '../element'
 import { type ShadowRoot } from '../shadow_root'
 import { type VirtualNode } from '../virtual_node'
-import { dispatchError, triggerWarning } from '../warning'
+import { triggerWarning } from '../warning'
 import { type UpdatePathTreeNode, type UpdatePathTreeRoot } from './proc_gen_wrapper'
 
 export class RangeListManager {
@@ -77,9 +77,10 @@ export class RangeListManager {
         items[i] = i
       }
     } else {
-      dispatchError(
-        new Error(`The for-list data is neither Array nor Object, got type "${typeof dataList}".`),
-        undefined,
+      triggerWarning(
+        `The for-list data is neither Array nor Object, got type "${
+          dataList === null ? 'null' : typeof dataList
+        }".`,
         this.ownerShadowRoot.getHostNode(),
         this.elem,
       )
