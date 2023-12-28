@@ -1,4 +1,4 @@
-import { tmpl, domBackend, composedBackend } from '../base/env'
+import { tmpl, domBackend, composedBackend, shadowBackend } from '../base/env'
 import * as glassEasel from '../../src'
 
 const domHtml = (elem: glassEasel.Element): string => {
@@ -229,4 +229,5 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
 }
 
 describe('binding map (DOM backend)', () => testCases(domBackend))
+describe('binding map (shadow backend)', () => testCases(shadowBackend))
 describe('binding map (composed backend)', () => testCases(composedBackend))

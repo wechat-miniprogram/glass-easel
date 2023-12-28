@@ -1,4 +1,4 @@
-import { tmpl, domBackend, composedBackend } from '../base/env'
+import { tmpl, domBackend, composedBackend, shadowBackend } from '../base/env'
 import * as glassEasel from '../../src'
 
 const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
@@ -318,4 +318,5 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
 }
 
 describe('event bindings (DOM backend)', () => testCases(domBackend))
+describe('event bindings (shadow backend)', () => testCases(shadowBackend))
 describe('event bindings (composed backend)', () => testCases(composedBackend))

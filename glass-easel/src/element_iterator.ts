@@ -24,10 +24,15 @@ export const enum ElementIteratorType {
  * This iterator is convenient but seems a little slower.
  */
 export class ElementIterator {
+  /* @internal */
   private _$node: Node
+  /* @internal */
   private _$nodeTypeLimit: unknown
+  /* @internal */
   private _$composed: boolean
+  /* @internal */
   private _$isAncestor: boolean
+  /* @internal */
   private _$rootFirst: boolean
 
   /**

@@ -15,8 +15,11 @@ import { type ShadowRoot } from './shadow_root'
 import { TEXT_NODE_SYMBOL, isTextNode } from './type_symbol'
 
 export class TextNode implements NodeCast {
+  /* @internal */
   [TEXT_NODE_SYMBOL]!: true
+  /* @internal */
   _$backendElement: GeneralBackendElement | null
+  /* @internal */
   private _$text: string
   ownerShadowRoot: ShadowRoot
   parentNode: Element | null
@@ -46,8 +49,8 @@ export class TextNode implements NodeCast {
         text,
       )
     } else if (BM.SHADOW || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Shadow)) {
-      const backend = owner._$backendShadowRoot
-      backendElement = backend?.createTextNode(text) || null
+      const backend = owner._$backendShadowRoot!
+      backendElement = backend.createTextNode(text)
     } else {
       const backend = owner._$nodeTreeContext as composedBackend.Context
       backendElement = backend.createTextNode(text)
@@ -136,7 +139,9 @@ export class TextNode implements NodeCast {
   }
 
   set textContent(text: string) {
-    this._$text = String(text)
+    const newText = String(text)
+    if (newText === this._$text) return
+    this._$text = newText
     if (this._$backendElement) {
       if (ENV.DEV) performanceMeasureStart('backend.setText')
       if (

@@ -29,19 +29,31 @@ type AppliedSlotMeta = {
 }
 
 export class ShadowRoot extends VirtualNode {
+  /* @internal */
   [SHADOW_ROOT_SYMBOL]: true
+  /* @internal */
   private _$host: GeneralComponent
   /** @internal */
   _$backendShadowRoot: backend.ShadowRootContext | null
+  /* @internal */
   private _$slotMode: SlotMode
+  /* @internal */
   private _$idMap: { [id: string]: Element } | null
+  /* @internal */
   private _$singleSlot?: Element | null
+  /* @internal */
   private _$slots?: Record<string, Element>
+  /* @internal */
   private _$slotsList?: Record<string, DoubleLinkedList<Element>>
+  /* @internal */
   private _$dynamicSlotsInserted?: boolean
+  /* @internal */
   private _$dynamicSlots?: Map<Element, AppliedSlotMeta>
+  /* @internal */
   private _$requiredSlotValueNames?: string[]
+  /* @internal */
   private _$propertyPassingDeepCopy?: DeepCopyStrategy
+  /* @internal */
   private _$insertDynamicSlotHandler?: (
     slots: {
       slot: Element
@@ -49,7 +61,9 @@ export class ShadowRoot extends VirtualNode {
       slotValues: { [name: string]: unknown }
     }[],
   ) => void
+  /* @internal */
   private _$removeDynamicSlotHandler?: (slots: Element[]) => void
+  /* @internal */
   private _$updateDynamicSlotHandler?: (
     slot: Element,
     slotValues: { [name: string]: unknown },
@@ -67,11 +81,13 @@ export class ShadowRoot extends VirtualNode {
 
   static createShadowRoot(host: GeneralComponent): ShadowRoot {
     const node = Object.create(ShadowRoot.prototype) as ShadowRoot
-    const sr =
-      BM.SHADOW || (BM.DYNAMIC && host.getBackendMode() === BackendMode.Shadow)
-        ? (host.getBackendElement() as backend.Element | null)?.getShadowRoot() || null
-        : null
-    node._$initializeVirtual('shadow', node, host._$nodeTreeContext, sr)
+
+    let be: backend.ShadowRootContext | null = null
+    if (BM.SHADOW || (BM.DYNAMIC && host.getBackendMode() === BackendMode.Shadow)) {
+      be = (host._$backendElement as backend.Element).getShadowRoot()!
+    }
+
+    node.is = 'shadow'
     node._$idMap = null
     let slotMode = SlotMode.Single
     const hostComponentOptions = host.getComponentOptions()
@@ -95,10 +111,11 @@ export class ShadowRoot extends VirtualNode {
       node._$removeDynamicSlotHandler = undefined
       node._$updateDynamicSlotHandler = undefined
     }
-    node._$backendShadowRoot = sr
-    node._$initialize(true, sr, node, host._$nodeTreeContext)
+    node._$backendShadowRoot = be
+    node._$initialize(true, be, node, host._$nodeTreeContext)
     node._$host = host
     host.shadowRoot = node
+    be?.associateValue(node)
     return node
   }
 
@@ -222,6 +239,13 @@ export class ShadowRoot extends VirtualNode {
       undefined,
       initPropValues,
     )
+  }
+
+  createComponentByDef(
+    tagName: string,
+    componentDef: GeneralComponentDefinition,
+  ): GeneralComponent {
+    return Component._$advancedCreate(tagName, componentDef, this, null, null, undefined)
   }
 
   /**
