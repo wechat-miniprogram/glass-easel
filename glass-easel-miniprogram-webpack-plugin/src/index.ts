@@ -1,20 +1,14 @@
-/* eslint-disable @typescript-eslint/no-var-requires */
-
 import { promises as fs } from 'node:fs'
 import * as path from 'node:path'
 import { NormalModule, type Compiler, type WebpackPluginInstance } from 'webpack'
+import chokidar from 'chokidar'
+import { RawSource } from 'webpack-sources'
+import VirtualModulesPlugin from 'webpack-virtual-modules'
 import { TmplGroup } from 'glass-easel-template-compiler'
 import { escapeJsString } from './helpers'
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-const chokidar = require('chokidar')
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-const { RawSource } = require('webpack-sources')
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-const VirtualModulesPlugin = require('webpack-virtual-modules')
-
-export const GlassEaselMiniprogramWxmlLoader = path.join(__dirname, 'wxml_loader.js')
-export const GlassEaselMiniprogramWxssLoader = path.join(__dirname, 'wxss_loader.js')
+export const GlassEaselMiniprogramWxmlLoader = path.join(__dirname, 'wxml-loader.js')
+export const GlassEaselMiniprogramWxssLoader = path.join(__dirname, 'wxss-loader.js')
 
 const PLUGIN_NAME = 'GlassEaselMiniprogramWebpackPlugin'
 const CACHE_ETAG = 1

@@ -15,7 +15,7 @@
     "url": "https://github.com/wechat-miniprogram/glass-easel/issues"
   },
   "homepage": "https://github.com/wechat-miniprogram/glass-easel",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
     "build": "tsc -p .",
     "lint": "eslint src/**/*.ts"
