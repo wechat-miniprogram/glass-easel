@@ -220,8 +220,8 @@ export class SelectorQuery {
             [
               (done) => {
                 const ctx = component._$.getBackendContext()
-                const width = ctx.getWindowWidth()
-                const height = ctx.getWindowHeight()
+                const width = ctx ? ctx.getWindowWidth() : 0
+                const height = ctx ? ctx.getWindowHeight() : 0
                 if (fields.id) res.id = ''
                 if (fields.dataset) res.dataset = {}
                 if (fields.mark) res.mark = {}
