@@ -40,19 +40,21 @@ export class NativeNode extends Element {
     node.is = tagName
     node.stylingName = stylingName ?? tagName
     node._$placeholderHandlerRemover = placeholderHandlerRemover
-    const nodeTreeContext = owner._$nodeTreeContext
-    let backendElement: GeneralBackendElement
-    if (ENV.DEV) performanceMeasureStart('backend.createElement')
-    if (BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike)) {
-      backendElement = (nodeTreeContext as domlikeBackend.Context).document.createElement(tagName)
-    } else if (BM.SHADOW || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Shadow)) {
-      backendElement = owner._$backendShadowRoot!.createElement(tagName, node.stylingName)
-    } else {
-      const backend = nodeTreeContext as composedBackend.Context
-      backendElement = backend.createElement(tagName, node.stylingName)
+    const nodeTreeContext = owner.getBackendContext()
+    let backendElement: GeneralBackendElement | null = null
+    if (nodeTreeContext) {
+      if (ENV.DEV) performanceMeasureStart('backend.createElement')
+      if (BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike)) {
+        backendElement = (nodeTreeContext as domlikeBackend.Context).document.createElement(tagName)
+      } else if (BM.SHADOW || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Shadow)) {
+        backendElement = owner._$backendShadowRoot!.createElement(tagName, node.stylingName)
+      } else {
+        const backend = nodeTreeContext as composedBackend.Context
+        backendElement = backend.createElement(tagName, node.stylingName)
+      }
+      if (ENV.DEV) performanceMeasureEnd()
     }
-    if (ENV.DEV) performanceMeasureEnd()
-    node._$initialize(false, backendElement, owner, nodeTreeContext)
+    node._$initialize(false, backendElement, owner, owner._$nodeTreeContext)
     const ownerHost = owner.getHostNode()
     const ownerComponentOptions = ownerHost.getComponentOptions()
     const styleScope = ownerComponentOptions.styleScope ?? StyleScopeManager.globalScope()
@@ -66,27 +68,29 @@ export class NativeNode extends Element {
       extraStyleScope,
       styleScopeManager,
     )
-    if (BM.COMPOSED || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Composed)) {
-      if (ENV.DEV) performanceMeasureStart('backend.setStyleScope')
-      ;(backendElement as composedBackend.Element).setStyleScope(styleScope, extraStyleScope)
+    if (backendElement) {
+      if (BM.COMPOSED || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Composed)) {
+        if (ENV.DEV) performanceMeasureStart('backend.setStyleScope')
+        ;(backendElement as composedBackend.Element).setStyleScope(styleScope, extraStyleScope)
+        if (ENV.DEV) performanceMeasureEnd()
+      }
+      if (globalOptions.writeExtraInfoToAttr) {
+        const prefix = styleScopeManager.queryName(styleScope)
+        if (prefix) {
+          backendElement.setAttribute('exparser:info-class-prefix', `${prefix}--`)
+        }
+      }
+      if (ENV.DEV) performanceMeasureStart('backend.associateValue')
+      if (!(BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike))) {
+        ;(backendElement as backend.Element | composedBackend.Element).associateValue(node)
+      } else {
+        ;(owner.getBackendContext() as domlikeBackend.Context).associateValue(
+          backendElement as domlikeBackend.Element,
+          node,
+        )
+      }
       if (ENV.DEV) performanceMeasureEnd()
     }
-    if (globalOptions.writeExtraInfoToAttr) {
-      const prefix = styleScopeManager.queryName(styleScope)
-      if (prefix) {
-        backendElement.setAttribute('exparser:info-class-prefix', `${prefix}--`)
-      }
-    }
-    if (ENV.DEV) performanceMeasureStart('backend.associateValue')
-    if (!(BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike))) {
-      ;(backendElement as backend.Element | composedBackend.Element).associateValue(node)
-    } else {
-      ;(owner._$nodeTreeContext as domlikeBackend.Context).associateValue(
-        backendElement as domlikeBackend.Element,
-        node,
-      )
-    }
-    if (ENV.DEV) performanceMeasureEnd()
     return node
   }
 

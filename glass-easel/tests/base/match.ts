@@ -33,7 +33,7 @@ export const native = (structure: {
 // check the structure of a backend element
 const testBackend = (elem: GeneralComponent): void => {
   const testDom = (be: domlikeBackend.Element) => {
-    if (elem.getBackendContext().mode === BackendMode.Domlike) {
+    if (elem.getBackendMode() === BackendMode.Domlike) {
       expect(be).toBeInstanceOf(HTMLElement)
     }
     let sr = be
@@ -56,7 +56,7 @@ const testBackend = (elem: GeneralComponent): void => {
       for (let i = 0; i < be.childNodes.length; i += 1) {
         const domChild = be.childNodes[i]! as Node & domlikeBackend.Element
         if (domChild.nodeType === domChild.TEXT_NODE) {
-          if (elem.getBackendContext().mode === BackendMode.Domlike) {
+          if (elem.getBackendMode() === BackendMode.Domlike) {
             expect(domChild).toBeInstanceOf(Text)
           }
         } else {
@@ -65,7 +65,7 @@ const testBackend = (elem: GeneralComponent): void => {
       }
     }
   }
-  if (elem.getBackendContext().mode === BackendMode.Shadow) {
+  if (elem.getBackendMode() === BackendMode.Shadow) {
     testDom(
       (
         elem.getBackendElement() as backend.Element
@@ -192,7 +192,7 @@ export const virtual = (elem: Element, defDomElem?: HTMLElement, defIndex?: numb
       }
       expect(parentNode).toBe(expectParentNode)
     }
-    if (elem.getBackendContext().mode === BackendMode.Shadow) {
+    if (elem.getBackendMode() === BackendMode.Shadow) {
       expect(child.getBackendElement()).not.toBe(null)
     } else {
       if (child instanceof Element && child.isVirtual()) {

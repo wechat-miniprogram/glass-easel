@@ -42,18 +42,19 @@ export class TextNode implements NodeCast {
 
   constructor(text: string, owner: ShadowRoot) {
     this._$text = String(text)
-    let backendElement: GeneralBackendElement | null
-    if (ENV.DEV) performanceMeasureStart('backend.createTextNode')
-    if (BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike)) {
-      backendElement = (owner._$nodeTreeContext as domlikeBackend.Context).document.createTextNode(
-        text,
-      )
-    } else if (BM.SHADOW || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Shadow)) {
-      const backend = owner._$backendShadowRoot!
-      backendElement = backend.createTextNode(text)
-    } else {
-      const backend = owner._$nodeTreeContext as composedBackend.Context
-      backendElement = backend.createTextNode(text)
+    let backendElement: GeneralBackendElement | null = null
+    const context = owner.getBackendContext()
+    if (context) {
+      if (ENV.DEV) performanceMeasureStart('backend.createTextNode')
+      if (BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike)) {
+        backendElement = (context as domlikeBackend.Context).document.createTextNode(text)
+      } else if (BM.SHADOW || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Shadow)) {
+        const backend = owner._$backendShadowRoot!
+        backendElement = backend.createTextNode(text)
+      } else {
+        const backend = context as composedBackend.Context
+        backendElement = backend.createTextNode(text)
+      }
     }
     if (ENV.DEV) performanceMeasureEnd()
     this._$backendElement = backendElement

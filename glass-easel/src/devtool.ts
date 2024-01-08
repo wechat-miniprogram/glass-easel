@@ -66,18 +66,22 @@ export const performanceMeasureRenderWaterfall = (
   }
 
   const pendingTimestamp = devtool.now()
-  const nodeTreeContext = comp._$nodeTreeContext
-  const measureId = nodeTreeContext.performanceTraceStart?.()
-  performanceMeasureStart(type, comp)
-  render()
-  performanceMeasureEnd()
-  nodeTreeContext.performanceTraceEnd?.(measureId!, ({ startTimestamp, endTimestamp }) => {
-    devtool.addTimelineBackendWaterfall(waterfallType, [
-      pendingTimestamp,
-      startTimestamp,
-      endTimestamp,
-    ])
-  })
+  const nodeTreeContext = comp.getBackendContext()
+  if (nodeTreeContext) {
+    const measureId = nodeTreeContext.performanceTraceStart?.()
+    performanceMeasureStart(type, comp)
+    render()
+    performanceMeasureEnd()
+    nodeTreeContext.performanceTraceEnd?.(measureId!, ({ startTimestamp, endTimestamp }) => {
+      devtool.addTimelineBackendWaterfall(waterfallType, [
+        pendingTimestamp,
+        startTimestamp,
+        endTimestamp,
+      ])
+    })
+  } else {
+    render()
+  }
 }
 
 export const addTimelineEvent = (type: string, data?: Record<string, unknown>) => {
