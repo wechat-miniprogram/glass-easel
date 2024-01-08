@@ -394,9 +394,6 @@ export class ClassList {
     force?: boolean,
     segmentIndex: StyleSegmentIndex = StyleSegmentIndex.MAIN,
   ): boolean {
-    /* istanbul ignore if */
-    if (CLASS_NAME_REG_EXP.test(name)) throw new Error('Class name contains space characters.')
-
     const backendElement = this._$element._$backendElement
     const rawClassIndex = this._$rawNames[segmentIndex]
       ? this._$rawNames[segmentIndex]!.indexOf(name)
