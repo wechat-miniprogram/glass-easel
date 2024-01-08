@@ -530,8 +530,8 @@ export class Component<
     let dataGroupObserverTree = def._$detail!.dataGroupObserverTree
     const options = def._$options
     const behavior = def.behavior
-    const nodeTreeContext: GeneralBackendContext = owner
-      ? owner._$nodeTreeContext
+    const nodeTreeContext: GeneralBackendContext | null = owner
+      ? owner.getBackendContext()
       : backendContext || globalOptions.backendContext || getDefaultBackendContext()
     const external = options.externalComponent
     const propEarlyInit = options.propertyEarlyInit
@@ -550,37 +550,46 @@ export class Component<
 
     // create backend element
     let backendElement: GeneralBackendElement | null = null
-    if (BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike)) {
-      if (!virtualHost) {
-        if (ENV.DEV) performanceMeasureStart('backend.createElement')
-        backendElement = (nodeTreeContext as domlikeBackend.Context).document.createElement(tagName)
-        if (ENV.DEV) performanceMeasureEnd()
-      }
-    } else if (BM.COMPOSED || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Composed)) {
-      if (!virtualHost) {
-        if (ENV.DEV) performanceMeasureStart('backend.createElement')
-        backendElement = (nodeTreeContext as composedBackend.Context).createElement(
-          options.hostNodeTagName,
+    if (nodeTreeContext) {
+      if (BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike)) {
+        if (!virtualHost) {
+          if (ENV.DEV) performanceMeasureStart('backend.createElement')
+          backendElement = (nodeTreeContext as domlikeBackend.Context).document.createElement(
+            tagName,
+          )
+          if (ENV.DEV) performanceMeasureEnd()
+        }
+      } else if (BM.COMPOSED || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Composed)) {
+        if (!virtualHost) {
+          if (ENV.DEV) performanceMeasureStart('backend.createElement')
+          backendElement = (nodeTreeContext as composedBackend.Context).createElement(
+            options.hostNodeTagName,
+            tagName,
+          )
+          if (ENV.DEV) performanceMeasureEnd()
+        }
+      } else if (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Shadow)) {
+        if (ENV.DEV) performanceMeasureStart('component.createComponent')
+        const be = (
+          owner ? owner._$backendShadowRoot! : (nodeTreeContext as backend.Context).getRootNode()
+        ).createComponent(
           tagName,
+          external,
+          virtualHost,
+          options.styleScope ?? StyleScopeManager.globalScope(),
+          options.extraStyleScope,
+          behavior._$externalClasses,
         )
         if (ENV.DEV) performanceMeasureEnd()
+        backendElement = be
       }
-    } else if (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Shadow)) {
-      if (ENV.DEV) performanceMeasureStart('component.createComponent')
-      const be = (
-        owner ? owner._$backendShadowRoot! : (nodeTreeContext as backend.Context).getRootNode()
-      ).createComponent(
-        tagName,
-        external,
-        virtualHost,
-        options.styleScope ?? StyleScopeManager.globalScope(),
-        options.extraStyleScope,
-        behavior._$externalClasses,
-      )
-      if (ENV.DEV) performanceMeasureEnd()
-      backendElement = be
     }
-    comp._$initialize(virtualHost, backendElement, owner, nodeTreeContext)
+    comp._$initialize(
+      virtualHost,
+      backendElement,
+      owner,
+      owner ? owner._$nodeTreeContext : nodeTreeContext!,
+    )
 
     const ownerHost = owner ? owner.getHostNode() : undefined
     const ownerComponentOptions = ownerHost?.getComponentOptions()
@@ -599,7 +608,7 @@ export class Component<
       styleScopeManager,
     )
     if (backendElement) {
-      if (BM.COMPOSED || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Composed)) {
+      if (BM.COMPOSED || (BM.DYNAMIC && nodeTreeContext!.mode === BackendMode.Composed)) {
         ;(backendElement as composedBackend.Element).setStyleScope(
           styleScope,
           extraStyleScope,
@@ -624,7 +633,7 @@ export class Component<
     // associate in backend
     if (backendElement) {
       if (ENV.DEV) performanceMeasureStart('backend.associateValue')
-      if (!(BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike))) {
+      if (!(BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext!.mode === BackendMode.Domlike))) {
         ;(backendElement as backend.Element | composedBackend.Element).associateValue(comp)
       } else {
         ;(nodeTreeContext as domlikeBackend.Context).associateValue(

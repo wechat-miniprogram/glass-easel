@@ -15,5 +15,7 @@ const triggerRenderOnContext = (
 
 export const triggerRender = (element: Element, callback?: (err: Error | null) => void) => {
   const context = element.getBackendContext()
-  triggerRenderOnContext(context, callback || null)
+  if (context) {
+    triggerRenderOnContext(context, callback || null)
+  }
 }
