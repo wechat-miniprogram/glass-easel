@@ -789,7 +789,7 @@ impl TmplExpr {
             }
             TmplExpr::DynamicMember(x, y) => {
                 let ident = {
-                    let ident = w.gen_ident();
+                    let ident = w.gen_private_ident();
                     let mut s = String::new();
                     y.to_proc_gen_rec_and_end_path(
                         w,
