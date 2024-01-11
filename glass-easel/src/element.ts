@@ -2813,7 +2813,10 @@ export class Element implements NodeCast {
           target,
           target.parentIndex,
           targetDepth,
-          newPosIndex - 0.5,
+          newPosIndex >= 0
+            ? newPosIndex - 0.5
+            : // negative posIndex (such as -1) means to insert at the tail
+              slotNodes.length,
         ) < 0
       )
         break

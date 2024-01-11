@@ -751,6 +751,41 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect(domHtml(elem)).toBe('<span>0</span><span>1</span>')
   })
 
+  test('slot inside for blocks', () => {
+    const x = glassEasel.registerElement({})
+    const def = glassEasel.registerElement({
+      using: { x },
+      template: tmpl(`
+          <x>
+            <block wx:for="{{n}}">
+              <s>{{item}}</s>
+            </block>
+          </x>
+        `),
+      data: { n: [0, 1, 2] },
+    })
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe('<x><s>0</s><s>1</s><s>2</s></x>')
+    matchElementWithDom(elem)
+    elem.spliceArrayDataOnPath(['n'], 3, 0, [3, 4])
+    elem.applyDataUpdates()
+    expect(domHtml(elem)).toBe('<x><s>0</s><s>1</s><s>2</s><s>3</s><s>4</s></x>')
+    matchElementWithDom(elem)
+    elem.spliceArrayDataOnPath(['n'], 0, 0, [5, 6])
+    elem.applyDataUpdates()
+    expect(domHtml(elem)).toBe('<x><s>5</s><s>6</s><s>0</s><s>1</s><s>2</s><s>3</s><s>4</s></x>')
+    matchElementWithDom(elem)
+    elem.spliceArrayDataOnPath(['n'], 2, 3, [7, 8])
+    elem.applyDataUpdates()
+    expect(domHtml(elem)).toBe('<x><s>5</s><s>6</s><s>7</s><s>8</s><s>3</s><s>4</s></x>')
+    matchElementWithDom(elem)
+    elem.spliceArrayDataOnPath(['n'], 0, 3, [])
+    elem.applyDataUpdates()
+    expect(domHtml(elem)).toBe('<x><s>8</s><s>3</s><s>4</s></x>')
+    matchElementWithDom(elem)
+  })
+
   test('template include', () => {
     const def = glassEasel
       .registerElement({
