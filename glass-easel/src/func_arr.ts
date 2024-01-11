@@ -97,6 +97,7 @@ export class FuncArrWithMeta<F extends GeneralFuncType, T> {
     args: Parameters<F>,
     retainFn: (data: T) => boolean,
     relatedComponent?: GeneralComponent,
+    handleReturn?: (ret: unknown) => boolean | void,
   ): boolean {
     const arr = this._$arr
     let ret = true
@@ -104,7 +105,8 @@ export class FuncArrWithMeta<F extends GeneralFuncType, T> {
       for (let i = 0; i < arr.length; i += 1) {
         const { f, data } = arr[i]!
         if (!retainFn(data)) continue
-        const r = safeCallback(this._$type, f, caller, args, relatedComponent)
+        const rawReturn = safeCallback(this._$type, f, caller, args, relatedComponent)
+        const r = handleReturn ? handleReturn(rawReturn) : rawReturn
         if (r === false) ret = false
       }
     }

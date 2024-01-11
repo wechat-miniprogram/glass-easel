@@ -16,6 +16,7 @@ export type EventOptions = {
   composed?: boolean
   capturePhase?: boolean
   extraFields?: { [key: string]: unknown }
+  handleListenerReturn?: (ret: unknown) => boolean | void
 }
 
 /**
@@ -187,6 +188,8 @@ export class Event<TDetail> {
     mutated: boolean
     noDefault: boolean
   }
+  /** @internal */
+  private _$handleListenerReturn: ((ret: unknown) => boolean | void) | undefined
 
   constructor(name: string, detail: TDetail, options: EventOptions = {}) {
     const ts = getCurrentTimeStamp()
@@ -203,6 +206,7 @@ export class Event<TDetail> {
     }
     this._$originalEvent = options.originalEvent
     this._$dispatched = false
+    this._$handleListenerReturn = options.handleListenerReturn
     if (options.extraFields) {
       Object.assign(this, options.extraFields)
     }
@@ -253,6 +257,10 @@ export class Event<TDetail> {
     return this._$eventBubblingControl.mutated
   }
 
+  listenerReturnHandler() {
+    return this._$handleListenerReturn
+  }
+
   callListener(
     currentTarget: Element,
     mark: Record<string, unknown> | null,
@@ -282,6 +290,7 @@ export class Event<TDetail> {
       [ev],
       (mulLevel) => !skipMut || mulLevel !== MutLevel.Mut,
       isComponent(target) ? target : undefined,
+      this._$handleListenerReturn,
     )
     if (ret === false || efa.finalCount > 0) {
       ev.stopPropagation()
