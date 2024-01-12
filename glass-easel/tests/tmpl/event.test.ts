@@ -315,6 +315,53 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     glassEasel.Element.pretendAttached(elem)
     expect(triggered).toStrictEqual(['abc', 'def'])
   })
+
+  test('handle listener return', () => {
+    const def = glassEasel.registerElement({
+      template: tmpl(`
+        <div id="a" bind:customEv="evA">
+          <div id="b" catch:customEv="evB">
+            <div id="c" bind:customEv="evC" bind:customEv="evCC" />
+          </div>
+        </div>
+      `),
+      methods: {
+        evA() {
+          return 1
+        },
+        evB() {
+          return 2
+        },
+        evC() {
+          return 3
+        },
+        evCC() {
+          return 4
+        },
+      },
+    })
+    const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
+    const c = elem.getShadowRoot()!.getElementById('c')!
+    let eventOrder: number[] = []
+    c.triggerEvent('customEv', null, {
+      bubbles: true,
+      handleListenerReturn(ret) {
+        expect(typeof ret).toBe('number')
+        eventOrder.push(Number(ret))
+      },
+    })
+    expect(eventOrder).toStrictEqual([3, 4, 2])
+    eventOrder = []
+    c.triggerEvent('customEv', null, {
+      bubbles: true,
+      handleListenerReturn(ret) {
+        expect(typeof ret).toBe('number')
+        eventOrder.push(Number(ret))
+        return ret !== 4
+      },
+    })
+    expect(eventOrder).toStrictEqual([3, 4])
+  })
 }
 
 describe('event bindings (DOM backend)', () => testCases(domBackend))
