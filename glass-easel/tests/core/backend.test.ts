@@ -150,4 +150,56 @@ describe('backend', () => {
     glassEasel.Element.pretendDetached(elem)
     expect(elem.$$).toBe(null)
   })
+
+  test('avoid backend operation after element destroy', async () => {
+    const childCompDef = componentSpace.defineComponent({
+      template: tmpl(`
+        <div wx:if="{{text}}">{{text}}</div>
+      `),
+      data: { text: '' },
+    })
+    const compDef = componentSpace.defineComponent({
+      using: {
+        child: childCompDef,
+      },
+      template: tmpl(`
+        <child id="child" wx:if="{{hasChild}}" />
+      `),
+      data: {
+        hasChild: true,
+      },
+    })
+
+    await forEachBackend((context) => {
+      const elem = glassEasel.Component.createWithContext('root', compDef.general(), context)
+      glassEasel.Element.pretendAttached(elem)
+      const child = elem.getShadowRoot()!.querySelector('#child')!.asInstanceOf(childCompDef)!
+      const childShadowRoot = child.getShadowRoot()!
+
+      expect(child.getBackendElement()).toBeTruthy()
+      expect(child.getBackendContext()).toBe(context)
+      expect(childShadowRoot.getBackendContext()).toBe(context)
+      expect(childShadowRoot.childNodes[0]!.asVirtualNode()!.getBackendContext()).toBe(context)
+
+      elem.setData({ hasChild: false })
+      expect(child.getBackendElement()).toBeNull()
+      expect(child.getBackendContext()).toBeNull()
+      expect(childShadowRoot.getBackendContext()).toBeNull()
+      expect(childShadowRoot.childNodes[0]!.asVirtualNode()!.getBackendContext()).toBeNull()
+
+      child.setData({ text: 'test' })
+      const ifBlock = childShadowRoot.childNodes[0]!.asVirtualNode()!
+      const div = ifBlock.childNodes[0]!.asNativeNode()!
+      const textNode = div.childNodes[0]!.asTextNode()!
+      expect(ifBlock.getBackendContext()).toBeNull()
+      expect(div.getBackendContext()).toBeNull()
+      expect(div.getBackendElement()).toBeNull()
+      expect(textNode.getBackendElement()).toBeNull()
+
+      child.setData({ text: '' })
+      expect(childShadowRoot.childNodes[0]!.asVirtualNode()!.getBackendContext()).toBeNull()
+
+      return Promise.resolve()
+    })
+  })
 })

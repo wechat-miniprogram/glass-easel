@@ -264,6 +264,7 @@ export class BaseBehaviorBuilder<
       lifetime,
       pageLifetime,
       method,
+      listener,
     }) {
       const relationInit = ((rel: RelationParams | TraitRelationParams<any>) => {
         if (rel.target instanceof TraitBehavior) {
@@ -296,7 +297,7 @@ export class BaseBehaviorBuilder<
 
       const methodCaller = this as unknown as Component<TData, TProperty, TMethod, TComponentExport>
 
-      func.call(methodCaller, {
+      return func.call(methodCaller, {
         self: methodCaller,
         data,
         setData: (newData, callback) => {
@@ -313,6 +314,7 @@ export class BaseBehaviorBuilder<
         lifetime,
         pageLifetime,
         method,
+        listener,
       })
     })
     return this as any

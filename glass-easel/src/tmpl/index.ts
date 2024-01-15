@@ -2,12 +2,12 @@
 
 import { type GeneralBehavior } from '../behavior'
 import { type GeneralComponent } from '../component'
-import { type DataValue, type DataChange } from '../data_proxy'
+import { type DataChange, type DataValue } from '../data_proxy'
 import { type ShadowedEvent } from '../event'
 import { type ExternalShadowRoot } from '../external_shadow_tree'
 import { type NormalizedComponentOptions } from '../global_options'
-import { ShadowRoot } from '../shadow_root'
-import { type Template, type TemplateInstance, type TemplateEngine } from '../template_engine'
+import { type ShadowRoot } from '../shadow_root'
+import { type Template, type TemplateEngine, type TemplateInstance } from '../template_engine'
 import { GlassEaselTemplateDOM } from './native_rendering'
 import {
   ProcGenWrapper,
@@ -87,8 +87,11 @@ class GlassEaselTemplate implements Template {
     this.eventObjectFilter = c.eventObjectFilter
   }
 
-  createInstance(comp: GeneralComponent): TemplateInstance {
-    return new GlassEaselTemplateInstance(this, comp)
+  createInstance(
+    comp: GeneralComponent,
+    createShadowRoot: (component: GeneralComponent) => ShadowRoot,
+  ): TemplateInstance {
+    return new GlassEaselTemplateInstance(this, comp, createShadowRoot(comp))
   }
 }
 
@@ -99,9 +102,9 @@ class GlassEaselTemplateInstance implements TemplateInstance {
   forceBindingMapUpdate!: BindingMapUpdateEnabled
   bindingMapGen: { [field: string]: BindingMapGen[] } | undefined
 
-  constructor(template: GlassEaselTemplate, comp: GeneralComponent) {
+  constructor(template: GlassEaselTemplate, comp: GeneralComponent, shadowRoot: ShadowRoot) {
     this.comp = comp
-    this.shadowRoot = ShadowRoot.createShadowRoot(comp)
+    this.shadowRoot = shadowRoot
     this.shadowRoot.destroyBackendElementOnDetach()
     this._$applyTemplate(template)
   }

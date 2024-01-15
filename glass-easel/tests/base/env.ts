@@ -4,6 +4,7 @@
 import { TmplGroup } from 'glass-easel-template-compiler'
 import * as glassEasel from '../../src'
 import * as ComposedBackend from './composed_backend'
+import * as ShadowBackend from './shadow_backend'
 
 glassEasel.globalOptions.throwGlobalError = true
 const warningThrow = (msg: string) => {
@@ -19,6 +20,20 @@ glassEasel.addGlobalWarningListener(warningThrow)
 ;(glassEasel.TextNode.prototype as any).toJSON = function () {
   return `[GlassEaselTextNode ${glassEasel.dumpSingleElementToString(this)}]`
 }
+
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: jest.fn().mockImplementation((query) => ({
+    matches: false,
+    media: query as unknown,
+    onchange: null,
+    addListener: jest.fn(), // Deprecated
+    removeListener: jest.fn(), // Deprecated
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
+    dispatchEvent: jest.fn(),
+  })),
+})
 
 export const execWithWarn = <T>(expectCount: number, func: () => T): T => {
   let count = 0
@@ -100,5 +115,42 @@ export const multiTmpl = (src: { [path: string]: string }, options?: TemplateOpt
 }
 
 export const domBackend = new glassEasel.CurrentWindowBackendContext()
-export const shadowBackend = new glassEasel.EmptyBackendContext()
+export const shadowBackend = new ShadowBackend.Context()
 export const composedBackend = new ComposedBackend.Context()
+
+export const getCustomExternalTemplateEngine = (
+  createExternalShadowRoot: (comp: glassEasel.GeneralComponent) => glassEasel.ExternalShadowRoot,
+) => {
+  class CustomExternalTemplateEngine implements glassEasel.templateEngine.Template {
+    static create() {
+      return new CustomExternalTemplateEngine()
+    }
+
+    // eslint-disable-next-line class-methods-use-this
+    createInstance(comp: glassEasel.GeneralComponent): glassEasel.templateEngine.TemplateInstance {
+      return new EmptyTemplateInstance(comp, createExternalShadowRoot(comp))
+    }
+  }
+
+  class EmptyTemplateInstance implements glassEasel.templateEngine.TemplateInstance {
+    comp: glassEasel.GeneralComponent
+    shadowRoot: glassEasel.ExternalShadowRoot
+
+    constructor(comp: glassEasel.GeneralComponent, shadowRoot: glassEasel.ExternalShadowRoot) {
+      this.comp = comp
+      this.shadowRoot = shadowRoot
+    }
+
+    // eslint-disable-next-line class-methods-use-this
+    initValues() {
+      // empty
+    }
+
+    // eslint-disable-next-line class-methods-use-this
+    updateValues() {
+      // empty
+    }
+  }
+
+  return CustomExternalTemplateEngine
+}

@@ -17,7 +17,7 @@ export class Context implements glassEasel.composedBackend.Context {
   private _$theme = 'light'
 
   private _$styleSheetIdInc = 1
-  public _$styleScopes = new Set<number>()
+  public _$styleScopes = new Set<number>([0])
   private _$styleSheetContents = new Map<string, unknown>()
 
   public _$allElements: Node[] = []
@@ -193,6 +193,8 @@ abstract class Node implements glassEasel.composedBackend.Element {
 
   private _$style = ''
   private _$styleScope = 0
+  private _$extraStyleScope: number | undefined
+  private _$hostStyleScope: number | undefined
   private _$classes: Array<[string, number | undefined]> | undefined
   private _$attributes: Array<[string, unknown]> = []
   private _$styleScopeManager: glassEasel.StyleScopeManager | undefined
@@ -244,6 +246,15 @@ abstract class Node implements glassEasel.composedBackend.Element {
       throw new Error(
         `try to remove ${deleteCount} children starting from ${index}, but there are only ${this.childNodes.length} children.`,
       )
+    }
+  }
+  private assertStyleScope(styleScope: number | undefined) {
+    if (styleScope !== undefined && !this._$ownerContext._$styleScopes.has(styleScope)) {
+      if (this._$ownerContext.shouldThrows(ThrowOption.StyleScopeNotFound)) {
+        throw new Error(
+          `set style scope to ${styleScope}, but its owner context do not have a style sheet with that scope`,
+        )
+      }
     }
   }
 
@@ -421,15 +432,17 @@ abstract class Node implements glassEasel.composedBackend.Element {
     this.id = id
   }
 
-  setStyleScope(styleScope: number): void {
-    if (!this._$ownerContext._$styleScopes.has(styleScope)) {
-      if (this._$ownerContext.shouldThrows(ThrowOption.StyleScopeNotFound)) {
-        throw new Error(
-          `set style scope to ${styleScope}, but its owner context do not have a style sheet with that scope`,
-        )
-      }
-    }
+  setStyleScope(
+    styleScope: number,
+    extraStyleScope: number | undefined,
+    hostStyleScope: number | undefined,
+  ): void {
+    this.assertStyleScope(styleScope)
+    this.assertStyleScope(extraStyleScope)
+    this.assertStyleScope(hostStyleScope)
     this._$styleScope = styleScope
+    this._$extraStyleScope = extraStyleScope
+    this._$hostStyleScope = hostStyleScope
   }
 
   setStyle(styleText: string): void {

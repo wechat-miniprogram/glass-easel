@@ -6,7 +6,7 @@ import {
   type composedBackend,
   type domlikeBackend,
 } from './backend'
-import { type Element, StyleSegmentIndex } from './element'
+import { StyleSegmentIndex, type Element } from './element'
 
 const CLASS_NAME_REG_EXP = /[^\s.,]+/g
 
@@ -65,8 +65,6 @@ export class ClassList {
   /** @internal */
   private _$element: Element
   /** @internal */
-  private _$backendMode: BackendMode
-  /** @internal */
   private _$owner: ClassList | null
   /** @internal */
   private _$defaultScope: StyleScopeId
@@ -75,7 +73,7 @@ export class ClassList {
   /** @internal */
   private _$rootScope: StyleScopeId | undefined
   /** @internal */
-  private _$externalNames: string[] | null = null
+  private _$externalNames: string[] | undefined = undefined
   /** @internal */
   private _$externalRawAlias: (string[] | undefined)[] | null = null
   /** @internal */
@@ -95,15 +93,13 @@ export class ClassList {
 
   constructor(
     element: Element,
-    backendMode: BackendMode,
-    externalNames: string[] | null,
+    externalNames: string[] | undefined,
     owner: ClassList | null,
     styleScope: number,
     extraStyleScope: number | undefined,
     styleScopeManager: StyleScopeManager | undefined,
   ) {
     this._$element = element
-    this._$backendMode = backendMode
     this._$owner = owner
     this._$defaultScope = styleScope
     this._$extraScope = extraStyleScope
@@ -179,11 +175,8 @@ export class ClassList {
   }
 
   /** @internal */
-  _$getAlias(name: string): string | undefined {
-    if (!this._$externalNames) return undefined
-    const externalIndex = this._$externalNames.indexOf(name)
-    if (externalIndex === -1) return undefined
-    return (this._$externalRawAlias![externalIndex] || []).join(' ')
+  _$getAlias(): string[] | undefined {
+    return this._$externalNames
   }
 
   /** @internal */
@@ -210,6 +203,23 @@ export class ClassList {
       this._$updateResolvedNames()
     }
     return !!this._$dirtyExternalNames || shouldUpdate
+  }
+
+  /** @internal */
+  _$shouldUpdateExternalClass() {
+    if (!this._$dirtyExternalNames) return false
+    if (BM.SHADOW || (BM.DYNAMIC && this._$element.getBackendMode() === BackendMode.Shadow)) {
+      const dirtyExternalNames = this._$dirtyExternalNames
+      for (let i = 0; i < dirtyExternalNames.length; i += 1) {
+        const name = dirtyExternalNames[i]!
+        const externalIndex = this._$externalNames!.indexOf(name)
+        const targets = this._$externalRawAlias![externalIndex] || []
+        ;(this._$element._$backendElement as backend.Element).setClassAlias(name, targets)
+      }
+      this._$dirtyExternalNames = null
+      return false
+    }
+    return true
   }
 
   /** @internal */
@@ -252,24 +262,47 @@ export class ClassList {
 
     this._$hasAliasNames = false
 
-    for (let i = 0, l = rawNames.length; i < l; i += 1) {
-      const names = rawNames[i]
-      if (!names) continue
-      for (let j = 0, ll = names.length; j < ll; j += 1) {
-        const rawName = names[j]!
-        this._$resolvePrefixes(rawName, (scopeId, className) => {
-          if (this._$hasAliasNames) {
-            for (let i = 0; i < newBackendNames.length; i += 1) {
-              if (className === newBackendNames[i] && scopeId === newBackendNameScopes[i]) {
-                newBackendNamesCount[i] += 1
-                return
-              }
+    if (BM.SHADOW || (BM.DYNAMIC && this._$element.getBackendMode() === BackendMode.Shadow)) {
+      for (let i = 0, l = rawNames.length; i < l; i += 1) {
+        const names = rawNames[i]
+        if (!names) continue
+        for (let j = 0, ll = names.length; j < ll; j += 1) {
+          const rawName = names[j]!
+          let found = false
+          for (let i = 0; i < newBackendNames.length; i += 1) {
+            if (rawName === newBackendNames[i]) {
+              newBackendNamesCount[i] += 1
+              found = true
+              break
             }
           }
-          newBackendNames.push(className)
-          newBackendNameScopes.push(scopeId)
-          newBackendNamesCount.push(1)
-        })
+          if (!found) {
+            newBackendNames.push(rawName)
+            newBackendNameScopes.push(undefined)
+            newBackendNamesCount.push(1)
+          }
+        }
+      }
+    } else {
+      for (let i = 0, l = rawNames.length; i < l; i += 1) {
+        const names = rawNames[i]
+        if (!names) continue
+        for (let j = 0, ll = names.length; j < ll; j += 1) {
+          const rawName = names[j]!
+          this._$resolvePrefixes(rawName, (scopeId, className) => {
+            if (this._$hasAliasNames) {
+              for (let i = 0; i < newBackendNames.length; i += 1) {
+                if (className === newBackendNames[i] && scopeId === newBackendNameScopes[i]) {
+                  newBackendNamesCount[i] += 1
+                  return
+                }
+              }
+            }
+            newBackendNames.push(className)
+            newBackendNameScopes.push(scopeId)
+            newBackendNamesCount.push(1)
+          })
+        }
       }
     }
 
@@ -313,12 +346,17 @@ export class ClassList {
     scope: StyleScopeId | undefined,
     e: GeneralBackendElement,
   ) {
-    if (BM.DOMLIKE || (BM.DYNAMIC && this._$backendMode === BackendMode.Domlike)) {
+    if (BM.DOMLIKE || (BM.DYNAMIC && this._$element.getBackendMode() === BackendMode.Domlike)) {
       const prefix = scope === undefined ? '' : this._$prefixManager?.queryName(scope)
       const val = prefix ? `${prefix}--${name}` : name
       ;(e as domlikeBackend.Element).classList.add(val)
+    } else if (
+      BM.COMPOSED ||
+      (BM.DYNAMIC && this._$element.getBackendMode() === BackendMode.Composed)
+    ) {
+      ;(e as composedBackend.Element).addClass(name, scope)
     } else {
-      ;(e as backend.Element | composedBackend.Element).addClass(name, scope)
+      ;(e as backend.Element).addClass(name)
     }
   }
 
@@ -328,12 +366,17 @@ export class ClassList {
     scope: StyleScopeId | undefined,
     e: GeneralBackendElement,
   ) {
-    if (BM.DOMLIKE || (BM.DYNAMIC && this._$backendMode === BackendMode.Domlike)) {
+    if (BM.DOMLIKE || (BM.DYNAMIC && this._$element.getBackendMode() === BackendMode.Domlike)) {
       const prefix = scope && this._$prefixManager?.queryName(scope)
       const val = prefix ? `${prefix}--${name}` : name
       ;(e as domlikeBackend.Element).classList.remove(val)
+    } else if (
+      BM.COMPOSED ||
+      (BM.DYNAMIC && this._$element.getBackendMode() === BackendMode.Composed)
+    ) {
+      ;(e as composedBackend.Element).removeClass(name, scope)
     } else {
-      ;(e as backend.Element | composedBackend.Element).removeClass(name, scope)
+      ;(e as backend.Element).removeClass(name)
     }
   }
 
@@ -410,9 +453,13 @@ export class ClassList {
         const names = rawNames[segmentIndex]!
         names.push(name)
         if (backendElement) {
-          this._$resolvePrefixes(name, (scopeId, className) => {
-            this._$addClass(className, scopeId, backendElement)
-          })
+          if (BM.SHADOW || (BM.DYNAMIC && this._$element.getBackendMode() === BackendMode.Shadow)) {
+            this._$addClass(name, undefined, backendElement)
+          } else {
+            this._$resolvePrefixes(name, (scopeId, className) => {
+              this._$addClass(className, scopeId, backendElement)
+            })
+          }
         }
         changed = true
       }
@@ -420,9 +467,13 @@ export class ClassList {
       const names = this._$rawNames[segmentIndex]
       if (names) names.splice(rawClassIndex, 1)
       if (backendElement) {
-        this._$resolvePrefixes(name, (scopeId, className) => {
-          this._$removeClass(className, scopeId, backendElement)
-        })
+        if (BM.SHADOW || (BM.DYNAMIC && this._$element.getBackendMode() === BackendMode.Shadow)) {
+          this._$removeClass(name, undefined, backendElement)
+        } else {
+          this._$resolvePrefixes(name, (scopeId, className) => {
+            this._$removeClass(className, scopeId, backendElement)
+          })
+        }
       }
       changed = true
     }

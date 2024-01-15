@@ -2,7 +2,9 @@
 
 use crate::binding_map::{BindingMapCollector, BindingMapKeys};
 use crate::escape::{escape_html_text, gen_lit_str};
-use crate::proc_gen::{JsExprWriter, JsFunctionScopeWriter, JsIdent, ScopeVar, ScopeVarLvaluePath};
+use crate::proc_gen::{
+    JsExprWriter, JsFunctionScopeWriter, JsIdent, JsTopScopeWriter, ScopeVar, ScopeVarLvaluePath,
+};
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Write;
@@ -290,69 +292,134 @@ impl TmplTree {
                         })
                     })
                 })?;
-                let write_template_item = |
-                    key,
-                    w: &mut JsFunctionScopeWriter<W>,
-                    scopes: &mut Vec<ScopeVar>,
-                    bmc: &BindingMapCollector,
-                    children: &Vec<TmplNode>,
-                    has_scripts: bool,
-                | {
-                    w.expr_stmt(|w| {
-                        write!(w, "H[{key}]=", key = gen_lit_str(key))?;
-                        w.function_args("R,C,D,U", |w| {
-                            if has_scripts {
-                                w.expr_stmt(|w| {
-                                    write!(w, "R.setFnFilter(Q.A,Q.B)")?;
-                                    Ok(())
-                                })?;
-                            }
-                            macro_rules! declare_shortcut {
-                                ($d:expr, $v:expr) => {
-                                    w.expr_stmt(|w| {
-                                        write!(w, "var {}=R.{}", $d, $v)?;
-                                        Ok(())
+                let write_template_item =
+                    |key,
+                     w: &mut JsFunctionScopeWriter<W>,
+                     scopes: &mut Vec<ScopeVar>,
+                     bmc: &BindingMapCollector,
+                     children: &Vec<TmplNode>,
+                     has_scripts: bool| {
+                        w.expr_stmt(|w| {
+                            write!(w, "H[{key}]=", key = gen_lit_str(key))?;
+                            w.paren(|w| {
+                                w.function(|w| {
+                                    let mut writer = JsTopScopeWriter::new(String::new());
+                                    writer.function_scope(|w| {
+                                        w.set_var_on_top_scope("L")?;
+                                        w.set_var_on_top_scope("M")?;
+                                        w.set_var_on_top_scope("O")?;
+                                        w.set_var_on_top_scope("A")?;
+                                        w.set_var_on_top_scope("K")?;
+                                        w.set_var_on_top_scope("R")?;
+                                        w.set_var_on_top_scope("D")?;
+                                        w.set_var_on_top_scope("U")?;
+                                        let define_root_ident = w.declare_var_on_top_scope_init(|w, define_root_ident| {
+                                            TmplNode::to_proc_gen_define_children(
+                                                &mut children.iter(),
+                                                w,
+                                                scopes,
+                                                |args, w, var_slot_map, scopes| {
+                                                    w.function_args(args, |w| {
+                                                        TmplNode::to_proc_gen_define_children_content(
+                                                            &children,
+                                                            &var_slot_map,
+                                                            w,
+                                                            scopes,
+                                                            bmc,
+                                                            group,
+                                                            &self.path,
+                                                        )
+                                                    })
+                                                },
+                                            )?;
+                                            Ok(define_root_ident)
+                                        })?;
+                                        let var_proc_gen_wrapper = w.gen_ident();
+                                        let var_data_value = w.gen_ident();
+                                        let var_update_path_tree = w.gen_ident();
+                                        w.expr_stmt(|w| {
+                                            write!(w, "return")?;
+                                            w.function_args(
+                                                &format!(
+                                                    "{},C,{},{}",
+                                                    var_proc_gen_wrapper,
+                                                    var_data_value,
+                                                    var_update_path_tree
+                                                ),
+                                                |w| {
+                                                    macro_rules! declare_shortcut {
+                                                        ($d:expr, $v:expr) => {
+                                                            w.expr_stmt(|w| {
+                                                                write!(w, "{}={}", $d, $v)?;
+                                                                Ok(())
+                                                            })?;
+                                                        };
+                                                    }
+                                                    declare_shortcut!("R", var_proc_gen_wrapper);
+                                                    declare_shortcut!("D", var_data_value);
+                                                    declare_shortcut!("U", var_update_path_tree);
+                                                    if has_scripts {
+                                                        w.expr_stmt(|w| {
+                                                            write!(w, "R.setFnFilter(Q.A,Q.B)")?;
+                                                            Ok(())
+                                                        })?;
+                                                    }
+                                                    declare_shortcut!("L", "R.c");
+                                                    declare_shortcut!("M", "R.m");
+                                                    declare_shortcut!("O", "R.r");
+                                                    w.expr_stmt(|w| {
+                                                        write!(w, "A={{")?;
+                                                        for (index, (key, size)) in
+                                                            bmc.list_fields().enumerate()
+                                                        {
+                                                            if index > 0 {
+                                                                write!(w, ",")?;
+                                                            }
+                                                            write!(
+                                                                w,
+                                                                "{}:new Array({})",
+                                                                gen_lit_str(key),
+                                                                size
+                                                            )?;
+                                                        }
+                                                        write!(w, "}}")?;
+                                                        Ok(())
+                                                    })?;
+                                                    w.expr_stmt(|w| {
+                                                        write!(w, "K=U===true")?;
+                                                        Ok(())
+                                                    })?;
+                                                    w.expr_stmt(|w| {
+                                                        write!(
+                                                            w,
+                                                            "return {{C:{},B:A}}",
+                                                            define_root_ident
+                                                        )?;
+                                                        Ok(())
+                                                    })?;
+                                                    Ok(())
+                                                },
+                                            )
+                                        })
                                     })?;
-                                };
-                            }
-                            declare_shortcut!("L", "c");
-                            declare_shortcut!("M", "m");
-                            declare_shortcut!("O", "r");
-                            w.expr_stmt(|w| {
-                                write!(w, "var A={{")?;
-                                for (index, (key, size)) in bmc.list_fields().enumerate() {
-                                    if index > 0 {
-                                        write!(w, ",")?;
-                                    }
-                                    write!(w, "{}:new Array({})", gen_lit_str(key), size)?;
-                                }
-                                write!(w, "}}")?;
-                                Ok(())
+                                    w.expr_stmt(|w| {
+                                        write!(w, "{}", &writer.finish())?;
+                                        Ok(())
+                                    })
+                                })
                             })?;
-                            w.expr_stmt(|w| {
-                                write!(w, "var K=U===true")?;
-                                Ok(())
-                            })?;
-                            w.expr_stmt(|w| {
-                                write!(w, "return {{C:")?;
-                                TmplNode::to_proc_gen_define_children(
-                                    children, w, scopes, bmc, group, &self.path,
-                                )?;
-                                write!(w, ",B:A")?;
-                                write!(w, "}}")?;
-                                Ok(())
-                            })?;
-                            Ok(())
-                        })?;
-                        Ok(())
-                    })
-                };
+                            w.paren(|_| Ok(()))
+                        })
+                    };
                 let scopes = &mut vec![];
                 let has_scripts = if self.scripts.len() > 0 {
                     for script in &self.scripts {
-                        let ident = w.gen_ident();
+                        let ident = w.gen_private_ident();
                         let lvalue_path = match script {
-                            TmplScript::GlobalRef { module_name: _, rel_path } => {
+                            TmplScript::GlobalRef {
+                                module_name: _,
+                                rel_path,
+                            } => {
                                 let abs_path = crate::group::path::resolve(&self.path, &rel_path);
                                 w.expr_stmt(|w| {
                                     write!(w, r#"var {}=R[{}]()"#, ident, gen_lit_str(&abs_path))?;
@@ -360,9 +427,16 @@ impl TmplTree {
                                 })?;
                                 ScopeVarLvaluePath::Script { abs_path }
                             }
-                            TmplScript::Inline { module_name, content } => {
+                            TmplScript::Inline {
+                                module_name,
+                                content,
+                            } => {
                                 w.expr_stmt(|w| {
-                                    write!(w, "var {}=D('{}#{}',(require,exports,module)=>{{{}}})()", ident, &self.path, module_name, content)?;
+                                    write!(
+                                        w,
+                                        "var {}=D('{}#{}',(require,exports,module)=>{{{}}})()",
+                                        ident, &self.path, module_name, content
+                                    )?;
                                     Ok(())
                                 })?;
                                 ScopeVarLvaluePath::InlineScript {
@@ -371,7 +445,11 @@ impl TmplTree {
                                 }
                             }
                         };
-                        scopes.push(ScopeVar { var: ident, update_path_tree: None, lvalue_path })
+                        scopes.push(ScopeVar {
+                            var: ident,
+                            update_path_tree: None,
+                            lvalue_path,
+                        })
                     }
                     true
                 } else {
@@ -390,7 +468,10 @@ impl TmplTree {
                     has_scripts,
                 )?;
                 w.expr_stmt(|w| {
-                    write!(w, "return Object.assign(function(R){{return H[R]}},{{_:H}})")?;
+                    write!(
+                        w,
+                        "return Object.assign(function(R){{return H[R]}},{{_:H}})"
+                    )?;
                     Ok(())
                 })?;
                 Ok(())
@@ -438,7 +519,10 @@ impl fmt::Display for TmplTree {
 }
 
 impl TmplNode {
-    fn to_proc_gen_function_args(list: &[Self], with_slot_values: bool) -> &'static str {
+    fn to_proc_gen_function_args<'a>(
+        list_iter: &mut (impl IntoIterator<Item = &'a TmplNode> + Clone),
+        with_slot_values: bool,
+    ) -> &'static str {
         #[repr(u8)]
         #[derive(Clone, Copy)]
         enum ArgLevel {
@@ -479,8 +563,8 @@ impl TmplNode {
                     *overall_level = level;
                 }
             }
-            for c in list.iter() {
-                match_child(c, &mut overall_level);
+            for c in list_iter.clone().into_iter() {
+                match_child(&c, &mut overall_level);
             }
         }
         match overall_level {
@@ -497,13 +581,25 @@ impl TmplNode {
 
     fn to_proc_gen_define_children_content<W: std::fmt::Write>(
         list: &[Self],
-        var_slot_map: HashMap<String, (JsIdent, JsIdent)>,
+        var_slot_map: &Option<HashMap<String, (JsIdent, JsIdent)>>,
         w: &mut JsFunctionScopeWriter<W>,
         scopes: &mut Vec<ScopeVar>,
         bmc: &BindingMapCollector,
         group: &TmplGroup,
         cur_path: &str,
-    ) -> Result<HashMap<String, (JsIdent, JsIdent)>, TmplError> {
+    ) -> Result<(), TmplError> {
+        if let Some(var_slot_map) = var_slot_map {
+            for (slot_value_name, (var_scope, var_update_path_tree)) in var_slot_map.iter() {
+                w.expr_stmt(|w| {
+                    write!(
+                        w,
+                        "{}=X(V).{},{}=C?!0:W.{}",
+                        var_scope, slot_value_name, var_update_path_tree, slot_value_name
+                    )?;
+                    Ok(())
+                })?;
+            }
+        }
         for c in list.iter() {
             match c {
                 TmplNode::TextNode(c) => {
@@ -512,15 +608,17 @@ impl TmplNode {
                 TmplNode::Element(c) => {
                     let mut slot_value_count = 0;
                     for (slot_value_name, _) in c.slot_values.iter() {
-                        if let Some((var_scope, var_update_path_tree)) =
-                            var_slot_map.get(slot_value_name)
-                        {
-                            slot_value_count += 1;
-                            scopes.push(ScopeVar {
-                                var: var_scope.clone(),
-                                update_path_tree: Some(var_update_path_tree.clone()),
-                                lvalue_path: ScopeVarLvaluePath::Invalid,
-                            });
+                        if let Some(var_slot_map) = var_slot_map {
+                            if let Some((var_scope, var_update_path_tree)) =
+                                var_slot_map.get(slot_value_name)
+                            {
+                                slot_value_count += 1;
+                                scopes.push(ScopeVar {
+                                    var: var_scope.clone(),
+                                    update_path_tree: Some(var_update_path_tree.clone()),
+                                    lvalue_path: ScopeVarLvaluePath::Invalid,
+                                });
+                            }
                         }
                     }
                     c.to_proc_gen(w, scopes, bmc, group, cur_path)?;
@@ -530,72 +628,45 @@ impl TmplNode {
                 }
             }
         }
-        Ok(var_slot_map)
+        Ok(())
     }
 
-    fn to_proc_gen_define_children<W: std::fmt::Write>(
-        list: &[Self],
+    fn to_proc_gen_define_children<'a, W: std::fmt::Write>(
+        list_iter: &mut (impl IntoIterator<Item = &'a TmplNode> + Clone),
         w: &mut JsExprWriter<W>,
         scopes: &mut Vec<ScopeVar>,
-        bmc: &BindingMapCollector,
-        group: &TmplGroup,
-        cur_path: &str,
-    ) -> Result<HashMap<String, (JsIdent, JsIdent)>, TmplError> {
-        let mut has_slot_values = false;
-        for item in list {
+        f: impl FnOnce(
+            &str,
+            &mut JsExprWriter<W>,
+            &Option<HashMap<String, (JsIdent, JsIdent)>>,
+            &mut Vec<ScopeVar>,
+        ) -> Result<(), TmplError>,
+    ) -> Result<Option<HashMap<String, (JsIdent, JsIdent)>>, TmplError> {
+        let mut var_slot_map: Option<HashMap<String, (JsIdent, JsIdent)>> = None;
+        for item in list_iter.clone().into_iter() {
             match item {
                 TmplNode::TextNode(..) => {}
                 TmplNode::Element(elem) => {
-                    if elem.slot_values.len() > 0 {
-                        has_slot_values = true;
-                        break;
-                    }
-                }
-            }
-        }
-        let args = TmplNode::to_proc_gen_function_args(list, has_slot_values);
-        w.function_args(args, |w| {
-            let mut var_slot_map = HashMap::new();
-            if has_slot_values {
-                for item in list {
-                    match item {
-                        TmplNode::TextNode(..) => {}
-                        TmplNode::Element(elem) => {
-                            for (slot_value_name, _) in elem.slot_values.iter() {
-                                let var_scope = w.gen_ident();
-                                let var_update_path_tree = w.gen_ident();
-                                w.expr_stmt(|w| {
-                                    write!(w, "var {}=X(V).{}", var_scope, slot_value_name)?;
-                                    Ok(())
-                                })?;
-                                w.expr_stmt(|w| {
-                                    write!(
-                                        w,
-                                        "var {}=C?!0:W.{}",
-                                        var_update_path_tree, slot_value_name
-                                    )?;
-                                    Ok(())
-                                })?;
-                                var_slot_map.insert(
-                                    slot_value_name.to_string(),
-                                    (var_scope, var_update_path_tree),
-                                );
-                            }
+                    for (slot_value_name, _) in elem.slot_values.iter() {
+                        if var_slot_map.is_none() {
+                            var_slot_map = Some(HashMap::new());
+                        }
+                        let var_slot_map = var_slot_map.as_mut().unwrap();
+                        if !var_slot_map.contains_key(slot_value_name) {
+                            let var_scope = w.declare_var_on_top_scope()?;
+                            let var_update_path_tree = w.declare_var_on_top_scope()?;
+                            var_slot_map.insert(
+                                slot_value_name.to_string(),
+                                (var_scope, var_update_path_tree),
+                            );
                         }
                     }
                 }
             }
-            let var_slot_map = TmplNode::to_proc_gen_define_children_content(
-                list,
-                var_slot_map,
-                w,
-                scopes,
-                bmc,
-                group,
-                cur_path,
-            )?;
-            Ok(var_slot_map)
-        })
+        }
+        let args = TmplNode::to_proc_gen_function_args(list_iter, var_slot_map.is_some());
+        f(args, w, &var_slot_map, scopes)?;
+        Ok(var_slot_map)
     }
 }
 
@@ -724,6 +795,28 @@ impl TmplElement {
         match &self.virtual_type {
             TmplVirtualType::None => {
                 let slot_kind = SlotKind::new(&self.slot, w, scopes)?;
+                let (child_ident, var_slot_map) =
+                    w.declare_var_on_top_scope_init(|w, ident| {
+                        let var_slot_map = TmplNode::to_proc_gen_define_children(
+                            &mut self.children.iter(),
+                            w,
+                            scopes,
+                            |args, w, var_slot_map, scopes| {
+                                w.function_args(args, |w| {
+                                    TmplNode::to_proc_gen_define_children_content(
+                                        &self.children,
+                                        &var_slot_map,
+                                        w,
+                                        scopes,
+                                        bmc,
+                                        group,
+                                        cur_path,
+                                    )
+                                })
+                            },
+                        )?;
+                        Ok((ident, var_slot_map))
+                    })?;
                 w.expr_stmt(|w| {
                     write!(w, "E({},{{", gen_lit_str(&self.tag_name),)?;
                     if let Some(generics) = self.generics.as_ref() {
@@ -770,56 +863,62 @@ impl TmplElement {
                         }
                         Ok(())
                     })?;
-                    write!(w, ",")?;
-                    let var_slot_map = TmplNode::to_proc_gen_define_children(
-                        &self.children,
-                        w,
-                        scopes,
-                        bmc,
-                        group,
-                        cur_path,
-                    )?;
-                    if self.slot.is_some() || var_slot_map.len() > 0 {
+                    write!(w, ",{}", child_ident)?;
+                    if self.slot.is_some() || var_slot_map.is_some() {
                         write!(w, ",")?;
                         match slot_kind {
                             SlotKind::None => write!(w, "undefined")?,
                             SlotKind::Static(s) => write!(w, "{}", gen_lit_str(s))?,
                             SlotKind::Dynamic(p) => p.value_expr(w)?,
                         }
-                        if var_slot_map.len() > 0 {
-                            write!(w, ",[")?;
-                            for (index, name) in var_slot_map.keys().enumerate() {
-                                if index > 0 {
-                                    write!(w, ",")?;
+                        if let Some(var_slot_map) = var_slot_map {
+                            if var_slot_map.len() > 0 {
+                                write!(w, ",[")?;
+                                for (index, name) in var_slot_map.keys().enumerate() {
+                                    if index > 0 {
+                                        write!(w, ",")?;
+                                    }
+                                    write!(w, "{}", gen_lit_str(name))?;
                                 }
-                                write!(w, "{}", gen_lit_str(name))?;
+                                write!(w, "]")?;
                             }
-                            write!(w, "]")?;
                         }
                     }
                     write!(w, ")")?;
                     Ok(())
-                })?;
+                })
             }
             TmplVirtualType::Pure => {
                 let slot_kind = SlotKind::new(&self.slot, w, scopes)?;
-                w.expr_stmt(|w| {
-                    write!(w, "J(")?;
+                let child_ident = w.declare_var_on_top_scope_init(|w, ident| {
                     TmplNode::to_proc_gen_define_children(
-                        &self.children,
+                        &mut self.children.iter(),
                         w,
                         scopes,
-                        bmc,
-                        group,
-                        cur_path,
+                        |args, w, var_slot_map, scopes| {
+                            w.function_args(args, |w| {
+                                TmplNode::to_proc_gen_define_children_content(
+                                    &self.children,
+                                    &var_slot_map,
+                                    w,
+                                    scopes,
+                                    bmc,
+                                    group,
+                                    cur_path,
+                                )
+                            })
+                        },
                     )?;
+                    Ok(ident)
+                })?;
+                w.expr_stmt(|w| {
+                    write!(w, "J({}", child_ident)?;
                     slot_kind.write_as_extra_argument(w)?;
                     write!(w, ")")?;
                     Ok(())
-                })?;
+                })
             }
             TmplVirtualType::IfGroup => {
-                let var_branch_index = w.gen_ident();
                 enum CondItem<'a> {
                     None,
                     Static(&'a str),
@@ -847,8 +946,9 @@ impl TmplElement {
                     };
                     cond_list.push(item);
                 }
+                let var_branch_index = w.declare_var_on_top_scope()?;
                 w.expr_stmt(|w| {
-                    write!(w, "var {}=", var_branch_index)?;
+                    write!(w, "{}=", var_branch_index)?;
                     for (index, branch) in cond_list.into_iter().enumerate() {
                         match branch {
                             CondItem::None => {
@@ -859,9 +959,7 @@ impl TmplElement {
                             }
                             CondItem::Dynamic(p) => {
                                 if p.above_cond_expr() {
-                                    w.paren(|w| {
-                                        p.value_expr(w)
-                                    })?;
+                                    w.paren(|w| p.value_expr(w))?;
                                 } else {
                                     p.value_expr(w)?;
                                 }
@@ -872,64 +970,78 @@ impl TmplElement {
                     write!(w, "0")?;
                     Ok(())
                 })?;
-                w.expr_stmt(|w| {
-                    write!(w, "B({},", var_branch_index)?;
-                    let args = format!(
-                        "{}",
-                        TmplNode::to_proc_gen_function_args(&self.children, false)
-                    );
-                    w.function_args(&args, |w| {
-                        w.expr_stmt(|w| {
-                            for (index, branch) in self.children.iter().enumerate() {
-                                match branch {
-                                    TmplNode::Element(elem) => {
-                                        match &elem.virtual_type {
-                                            TmplVirtualType::If { .. } => {
-                                                write!(
-                                                    w,
-                                                    "if({}==={})",
-                                                    var_branch_index,
-                                                    index + 1
-                                                )?;
-                                            }
-                                            TmplVirtualType::Elif { .. } => {
-                                                write!(
-                                                    w,
-                                                    "else if({}==={})",
-                                                    var_branch_index,
-                                                    index + 1
-                                                )?;
-                                            }
-                                            TmplVirtualType::Else => {
-                                                write!(w, "else")?;
-                                            }
-                                            _ => unreachable!(),
-                                        }
-                                        w.brace_block(|w| {
-                                            TmplNode::to_proc_gen_define_children_content(
-                                                &elem.children,
-                                                HashMap::with_capacity(0),
-                                                w,
-                                                scopes,
-                                                bmc,
-                                                group,
-                                                cur_path,
-                                            )?;
-                                            Ok(())
-                                        })?;
-                                    }
-                                    TmplNode::TextNode(..) => {
-                                        unreachable!()
-                                    }
-                                }
+                let child_ident = w.declare_var_on_top_scope_init(|w, ident| {
+                    let mut list_iter: Box<dyn Iterator<Item = &TmplNode>> = Box::new([].iter());
+                    for branch in self.children.iter() {
+                        match branch {
+                            TmplNode::TextNode(..) => unreachable!(),
+                            TmplNode::Element(elem) => {
+                                list_iter = Box::new(list_iter.chain(elem.children.iter()));
                             }
-                            Ok(())
-                        })?;
-                        Ok(())
-                    })?;
-                    write!(w, ")")?;
-                    Ok(())
+                        }
+                    }
+                    let list: Vec<&TmplNode> = list_iter.collect();
+                    TmplNode::to_proc_gen_define_children(
+                        &mut list.into_iter(),
+                        w,
+                        scopes,
+                        |args, w, var_slot_map, scopes| {
+                            w.function_args(&args, |w| {
+                                w.expr_stmt(|w| {
+                                    for (index, branch) in self.children.iter().enumerate() {
+                                        match branch {
+                                            TmplNode::Element(elem) => {
+                                                match &elem.virtual_type {
+                                                    TmplVirtualType::If { .. } => {
+                                                        write!(
+                                                            w,
+                                                            "if({}==={})",
+                                                            var_branch_index,
+                                                            index + 1
+                                                        )?;
+                                                    }
+                                                    TmplVirtualType::Elif { .. } => {
+                                                        write!(
+                                                            w,
+                                                            "else if({}==={})",
+                                                            var_branch_index,
+                                                            index + 1
+                                                        )?;
+                                                    }
+                                                    TmplVirtualType::Else => {
+                                                        write!(w, "else")?;
+                                                    }
+                                                    _ => unreachable!(),
+                                                }
+                                                w.brace_block(|w| {
+                                                    TmplNode::to_proc_gen_define_children_content(
+                                                        &elem.children,
+                                                        var_slot_map,
+                                                        w,
+                                                        scopes,
+                                                        bmc,
+                                                        group,
+                                                        cur_path,
+                                                    )?;
+                                                    Ok(())
+                                                })?;
+                                            }
+                                            TmplNode::TextNode(..) => {
+                                                unreachable!()
+                                            }
+                                        }
+                                    }
+                                    Ok(())
+                                })
+                            })
+                        },
+                    )?;
+                    Ok(ident)
                 })?;
+                w.expr_stmt(|w| {
+                    write!(w, "B({},{})", var_branch_index, child_ident)?;
+                    Ok(())
+                })
             }
             TmplVirtualType::If { .. } | TmplVirtualType::Elif { .. } | TmplVirtualType::Else => {
                 unreachable!()
@@ -949,17 +1061,99 @@ impl TmplElement {
                         list_expr = ListExpr::Dynamic(p);
                     }
                 }
-                let var_scope_item = w.gen_ident();
-                let var_scope_index = w.gen_ident();
-                let var_scope_item_update_path_tree = w.gen_ident();
-                let var_scope_index_update_path_tree = w.gen_ident();
-                let var_scope_item_lvalue_path = w.gen_ident();
+
+                let var_scope_item = w.declare_var_on_top_scope()?;
+                let var_scope_index = w.declare_var_on_top_scope()?;
+                let var_scope_item_update_path_tree = w.declare_var_on_top_scope()?;
+                let var_scope_index_update_path_tree = w.declare_var_on_top_scope()?;
+                let var_scope_item_lvalue_path = w.declare_var_on_top_scope()?;
+
+                let arg_scope_item = w.gen_private_ident();
+                let arg_scope_index = w.gen_private_ident();
+                let arg_scope_item_update_path_tree = w.gen_private_ident();
+                let arg_scope_index_update_path_tree = w.gen_private_ident();
+                let arg_scope_item_lvalue_path = w.gen_private_ident();
+
+                let lvalue_path_from_data_scope = match &list_expr {
+                    ListExpr::Static(_) => None,
+                    ListExpr::Dynamic(p) => {
+                        let has_model_lvalue_path = p.is_model_lvalue_path(scopes);
+                        let has_lvalue_path = p.is_general_lvalue_path(scopes);
+                        has_lvalue_path.then_some(has_model_lvalue_path)
+                    }
+                };
+
+                let child_ident = w.declare_var_on_top_scope_init(|w, ident| {
+                    scopes.push(ScopeVar {
+                        var: var_scope_item.clone(),
+                        update_path_tree: Some(var_scope_item_update_path_tree.clone()),
+                        lvalue_path: if let Some(from_data_scope) = lvalue_path_from_data_scope {
+                            ScopeVarLvaluePath::Var {
+                                var_name: var_scope_item_lvalue_path.clone(),
+                                from_data_scope,
+                            }
+                        } else {
+                            ScopeVarLvaluePath::Invalid
+                        },
+                    });
+                    scopes.push(ScopeVar {
+                        var: var_scope_index.clone(),
+                        update_path_tree: Some(var_scope_index_update_path_tree.clone()),
+                        lvalue_path: ScopeVarLvaluePath::Invalid,
+                    });
+                    TmplNode::to_proc_gen_define_children(
+                        &mut self.children.iter(),
+                        w,
+                        scopes,
+                        |args, w, var_slot_map, scopes| {
+                            let children_args = format!(
+                                "C,{},{},{},{},{}{}",
+                                arg_scope_item,
+                                arg_scope_index,
+                                arg_scope_item_update_path_tree,
+                                arg_scope_index_update_path_tree,
+                                arg_scope_item_lvalue_path,
+                                args.trim_start_matches("C"),
+                            );
+                            w.function_args(&children_args, |w| {
+                                w.expr_stmt(|w| {
+                                    write!(
+                                        w,
+                                        "{}={},{}={},{}={},{}={},{}={}",
+                                        var_scope_item,
+                                        arg_scope_item,
+                                        var_scope_index,
+                                        arg_scope_index,
+                                        var_scope_item_update_path_tree,
+                                        arg_scope_item_update_path_tree,
+                                        var_scope_index_update_path_tree,
+                                        arg_scope_index_update_path_tree,
+                                        var_scope_item_lvalue_path,
+                                        arg_scope_item_lvalue_path,
+                                    )?;
+                                    Ok(())
+                                })?;
+                                TmplNode::to_proc_gen_define_children_content(
+                                    &self.children,
+                                    &var_slot_map,
+                                    w,
+                                    scopes,
+                                    bmc,
+                                    group,
+                                    cur_path,
+                                )
+                            })
+                        },
+                    )?;
+                    scopes.pop();
+                    scopes.pop();
+                    Ok(ident)
+                })?;
                 w.expr_stmt(|w| {
                     write!(w, "F(")?;
-                    let lvalue_path_from_data_scope = match &list_expr {
+                    match &list_expr {
                         ListExpr::Static(v) => {
                             write!(w, r#"{},null,undefined,null,"#, gen_lit_str(&v))?;
-                            None
                         }
                         ListExpr::Dynamic(p) => {
                             p.value_expr(w)?;
@@ -973,7 +1167,6 @@ impl TmplElement {
                             )?;
                             p.lvalue_state_expr(w, scopes)?;
                             write!(w, ":undefined,")?;
-                            let has_model_lvalue_path = p.is_model_lvalue_path(scopes);
                             let has_lvalue_path = p.is_general_lvalue_path(scopes);
                             if has_lvalue_path {
                                 p.lvalue_path(w, scopes, false)?;
@@ -981,77 +1174,33 @@ impl TmplElement {
                                 write!(w, "null")?;
                             }
                             write!(w, ",")?;
-                            has_lvalue_path.then_some(has_model_lvalue_path)
                         }
                     };
-                    let args = TmplNode::to_proc_gen_function_args(&self.children, false)
-                        .trim_start_matches("C");
-                    let children_args = format!(
-                        "C,{},{},{},{},{}{}",
-                        var_scope_item,
-                        var_scope_index,
-                        var_scope_item_update_path_tree,
-                        var_scope_index_update_path_tree,
-                        var_scope_item_lvalue_path,
-                        args,
-                    );
-                    w.function_args(&children_args, |w| {
-                        scopes.push(ScopeVar {
-                            var: var_scope_item,
-                            update_path_tree: Some(var_scope_item_update_path_tree),
-                            lvalue_path: if let Some(from_data_scope) = lvalue_path_from_data_scope {
-                                ScopeVarLvaluePath::Var {
-                                    var_name: var_scope_item_lvalue_path,
-                                    from_data_scope,
-                                }
-                            } else {
-                                ScopeVarLvaluePath::Invalid
-                            },
-                        });
-                        scopes.push(ScopeVar {
-                            var: var_scope_index,
-                            update_path_tree: Some(var_scope_index_update_path_tree),
-                            lvalue_path: ScopeVarLvaluePath::Invalid,
-                        });
-                        TmplNode::to_proc_gen_define_children_content(
-                            &self.children,
-                            HashMap::with_capacity(0),
-                            w,
-                            scopes,
-                            bmc,
-                            group,
-                            cur_path,
-                        )?;
-                        scopes.pop();
-                        scopes.pop();
-                        Ok(())
-                    })?;
-                    write!(w, ")")?;
+                    write!(w, "{})", child_ident)?;
                     Ok(())
-                })?;
+                })
             }
             TmplVirtualType::TemplateRef { target, data } => {
-                let var_key = w.gen_ident();
+                let var_key = w.declare_var_on_top_scope()?;
                 match target {
                     TmplAttrValue::Static(v) => {
                         w.expr_stmt(|w| {
-                            write!(w, "var {}={}", var_key, gen_lit_str(v.as_str()))?;
+                            write!(w, "{}={}", var_key, gen_lit_str(v.as_str()))?;
                             Ok(())
                         })?;
                     }
                     TmplAttrValue::Dynamic { expr, .. } => {
                         let p = expr.to_proc_gen_prepare(w, scopes)?;
                         w.expr_stmt(|w| {
-                            write!(w, "var {}=", var_key)?;
+                            write!(w, "{}=", var_key)?;
                             p.value_expr(w)?;
                             Ok(())
                         })?;
                     }
                 }
-                w.expr_stmt(|w| {
-                    write!(w, "B({},", var_key)?;
+                let child_ident = w.declare_var_on_top_scope_init(|w, ident| {
                     w.function_args("C,T,E,B,F,S,J", |w| {
-                        let var_target = w.gen_ident();
+                        let var_target = w.gen_private_ident();
                         w.expr_stmt(|w| {
                             write!(w, "var {}=I({})", var_target, var_key)?;
                             Ok(())
@@ -1085,15 +1234,18 @@ impl TmplElement {
                             }
                         }
                     })?;
-                    write!(w, ")")?;
-                    Ok(())
+                    Ok(ident)
                 })?;
+                w.expr_stmt(|w| {
+                    write!(w, "B({},", var_key)?;
+                    write!(w, "{})", child_ident)?;
+                    Ok(())
+                })
             }
             TmplVirtualType::Include { path: rel_path } => {
-                let var_key = w.gen_ident();
+                let var_key = w.gen_private_ident();
                 let normalized_path = path::resolve(cur_path, rel_path);
-                w.expr_stmt(|w| {
-                    write!(w, "J(")?;
+                let child_ident = w.declare_var_on_top_scope_init(|w, ident| {
                     w.function_args("C,T,E,B,F,S,J", |w| {
                         w.expr_stmt(|w| {
                             write!(w, "var {}=G[{}]", var_key, gen_lit_str(&normalized_path))?;
@@ -1106,17 +1258,19 @@ impl TmplElement {
                                 var_key, var_key
                             )?;
                             Ok(())
-                        })?;
-                        Ok(())
+                        })
                     })?;
-                    write!(w, ")")?;
-                    Ok(())
+                    Ok(ident)
                 })?;
+                w.expr_stmt(|w| {
+                    write!(w, "J({})", child_ident)?;
+                    Ok(())
+                })
             }
             TmplVirtualType::Slot { name, props } => {
                 let slot_kind = SlotKind::new(&self.slot, w, scopes)?;
                 let slot_value_init = if let Some(props) = props {
-                    let var_slot_value_init = w.gen_ident();
+                    let var_slot_value_init = w.gen_private_ident();
                     w.expr_stmt(|w| {
                         write!(w, "var {}=", var_slot_value_init)?;
                         w.function_args("N", |w| {
@@ -1188,10 +1342,9 @@ impl TmplElement {
                     }
                     write!(w, ")")?;
                     Ok(())
-                })?;
+                })
             }
         }
-        Ok(())
     }
 }
 

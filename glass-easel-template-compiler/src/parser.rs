@@ -617,12 +617,13 @@ pub fn parse_tmpl(tmpl_str: &str, path: &str) -> Result<TmplTree, TmplParseError
                                             includes.push(path.clone());
                                             elem.virtual_type = TmplVirtualType::Include { path };
                                             elem.children.clear();
-                                            parent.children.push(TmplNode::Element(elem));
                                         }
                                     }
                                     None => {} // FIXME warn no src attr found
                                 }
-                                continue;
+                                if elem.tag_name.as_str() == "import" {
+                                    continue;
+                                }
                             }
                             "template" => {
                                 let old_attrs = std::mem::replace(&mut elem.attrs, vec![]);

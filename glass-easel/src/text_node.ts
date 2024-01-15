@@ -15,8 +15,11 @@ import { type ShadowRoot } from './shadow_root'
 import { TEXT_NODE_SYMBOL, isTextNode } from './type_symbol'
 
 export class TextNode implements NodeCast {
+  /* @internal */
   [TEXT_NODE_SYMBOL]!: true
+  /* @internal */
   _$backendElement: GeneralBackendElement | null
+  /* @internal */
   private _$text: string
   ownerShadowRoot: ShadowRoot
   parentNode: Element | null
@@ -39,18 +42,19 @@ export class TextNode implements NodeCast {
 
   constructor(text: string, owner: ShadowRoot) {
     this._$text = String(text)
-    let backendElement: GeneralBackendElement | null
-    if (ENV.DEV) performanceMeasureStart('backend.createTextNode')
-    if (BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike)) {
-      backendElement = (owner._$nodeTreeContext as domlikeBackend.Context).document.createTextNode(
-        text,
-      )
-    } else if (BM.SHADOW || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Shadow)) {
-      const backend = owner._$backendShadowRoot
-      backendElement = backend?.createTextNode(text) || null
-    } else {
-      const backend = owner._$nodeTreeContext as composedBackend.Context
-      backendElement = backend.createTextNode(text)
+    let backendElement: GeneralBackendElement | null = null
+    const context = owner.getBackendContext()
+    if (context) {
+      if (ENV.DEV) performanceMeasureStart('backend.createTextNode')
+      if (BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike)) {
+        backendElement = (context as domlikeBackend.Context).document.createTextNode(text)
+      } else if (BM.SHADOW || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Shadow)) {
+        const backend = owner._$backendShadowRoot!
+        backendElement = backend.createTextNode(text)
+      } else {
+        const backend = context as composedBackend.Context
+        backendElement = backend.createTextNode(text)
+      }
     }
     if (ENV.DEV) performanceMeasureEnd()
     this._$backendElement = backendElement
@@ -136,7 +140,9 @@ export class TextNode implements NodeCast {
   }
 
   set textContent(text: string) {
-    this._$text = String(text)
+    const newText = String(text)
+    if (newText === this._$text) return
+    this._$text = newText
     if (this._$backendElement) {
       if (ENV.DEV) performanceMeasureStart('backend.setText')
       if (

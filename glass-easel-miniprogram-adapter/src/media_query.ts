@@ -15,10 +15,8 @@ export class MediaQueryObserver {
     listener: (status: { matches: boolean }) => void,
   ) {
     if (this._$observer) this._$observer.disconnect()
-    this._$observer = this._$comp._$.getBackendContext().createMediaQueryObserver(
-      descriptor,
-      listener,
-    )
+    this._$observer =
+      this._$comp._$.getBackendContext()?.createMediaQueryObserver?.(descriptor, listener) || null
   }
 
   disconnect() {

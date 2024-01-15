@@ -161,7 +161,7 @@ export class EmptyComposedBackendElement implements Element {
     // empty
   }
 
-  setStyleScope(_styleScope: number): void {
+  setStyleScope(_styleScope: number, _extraStyleScope?: number, _hostStyleScope?: number): void {
     // empty
   }
 

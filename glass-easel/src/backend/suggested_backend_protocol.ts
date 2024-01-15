@@ -4,19 +4,36 @@ import {
   type GetAllComputedStylesResponses,
   type GetMatchedRulesResponses,
   type ScrollOffset,
+  type IntersectionStatus,
+  type MediaQueryStatus,
+  type Observer,
 } from './shared'
 
 interface GetWrapper<T> {
   get(): T
 }
 
-export interface Element {
+export type Element<E> = {
   getAllComputedStyles(cb: (res: GetAllComputedStylesResponses) => void): void
   getBoundingClientRect(cb: (res: BoundingClientRect) => void): void
+  createIntersectionObserver(
+    relativeElement: E | null,
+    relativeElementMargin: string,
+    thresholds: number[],
+    listener: (res: IntersectionStatus) => void,
+  ): Observer
   getMatchedRules(cb: (res: GetMatchedRulesResponses) => void): void
-  replaceStyleSheetInlineStyle(inlineStyle: string): void
   getScrollOffset(cb: (res: ScrollOffset) => void): void
   setScrollPosition(scrollLeft: number, scrollTop: number, duration: number): void
+  getContext(cb: (res: unknown) => void): void
+}
+
+export type ElementForDomLike = {
+  getBoundingClientRect(): BoundingClientRect
+  readonly scrollLeft: number
+  readonly scrollTop: number
+  readonly scrollWidth: number
+  readonly scrollHeight: number
 }
 
 export interface Context<Ctx> {
@@ -26,9 +43,19 @@ export interface Context<Ctx> {
   ): void
 
   setFocusedNode(target: Node): void
-  getFocusedNode(): Node | undefined
+  getFocusedNode(cb: (node: Node | undefined) => void): void
+
+  onWindowResize(
+    cb: (res: { width: number; height: number; devicePixelRatio: number }) => void,
+  ): void
+  onThemeChange(cb: (res: { theme: string }) => void): void
 
   elementFromPoint(left: number, top: number, cb: (node: Node) => void): void
+
+  createMediaQueryObserver(
+    status: MediaQueryStatus,
+    listener: (res: { matches: boolean }) => void,
+  ): Observer
 
   // StyleSheet related
   addStyleSheetRule(
@@ -86,3 +113,22 @@ export interface Context<Ctx> {
     cb: (stats: { startTimestamp: number; endTimestamp: number }) => void,
   ): void
 }
+
+type UnshiftTarget<Fn, T> = Fn extends (...args: infer Args) => infer Ret
+  ? (target: T, ...args: Args) => Ret
+  : never
+
+type UnshiftTargets<T, E> = { [K in keyof T]: UnshiftTarget<T[K], E> }
+
+export type ContextForDomLike<Ctx> = Context<Ctx> &
+  UnshiftTargets<
+    Pick<
+      Element<Ctx>,
+      | 'getAllComputedStyles'
+      | 'createIntersectionObserver'
+      | 'getMatchedRules'
+      | 'setScrollPosition'
+      | 'getContext'
+    >,
+    Ctx
+  >

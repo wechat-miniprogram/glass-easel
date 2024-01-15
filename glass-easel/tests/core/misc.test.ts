@@ -165,7 +165,7 @@ describe('event', () => {
       },
       componentSpace,
     )
-    const comp = glassEasel.createElement('root', compDef)
+    const comp = glassEasel.Component.createWithContext('root', compDef, domBackend)
     glassEasel.Element.pretendAttached(comp)
     expect(eventArr).toEqual([123, 123, 456, 456, 456])
   })
@@ -202,7 +202,7 @@ describe('event', () => {
       },
       componentSpace,
     )
-    const comp = glassEasel.createElement('root', compDef)
+    const comp = glassEasel.Component.createWithContext('root', compDef, domBackend)
     const child = comp.getShadowRoot()!.getElementById('a')!.asInstanceOf(childCompDef)!
     const listener = () => {
       /* empty */
@@ -262,7 +262,7 @@ describe('component utils', () => {
     compDef.prepare()
     expect(compDef.isPrepared()).toBe(true)
     expect(glassEasel.Component.getMethodsFromDef(compDef.general()).abc!()).toBe('abc')
-    const comp = glassEasel.createElement('root', compDef.general())
+    const comp = glassEasel.Component.createWithContext('root', compDef.general(), domBackend)
     expect(glassEasel.Component.getMethod(comp.general(), 'abc')!()).toBe('abc')
     expect(comp.callMethod('abc')).toBe('abc')
   })
@@ -281,7 +281,7 @@ describe('component utils', () => {
     compDef.prepare()
     expect(compDef.isPrepared()).toBe(true)
     expect(glassEasel.Component.getMethodsFromDef(compDef.general()).abc).toBe(undefined)
-    const comp = glassEasel.createElement('root', compDef.general())
+    const comp = glassEasel.Component.createWithContext('root', compDef.general(), domBackend)
     expect(glassEasel.Component.getMethod(comp.general(), 'abc')!()).toBe('abc')
     expect(comp.callMethod('abc')).toBe('abc')
   })
@@ -295,7 +295,7 @@ describe('component utils', () => {
       },
       componentSpace,
     )
-    const comp = glassEasel.createElement('root', compDef.general())
+    const comp = glassEasel.Component.createWithContext('root', compDef.general(), domBackend)
     const caller = {
       abc() {
         return 'abc'
@@ -316,7 +316,7 @@ describe('component utils', () => {
       },
       componentSpace,
     )
-    const comp = glassEasel.createElement('root', compDef.general())
+    const comp = glassEasel.Component.createWithContext('root', compDef.general(), domBackend)
     expect(comp.isInnerDataExcluded('_a')).toBe(true)
     expect(comp.isInnerDataExcluded('a')).toBe(false)
   })
@@ -333,7 +333,7 @@ describe('component utils', () => {
       },
       componentSpace,
     )
-    const comp = glassEasel.createElement('root', compDef.general())
+    const comp = glassEasel.Component.createWithContext('root', compDef.general(), domBackend)
     expect(glassEasel.Component.getInnerData(comp.general())).toStrictEqual(comp.data)
   })
 
@@ -349,7 +349,7 @@ describe('component utils', () => {
       },
       componentSpace,
     )
-    const comp = glassEasel.createElement('root', compDef.general())
+    const comp = glassEasel.Component.createWithContext('root', compDef.general(), domBackend)
     const oldData = comp.data
     glassEasel.Component.replaceWholeData(comp.general(), { b: 456 })
     expect(oldData).toStrictEqual({ a: 123 })
@@ -439,7 +439,7 @@ describe('component utils', () => {
         num: 123,
       }))
       .registerComponent()
-    const elem = glassEasel.createElement('root', compDef.general())
+    const elem = glassEasel.Component.createWithContext('root', compDef.general(), domBackend)
     glassEasel.Element.pretendAttached(elem)
     const shadowRoot = elem.getShadowRoot()!
     expect(shadowRoot.childNodes[0]!.asTextNode()!.textContent).toBe('ABC-123')
@@ -448,7 +448,7 @@ describe('component utils', () => {
 
     compDef.updateTemplate(tmpl('DEF-{{num}}'))
     expect(shadowRoot.childNodes[0]!.asTextNode()!.textContent).toBe('ABC-456')
-    const elem2 = glassEasel.createElement('root', compDef.general())
+    const elem2 = glassEasel.Component.createWithContext('root', compDef.general(), domBackend)
     const shadowRoot2 = elem2.getShadowRoot()!
     expect(shadowRoot2.childNodes[0]!.asTextNode()!.textContent).toBe('DEF-123')
 
@@ -484,7 +484,7 @@ describe('component utils', () => {
         `),
       )
       .registerComponent()
-    const elem = glassEasel.createElement('root', compDef.general())
+    const elem = glassEasel.Component.createWithContext('root', compDef.general(), domBackend)
     glassEasel.Element.pretendAttached(elem)
     const shadowRoot = elem.getShadowRoot()!
     expect(shadowRoot.childNodes[0]!.asInstanceOf(childComp)!.data.a1b).toBe('1')
@@ -551,7 +551,7 @@ describe('component utils', () => {
       `),
       )
       .registerComponent()
-    const elem = glassEasel.createElement('root', compDef.general())
+    const elem = glassEasel.Component.createWithContext('root', compDef.general(), domBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(callOrder).toStrictEqual([2, 1, 4, 5, 3, 6])
   })

@@ -76,6 +76,11 @@ export const setRevertEventDefaultPrevented = (value: boolean) => {
   revertEventDefaultPrevented = value
 }
 
+type DestroyedBackendContext = { mode: BackendMode; destroyed: true }
+const DESTROYED_SHADOW_BACKEND_CONTEXT = { mode: BackendMode.Shadow, destroyed: true } as const
+const DESTROYED_COMPOSED_BACKEND_CONTEXT = { mode: BackendMode.Composed, destroyed: true } as const
+const DESTROYED_DOMLIKE_BACKEND_CONTEXT = { mode: BackendMode.Domlike, destroyed: true } as const
+
 export type DoubleLinkedList<T> = {
   value: T
   prev: DoubleLinkedList<T> | null
@@ -96,7 +101,7 @@ export class Element implements NodeCast {
   /** @internal */
   _$destroyOnDetach: boolean
   /** @internal */
-  _$nodeTreeContext: GeneralBackendContext
+  _$nodeTreeContext: GeneralBackendContext | DestroyedBackendContext
   /** @internal */
   private _$nodeId: string
   /** @internal */
@@ -152,11 +157,12 @@ export class Element implements NodeCast {
     throw new Error('Element cannot be constructed directly')
   }
 
+  /* @internal */
   protected _$initialize(
     virtual: boolean,
     backendElement: GeneralBackendElement | null,
     owner: ShadowRoot | null,
-    nodeTreeContext: GeneralBackendContext,
+    nodeTreeContext: GeneralBackendContext | DestroyedBackendContext,
   ) {
     this._$backendElement = backendElement
     this._$destroyOnDetach = false
@@ -352,8 +358,20 @@ export class Element implements NodeCast {
   }
 
   /** Get the backend context */
-  getBackendContext(): GeneralBackendContext {
-    return this._$nodeTreeContext
+  getBackendContext(): GeneralBackendContext | null {
+    const context = this._$nodeTreeContext
+    if (BM.SHADOW) {
+      if (context === DESTROYED_SHADOW_BACKEND_CONTEXT) return null
+    } else if (BM.COMPOSED) {
+      if (context === DESTROYED_COMPOSED_BACKEND_CONTEXT) return null
+    } else if (BM.DOMLIKE) {
+      if (context === DESTROYED_DOMLIKE_BACKEND_CONTEXT) return null
+    } else {
+      if (context === DESTROYED_SHADOW_BACKEND_CONTEXT) return null
+      if (context === DESTROYED_COMPOSED_BACKEND_CONTEXT) return null
+      if (context === DESTROYED_DOMLIKE_BACKEND_CONTEXT) return null
+    }
+    return context as GeneralBackendContext
   }
 
   /** Get the backend mode */
@@ -376,8 +394,13 @@ export class Element implements NodeCast {
       }
       this._$backendElement = null
     }
-    // FIXME: dirty fix to release backendContext, for memory leak
-    this._$nodeTreeContext = emptyContext
+    if (BM.COMPOSED || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Composed)) {
+      this._$nodeTreeContext = DESTROYED_COMPOSED_BACKEND_CONTEXT
+    } else if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
+      this._$nodeTreeContext = DESTROYED_DOMLIKE_BACKEND_CONTEXT
+    } else {
+      this._$nodeTreeContext = DESTROYED_SHADOW_BACKEND_CONTEXT
+    }
   }
 
   /** Destroy the backend element on next detach */
@@ -625,7 +648,6 @@ export class Element implements NodeCast {
     }
   }
 
-  /** @internal */
   static insertChildReassign(
     shadowParent: Element,
     child: Node,
@@ -657,7 +679,7 @@ export class Element implements NodeCast {
             const [before, removeCount] = d
             if (
               BM.DOMLIKE ||
-              (BM.DYNAMIC && shadowParent.getBackendContext().mode === BackendMode.Domlike)
+              (BM.DYNAMIC && shadowParent.getBackendMode() === BackendMode.Domlike)
             ) {
               const rel = before._$backendElement as domlikeBackend.Element
               for (let i = 1; i < removeCount; i += 1) {
@@ -916,7 +938,8 @@ export class Element implements NodeCast {
     }
     if (!cur) return
     const slotParent = cur
-    const context = slotParent._$nodeTreeContext as composedContext
+    const context = slotParent._$nodeTreeContext as composedContext | null
+    if (!context) return
 
     // detect whether it is in single-slot mode
     let sharedNonVirtualParent: composedElement | null | undefined
@@ -1696,20 +1719,24 @@ export class Element implements NodeCast {
             )
             if (ENV.DEV) performanceMeasureEnd()
           }
-        } else if (relChild) {
-          if (ENV.DEV) performanceMeasureStart('backend.insertBefore')
-          ;(parent._$backendElement as backend.Element).insertBefore(
-            newChild!._$backendElement as backend.Element,
-            relChild._$backendElement as backend.Element,
-            posIndex,
-          )
-          if (ENV.DEV) performanceMeasureEnd()
         } else {
-          if (ENV.DEV) performanceMeasureStart('backend.appendChild')
-          ;(parent._$backendElement as backend.Element).appendChild(
-            newChild!._$backendElement as backend.Element,
-          )
-          if (ENV.DEV) performanceMeasureEnd()
+          // relChild could equal to newChild and have been removed above
+          const before = parent.childNodes[posIndex]
+          if (before) {
+            if (ENV.DEV) performanceMeasureStart('backend.insertBefore')
+            ;(parent._$backendElement as backend.Element).insertBefore(
+              newChild!._$backendElement as backend.Element,
+              before._$backendElement as backend.Element,
+              posIndex,
+            )
+            if (ENV.DEV) performanceMeasureEnd()
+          } else {
+            if (ENV.DEV) performanceMeasureStart('backend.appendChild')
+            ;(parent._$backendElement as backend.Element).appendChild(
+              newChild!._$backendElement as backend.Element,
+            )
+            if (ENV.DEV) performanceMeasureEnd()
+          }
         }
       }
     } else {
@@ -2327,24 +2354,26 @@ export class Element implements NodeCast {
       default:
         return
     }
-    if (ENV.DEV) performanceMeasureStart('backend.setListenerStats')
-    if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
-      ;(this._$nodeTreeContext as domlikeBackend.Context).setListenerStats(
-        this._$backendElement as domlikeBackend.Element,
-        name,
-        capture,
-        mutLevel,
-      )
-    } else if (BM.COMPOSED || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Composed)) {
-      const defaultPrevented = mutLevel === MutLevel.Final
-      ;(this._$backendElement as composedBackend.Element).setEventDefaultPrevented(
-        name,
-        revertEventDefaultPrevented ? !defaultPrevented : defaultPrevented,
-      )
-    } else {
-      ;(this._$backendElement as backend.Element).setListenerStats(name, capture, mutLevel)
+    if (this._$nodeTreeContext) {
+      if (ENV.DEV) performanceMeasureStart('backend.setListenerStats')
+      if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
+        ;(this._$nodeTreeContext as domlikeBackend.Context).setListenerStats(
+          this._$backendElement as domlikeBackend.Element,
+          name,
+          capture,
+          mutLevel,
+        )
+      } else if (BM.COMPOSED || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Composed)) {
+        const defaultPrevented = mutLevel === MutLevel.Final
+        ;(this._$backendElement as composedBackend.Element).setEventDefaultPrevented(
+          name,
+          revertEventDefaultPrevented ? !defaultPrevented : defaultPrevented,
+        )
+      } else {
+        ;(this._$backendElement as backend.Element).setListenerStats(name, capture, mutLevel)
+      }
+      if (ENV.DEV) performanceMeasureEnd()
     }
-    if (ENV.DEV) performanceMeasureEnd()
   }
 
   /** Add an event listener on the element */
@@ -2617,6 +2646,11 @@ export class Element implements NodeCast {
     return element._$inheritSlots
   }
 
+  /** Get whether the slot-inherit mode is set or not */
+  isInheritSlots() {
+    return this._$inheritSlots
+  }
+
   /**
    * Set the binding slot of specific node
    *
@@ -2660,7 +2694,6 @@ export class Element implements NodeCast {
     }
   }
 
-  /** @internal */
   static _$updateContainingSlot(node: Node, containingSlot: Element | null | undefined): void {
     node.containingSlot = containingSlot
 
@@ -2676,7 +2709,6 @@ export class Element implements NodeCast {
     }
   }
 
-  /** @internal */
   static _$spliceSlotNodes(
     slot: Element,
     before: number,
@@ -2711,7 +2743,7 @@ export class Element implements NodeCast {
       }
     }
 
-    if (BM.SHADOW || (BM.DYNAMIC && slot._$nodeTreeContext.mode === BackendMode.Shadow)) {
+    if (BM.SHADOW || (BM.DYNAMIC && slot.getBackendMode() === BackendMode.Shadow)) {
       if (insertion?.length) {
         if (ENV.DEV) performanceMeasureStart('backend.createFragment')
         const frag = (slot._$nodeTreeContext as backend.Context).createFragment()
@@ -2957,17 +2989,7 @@ export class Element implements NodeCast {
    */
   getBoundingClientRect(cb: (res: BoundingClientRect) => void): void {
     const backendElement = this._$backendElement
-    if (backendElement) {
-      if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
-        const e = backendElement as domlikeBackend.Element
-        const res = e.getBoundingClientRect()
-        setTimeout(() => {
-          cb(res)
-        }, 0)
-      } else {
-        ;(backendElement as backend.Element | composedBackend.Element).getBoundingClientRect(cb)
-      }
-    } else {
+    if (!backendElement) {
       setTimeout(() => {
         cb({
           left: 0,
@@ -2976,6 +2998,28 @@ export class Element implements NodeCast {
           height: 0,
         })
       }, 0)
+      return
+    }
+    if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
+      const e = backendElement as domlikeBackend.Element
+      const res = e.getBoundingClientRect?.() || { left: 0, top: 0, width: 0, height: 0 }
+      setTimeout(() => {
+        cb(res)
+      }, 0)
+    } else {
+      const be = backendElement as backend.Element | composedBackend.Element
+      if (be.getBoundingClientRect) {
+        be.getBoundingClientRect(cb)
+      } else {
+        setTimeout(() => {
+          cb({
+            left: 0,
+            top: 0,
+            width: 0,
+            height: 0,
+          })
+        }, 0)
+      }
     }
   }
 
@@ -2986,22 +3030,7 @@ export class Element implements NodeCast {
    */
   getScrollOffset(cb: (res: ScrollOffset) => void): void {
     const backendElement = this._$backendElement
-    if (backendElement) {
-      if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
-        const e = backendElement as domlikeBackend.Element
-        const res = {
-          scrollLeft: e.scrollLeft,
-          scrollTop: e.scrollTop,
-          scrollWidth: e.scrollWidth,
-          scrollHeight: e.scrollHeight,
-        }
-        setTimeout(() => {
-          cb(res)
-        }, 0)
-      } else {
-        ;(backendElement as backend.Element | composedBackend.Element).getScrollOffset(cb)
-      }
-    } else {
+    if (!backendElement) {
       setTimeout(() => {
         cb({
           scrollLeft: 0,
@@ -3010,6 +3039,33 @@ export class Element implements NodeCast {
           scrollHeight: 0,
         })
       }, 0)
+      return
+    }
+    if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
+      const e = backendElement as domlikeBackend.Element
+      const res = {
+        scrollLeft: e.scrollLeft || 0,
+        scrollTop: e.scrollTop || 0,
+        scrollWidth: e.scrollWidth || 0,
+        scrollHeight: e.scrollHeight || 0,
+      }
+      setTimeout(() => {
+        cb(res)
+      }, 0)
+    } else {
+      const be = backendElement as backend.Element | composedBackend.Element
+      if (be.getScrollOffset) {
+        be.getScrollOffset(cb)
+      } else {
+        setTimeout(() => {
+          cb({
+            scrollLeft: 0,
+            scrollTop: 0,
+            scrollWidth: 0,
+            scrollHeight: 0,
+          })
+        }, 0)
+      }
     }
   }
 
@@ -3033,7 +3089,9 @@ export class Element implements NodeCast {
         return null
       }
       if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
-        return (this._$nodeTreeContext as domlikeBackend.Context).createIntersectionObserver(
+        const context = this._$nodeTreeContext as domlikeBackend.Context | null
+        if (!context || !context.createIntersectionObserver) return null
+        return context.createIntersectionObserver(
           backendElement as domlikeBackend.Element,
           (relativeElement?._$backendElement as domlikeBackend.Element | undefined) || null,
           relativeElementMargin,
@@ -3041,11 +3099,13 @@ export class Element implements NodeCast {
           listener!,
         )
       }
-      return (backendElement as backend.Element).createIntersectionObserver(
-        (relativeElement?._$backendElement as backend.Element | undefined) || null,
+      const be = backendElement as backend.Element | composedBackend.Element
+      if (!be.createIntersectionObserver) return null
+      return be.createIntersectionObserver(
+        (relativeElement?._$backendElement as any) || null,
         relativeElementMargin,
         thresholds,
-        listener,
+        listener as any,
       )
     }
     return null
@@ -3058,12 +3118,19 @@ export class Element implements NodeCast {
     const backendElement = this._$backendElement
     if (!backendElement) return
     if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
-      ;(this._$nodeTreeContext as domlikeBackend.Context).getContext(
-        backendElement as domlikeBackend.Element,
-        cb,
-      )
+      const context = this._$nodeTreeContext as domlikeBackend.Context | null
+      if (context?.getContext) {
+        context.getContext(backendElement as domlikeBackend.Element, cb)
+      } else {
+        cb(null)
+      }
     } else {
-      ;(backendElement as backend.Element).getContext(cb)
+      const be = backendElement as backend.Element | composedBackend.Element
+      if (be.getContext) {
+        be.getContext(cb)
+      } else {
+        cb(null)
+      }
     }
   }
 }

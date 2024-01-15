@@ -1,15 +1,9 @@
 import { type Element as GlassEaselElement } from '../element'
 import { type EventBubbleStatus, type EventOptions, type MutLevel } from '../event'
-import {
-  type BackendMode,
-  type BoundingClientRect,
-  type IntersectionStatus,
-  type MediaQueryStatus,
-  type Observer,
-} from './shared'
+import { type BackendMode } from './shared'
 import type * as suggestedBackend from './suggested_backend_protocol'
 
-export interface Context extends Partial<suggestedBackend.Context<Context>> {
+export interface Context extends Partial<suggestedBackend.ContextForDomLike<Element>> {
   mode: BackendMode.Domlike
   destroy(): void
   getWindowWidth(): number
@@ -41,24 +35,13 @@ export interface Context extends Partial<suggestedBackend.Context<Context>> {
     attributeName: string,
     listener: ((newValue: unknown) => void) | null,
   ): void
-  createIntersectionObserver(
-    targetElement: Element,
-    relativeElement: Element | null,
-    relativeElementMargin: string,
-    thresholds: number[],
-    listener: (res: IntersectionStatus) => void,
-  ): Observer
-  createMediaQueryObserver(
-    status: MediaQueryStatus,
-    listener: (res: { matches: boolean }) => void,
-  ): Observer
-  getContext(element: Element, cb: (res: unknown) => void): void
 }
 
-export interface Element extends Partial<suggestedBackend.Element> {
+export interface Element extends Partial<suggestedBackend.ElementForDomLike> {
   _$wxArgs?: {
     modelListeners: { [name: string]: ((newValue: unknown) => void) | null }
   }
+  __wxElement?: GlassEaselElement
   appendChild(child: Element): void
   removeChild(child: Element, index?: number): void
   insertBefore(child: Element, before?: Element, index?: number): void
@@ -75,12 +58,6 @@ export interface Element extends Partial<suggestedBackend.Element> {
   nextSibling: Element | undefined
   childNodes: Element[]
   parentNode: Element | null
-  getBoundingClientRect(): BoundingClientRect
-  scrollLeft: number
-  scrollTop: number
-  scrollWidth: number
-  scrollHeight: number
-  __wxElement?: GlassEaselElement
   addEventListener<K extends keyof HTMLElementEventMap>(
     type: K,
     listener: (this: HTMLElement, ev: HTMLElementEventMap[K]) => unknown,

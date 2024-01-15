@@ -1,4 +1,11 @@
-import { tmpl, multiTmpl, domBackend, execWithWarn, composedBackend } from '../base/env'
+import {
+  tmpl,
+  multiTmpl,
+  domBackend,
+  execWithWarn,
+  composedBackend,
+  shadowBackend,
+} from '../base/env'
 import { virtual as matchElementWithDom } from '../base/match'
 import * as glassEasel from '../../src'
 
@@ -20,6 +27,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     expect(domHtml(elem)).toBe('<div style="font-weight: bold"><span>Hello world!</span></div>')
+    matchElementWithDom(elem)
   })
 
   test('basic data binding', () => {
@@ -38,11 +46,13 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, testBackend).general()
     expect(domHtml(elem)).toBe('<div class="123"><span>abc</span></div>')
+    matchElementWithDom(elem)
     elem.setData({
       a: true,
       c: false,
     })
     expect(domHtml(elem)).toBe('<div class="true"><span>false</span></div>')
+    matchElementWithDom(elem)
   })
 
   test('if blocks', () => {
@@ -64,18 +74,22 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     expect(domHtml(elem)).toBe('<div>c</div><div>f</div>')
+    matchElementWithDom(elem)
     elem.setData({
       cond1: true,
     })
     expect(domHtml(elem)).toBe('<div>a</div><div>c</div><div>d</div>')
+    matchElementWithDom(elem)
     elem.setData({
       cond2: 1,
     })
     expect(domHtml(elem)).toBe('<div>a</div><div>b</div><div>d</div>')
+    matchElementWithDom(elem)
     elem.setData({
       cond1: null,
     })
     expect(domHtml(elem)).toBe('<div>b</div><div>e</div>')
+    matchElementWithDom(elem)
   })
 
   test('if blocks in template-is', () => {
@@ -100,15 +114,47 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     expect(domHtml(elem)).toBe('<div>456</div>')
+    matchElementWithDom(elem)
     elem.setData({
       cond: true,
     })
     expect(domHtml(elem)).toBe('<div>123</div>')
+    matchElementWithDom(elem)
     elem.setData({
       cond: false,
       c: 789,
     })
     expect(domHtml(elem)).toBe('<div>789</div>')
+    matchElementWithDom(elem)
+  })
+
+  test('if blocks in include', () => {
+    const def = glassEasel
+      .registerElement({
+        template: multiTmpl({
+          '': '<include wx:if="{{!cond}}" src="./a.wxml" />',
+          a: '<div>{{a}}</div>',
+        }),
+        data: {
+          cond: false,
+          a: 123,
+        },
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    expect(domHtml(elem)).toBe('<div>123</div>')
+    matchElementWithDom(elem)
+    elem.setData({
+      cond: true,
+    })
+    expect(domHtml(elem)).toBe('')
+    matchElementWithDom(elem)
+    elem.setData({
+      cond: false,
+      a: 456,
+    })
+    expect(domHtml(elem)).toBe('<div>456</div>')
+    matchElementWithDom(elem)
   })
 
   test('if blocks in slot', () => {
@@ -198,6 +244,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<div><x-c>0</x-c></div><div><x-c>1</x-c></div>')
+    matchElementWithDom(elem)
     expect(ops).toEqual([
       [-1, '10'],
       [-1, '20'],
@@ -207,6 +254,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       list: [20, 10],
     })
     expect(domHtml(elem)).toBe('<div><x-c>0</x-c></div><div><x-c>1</x-c></div>')
+    matchElementWithDom(elem)
     expect(ops).toEqual([])
     ops.length = 0
     elem.setData({
@@ -215,6 +263,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect(domHtml(elem)).toBe(
       '<div><x-c>0</x-c></div><div><x-c>1</x-c></div><div><x-c>2</x-c></div><div><x-c>3</x-c></div>',
     )
+    matchElementWithDom(elem)
     expect(ops).toEqual([
       [-1, '50'],
       [-1, '60'],
@@ -224,6 +273,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       list: [50],
     })
     expect(domHtml(elem)).toBe('<div><x-c>0</x-c></div>')
+    matchElementWithDom(elem)
     expect(ops).toEqual([
       [-2, '40'],
       [-2, '50'],
@@ -277,6 +327,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     }
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<x-c>10</x-c><x-c>20</x-c>')
+    matchElementWithDom(elem)
     checkIndex()
     expect(ops).toEqual([
       [-1, 'a:10'],
@@ -293,6 +344,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       ],
     })
     expect(domHtml(elem)).toBe('<x-c>30</x-c><x-c>40</x-c><x-c>50</x-c><x-c>60</x-c><x-c>70</x-c>')
+    matchElementWithDom(elem)
     checkIndex()
     expect(ops).toEqual([
       [-1, 'c:30'],
@@ -310,6 +362,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       ],
     })
     expect(domHtml(elem)).toBe('<x-c>30</x-c><x-c>60</x-c><x-c>40</x-c><x-c>50</x-c><x-c>70</x-c>')
+    matchElementWithDom(elem)
     checkIndex()
     expect(ops).toEqual([[-3, 'b:60']])
     ops.length = 0
@@ -323,6 +376,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       ],
     })
     expect(domHtml(elem)).toBe('<x-c>30</x-c><x-c>40</x-c><x-c>50</x-c><x-c>60</x-c><x-c>70</x-c>')
+    matchElementWithDom(elem)
     checkIndex()
     expect(ops).toEqual([[-3, 'a:40']])
     ops.length = 0
@@ -336,6 +390,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       ],
     })
     expect(domHtml(elem)).toBe('<x-c>30</x-c><x-c>40</x-c><x-c>50</x-c><x-c>60</x-c><x-c>70</x-c>')
+    matchElementWithDom(elem)
     checkIndex()
     expect(ops).toEqual([])
     ops.length = 0
@@ -346,6 +401,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       ],
     })
     expect(domHtml(elem)).toBe('<x-c>80</x-c><x-c>90</x-c>')
+    matchElementWithDom(elem)
     checkIndex()
     expect(ops).toEqual([
       [-2, 'c:30'],
@@ -444,6 +500,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<div><x-c>a</x-c></div><div><x-c>b</x-c></div>')
+    matchElementWithDom(elem)
     expect(ops).toEqual([
       [-1, 'a:10'],
       [-1, 'b:20'],
@@ -453,6 +510,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       list: { a: 20, b: 10 },
     })
     expect(domHtml(elem)).toBe('<div><x-c>a</x-c></div><div><x-c>b</x-c></div>')
+    matchElementWithDom(elem)
     expect(ops).toEqual([])
     ops.length = 0
     elem.setData({
@@ -466,6 +524,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect(domHtml(elem)).toBe(
       '<div><x-c>a</x-c></div><div><x-c>b</x-c></div><div><x-c>c</x-c></div><div><x-c>d</x-c></div>',
     )
+    matchElementWithDom(elem)
     expect(ops).toEqual([
       [-1, 'c:50'],
       [-1, 'd:60'],
@@ -475,6 +534,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       list: { c: 50 },
     })
     expect(domHtml(elem)).toBe('<div><x-c>c</x-c></div>')
+    matchElementWithDom(elem)
     expect(ops).toEqual([
       [-2, 'b:40'],
       [-2, 'c:50'],
@@ -525,6 +585,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     }
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<x-c>10</x-c><x-c>20</x-c>')
+    matchElementWithDom(elem)
     checkIndex()
     expect(ops).toEqual([
       [-1, 'a:10'],
@@ -544,6 +605,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect(domHtml(elem)).toBe(
       '<x-c>30</x-c><x-c>40</x-c><x-c>50</x-c><x-c>60</x-c><x-c>70</x-c><x-c>80</x-c>',
     )
+    matchElementWithDom(elem)
     checkIndex()
     expect(ops).toEqual([
       [-1, 'c:30'],
@@ -565,6 +627,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect(domHtml(elem)).toBe(
       '<x-c>50</x-c><x-c>60</x-c><x-c>70</x-c><x-c>80</x-c><x-c>30</x-c><x-c>40</x-c>',
     )
+    matchElementWithDom(elem)
     checkIndex()
     expect(ops).toEqual([
       [-2, 'c:30'],
@@ -583,6 +646,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       },
     })
     expect(domHtml(elem)).toBe('<x-c>10</x-c><x-c>20</x-c><x-c>30</x-c><x-c>40</x-c><x-c>50</x-c>')
+    matchElementWithDom(elem)
     checkIndex()
     expect(ops).toEqual([
       [-3, 'g:30'],
@@ -604,6 +668,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect(domHtml(elem)).toBe(
       '<x-c>10</x-c><x-c>20</x-c><x-c>30</x-c><x-c>40</x-c><x-c>50</x-c><x-c>60</x-c><x-c>70</x-c>',
     )
+    matchElementWithDom(elem)
     checkIndex()
     expect(ops).toEqual([
       [-3, 'a:40'],
@@ -625,6 +690,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect(domHtml(elem)).toBe(
       '<x-c>60</x-c><x-c>50</x-c><x-c>40</x-c><x-c>30</x-c><x-c>20</x-c><x-c>10</x-c>',
     )
+    matchElementWithDom(elem)
     checkIndex()
     expect(ops).toEqual([
       [-3, 'h:70'],
@@ -648,6 +714,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect(domHtml(elem)).toBe(
       '<x-c>80</x-c><x-c>70</x-c><x-c>60</x-c><x-c>50</x-c><x-c>40</x-c><x-c>30</x-c><x-c>20</x-c><x-c>10</x-c>',
     )
+    matchElementWithDom(elem)
     checkIndex()
     expect(ops).toEqual([
       [-3, 'f:40'],
@@ -696,6 +763,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     )
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<x-c>x</x-c>')
+    matchElementWithDom(elem)
     expect(ops).toEqual([[-1, 'x']])
     ops.length = 0
     execWithWarn(1, () => {
@@ -704,6 +772,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       })
     })
     expect(domHtml(elem)).toBe('<x-c>a</x-c><x-c>b</x-c><x-c>c</x-c>')
+    matchElementWithDom(elem)
     expect(ops).toEqual([
       [-2, 'x'],
       [-1, 'a'],
@@ -717,6 +786,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       })
     })
     expect(domHtml(elem)).toBe('<x-c>c</x-c><x-c>a</x-c><x-c>b</x-c>')
+    matchElementWithDom(elem)
     ops.length = 0
     execWithWarn(1, () => {
       elem.setData({
@@ -724,6 +794,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       })
     })
     expect(domHtml(elem)).toBe('')
+    matchElementWithDom(elem)
     expect(ops).toEqual([
       [-2, 'c'],
       [-2, 'a'],
@@ -747,8 +818,49 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     )
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<span>0</span><span>1</span><span>2</span>')
+    matchElementWithDom(elem)
     execWithWarn(1, () => elem.setData({ n: 2 }))
     expect(domHtml(elem)).toBe('<span>0</span><span>1</span>')
+    matchElementWithDom(elem)
+  })
+
+  test('slot inside for blocks', () => {
+    const x = glassEasel.registerElement({})
+    const def = glassEasel.registerElement({
+      using: { x },
+      template: tmpl(`
+        <x>
+          <block wx:for="{{n}}">
+            <s>{{item}}</s>
+          </block>
+        </x>
+      `),
+      data: { n: [0, 1, 2] },
+    })
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe('<x><s>0</s><s>1</s><s>2</s></x>')
+    matchElementWithDom(elem)
+    elem.spliceArrayDataOnPath(['n'], 3, 0, [3, 4])
+    elem.applyDataUpdates()
+    expect(domHtml(elem)).toBe('<x><s>0</s><s>1</s><s>2</s><s>3</s><s>4</s></x>')
+    matchElementWithDom(elem)
+    elem.spliceArrayDataOnPath(['n'], 0, 0, [5, 6])
+    elem.applyDataUpdates()
+    expect(domHtml(elem)).toBe('<x><s>5</s><s>6</s><s>0</s><s>1</s><s>2</s><s>3</s><s>4</s></x>')
+    matchElementWithDom(elem)
+    elem.spliceArrayDataOnPath(['n'], 2, 3, [7, 8])
+    elem.applyDataUpdates()
+    expect(domHtml(elem)).toBe('<x><s>5</s><s>6</s><s>7</s><s>8</s><s>3</s><s>4</s></x>')
+    matchElementWithDom(elem)
+    elem.spliceArrayDataOnPath(['n'], 0, 3, [])
+    elem.applyDataUpdates()
+    expect(domHtml(elem)).toBe('<x><s>8</s><s>3</s><s>4</s></x>')
+    matchElementWithDom(elem)
+    elem.spliceArrayDataOnPath(['n'], 1, 2, [])
+    elem.applyDataUpdates()
+    expect(domHtml(elem)).toBe('<x><s>8</s></x>')
+    matchElementWithDom(elem)
   })
 
   test('slot inside for blocks', () => {
@@ -800,8 +912,10 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     expect(domHtml(elem)).toBe('<div>123</div>')
+    matchElementWithDom(elem)
     elem.setData({ a: 456 })
     expect(domHtml(elem)).toBe('<div>456</div>')
+    matchElementWithDom(elem)
   })
 
   test('template undefined include', () => {
@@ -817,6 +931,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     expect(domHtml(elem)).toBe('<div></div>')
+    matchElementWithDom(elem)
   })
 
   test('template-name data', () => {
@@ -846,8 +961,10 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     expect(domHtml(elem)).toBe('<div><span>0:123</span><span>2:789</span></div>')
+    matchElementWithDom(elem)
     elem.setData({ 'arr[0].shown': false })
     expect(domHtml(elem)).toBe('<div><span>2:789</span></div>')
+    matchElementWithDom(elem)
     elem.setData({
       arr: [
         { shown: false, data: 789 },
@@ -855,6 +972,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       ],
     })
     expect(domHtml(elem)).toBe('<div><span>1:456</span></div>')
+    matchElementWithDom(elem)
   })
 
   test('template-name data shortcut', () => {
@@ -886,10 +1004,13 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     expect(domHtml(elem)).toBe('<div><span>123</span></div><div><span>123</span></div>')
+    matchElementWithDom(elem)
     elem.setData({ obj: { a: 456 } })
     expect(domHtml(elem)).toBe('<div><span>456</span></div><div><span>456</span></div>')
+    matchElementWithDom(elem)
     elem.setData({ 'obj.a': 789 })
     expect(domHtml(elem)).toBe('<div><span>789</span></div><div><span>789</span></div>')
+    matchElementWithDom(elem)
   })
 
   test('template-name data cascaded passing', () => {
@@ -913,10 +1034,13 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     expect(domHtml(elem)).toBe('<div><span>123</span></div>')
+    matchElementWithDom(elem)
     elem.setData({ obj: { a: 456 } })
     expect(domHtml(elem)).toBe('<div><span>456</span></div>')
+    matchElementWithDom(elem)
     elem.setData({ 'obj.a': 789 })
     expect(domHtml(elem)).toBe('<div><span>789</span></div>')
+    matchElementWithDom(elem)
   })
 
   test('static template-is', () => {
@@ -939,12 +1063,16 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     expect(domHtml(elem)).toBe('<div><span>345</span></div>')
+    matchElementWithDom(elem)
     elem.setData({ b: { a: 200, d: 7 } })
     expect(domHtml(elem)).toBe('<div><span>247</span></div>')
+    matchElementWithDom(elem)
     elem.setData({ 'b.a': 100 })
     expect(domHtml(elem)).toBe('<div><span>147</span></div>')
+    matchElementWithDom(elem)
     elem.setData({ 'b.hidden': true })
     expect(domHtml(elem)).toBe('<div></div>')
+    matchElementWithDom(elem)
   })
 
   test('dynamic template-is', () => {
@@ -972,14 +1100,19 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     expect(domHtml(elem)).toBe('<div></div>')
+    matchElementWithDom(elem)
     elem.setData({ childType: 'A' })
     expect(domHtml(elem)).toBe('<div><span>123</span></div>')
+    matchElementWithDom(elem)
     elem.setData({ childType: 'B' })
     expect(domHtml(elem)).toBe('<div><span>456</span></div>')
+    matchElementWithDom(elem)
     elem.setData({ a: 0 })
     expect(domHtml(elem)).toBe('<div><span>456</span></div>')
+    matchElementWithDom(elem)
     elem.setData({ b: 789 })
     expect(domHtml(elem)).toBe('<div><span>789</span></div>')
+    matchElementWithDom(elem)
   })
 
   test('template-is inside for block', () => {
@@ -1009,14 +1142,19 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     expect(domHtml(elem)).toBe('<div></div>')
+    matchElementWithDom(elem)
     elem.setData({ list: [1, 2] })
     expect(domHtml(elem)).toBe('<div><span>0:123</span><span>1:456</span></div>')
+    matchElementWithDom(elem)
     elem.setData({ list: [2, 1, 1] })
     expect(domHtml(elem)).toBe('<div><span>0:456</span><span>1:123</span><span>2:123</span></div>')
+    matchElementWithDom(elem)
     elem.setData({ a: 0 })
     expect(domHtml(elem)).toBe('<div><span>0:456</span><span>1:0</span><span>2:0</span></div>')
+    matchElementWithDom(elem)
     elem.setData({ b: 789 })
     expect(domHtml(elem)).toBe('<div><span>0:789</span><span>1:0</span><span>2:0</span></div>')
+    matchElementWithDom(elem)
   })
 
   test('undefined template-is', () => {
@@ -1034,6 +1172,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     expect(domHtml(elem)).toBe('<div></div>')
+    matchElementWithDom(elem)
   })
 
   test('cascaded template', () => {
@@ -1065,9 +1204,11 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, testBackend).asInstanceOf(def)!
     expect(domHtml(elem)).toBe('<div>key: A</div><div>value: a</div>')
+    matchElementWithDom(elem)
 
     elem.setData({ 'c.i': 'B' })
     expect(domHtml(elem)).toBe('<div>key: B</div><div>value: b</div>')
+    matchElementWithDom(elem)
   })
 
   test('custom scripts', () => {
@@ -1092,6 +1233,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, testBackend).asInstanceOf(def)!
     expect(domHtml(elem)).toBe('<div>6</div>')
+    matchElementWithDom(elem)
   })
 
   test('custom inline scripts', () => {
@@ -1113,6 +1255,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, testBackend).asInstanceOf(def)!
     expect(domHtml(elem)).toBe('<div>6</div>')
+    matchElementWithDom(elem)
   })
 
   test('custom scripts across files', () => {
@@ -1141,6 +1284,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, testBackend).asInstanceOf(def)!
     expect(domHtml(elem)).toBe('<div>-1 3</div>')
+    matchElementWithDom(elem)
   })
 
   test('block slot', () => {
@@ -1191,6 +1335,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<div></div>')
+    matchElementWithDom(elem)
   })
 
   test('dataset name cases', () => {
@@ -1204,6 +1349,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<div></div>')
+    matchElementWithDom(elem)
     expect(elem.getShadowRoot()!.childNodes[0]!.asElement()!.dataset.camelcase).toBe(123)
   })
 
@@ -1218,6 +1364,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<div hidden=""></div>')
+    matchElementWithDom(elem)
   })
 
   test('attribute types', () => {
@@ -1250,6 +1397,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect(domHtml(elem)).toBe(
       '<div a="" c="" d="" e="" f="[object Object]" g="0" h="NaN" i="Infinity" j=""></div>',
     )
+    matchElementWithDom(elem)
   })
 
   test('property name cases', () => {
@@ -1288,11 +1436,13 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<a href="abc"></a>')
+    matchElementWithDom(elem)
     elem.setData({
       hidden: true,
       url: '',
     })
     expect(domHtml(elem)).toBe('<a href="" hidden=""></a>')
+    matchElementWithDom(elem)
   })
 
   test('setting element id', () => {
@@ -1309,6 +1459,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<div>123</div>')
+    matchElementWithDom(elem)
     expect(domHtml(elem.getShadowRoot()!.getElementById('abc')!)).toBe('123')
     elem.setData({
       d: 'def',
@@ -1448,6 +1599,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<div><span></span></div>')
+    matchElementWithDom(elem)
     const child = elem.getShadowRoot()!.getElementById('child')!
     child.triggerEvent('customEv')
     const ev = ops.shift() as glassEasel.ShadowedEvent<any>
@@ -1521,6 +1673,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<sub-comp><div class="abc a-4"></div></sub-comp>')
+    matchElementWithDom(elem)
   })
 
   test('setting array as classNames', () => {
@@ -1554,12 +1707,14 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect(domHtml(elem)).toBe(
       '<sub-comp class="p--static"><div class="inner p--a-class"></div></sub-comp>',
     )
+    matchElementWithDom(elem)
     elem.setData({
       classes: ['static', 'dynamic'],
     })
     expect(domHtml(elem)).toBe(
       '<sub-comp class="p--static p--dynamic"><div class="inner p--a-class"></div></sub-comp>',
     )
+    matchElementWithDom(elem)
     elem.setData({
       classes: '',
       extClass: ['a-class', 'dynamic'],
@@ -1567,14 +1722,20 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect(domHtml(elem)).toBe(
       '<sub-comp class=""><div class="inner p--a-class p--dynamic"></div></sub-comp>',
     )
+    matchElementWithDom(elem)
     elem.setData({
       extClass: 'static',
     })
     expect(domHtml(elem)).toBe('<sub-comp class=""><div class="inner p--static"></div></sub-comp>')
+    matchElementWithDom(elem)
   })
 
   test('setting external classes', () => {
-    const cs = new glassEasel.ComponentSpace()
+    const cs = new glassEasel.ComponentSpace(
+      undefined,
+      undefined,
+      glassEasel.getDefaultComponentSpace().styleScopeManager,
+    )
     const ssm = cs.styleScopeManager
     const subComp = cs.defineComponent({
       externalClasses: ['class', 'ext-class'],
@@ -1603,18 +1764,88 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect(domHtml(elem)).toBe(
       '<sub-comp class="p--static"><div class="p--static p--a-class"></div></sub-comp>',
     )
+    matchElementWithDom(elem)
     elem.setData({
       dynamic: 'dynamic',
     })
     expect(domHtml(elem)).toBe(
       '<sub-comp class="p--static p--dynamic"><div class="p--static p--a-class p--dynamic"></div></sub-comp>',
     )
+    matchElementWithDom(elem)
     elem.setData({
       dynamic: '',
     })
     expect(domHtml(elem)).toBe(
       '<sub-comp class="p--static"><div class="p--static p--a-class"></div></sub-comp>',
     )
+    matchElementWithDom(elem)
+  })
+
+  test('setting nested external classes', () => {
+    const cs = new glassEasel.ComponentSpace(
+      undefined,
+      undefined,
+      glassEasel.getDefaultComponentSpace().styleScopeManager,
+    )
+    const ssm = cs.styleScopeManager
+    const subComp = cs.defineComponent({
+      externalClasses: ['class', 'ext-class'],
+      template: tmpl(`
+        <div class="class ext-class"></div>
+      `),
+    })
+    const def = cs
+      .defineComponent({
+        options: {
+          styleScope: ssm.register('p'),
+        },
+        using: {
+          sub: subComp.general(),
+        },
+        properties: {
+          dynamic: String,
+        },
+        externalClasses: ['a-class'],
+        template: tmpl(`
+          <sub class="static {{ dynamic || '' }}" ext-class="a-class" />
+        `),
+      })
+      .general()
+    const parent = cs.defineComponent({
+      options: {
+        styleScope: ssm.register('pp'),
+        extraStyleScope: glassEasel.StyleScopeManager.globalScope(),
+      },
+      using: {
+        def,
+      },
+      data: {
+        dynamic1: '',
+        dynamic2: '',
+      },
+      template: tmpl(`<def dynamic="{{dynamic1}}" a-class="root {{dynamic2}}" />`),
+    })
+    const elem = glassEasel.Component.createWithContext('root', parent, testBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe(
+      '<def><sub class="p--static"><div class="p--static root pp--root"></div></sub></def>',
+    )
+    matchElementWithDom(elem)
+    elem.setData({
+      dynamic1: 'dynamic',
+    })
+    expect(domHtml(elem)).toBe(
+      '<def><sub class="p--static p--dynamic"><div class="p--static root pp--root p--dynamic"></div></sub></def>',
+    )
+    matchElementWithDom(elem)
+    elem.setData({
+      dynamic1: '',
+      dynamic2: 'dynamic',
+    })
+    expect(domHtml(elem)).toBe(
+      '<def><sub class="p--static"><div class="p--static root pp--root dynamic pp--dynamic"></div></sub></def>',
+    )
+    matchElementWithDom(elem)
   })
 
   test('pass object to child components', () => {
@@ -1652,6 +1883,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<sub-comp><div class="a1"></div></sub-comp>')
+    matchElementWithDom(elem)
     expect(ops).toBe(1)
     elem.setData({
       'obj.b': 'b1',
@@ -1665,9 +1897,11 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       obj: { a: 'a2' },
     })
     expect(domHtml(elem)).toBe('<sub-comp><div class="a2"></div></sub-comp>')
+    matchElementWithDom(elem)
     expect(ops).toBe(3)
   })
 }
 
 describe('node tree structure (DOM backend)', () => testCases(domBackend))
+describe('node tree structure (shadow backend)', () => testCases(shadowBackend))
 describe('node tree structure (composed backend)', () => testCases(composedBackend))

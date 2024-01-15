@@ -1,3 +1,4 @@
+import type * as glassEasel from 'glass-easel'
 import type { utils as typeUtils } from '../types'
 import type { ComponentType, GeneralBehavior, TraitBehavior } from '../behavior'
 import type { GeneralComponent } from '../component'
@@ -94,4 +95,5 @@ export interface BuilderContext<
   lifetime: <L extends keyof Lifetimes>(name: L, func: Lifetimes[L]) => void
   pageLifetime: (name: string, func: (...args: any[]) => void) => void
   method: <Fn extends ComponentMethod>(func: Fn) => TaggedMethod<Fn>
+  listener: <T>(func: glassEasel.EventListener<T>) => TaggedMethod<glassEasel.EventListener<T>>
 }
