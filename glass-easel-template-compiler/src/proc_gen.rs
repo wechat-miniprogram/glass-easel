@@ -74,6 +74,10 @@ impl<'a, W: fmt::Write> JsTopScopeWriter<W> {
         }
     }
 
+    pub(crate) fn align<WW: fmt::Write>(&mut self, w: &JsFunctionScopeWriter<'a, WW>) {
+        self.block.align(w.get_block());
+    }
+
     pub(crate) fn finish(self) -> W {
         let mut w = self.w;
         let mut first = true;
@@ -173,7 +177,15 @@ fn get_var_name(mut var_id: usize) -> String {
 }
 
 impl<'a, W: fmt::Write> JsFunctionScopeWriter<'a, W> {
-    fn get_block(&mut self) -> &mut JsBlockStat {
+    fn get_block(&self) -> &JsBlockStat {
+        if self.block.is_some() {
+            self.block.as_ref().unwrap()
+        } else {
+            &self.top_scope.block
+        }
+    }
+
+    fn get_block_mut(&mut self) -> &mut JsBlockStat {
         if self.block.is_some() {
             self.block.as_mut().unwrap()
         } else {
@@ -182,7 +194,7 @@ impl<'a, W: fmt::Write> JsFunctionScopeWriter<'a, W> {
     }
 
     pub(crate) fn gen_ident(&mut self) -> JsIdent {
-        let block = self.get_block();
+        let block = self.get_block_mut();
         let var_id = block.ident_id_inc;
         block.ident_id_inc += 1;
         JsIdent {
@@ -191,7 +203,7 @@ impl<'a, W: fmt::Write> JsFunctionScopeWriter<'a, W> {
     }
 
     pub(crate) fn gen_private_ident(&mut self) -> JsIdent {
-        let block = self.get_block();
+        let block = self.get_block_mut();
         let var_id = block.private_ident_id_inc;
         block.private_ident_id_inc += 1;
         JsIdent {
@@ -200,7 +212,7 @@ impl<'a, W: fmt::Write> JsFunctionScopeWriter<'a, W> {
     }
 
     pub(crate) fn custom_stmt_str(&mut self, content: &str) -> Result<(), TmplError> {
-        let block = self.get_block();
+        let block = self.get_block_mut();
         if block.need_stat_sep {
             block.need_stat_sep = false;
             write!(&mut self.w, ";")?;
@@ -213,7 +225,7 @@ impl<'a, W: fmt::Write> JsFunctionScopeWriter<'a, W> {
         &mut self,
         f: impl FnOnce(&mut Self) -> Result<R, TmplError>,
     ) -> Result<R, TmplError> {
-        let block = self.get_block();
+        let block = self.get_block_mut();
         if block.need_stat_sep {
             write!(&mut self.w, ";")?;
         } else {

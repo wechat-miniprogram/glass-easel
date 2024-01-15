@@ -304,6 +304,7 @@ impl TmplTree {
                             w.paren(|w| {
                                 w.function(|w| {
                                     let mut writer = JsTopScopeWriter::new(String::new());
+                                    writer.align(w);
                                     writer.function_scope(|w| {
                                         w.set_var_on_top_scope("L")?;
                                         w.set_var_on_top_scope("M")?;
@@ -414,7 +415,7 @@ impl TmplTree {
                 let scopes = &mut vec![];
                 let has_scripts = if self.scripts.len() > 0 {
                     for script in &self.scripts {
-                        let ident = w.gen_private_ident();
+                        let ident = w.gen_ident();
                         let lvalue_path = match script {
                             TmplScript::GlobalRef {
                                 module_name: _,
