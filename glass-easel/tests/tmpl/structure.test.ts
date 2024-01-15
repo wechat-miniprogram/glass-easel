@@ -1252,6 +1252,25 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     matchElementWithDom(elem)
   })
 
+  test('custom scripts with template', () => {
+    const def = glassEasel
+      .registerElement({
+        template: tmpl(`
+          <wxs module="a">module.exports={ foo: 'foo' }</wxs>
+          <template name="test">
+            <div>{{a.foo}}</div>
+          </template>
+          <template is="test" data="{{ a: { foo: 'bar' } }}" />
+          <div>{{a.foo}}</div>
+        `),
+        data: {},
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend).asInstanceOf(def)!
+    expect(domHtml(elem)).toBe('<div>foo</div><div>foo</div>')
+    matchElementWithDom(elem)
+  })
+
   test('block slot', () => {
     const childComp = glassEasel.registerElement({
       options: {
