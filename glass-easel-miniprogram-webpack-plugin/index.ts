@@ -373,8 +373,8 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
                 if (x.loader === GlassEaselMiniprogramWxmlLoader) {
                   x.options = {
                     addTemplate(content: string) {
-                      depsTmplGroup.addTmpl(compPath, content)
                       wxmlContentMap[compPath] = content
+                      depsTmplGroup.addTmpl(compPath, content)
                       const deps = depsTmplGroup
                         .getDirectDependencies(compPath)
                         .concat(depsTmplGroup.getScriptDependencies(compPath))
