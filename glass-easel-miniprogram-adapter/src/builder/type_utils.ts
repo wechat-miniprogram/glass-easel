@@ -55,7 +55,7 @@ export interface BuilderContext<
   TMethodCaller,
 > extends ThisType<TMethodCaller> {
   self: TMethodCaller
-  data: typeUtils.DataWithPropertyValues<TPrevData, TProperty>
+  data: typeUtils.Merge<typeUtils.DataWithPropertyValues<TPrevData, TProperty>>
   setData: (newData: Partial<typeUtils.SetDataSetter<TPrevData>>, callback?: () => void) => void
   implement: <TIn extends { [x: string]: any }>(
     traitBehavior: TraitBehavior<TIn, any>,

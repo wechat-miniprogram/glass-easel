@@ -131,7 +131,7 @@ export class ComponentCaller<
   }
 
   /** The component data and property values */
-  get data(): AllData<TData, TProperty> {
+  get data(): typeUtils.Merge<AllData<TData, TProperty>> {
     return this._$.data
   }
   set data(value: AllData<TData, TProperty>) {
@@ -144,7 +144,7 @@ export class ComponentCaller<
   }
 
   /** The component data and property values (same as `data` ) */
-  get properties(): AllData<TData, TProperty> {
+  get properties(): typeUtils.Merge<AllData<TData, TProperty>> {
     return this._$.data
   }
   set properties(value: AllData<TData, TProperty>) {
