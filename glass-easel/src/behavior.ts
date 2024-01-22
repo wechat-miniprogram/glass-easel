@@ -16,10 +16,10 @@ import {
   type ComponentParams,
   type DataList,
   type DataWithPropertyValues,
-  type DeepReadonly,
   type Empty,
   type GetFromObserverPathString,
   type IsNever,
+  type Merge,
   type MethodList,
   type NewFieldList,
   type ObserverDataPathStrings,
@@ -83,7 +83,7 @@ export interface BuilderContext<
   TMethodCaller,
 > extends ThisType<TMethodCaller> {
   self: TMethodCaller
-  data: DeepReadonly<DataWithPropertyValues<TPrevData, TProperty>>
+  data: Merge<DataWithPropertyValues<TPrevData, TProperty>>
   setData: (newData: Partial<SetDataSetter<TPrevData>>) => void
   implement: <TIn extends { [x: string]: any }>(
     traitBehavior: TraitBehavior<TIn, any>,
@@ -95,7 +95,7 @@ export interface BuilderContext<
   relation(def: RelationParams): RelationHandler<any, never>
   observer<
     P extends ObserverDataPathStrings<DataWithPropertyValues<TPrevData, TProperty>>,
-    V = DeepReadonly<GetFromObserverPathString<DataWithPropertyValues<TPrevData, TProperty>, P>>,
+    V = Merge<GetFromObserverPathString<DataWithPropertyValues<TPrevData, TProperty>, P>>,
   >(
     paths: P,
     func: (newValue: V) => void,
@@ -103,7 +103,7 @@ export interface BuilderContext<
   observer<
     P extends ObserverDataPathStrings<DataWithPropertyValues<TPrevData, TProperty>>[],
     V = {
-      [K in keyof P]: DeepReadonly<
+      [K in keyof P]: Merge<
         GetFromObserverPathString<DataWithPropertyValues<TPrevData, TProperty>, P[K]>
       >
     },
@@ -430,7 +430,7 @@ export class BehaviorBuilder<
    */
   observer<
     P extends ObserverDataPathStrings<DataWithPropertyValues<TPrevData, TProperty>>,
-    V = DeepReadonly<GetFromObserverPathString<DataWithPropertyValues<TPrevData, TProperty>, P>>,
+    V = Merge<GetFromObserverPathString<DataWithPropertyValues<TPrevData, TProperty>, P>>,
   >(
     paths: P,
     func: (this: ComponentInstance<TData, TProperty, TMethod>, newValue: V) => void,
@@ -439,7 +439,7 @@ export class BehaviorBuilder<
   observer<
     P extends ObserverDataPathStrings<DataWithPropertyValues<TPrevData, TProperty>>[],
     V = {
-      [K in keyof P]: DeepReadonly<
+      [K in keyof P]: Merge<
         GetFromObserverPathString<DataWithPropertyValues<TPrevData, TProperty>, P[K]>
       >
     },

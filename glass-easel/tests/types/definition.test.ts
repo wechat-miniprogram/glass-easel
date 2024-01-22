@@ -58,18 +58,18 @@ glassEasel.registerElement({
     expectType<number>(this.data.propNumSf)
     expectType<boolean>(this.data.propBool)
     expectType<boolean>(this.data.propBoolSf)
-    expectType<Readonly<Record<string, any>> | null>(this.data.propObj)
-    expectType<Readonly<Record<string, any>> | null>(this.data.propObjSf)
-    expectType<{ readonly foo: string }>(this.data.propObjFoo)
+    expectType<Record<string, any> | null>(this.data.propObj)
+    expectType<Record<string, any> | null>(this.data.propObjSf)
+    expectType<{ foo: string }>(this.data.propObjFoo)
     expectType<string>(this.data.propObjFoo.foo)
-    expectType<{ readonly bar: string }>(this.data.propObjBar)
+    expectType<{ bar: string }>(this.data.propObjBar)
     expectType<string>(this.data.propObjBar.bar)
     expectType<(...args: any[]) => any>(this.data.propFunc)
     expectType<(...args: any[]) => any>(this.data.propFuncSf)
     expectType<() => 'foo'>(this.data.propFuncFoo)
-    expectType<readonly any[]>(this.data.propArr)
-    expectType<readonly any[]>(this.data.propArrSf)
-    expectType<readonly { readonly name: string }[]>(this.data.propArrBooks)
+    expectType<any[]>(this.data.propArr)
+    expectType<any[]>(this.data.propArrSf)
+    expectType<{ name: string }[]>(this.data.propArrBooks)
     expectType<any>(this.data.propAnySf)
     expectType<any>(this.data.propNull)
 
@@ -81,9 +81,7 @@ glassEasel.registerElement({
     // @ts-expect-error
     expectType<any>(this.data.nonExists)
 
-    // @ts-expect-error
     this.data.propStr = '123'
-    // @ts-expect-error
     this.data.propObjFoo.foo = '123'
   },
 })
@@ -127,17 +125,15 @@ glassEasel.registerElement({
     expectType<string>(this.data.str)
     expectType<number>(this.data.num)
     expectType<boolean>(this.data.bool)
-    expectType<{ readonly foo: string }>(this.data.foo)
+    expectType<{ foo: string }>(this.data.foo)
     expectType<() => 'foo'>(this.data.func)
-    expectType<readonly number[]>(this.data.arr)
-    expectType<readonly { readonly name: string }[]>(this.data.books)
+    expectType<number[]>(this.data.arr)
+    expectType<{ name: string }[]>(this.data.books)
 
     // @ts-expect-error
     expectType<any>(this.data.nonExists)
 
-    // @ts-expect-error
     this.data.str = '123'
-    // @ts-expect-error
     this.data.foo.foo = '123'
   },
 })

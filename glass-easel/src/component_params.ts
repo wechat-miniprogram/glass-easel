@@ -6,6 +6,8 @@ import { type TraitBehavior } from './trait_behaviors'
 
 export type Empty = Record<never, never>
 
+export type IsEmpty<T> = Equal<T, Empty>
+
 export type NewField<TObject, TField extends string, TValueType> = Extract<
   keyof TObject,
   TField
@@ -60,6 +62,16 @@ type SetDataStringPath<K extends string | number, Prefix extends string> = [Pref
   ? `${Prefix}[${K}]`
   : `${Prefix}.${K}`
 
+type Tuple<T, Res extends 1[] = []> = 0 extends 1
+  ? never
+  : Res['length'] extends T
+  ? Res
+  : Tuple<T, [...Res, 1]>
+
+type Subtract<M extends number, S extends number> = Tuple<M> extends [...Tuple<S>, ...infer Rest]
+  ? Rest['length']
+  : never
+
 /**
  * SetDataSetter<{ name: string; foo: { bar: number } }> = {
  *   name: string,
@@ -74,17 +86,31 @@ type SetDataStringPath<K extends string | number, Prefix extends string> = [Pref
  *   `foo[${number}].bar`: number,
  * }
  */
-export type SetDataSetter<T, Prefix extends string = never> = IsAny<T> extends true
+export type SetDataSetter<
+  T,
+  Prefix extends string = never,
+  Count extends number = 4,
+> = Count extends 0
+  ? Record<SetDataStringPath<any, Prefix>, T>
+  : IsAny<T> extends true
   ? Record<SetDataStringPath<any, Prefix>, T>
   : UnionToIntersection<
       T extends any[]
         ? {
-            [P in keyof T & number]: SetDataSetter<T[P], SetDataStringPath<P, Prefix>> &
+            [P in keyof T & number]: SetDataSetter<
+              T[P],
+              SetDataStringPath<P, Prefix>,
+              Subtract<Count, 1>
+            > &
               Record<SetDataStringPath<P, Prefix>, T[P]>
           }[keyof T & number]
         : T extends Record<string | number, any>
         ? {
-            [P in keyof T & (string | number)]: SetDataSetter<T[P], SetDataStringPath<P, Prefix>> &
+            [P in keyof T & (string | number)]: SetDataSetter<
+              T[P],
+              SetDataStringPath<P, Prefix>,
+              Subtract<Count, 1>
+            > &
               Record<SetDataStringPath<P, Prefix>, T[P]>
           }[keyof T & (string | number)]
         : never
@@ -97,10 +123,12 @@ export type SetDataSetter<T, Prefix extends string = never> = IsAny<T> extends t
  *   }
  * }
  */
-export type DeepReadonly<T> = T extends Record<any, any>
+export type DeepReadonly<T, Count extends number = 4> = Count extends 0
+  ? T
+  : T extends Record<any, any>
   ? T extends (...args: any[]) => any
     ? T
-    : { readonly [P in keyof T]: DeepReadonly<T[P]> }
+    : { readonly [P in keyof T]: DeepReadonly<T[P], Subtract<Count, 1>> }
   : T
 
 export type PublicFields<T> = {
@@ -108,27 +136,33 @@ export type PublicFields<T> = {
 }
 
 /**
- * ObjectKeyPaths<{ name: string; age: number }> = 'name' | 'age'
- * ObjectKeyPaths<{
+ * ObjectDataPathStrings<{ name: string; age: number }> = 'name' | 'age'
+ * ObjectDataPathStrings<{
  *   refCount: number;
  *   person: { name: string; age: number };
  * }> = 'refCount' | 'person' | 'person.name' | 'person.age'
- * ObjectKeyPaths<{ books: [{ name: string; price: number }] }> =
+ * ObjectDataPathStrings<{ books: [{ name: string; price: number }] }> =
  *   'books' | `books[${number}]` | `books[${number}].name` | `books[${number}].price`
  */
-export type ObjectDataPathStrings<T, Prefix extends string = never> = IsAny<T> extends true
+export type ObjectDataPathStrings<
+  T,
+  Prefix extends string = never,
+  Count extends number = 4,
+> = Count extends 0
+  ? SetDataStringPath<any, Prefix>
+  : IsAny<T> extends true
   ? SetDataStringPath<any, Prefix>
   : T extends any[]
   ? {
       [P in keyof T & number]:
         | SetDataStringPath<P, Prefix>
-        | ObjectDataPathStrings<T[P], SetDataStringPath<P, Prefix>>
+        | ObjectDataPathStrings<T[P], SetDataStringPath<P, Prefix>, Subtract<Count, 1>>
     }[keyof T & number]
   : T extends Record<string | number, any>
   ? {
       [P in keyof T & (string | number)]:
         | SetDataStringPath<P, Prefix>
-        | ObjectDataPathStrings<T[P], SetDataStringPath<P, Prefix>>
+        | ObjectDataPathStrings<T[P], SetDataStringPath<P, Prefix>, Subtract<Count, 1>>
     }[keyof T & (string | number)]
   : Prefix
 
@@ -305,8 +339,8 @@ export type PropertyOption<T extends PropertyType, V> = {
   optionalTypes?: T[]
   value?: V
   default?: () => V
-  observer?: ((newValue: DeepReadonly<V>, oldValue: DeepReadonly<V>) => void) | string
-  comparer?: (newValue: DeepReadonly<V>, oldValue: DeepReadonly<V>) => boolean
+  observer?: ((newValue: V, oldValue: V) => void) | string
+  comparer?: (newValue: V, oldValue: V) => boolean
   reflectIdPrefix?: boolean
 }
 
@@ -366,8 +400,8 @@ export type ComponentInstance<
   TProperty extends PropertyList,
   TMethod extends MethodList,
 > = Component<TData, TProperty, TMethod> & {
-  data: DeepReadonly<DataWithPropertyValues<TData, TProperty>>
-  properties: DeepReadonly<DataWithPropertyValues<TData, TProperty>>
+  data: Merge<DataWithPropertyValues<TData, TProperty>>
+  properties: Merge<DataWithPropertyValues<TData, TProperty>>
 } & TMethod
 
 export type ComponentParams<

@@ -27,8 +27,8 @@ import {
   type ComponentParams,
   type DataList,
   type DataWithPropertyValues,
-  type DeepReadonly,
   type GetFromDataPath,
+  type Merge,
   type MethodList,
   type PropertyList,
   type RelationParams,
@@ -1038,11 +1038,11 @@ export class Component<
     return this._$definition.is
   }
 
-  get properties(): DeepReadonly<DataWithPropertyValues<TData, TProperty>> {
+  get properties(): Merge<DataWithPropertyValues<TData, TProperty>> {
     return this._$dataGroup.data as any
   }
 
-  get data(): DeepReadonly<DataWithPropertyValues<TData, TProperty>> {
+  get data(): Merge<DataWithPropertyValues<TData, TProperty>> {
     return this._$dataGroup.data as any
   }
 
