@@ -126,10 +126,7 @@ impl<'a, W: fmt::Write> JsTopScopeWriter<W> {
         self.function_scope(|w| w.expr_stmt(f))
     }
 
-    pub(crate) fn declare_on_top(
-        &mut self,
-        name: &str,
-    ) -> Result<(), TmplError> {
+    pub(crate) fn declare_on_top(&mut self, name: &str) -> Result<(), TmplError> {
         let mut sub_str = String::new();
         let need_stat_sep = self.block.need_stat_sep;
         self.block.need_stat_sep = false;
@@ -257,11 +254,21 @@ impl<'a, W: fmt::Write> JsFunctionScopeWriter<'a, W> {
         self.top_scope.declare_on_top(name)
     }
 
+    pub(crate) fn set_var_on_top_scope_init<R>(
+        &mut self,
+        name: &str,
+        init: impl FnOnce(&mut JsExprWriter<W>) -> Result<R, TmplError>,
+    ) -> Result<R, TmplError> {
+        self.top_scope.declare_on_top_init(name, init)
+    }
+
     pub(crate) fn declare_var_on_top_scope(&mut self) -> Result<JsIdent, TmplError> {
         let block = &mut self.top_scope.block;
         let var_id = block.ident_id_inc;
         block.ident_id_inc += 1;
-        let ident = JsIdent { name: get_var_name(var_id) };
+        let ident = JsIdent {
+            name: get_var_name(var_id),
+        };
         self.top_scope.declare_on_top(&ident.name)?;
         Ok(ident)
     }
@@ -274,10 +281,11 @@ impl<'a, W: fmt::Write> JsFunctionScopeWriter<'a, W> {
         let var_id = block.ident_id_inc;
         block.ident_id_inc += 1;
         let var_name = get_var_name(var_id);
-        let ident = JsIdent { name: var_name.clone() };
-        self.top_scope.declare_on_top_init(&var_name, |w| {
-            init(w, ident)
-        })
+        let ident = JsIdent {
+            name: var_name.clone(),
+        };
+        self.top_scope
+            .declare_on_top_init(&var_name, |w| init(w, ident))
     }
 }
 
@@ -359,7 +367,9 @@ impl<'a, W: fmt::Write> JsExprWriter<'a, W> {
         let block = &mut self.top_scope.block;
         let var_id = block.ident_id_inc;
         block.ident_id_inc += 1;
-        let ident = JsIdent { name: get_var_name(var_id) };
+        let ident = JsIdent {
+            name: get_var_name(var_id),
+        };
         self.top_scope.declare_on_top(&ident.name)?;
         Ok(ident)
     }

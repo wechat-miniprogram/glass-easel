@@ -1884,6 +1884,85 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     matchElementWithDom(elem)
     expect(ops).toBe(3)
   })
+
+  test('recursive component', () => {
+    const cs = new glassEasel.ComponentSpace()
+    cs.updateComponentOptions({
+      writeFieldsToNode: false,
+    })
+    type INode = {
+      className: string
+      childNodes: INode[]
+      before?: string
+      after?: string
+    }
+    const Node = cs
+      .define('node')
+      .options({
+        virtualHost: true,
+        dataDeepCopy: glassEasel.DeepCopyKind.None,
+        propertyPassingDeepCopy: glassEasel.DeepCopyKind.None,
+      })
+      .property('childNodes', {
+        type: Array,
+        default: () => [] as INode[],
+      })
+      .externalClasses(['class'])
+      .template(
+        tmpl(`
+          <div class="class">
+            <block wx:for="{{childNodes}}">
+              <block wx:if="{{item.before}}">{{item.before}}</block>
+              <node child-nodes="{{item.childNodes}}" class="{{item.className}}" />
+              <block wx:if="{{item.after}}">{{item.after}}</block>
+            </block>
+          </div>
+        `),
+      )
+      .registerComponent()
+    cs.setGlobalUsingComponent('node', Node.general())
+    const Parent = cs
+      .define()
+      .usingComponents({ node: Node })
+      .options({
+        dataDeepCopy: glassEasel.DeepCopyKind.None,
+        propertyPassingDeepCopy: glassEasel.DeepCopyKind.None,
+      })
+      .template(
+        tmpl(`
+          <node child-nodes="{{node.childNodes}}" class="{{node.className}}" />
+        `),
+      )
+      .data(() => ({
+        node: {
+          className: 'root',
+          childNodes: [
+            {
+              className: 'c1',
+              childNodes: [
+                {
+                  className: 'c11',
+                  childNodes: [],
+                  before: '[',
+                  after: ']',
+                },
+              ],
+            },
+            {
+              className: 'c2',
+              childNodes: [],
+            },
+          ],
+        } satisfies INode,
+      }))
+      .registerComponent()
+    const elem = glassEasel.Component.createWithContext('root', Parent, testBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe(
+      '<div class="root"><div class="c1">[<div class="c11"></div>]</div><div class="c2"></div></div>',
+    )
+    matchElementWithDom(elem)
+  })
 }
 
 describe('node tree structure (DOM backend)', () => testCases(domBackend))
