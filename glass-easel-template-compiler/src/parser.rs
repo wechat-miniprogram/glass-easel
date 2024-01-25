@@ -1,6 +1,6 @@
 //! The basic parser logic
 
-use pest::Parser;
+use pest::{Parser, Position};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt;
@@ -39,38 +39,31 @@ impl fmt::Display for TmplParseError {
 
 impl std::error::Error for TmplParseError {}
 
-/// Parse a template string, returning a `TmplTree` if success.
-pub fn parse_tmpl(tmpl_str: &str, path: &str) -> Result<TmplTree, TmplParseError> {
-    let mut pairs = TmplParser::parse(Rule::main, tmpl_str).map_err(|e| {
-        use pest::error::*;
-        let (start_pos, end_pos) = match e.line_col {
-            LineColLocation::Pos(p) => (p, p),
-            LineColLocation::Span(start, end) => (start, end),
-        };
-        let (start_location, end_location) = match e.location {
-            InputLocation::Pos(p) => (p, p),
-            InputLocation::Span(p) => p,
-        };
-        let message = match e.variant {
-            ErrorVariant::ParsingError {
-                positives: _,
-                negatives: _,
-            } => {
-                let mut message = String::from("Unexpected character ");
-                message.push_str(&tmpl_str[start_location..end_location+1]);
-                message
-            },
-            ErrorVariant::CustomError { message: msg } => msg,
-        };
-        TmplParseError {
-            filename: String::from(path),
-            message,
-            start_pos,
-            end_pos,
-        }
-    })?;
+enum TextEntity<U> {
+    Static(U),
+    Dynamic(Box<TmplExpr>),
+}
 
-    fn parse_expr_or_obj(pair: pest::iterators::Pair<'_, Rule>) -> Box<TmplExpr> {
+pub struct TmplParseTask<'a> {
+    pub tmpl_str: &'a str,
+    pub path: &'a str,
+}
+
+impl<'a> TmplParseTask<'a> {
+    pub fn new(tmpl_str: &'a str, path: &'a str) -> Self {
+        TmplParseTask { tmpl_str, path }
+    }
+
+    fn raise_error<R>(self: &Self, message: &str, loc: &TmplLocation) -> Result<R, TmplParseError> {
+        Err(TmplParseError {
+            message: message.to_string(),
+            filename: self.path.to_string(),
+            start_pos: Position::new(self.tmpl_str, loc.start).unwrap().line_col(),
+            end_pos: Position::new(self.tmpl_str, loc.end).unwrap().line_col(),
+        })
+    }
+
+    fn parse_expr_or_obj(self: &Self, pair: pest::iterators::Pair<'_, Rule>) -> Box<TmplExpr> {
         fn parse_ident_or_keyword(pair: pest::iterators::Pair<'_, Rule>) -> Box<TmplExpr> {
             let name = pair.as_str();
             match name {
@@ -282,12 +275,7 @@ pub fn parse_tmpl(tmpl_str: &str, path: &str) -> Result<TmplTree, TmplParseError
         }
     }
 
-    enum TextEntity<U> {
-        Static(U),
-        Dynamic(Box<TmplExpr>),
-    }
-
-    fn parse_text_entity(pair: pest::iterators::Pair<'_, Rule>) -> TextEntity<String> {
+    fn parse_text_entity(self: &Self, pair: pest::iterators::Pair<'_, Rule>) -> TextEntity<String> {
         let mut is_dynamic = false;
         let segs: Vec<TextEntity<Cow<str>>> = pair
             .into_inner()
@@ -296,11 +284,9 @@ pub fn parse_tmpl(tmpl_str: &str, path: &str) -> Result<TmplTree, TmplParseError
                 match pair.as_rule() {
                     Rule::expr_or_obj => {
                         is_dynamic = true;
-                        TextEntity::Dynamic(parse_expr_or_obj(pair))
+                        TextEntity::Dynamic(self.parse_expr_or_obj(pair))
                     }
-                    Rule::entity => {
-                        TextEntity::Static(entities::decode(pair.as_str()))
-                    }
+                    Rule::entity => TextEntity::Static(entities::decode(pair.as_str())),
                     Rule::pure_text => TextEntity::Static(Cow::Borrowed(pair.as_str())),
                     _ => unreachable!(),
                 }
@@ -360,15 +346,28 @@ pub fn parse_tmpl(tmpl_str: &str, path: &str) -> Result<TmplTree, TmplParseError
         }
     }
 
-    fn parse_segment(target: &mut TmplElement, pairs: &mut pest::iterators::Pairs<'_, Rule>) {
+    fn parse_segment(
+        self: &Self,
+        target: &mut TmplElement,
+        pairs: &mut pest::iterators::Pairs<'_, Rule>,
+    ) {
         while let Some(pair) = pairs.peek() {
             match pair.as_rule() {
                 Rule::tag => {
                     let mut tag_pairs = pair.into_inner();
                     if let Some(pair) = tag_pairs.next() {
                         let read_attr = |mut pairs: pest::iterators::Pairs<Rule>| {
-                            let name = pairs.next().unwrap();
-                            let value = match pairs.next() {
+                            let name_pair = pairs.next().unwrap();
+                            let name = name_pair.as_str().to_string();
+                            let value_pair = pairs.next();
+                            let loc = TmplLocation {
+                                start: name_pair.as_span().end(),
+                                end: match value_pair {
+                                    None => name_pair.as_span().end(),
+                                    Some(ref value_pair) => value_pair.as_span().end(),
+                                },
+                            };
+                            let value = match value_pair {
                                 None => TmplAttrValue::Dynamic {
                                     // TODO use a better representation for default static values
                                     expr: Box::new(TmplExpr::LitBool(true)),
@@ -376,20 +375,16 @@ pub fn parse_tmpl(tmpl_str: &str, path: &str) -> Result<TmplTree, TmplParseError
                                 },
                                 Some(x) => {
                                     let value = x.into_inner().next().unwrap();
-                                    match parse_text_entity(value) {
-                                        TextEntity::Static(s) => {
-                                            TmplAttrValue::Static(s)
-                                        }
-                                        TextEntity::Dynamic(expr) => {
-                                            TmplAttrValue::Dynamic {
-                                                expr,
-                                                binding_map_keys: None,
-                                            }
-                                        }
+                                    match self.parse_text_entity(value) {
+                                        TextEntity::Static(s) => TmplAttrValue::Static(s),
+                                        TextEntity::Dynamic(expr) => TmplAttrValue::Dynamic {
+                                            expr,
+                                            binding_map_keys: None,
+                                        },
                                     }
                                 }
                             };
-                            (name.as_str().to_string(), value)
+                            (name, value, loc)
                         };
                         match pair.as_rule() {
                             Rule::wxs_script_tag_begin => {
@@ -402,24 +397,28 @@ pub fn parse_tmpl(tmpl_str: &str, path: &str) -> Result<TmplTree, TmplParseError
                                             match pair.as_rule() {
                                                 Rule::attr => {
                                                     let pairs = pair.into_inner();
-                                                    let (name, value) = read_attr(pairs);
-                                                    elem.add_attr(name.as_str(), value);
+                                                    let (name, value, loc) = read_attr(pairs);
+                                                    elem.add_attr(name.as_str(), value, Some(loc));
                                                 }
                                                 Rule::wxs_script_body => {
                                                     let text: String = pair
                                                         .into_inner()
-                                                        .map(|pair| {
-                                                            match pair.as_rule() {
-                                                                Rule::entity => entities::decode(pair.as_str()),
-                                                                Rule::pure_text => Cow::Borrowed(pair.as_str()),
-                                                                _ => unreachable!(),
+                                                        .map(|pair| match pair.as_rule() {
+                                                            Rule::entity => {
+                                                                entities::decode(pair.as_str())
                                                             }
+                                                            Rule::pure_text => {
+                                                                Cow::Borrowed(pair.as_str())
+                                                            }
+                                                            _ => unreachable!(),
                                                         })
                                                         .collect();
-                                                    elem.append_text_node(TmplTextNode::Static(text));
+                                                    elem.append_text_node(TmplTextNode::Static(
+                                                        text,
+                                                    ));
                                                     break;
                                                 }
-                                                _ => unreachable!()
+                                                _ => unreachable!(),
                                             }
                                         }
                                     }
@@ -440,8 +439,8 @@ pub fn parse_tmpl(tmpl_str: &str, path: &str) -> Result<TmplTree, TmplParseError
                                     let mut elem = TmplElement::new(tag_name, virtual_type);
                                     while let Some(pair) = pairs.next() {
                                         let pairs = pair.into_inner();
-                                        let (name, value) = read_attr(pairs);
-                                        elem.add_attr(name.as_str(), value);
+                                        let (name, value, loc) = read_attr(pairs);
+                                        elem.add_attr(name.as_str(), value, Some(loc));
                                     }
                                     elem
                                 };
@@ -453,7 +452,7 @@ pub fn parse_tmpl(tmpl_str: &str, path: &str) -> Result<TmplTree, TmplParseError
                                     pairs.next();
                                 } else {
                                     pairs.next();
-                                    parse_segment(&mut elem, pairs);
+                                    self.parse_segment(&mut elem, pairs);
                                 }
                                 target.append_element(elem);
                             }
@@ -475,7 +474,7 @@ pub fn parse_tmpl(tmpl_str: &str, path: &str) -> Result<TmplTree, TmplParseError
                     }
                 }
                 Rule::text_node => {
-                    match parse_text_entity(pair) {
+                    match self.parse_text_entity(pair) {
                         TextEntity::Static(s) => {
                             if s.trim() != "" {
                                 target.append_text_node(TmplTextNode::new_static(s))
@@ -492,385 +491,461 @@ pub fn parse_tmpl(tmpl_str: &str, path: &str) -> Result<TmplTree, TmplParseError
         }
     }
 
-    fn convert_directives(tree: &mut TmplTree) {
-        fn rec(
-            parent: &mut TmplElement,
-            imports: &mut Vec<String>,
-            includes: &mut Vec<String>,
-            sub_templates: &mut HashMap<String, TmplElement>,
-            scripts: &mut Vec<TmplScript>,
-        ) {
-            let old_children = std::mem::replace(&mut parent.children, vec![]);
-            for node in old_children.into_iter() {
-                match node {
-                    TmplNode::TextNode(text_node) => {
-                        parent.children.push(TmplNode::TextNode(text_node));
+    fn convert_directives_rec(
+        self: &Self,
+        path: &String,
+        parent: &mut TmplElement,
+        imports: &mut Vec<String>,
+        includes: &mut Vec<String>,
+        sub_templates: &mut HashMap<String, TmplElement>,
+        scripts: &mut Vec<TmplScript>,
+    ) -> Result<(), TmplParseError> {
+        let old_children = std::mem::replace(&mut parent.children, vec![]);
+        for node in old_children.into_iter() {
+            match node {
+                TmplNode::TextNode(text_node) => {
+                    parent.children.push(TmplNode::TextNode(text_node));
+                }
+                TmplNode::Element(mut elem) => {
+                    let mut inner_depth = 0;
+
+                    // read all attrs
+                    enum IfType {
+                        None,
+                        If(TmplAttr),
+                        Elif(TmplAttr),
+                        Else(TmplAttr),
                     }
-                    TmplNode::Element(mut elem) => {
-                        let mut inner_depth = 0;
+                    let mut attr_if = IfType::None;
+                    let mut attr_for = None;
+                    let mut attr_for_item = None;
+                    let mut attr_for_index = None;
+                    let mut attr_key = None;
+                    let mut attr_slot = None;
+                    let mut slot_values: Vec<(String, String)> = Vec::with_capacity(0);
+                    let mut generics: Option<HashMap<String, String>> = None;
 
-                        // read all attrs
-                        enum IfType {
-                            None,
-                            If(TmplAttrValue),
-                            Elif(TmplAttrValue),
-                            Else,
-                        }
-                        let mut attr_if = IfType::None;
-                        let mut attr_for = None;
-                        let mut attr_for_item = None;
-                        let mut attr_for_index = None;
-                        let mut attr_key = None;
-                        let mut attr_slot = None;
-                        let mut slot_values: Vec<(String, String)> = Vec::with_capacity(0);
-                        let mut generics: Option<HashMap<String, String>> = None;
-
-                        // extract attrs
-                        let old_attrs = std::mem::replace(&mut elem.attrs, vec![]);
-                        for attr in old_attrs.into_iter() {
-                            match &attr.kind {
-                                TmplAttrKind::WxDirective { name } => {
-                                    match name.as_str() {
-                                        "if" => attr_if = IfType::If(attr.value),
-                                        "elif" => attr_if = IfType::Elif(attr.value),
-                                        "else" => attr_if = IfType::Else,
-                                        "for" | "for-items" => attr_for = Some(attr.value),
-                                        "for-item" => {
-                                            attr_for_item = Some(attr.value.static_value())
-                                        }
-                                        "for-index" => {
-                                            attr_for_index = Some(attr.value.static_value())
-                                        }
-                                        "key" => attr_key = Some(attr.value.static_value()),
-                                        _ => {}
-                                    }
-                                    continue;
+                    // extract attrs
+                    let old_attrs = std::mem::replace(&mut elem.attrs, vec![]);
+                    for attr in old_attrs.into_iter() {
+                        match &attr.kind {
+                            TmplAttrKind::WxDirective { name } => {
+                                match name.as_str() {
+                                    "if" => attr_if = IfType::If(attr),
+                                    "elif" => attr_if = IfType::Elif(attr),
+                                    "else" => attr_if = IfType::Else(attr),
+                                    "for" | "for-items" => attr_for = Some(attr.value),
+                                    "for-item" => attr_for_item = Some(attr.value.static_value()),
+                                    "for-index" => attr_for_index = Some(attr.value.static_value()),
+                                    "key" => attr_key = Some(attr.value.static_value()),
+                                    _ => {}
                                 }
-                                TmplAttrKind::Generic { name } => {
-                                    if let Some(map) = &mut generics {
-                                        map.insert(name.to_string(), attr.value.static_value());
-                                    } else {
-                                        let mut map = HashMap::new();
-                                        map.insert(name.to_string(), attr.value.static_value());
-                                        generics = Some(map);
-                                    }
-                                    continue;
+                                continue;
+                            }
+                            TmplAttrKind::Generic { name } => {
+                                if let Some(map) = &mut generics {
+                                    map.insert(name.to_string(), attr.value.static_value());
+                                } else {
+                                    let mut map = HashMap::new();
+                                    map.insert(name.to_string(), attr.value.static_value());
+                                    generics = Some(map);
                                 }
-                                TmplAttrKind::SlotProperty { name } => {
-                                    match &attr.value {
-                                        TmplAttrValue::Static(s) => {
-                                            if s.as_str() == "" {
+                                continue;
+                            }
+                            TmplAttrKind::SlotProperty { name } => {
+                                match &attr.value {
+                                    TmplAttrValue::Static(s) => {
+                                        if s.as_str() == "" {
+                                            slot_values.push((name.to_string(), name.to_string()));
+                                        } else {
+                                            slot_values.push((
+                                                name.to_string(),
+                                                attr.value.static_value(),
+                                            ));
+                                        }
+                                    }
+                                    TmplAttrValue::Dynamic { expr, .. } => {
+                                        match &**expr {
+                                            TmplExpr::LitBool(true) => {
                                                 slot_values
                                                     .push((name.to_string(), name.to_string()));
-                                            } else {
-                                                slot_values.push((
-                                                    name.to_string(),
-                                                    attr.value.static_value(),
-                                                ));
                                             }
-                                        }
-                                        TmplAttrValue::Dynamic { expr, .. } => {
-                                            match &**expr {
-                                                TmplExpr::LitBool(true) => {
-                                                    slot_values
-                                                        .push((name.to_string(), name.to_string()));
-                                                }
-                                                _ => {
-                                                    // TODO warn dynamic value
-                                                }
+                                            _ => {
+                                                // TODO warn dynamic value
                                             }
                                         }
                                     }
-                                    continue;
                                 }
-                                TmplAttrKind::Slot => {
-                                    attr_slot = Some(attr.value);
-                                    continue;
-                                }
-                                _ => {}
+                                continue;
                             }
-                            elem.attrs.push(attr);
-                        }
-
-                        // handling special tags
-                        match elem.tag_name.as_str() {
-                            "include" | "import" => {
-                                let old_attrs = std::mem::replace(&mut elem.attrs, vec![]);
-                                let mut path = None;
-                                for attr in old_attrs.into_iter() {
-                                    if attr.is_property("src") {
-                                        if path.is_some() {
-                                            // FIXME warn duplicated attr
-                                        } else {
-                                            let p = attr.value.static_value();
-                                            path = Some(p.strip_suffix(".wxml").unwrap_or(&p).to_string());
-                                        }
-                                    } else {
-                                        // FIXME warn unused attr
-                                    }
-                                }
-                                match path {
-                                    Some(path) => {
-                                        if elem.tag_name.as_str() == "import" {
-                                            imports.push(path);
-                                        } else {
-                                            includes.push(path.clone());
-                                            elem.virtual_type = TmplVirtualType::Include { path };
-                                            elem.children.clear();
-                                        }
-                                    }
-                                    None => {} // FIXME warn no src attr found
-                                }
-                                if elem.tag_name.as_str() == "import" {
-                                    continue;
-                                }
-                            }
-                            "template" => {
-                                let old_attrs = std::mem::replace(&mut elem.attrs, vec![]);
-                                let mut name = None;
-                                let mut target = None;
-                                let mut data = None;
-                                for attr in old_attrs.into_iter() {
-                                    if attr.is_property("name") {
-                                        if name.is_some() {
-                                            // FIXME warn duplicated attr
-                                        } else {
-                                            name = Some(attr.value.static_value());
-                                        }
-                                    } else if attr.is_property("is") {
-                                        if target.is_some() {
-                                            // FIXME warn duplicated attr
-                                        } else {
-                                            target = Some(attr.value);
-                                        }
-                                    } else if attr.is_property("data") {
-                                        if data.is_some() {
-                                            // FIXME warn duplicated attr
-                                        } else {
-                                            data = Some(attr.value);
-                                        }
-                                    } else {
-                                        // FIXME warn unused attr
-                                    }
-                                }
-                                match name {
-                                    Some(name) => {
-                                        if target.is_some() || data.is_some() {
-                                            // FIXME warn unused attr
-                                        }
-                                        rec(&mut elem, imports, includes, sub_templates, scripts);
-                                        sub_templates.insert(name, elem);
-                                        continue;
-                                    }
-                                    None => {
-                                        match target {
-                                            Some(target) => {
-                                                elem.virtual_type = TmplVirtualType::TemplateRef {
-                                                    target,
-                                                    data: match data {
-                                                        Some(field) => {
-                                                            if let TmplAttrValue::Dynamic { expr, binding_map_keys } = field {
-                                                                let expr = match *expr {
-                                                                    TmplExpr::Ident(s) => TmplExpr::LitObj(vec![(Some(s.clone()), TmplExpr::Ident(s))]),
-                                                                    TmplExpr::LitObj(x) => TmplExpr::LitObj(x),
-                                                                    _ => {
-                                                                        // FIXME warn must be object
-                                                                        TmplExpr::LitObj(vec![])
-                                                                    }
-                                                                };
-                                                                TmplAttrValue::Dynamic { expr: Box::new(expr), binding_map_keys }
-                                                            } else {
-                                                                // FIXME warn must be object data binding
-                                                                TmplAttrValue::Dynamic {
-                                                                    expr: Box::new(TmplExpr::LitObj(vec![])),
-                                                                    binding_map_keys: None,
-                                                                }
-                                                            }
-                                                        }
-                                                        None => {
-                                                            TmplAttrValue::Dynamic {
-                                                                expr: Box::new(TmplExpr::LitObj(vec![])),
-                                                                binding_map_keys: None,
-                                                            }
-                                                        }
-                                                    },
-                                                }
-                                            }
-                                            None => {} // FIXME warn no src attr found
-                                        }
-                                    }
-                                }
-                            }
-                            "slot" => {
-                                let old_attrs = std::mem::replace(&mut elem.attrs, vec![]);
-                                let mut name = TmplAttrValue::Static(String::new());
-                                let mut props: Option<Vec<TmplAttr>> = None;
-                                for attr in old_attrs.into_iter() {
-                                    if attr.is_property("name") {
-                                        name = attr.value;
-                                    } else if attr.is_any_property() {
-                                        if let Some(arr) = &mut props {
-                                            arr.push(attr);
-                                        } else {
-                                            let mut arr = vec![];
-                                            arr.push(attr);
-                                            props = Some(arr);
-                                        }
-                                    }
-                                }
-                                elem.virtual_type = TmplVirtualType::Slot { name, props };
-                            }
-                            "wxs" => {
-                                let old_attrs = std::mem::replace(&mut elem.attrs, vec![]);
-                                let mut module_name = String::new();
-                                let mut src = String::new();
-                                for attr in old_attrs.into_iter() {
-                                    if attr.is_property("module") {
-                                        match attr.value {
-                                            TmplAttrValue::Dynamic { .. } => {
-                                                // FIXME warn must be static
-                                            }
-                                            TmplAttrValue::Static(s) => {
-                                                module_name = s;
-                                            }
-                                        }
-                                    } else if attr.is_property("src") {
-                                        match attr.value {
-                                            TmplAttrValue::Dynamic { .. } => {
-                                                // FIXME warn must be static
-                                            }
-                                            TmplAttrValue::Static(s) => {
-                                                src = s.strip_suffix(".wxs").unwrap_or(&s).to_string();
-                                            }
-                                        }
-                                    } else {
-                                        // FIXME warn unused attr
-                                    }
-                                }
-                                if src.len() == 0 {
-                                    let content = match elem.children.get(0) {
-                                        Some(TmplNode::TextNode(TmplTextNode::Static(x))) => x.as_str(),
-                                        None => "",
-                                        _ => unreachable!(),
-                                    };
-                                    scripts.push(TmplScript::Inline { module_name, content: content.to_string() });
-                                } else {
-                                    // FIXME warn unused script content
-                                    scripts.push(TmplScript::GlobalRef { module_name, rel_path: src });
-                                }
+                            TmplAttrKind::Slot => {
+                                attr_slot = Some(attr.value);
                                 continue;
                             }
                             _ => {}
                         }
-                        elem.generics = generics;
-                        elem.slot = attr_slot;
+                        elem.attrs.push(attr);
+                    }
 
-                        // a helper for generating middle virtual node
-                        let mut wrap_virtual_elem = |mut elem: TmplElement, virtual_type| {
-                            if let TmplVirtualType::Pure = elem.virtual_type {
-                                elem.virtual_type = virtual_type;
-                            } else {
-                                let mut p = TmplElement::new("block", virtual_type);
-                                p.append_element(elem);
-                                elem = p;
-                                inner_depth += 1;
+                    // handling special tags
+                    match elem.tag_name.as_str() {
+                        "include" | "import" => {
+                            let old_attrs = std::mem::replace(&mut elem.attrs, vec![]);
+                            let mut path = None;
+                            for attr in old_attrs.into_iter() {
+                                if attr.is_property("src") {
+                                    if path.is_some() {
+                                        // FIXME warn duplicated attr
+                                    } else {
+                                        let p = attr.value.static_value();
+                                        path =
+                                            Some(p.strip_suffix(".wxml").unwrap_or(&p).to_string());
+                                    }
+                                } else {
+                                    // FIXME warn unused attr
+                                }
                             }
-                            elem
-                        };
-
-                        // handling if
-                        match attr_if {
-                            IfType::None => {}
-                            IfType::If(attr_if) => {
-                                let virtual_type = TmplVirtualType::If { cond: attr_if };
-                                elem = wrap_virtual_elem(elem, virtual_type);
-                                elem = wrap_virtual_elem(elem, TmplVirtualType::IfGroup);
-                            }
-                            IfType::Elif(attr_if) => {
-                                let virtual_type = TmplVirtualType::Elif { cond: attr_if };
-                                if let Some(last) = parent.children.last_mut() {
-                                    if let TmplNode::Element(last) = last {
-                                        if let TmplVirtualType::IfGroup = last.virtual_type {
-                                            rec(&mut elem, imports, includes, sub_templates, scripts);
-                                            elem = wrap_virtual_elem(elem, virtual_type);
-                                            last.append_element(elem);
-                                            // FIXME here should display a warning if <for> is found
-                                            continue;
-                                        }
+                            match path {
+                                Some(path) => {
+                                    if elem.tag_name.as_str() == "import" {
+                                        imports.push(path);
+                                    } else {
+                                        includes.push(path.clone());
+                                        elem.virtual_type = TmplVirtualType::Include { path };
+                                        elem.children.clear();
                                     }
                                 }
-                                // FIXME here should display a warning if no matching <if> found
-                                elem = wrap_virtual_elem(elem, virtual_type);
-                                elem = wrap_virtual_elem(elem, TmplVirtualType::IfGroup);
+                                None => {} // FIXME warn no src attr found
                             }
-                            IfType::Else => {
-                                let virtual_type = TmplVirtualType::Else;
-                                if let Some(last) = parent.children.last_mut() {
-                                    if let TmplNode::Element(last) = last {
-                                        if let TmplVirtualType::IfGroup = last.virtual_type {
-                                            rec(&mut elem, imports, includes, sub_templates, scripts);
-                                            elem = wrap_virtual_elem(elem, virtual_type);
-                                            last.append_element(elem);
-                                            // FIXME here should display a warning if <for> is found
-                                            continue;
-                                        }
-                                    }
-                                }
-                                // FIXME here should display a warning if no matching <if> found
-                                elem = wrap_virtual_elem(elem, virtual_type);
-                                elem = wrap_virtual_elem(elem, TmplVirtualType::IfGroup);
+                            if elem.tag_name.as_str() == "import" {
+                                continue;
                             }
                         }
+                        "template" => {
+                            let old_attrs = std::mem::replace(&mut elem.attrs, vec![]);
+                            let mut name = None;
+                            let mut target = None;
+                            let mut data = None;
+                            for attr in old_attrs.into_iter() {
+                                if attr.is_property("name") {
+                                    if name.is_some() {
+                                        // FIXME warn duplicated attr
+                                    } else {
+                                        name = Some(attr.value.static_value());
+                                    }
+                                } else if attr.is_property("is") {
+                                    if target.is_some() {
+                                        // FIXME warn duplicated attr
+                                    } else {
+                                        target = Some(attr.value);
+                                    }
+                                } else if attr.is_property("data") {
+                                    if data.is_some() {
+                                        // FIXME warn duplicated attr
+                                    } else {
+                                        data = Some(attr.value);
+                                    }
+                                } else {
+                                    // FIXME warn unused attr
+                                }
+                            }
+                            match name {
+                                Some(name) => {
+                                    if target.is_some() || data.is_some() {
+                                        // FIXME warn unused attr
+                                    }
+                                    self.convert_directives_rec(
+                                        path,
+                                        &mut elem,
+                                        imports,
+                                        includes,
+                                        sub_templates,
+                                        scripts,
+                                    )?;
+                                    sub_templates.insert(name, elem);
+                                    continue;
+                                }
+                                None => {
+                                    match target {
+                                        Some(target) => {
+                                            elem.virtual_type = TmplVirtualType::TemplateRef {
+                                                target,
+                                                data: match data {
+                                                    Some(field) => {
+                                                        if let TmplAttrValue::Dynamic {
+                                                            expr,
+                                                            binding_map_keys,
+                                                        } = field
+                                                        {
+                                                            let expr = match *expr {
+                                                                TmplExpr::Ident(s) => {
+                                                                    TmplExpr::LitObj(vec![(
+                                                                        Some(s.clone()),
+                                                                        TmplExpr::Ident(s),
+                                                                    )])
+                                                                }
+                                                                TmplExpr::LitObj(x) => {
+                                                                    TmplExpr::LitObj(x)
+                                                                }
+                                                                _ => {
+                                                                    // FIXME warn must be object
+                                                                    TmplExpr::LitObj(vec![])
+                                                                }
+                                                            };
+                                                            TmplAttrValue::Dynamic {
+                                                                expr: Box::new(expr),
+                                                                binding_map_keys,
+                                                            }
+                                                        } else {
+                                                            // FIXME warn must be object data binding
+                                                            TmplAttrValue::Dynamic {
+                                                                expr: Box::new(TmplExpr::LitObj(
+                                                                    vec![],
+                                                                )),
+                                                                binding_map_keys: None,
+                                                            }
+                                                        }
+                                                    }
+                                                    None => TmplAttrValue::Dynamic {
+                                                        expr: Box::new(TmplExpr::LitObj(vec![])),
+                                                        binding_map_keys: None,
+                                                    },
+                                                },
+                                            }
+                                        }
+                                        None => {} // FIXME warn no src attr found
+                                    }
+                                }
+                            }
+                        }
+                        "slot" => {
+                            let old_attrs = std::mem::replace(&mut elem.attrs, vec![]);
+                            let mut name = TmplAttrValue::Static(String::new());
+                            let mut props: Option<Vec<TmplAttr>> = None;
+                            for attr in old_attrs.into_iter() {
+                                if attr.is_property("name") {
+                                    name = attr.value;
+                                } else if attr.is_any_property() {
+                                    if let Some(arr) = &mut props {
+                                        arr.push(attr);
+                                    } else {
+                                        let mut arr = vec![];
+                                        arr.push(attr);
+                                        props = Some(arr);
+                                    }
+                                }
+                            }
+                            elem.virtual_type = TmplVirtualType::Slot { name, props };
+                        }
+                        "wxs" => {
+                            let old_attrs = std::mem::replace(&mut elem.attrs, vec![]);
+                            let mut module_name = String::new();
+                            let mut src = String::new();
+                            for attr in old_attrs.into_iter() {
+                                if attr.is_property("module") {
+                                    match attr.value {
+                                        TmplAttrValue::Dynamic { .. } => {
+                                            // FIXME warn must be static
+                                        }
+                                        TmplAttrValue::Static(s) => {
+                                            module_name = s;
+                                        }
+                                    }
+                                } else if attr.is_property("src") {
+                                    match attr.value {
+                                        TmplAttrValue::Dynamic { .. } => {
+                                            // FIXME warn must be static
+                                        }
+                                        TmplAttrValue::Static(s) => {
+                                            src = s.strip_suffix(".wxs").unwrap_or(&s).to_string();
+                                        }
+                                    }
+                                } else {
+                                    // FIXME warn unused attr
+                                }
+                            }
+                            if src.len() == 0 {
+                                let content = match elem.children.get(0) {
+                                    Some(TmplNode::TextNode(TmplTextNode::Static(x))) => x.as_str(),
+                                    None => "",
+                                    _ => unreachable!(),
+                                };
+                                scripts.push(TmplScript::Inline {
+                                    module_name,
+                                    content: content.to_string(),
+                                });
+                            } else {
+                                // FIXME warn unused script content
+                                scripts.push(TmplScript::GlobalRef {
+                                    module_name,
+                                    rel_path: src,
+                                });
+                            }
+                            continue;
+                        }
+                        _ => {}
+                    }
+                    elem.generics = generics;
+                    elem.slot = attr_slot;
 
-                        // handling for
-                        if let Some(attr_for) = attr_for {
-                            let item_name = attr_for_item.unwrap_or("item".into());
-                            let index_name = attr_for_index.unwrap_or("index".into());
-                            let virtual_type = TmplVirtualType::For {
-                                list: attr_for,
-                                item_name,
-                                index_name,
-                                key: attr_key,
+                    // a helper for generating middle virtual node
+                    let mut wrap_virtual_elem = |mut elem: TmplElement, virtual_type| {
+                        if let TmplVirtualType::Pure = elem.virtual_type {
+                            elem.virtual_type = virtual_type;
+                        } else {
+                            let mut p = TmplElement::new("block", virtual_type);
+                            p.append_element(elem);
+                            elem = p;
+                            inner_depth += 1;
+                        }
+                        elem
+                    };
+
+                    // handling if
+                    match attr_if {
+                        IfType::None => {}
+                        IfType::If(attr_if) => {
+                            let virtual_type = TmplVirtualType::If {
+                                cond: attr_if.value,
                             };
                             elem = wrap_virtual_elem(elem, virtual_type);
+                            elem = wrap_virtual_elem(elem, TmplVirtualType::IfGroup);
                         }
-
-                        // recurse into children
-                        let mut next = &mut elem;
-                        for _ in 0..inner_depth {
-                            next = match next.children.first_mut().unwrap() {
-                                TmplNode::Element(elem) => elem,
-                                TmplNode::TextNode(_) => unreachable!(),
-                            }
-                        }
-                        rec(next, imports, includes, sub_templates, scripts);
-
-                        // eliminate pure virtual node
-                        let is_pure_virtual = if let TmplVirtualType::Pure = elem.virtual_type {
-                            true
-                        } else {
-                            false
-                        };
-                        if is_pure_virtual && elem.slot.is_none() {
-                            for child in elem.children.iter_mut() {
-                                match child {
-                                    TmplNode::TextNode(..) => {}
-                                    TmplNode::Element(x) => {
-                                        x.slot_values = slot_values.clone();
+                        IfType::Elif(attr_if) => {
+                            let virtual_type = TmplVirtualType::Elif {
+                                cond: attr_if.value,
+                            };
+                            if let Some(last) = parent.children.last_mut() {
+                                if let TmplNode::Element(last) = last {
+                                    if let TmplVirtualType::IfGroup = last.virtual_type {
+                                        if let Some(TmplNode::Element(TmplElement {
+                                            virtual_type: TmplVirtualType::Else,
+                                            ..
+                                        })) = last.children.last()
+                                        {
+                                            return self.raise_error(
+                                                "wx:elif has no adjacent wx:if",
+                                                &attr_if.loc.unwrap(),
+                                            );
+                                        }
+                                        self.convert_directives_rec(
+                                            path,
+                                            &mut elem,
+                                            imports,
+                                            includes,
+                                            sub_templates,
+                                            scripts,
+                                        )?;
+                                        elem = wrap_virtual_elem(elem, virtual_type);
+                                        last.append_element(elem);
+                                        // FIXME here should display a warning if <for> is found
+                                        continue;
                                     }
                                 }
                             }
-                            parent.children.append(&mut elem.children);
-                        } else {
-                            elem.slot_values = slot_values;
-                            parent.children.push(TmplNode::Element(elem));
+
+                            return self.raise_error(
+                                "wx:elif has no adjacent wx:if",
+                                &attr_if.loc.unwrap(),
+                            );
                         }
+                        IfType::Else(attr_if) => {
+                            let virtual_type = TmplVirtualType::Else;
+                            if let Some(last) = parent.children.last_mut() {
+                                if let TmplNode::Element(last) = last {
+                                    if let TmplVirtualType::IfGroup = last.virtual_type {
+                                        if let Some(TmplNode::Element(TmplElement {
+                                            virtual_type: TmplVirtualType::Else,
+                                            ..
+                                        })) = last.children.last()
+                                        {
+                                            return self.raise_error(
+                                                "wx:else has no adjacent wx:if",
+                                                &attr_if.loc.unwrap(),
+                                            );
+                                        }
+                                        self.convert_directives_rec(
+                                            path,
+                                            &mut elem,
+                                            imports,
+                                            includes,
+                                            sub_templates,
+                                            scripts,
+                                        )?;
+                                        elem = wrap_virtual_elem(elem, virtual_type);
+                                        last.append_element(elem);
+                                        // FIXME here should display a warning if <for> is found
+                                        continue;
+                                    }
+                                }
+                            }
+
+                            return self.raise_error(
+                                "wx:else has no adjacent wx:if",
+                                &attr_if.loc.unwrap(),
+                            );
+                        }
+                    }
+
+                    // handling for
+                    if let Some(attr_for) = attr_for {
+                        let item_name = attr_for_item.unwrap_or("item".into());
+                        let index_name = attr_for_index.unwrap_or("index".into());
+                        let virtual_type = TmplVirtualType::For {
+                            list: attr_for,
+                            item_name,
+                            index_name,
+                            key: attr_key,
+                        };
+                        elem = wrap_virtual_elem(elem, virtual_type);
+                    }
+
+                    // recurse into children
+                    let mut next = &mut elem;
+                    for _ in 0..inner_depth {
+                        next = match next.children.first_mut().unwrap() {
+                            TmplNode::Element(elem) => elem,
+                            TmplNode::TextNode(_) => unreachable!(),
+                        }
+                    }
+                    self.convert_directives_rec(
+                        path,
+                        next,
+                        imports,
+                        includes,
+                        sub_templates,
+                        scripts,
+                    )?;
+
+                    // eliminate pure virtual node
+                    let is_pure_virtual = if let TmplVirtualType::Pure = elem.virtual_type {
+                        true
+                    } else {
+                        false
+                    };
+                    if is_pure_virtual && elem.slot.is_none() {
+                        for child in elem.children.iter_mut() {
+                            match child {
+                                TmplNode::TextNode(..) => {}
+                                TmplNode::Element(x) => {
+                                    x.slot_values = slot_values.clone();
+                                }
+                            }
+                        }
+                        parent.children.append(&mut elem.children);
+                    } else {
+                        elem.slot_values = slot_values;
+                        parent.children.push(TmplNode::Element(elem));
                     }
                 }
             }
         }
+        Ok(())
+    }
+
+    fn convert_directives(self: &Self, tree: &mut TmplTree) -> Result<(), TmplParseError> {
         let TmplTree {
-            path: _,
+            path,
             root,
             imports,
             includes,
@@ -878,10 +953,11 @@ pub fn parse_tmpl(tmpl_str: &str, path: &str) -> Result<TmplTree, TmplParseError
             binding_map_collector: _,
             scripts,
         } = tree;
-        rec(root, imports, includes, sub_templates, scripts);
+
+        self.convert_directives_rec(path, root, imports, includes, sub_templates, scripts)
     }
 
-    fn prepare_expr_in_tree(tree: &mut TmplTree) {
+    fn prepare_expr_in_tree(self: &Self, tree: &mut TmplTree) {
         fn prepare_attr_value(
             v: &mut TmplAttrValue,
             bmc: &mut BindingMapCollector,
@@ -983,24 +1059,21 @@ pub fn parse_tmpl(tmpl_str: &str, path: &str) -> Result<TmplTree, TmplParseError
                             );
                         }
                         if let Some(slot) = elem.slot.as_mut() {
-                            prepare_attr_value(
-                                slot,
-                                bmc,
-                                scope_names_ref,
-                                should_disable,
-                            );
+                            prepare_attr_value(slot, bmc, scope_names_ref, should_disable);
                         }
                         rec(elem, bmc, scope_names_ref, should_disable);
                     }
                 }
             }
         }
-        let scope_names = tree.scripts.iter().map(|script| {
-            match script {
+        let scope_names = tree
+            .scripts
+            .iter()
+            .map(|script| match script {
                 TmplScript::Inline { module_name, .. } => module_name.to_string(),
                 TmplScript::GlobalRef { module_name, .. } => module_name.to_string(),
-            }
-        }).collect();
+            })
+            .collect();
         rec(
             &mut tree.root,
             &mut tree.binding_map_collector,
@@ -1012,20 +1085,56 @@ pub fn parse_tmpl(tmpl_str: &str, path: &str) -> Result<TmplTree, TmplParseError
         }
     }
 
-    let mut tree = TmplTree::new();
-    let main_pair = pairs.next().unwrap();
-    let mut segment = main_pair.into_inner().next().unwrap().into_inner();
-    parse_segment(tree.root_mut(), &mut segment);
-    convert_directives(&mut tree);
-    prepare_expr_in_tree(&mut tree);
-    if let Some(pair) = segment.peek() {
-        let span = pair.as_span();
-        return Err(TmplParseError {
-            filename: String::from(tree.path),
-            message: String::from("Unexpected segment"),
-            start_pos: span.start_pos().line_col(),
-            end_pos: span.end_pos().line_col(),
-        });
+    pub fn parse(self: &Self) -> Result<TmplTree, TmplParseError> {
+        let mut pairs = TmplParser::parse(Rule::main, self.tmpl_str).map_err(|e| {
+            use pest::error::*;
+            let (start_pos, end_pos) = match e.line_col {
+                LineColLocation::Pos(p) => (p, p),
+                LineColLocation::Span(start, end) => (start, end),
+            };
+            let (start_location, end_location) = match e.location {
+                InputLocation::Pos(p) => (p, p),
+                InputLocation::Span(p) => p,
+            };
+            let message = match e.variant {
+                ErrorVariant::ParsingError {
+                    positives: _,
+                    negatives: _,
+                } => {
+                    let mut message = String::from("Unexpected character ");
+                    message.push_str(&self.tmpl_str[start_location..end_location + 1]);
+                    message
+                }
+                ErrorVariant::CustomError { message: msg } => msg,
+            };
+            TmplParseError {
+                filename: String::from(self.path),
+                message,
+                start_pos,
+                end_pos,
+            }
+        })?;
+
+        let mut tree = TmplTree::new();
+        let main_pair = pairs.next().unwrap();
+        let mut segment = main_pair.into_inner().next().unwrap().into_inner();
+        self.parse_segment(tree.root_mut(), &mut segment);
+        self.convert_directives(&mut tree)?;
+        self.prepare_expr_in_tree(&mut tree);
+        if let Some(pair) = segment.peek() {
+            let span = pair.as_span();
+            return Err(TmplParseError {
+                filename: String::from(tree.path),
+                message: String::from("Unexpected segment"),
+                start_pos: span.start_pos().line_col(),
+                end_pos: span.end_pos().line_col(),
+            });
+        }
+        Ok(tree)
     }
-    Ok(tree)
+}
+
+/// Parse a template string, returning a `TmplTree` if success.
+pub fn parse_tmpl(tmpl_str: &str, path: &str) -> Result<TmplTree, TmplParseError> {
+    TmplParseTask::new(tmpl_str, path).parse()
 }
