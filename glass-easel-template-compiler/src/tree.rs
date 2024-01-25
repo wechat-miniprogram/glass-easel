@@ -98,9 +98,16 @@ pub(crate) enum TmplVirtualType {
 }
 
 #[derive(Debug, Clone)]
+pub(crate) struct TmplLocation {
+    pub(crate) start: usize,
+    pub(crate) end: usize,
+}
+
+#[derive(Debug, Clone)]
 pub(crate) struct TmplAttr {
     pub(crate) kind: TmplAttrKind,
     pub(crate) value: TmplAttrValue,
+    pub(crate) loc: Option<TmplLocation>
 }
 
 #[derive(Debug, Clone)]
@@ -654,7 +661,7 @@ impl TmplElement {
         self.tag_name == tag_name
     }
 
-    pub(crate) fn add_attr(&mut self, name: &str, value: TmplAttrValue) {
+    pub(crate) fn add_attr(&mut self, name: &str, value: TmplAttrValue, loc: Option<TmplLocation>) {
         let kind = if let Some((prefix, name)) = name.split_once(':') {
             let name = name.to_string();
             match prefix {
@@ -730,7 +737,7 @@ impl TmplElement {
                 },
             }
         };
-        self.attrs.push(TmplAttr { kind, value });
+        self.attrs.push(TmplAttr { kind, value, loc });
     }
 
     pub(crate) fn append_text_node(&mut self, child: TmplTextNode) {
