@@ -137,7 +137,7 @@ export class GlassEaselTemplateDOMInstance implements TemplateInstance, External
     const target = elem as unknown as ElementWithEvent
     let cur: Element = target
     const root = this.shadowRootElement
-    const evName = event.type
+    const evName = event.getEventName()
     const bubbles = event.bubbles
     for (;;) {
       const shadowedEvent = event.wrapShadowedEvent(target as any, null, cur as any)

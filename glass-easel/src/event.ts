@@ -177,6 +177,8 @@ export class Event<TDetail> {
   bubbles: boolean
   composed: boolean
   /** @internal */
+  private _$eventName: string
+  /** @internal */
   private _$capturePhase: boolean
   /** @internal */
   private _$originalEvent: unknown
@@ -193,7 +195,7 @@ export class Event<TDetail> {
 
   constructor(name: string, detail: TDetail, options: EventOptions = {}) {
     const ts = getCurrentTimeStamp()
-    this.type = name
+    this._$eventName = this.type = name
     this.timeStamp = ts
     this.detail = detail
     this.bubbles = options.bubbles || false
@@ -227,6 +229,10 @@ export class Event<TDetail> {
     ret.mark = mark
     ret.currentTarget = currentTargetCaller
     return ret
+  }
+
+  getEventName(): string {
+    return this._$eventName
   }
 
   getOriginalEvent(): unknown {
@@ -267,7 +273,7 @@ export class Event<TDetail> {
     target: Element,
     isCapture: boolean,
   ) {
-    const evName = this.type
+    const evName = this._$eventName
 
     const eventTarget = currentTarget._$eventTarget
     if (!eventTarget) return
@@ -303,7 +309,7 @@ export class Event<TDetail> {
       throw new Error('Event cannot be dispatched twice')
     }
     if (ENV.DEV) {
-      addTimelineEvent(this.type, { event: this })
+      addTimelineEvent(this._$eventName, { event: this })
       performanceMeasureStart('event.dispatch')
     }
     this._$dispatched = true
