@@ -496,9 +496,12 @@ export class Element implements NodeCast {
   }
 
   private static checkAndCallDetached(node: Node) {
+    const destroyQueue: Node[] = []
+
     const callFunc = function callFunc(node: Node) {
       if (node._$destroyOnDetach) {
-        node.destroyBackendElement()
+        // Destroy later to avoid missing backend elements
+        destroyQueue.push(node)
       }
       if (isElement(node) && node._$attached) {
         if (isComponent(node)) {
@@ -530,6 +533,10 @@ export class Element implements NodeCast {
       }
     }
     callFunc(node)
+
+    for (let i = 0; i < destroyQueue.length; i += 1) {
+      destroyQueue[i]!.destroyBackendElement()
+    }
   }
 
   private static checkAndCallMoved(node: Node) {
