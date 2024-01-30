@@ -19,9 +19,9 @@ componentSpace
     type: Object,
     value: { foo: 'foo' },
     observer: (newProp, oldProp) => {
-      expectType<{ readonly foo: string }>(newProp)
+      expectType<{ foo: string }>(newProp)
       expectType<string>(newProp.foo)
-      expectType<{ readonly foo: string }>(oldProp)
+      expectType<{ foo: string }>(oldProp)
       expectType<string>(oldProp.foo)
     },
   })
@@ -50,15 +50,15 @@ componentSpace
     expectType<string>(data.propStr)
     expectType<number>(data.propNum)
     expectType<boolean>(data.propBool)
-    expectType<Readonly<Record<string, any>> | null>(data.propObj)
-    expectType<{ readonly foo: string }>(data.propObjFoo)
+    expectType<Record<string, any> | null>(data.propObj)
+    expectType<{ foo: string }>(data.propObjFoo)
     expectType<string>(data.propObjFoo.foo)
-    expectType<{ readonly bar: string }>(data.propObjBar)
+    expectType<{ bar: string }>(data.propObjBar)
     expectType<string>(data.propObjBar.bar)
     expectType<(...args: any[]) => any>(data.propFunc)
     expectType<() => 'foo'>(data.propFuncFoo)
-    expectType<readonly any[]>(data.propArr)
-    expectType<readonly { readonly name: string }[]>(data.propArrBooks)
+    expectType<any[]>(data.propArr)
+    expectType<{ name: string }[]>(data.propArrBooks)
 
     expectType<string | number | boolean>(data.propOptional)
     expectType<number | boolean | 'foo'>(data.propOptionalFoo)
@@ -68,9 +68,7 @@ componentSpace
     // @ts-expect-error
     expectType<any>(data.nonExists)
 
-    // @ts-expect-error
     data.propStr = '123'
-    // @ts-expect-error
     data.propObjFoo.foo = '123'
   })
 
@@ -120,17 +118,15 @@ componentSpace
     expectType<string>(data.str)
     expectType<number>(data.num)
     expectType<boolean>(data.bool)
-    expectType<{ readonly foo: string }>(data.foo)
+    expectType<{ foo: string }>(data.foo)
     expectType<() => 'foo'>(data.func)
-    expectType<readonly number[]>(data.arr)
-    expectType<readonly { readonly name: string }[]>(data.books)
+    expectType<number[]>(data.arr)
+    expectType<{ name: string }[]>(data.books)
 
     // @ts-expect-error
     expectType<any>(data.nonExists)
 
-    // @ts-expect-error
     data.str = '123'
-    // @ts-expect-error
     data.foo.foo = '123'
   })
 
@@ -316,7 +312,7 @@ componentSpace
     })
 
     observer('objFoo', (newValue) => {
-      expectType<{ readonly foo: string }>(newValue)
+      expectType<{ foo: string }>(newValue)
       expectType<string>(newValue.foo)
     })
 
@@ -325,24 +321,24 @@ componentSpace
     })
 
     observer('objFoo.**', (newValue) => {
-      expectType<{ readonly foo: string }>(newValue)
+      expectType<{ foo: string }>(newValue)
     })
 
     observer(['str', 'objFoo'], (str, objFoo) => {
       expectType<string>(str)
-      expectType<{ readonly foo: string }>(objFoo)
+      expectType<{ foo: string }>(objFoo)
     })
 
     observer(['str', 'objFoo.**'], (str, objFoo) => {
       expectType<string>(str)
-      expectType<{ readonly foo: string }>(objFoo)
+      expectType<{ foo: string }>(objFoo)
     })
 
     observer('**', (newValue) => {
       expectType<{
-        readonly str: string
-        readonly objFoo: {
-          readonly foo: string
+        str: string
+        objFoo: {
+          foo: string
         }
       }>(newValue)
     })
@@ -372,7 +368,7 @@ componentSpace
   })
 
   .observer('objFoo', (newValue) => {
-    expectType<{ readonly foo: string }>(newValue)
+    expectType<{ foo: string }>(newValue)
     expectType<string>(newValue.foo)
   })
 
@@ -381,24 +377,24 @@ componentSpace
   })
 
   .observer('objFoo.**', (newValue) => {
-    expectType<{ readonly foo: string }>(newValue)
+    expectType<{ foo: string }>(newValue)
   })
 
   .observer(['str', 'objFoo'], (str, objFoo) => {
     expectType<string>(str)
-    expectType<{ readonly foo: string }>(objFoo)
+    expectType<{ foo: string }>(objFoo)
   })
 
   .observer(['str', 'objFoo.**'], (str, objFoo) => {
     expectType<string>(str)
-    expectType<{ readonly foo: string }>(objFoo)
+    expectType<{ foo: string }>(objFoo)
   })
 
   .observer('**', (newValue) => {
     expectType<{
-      readonly str: string
-      readonly objFoo: {
-        readonly foo: string
+      str: string
+      objFoo: {
+        foo: string
       }
     }>(newValue)
   })
@@ -524,8 +520,8 @@ componentSpace
   .property('prop2', String)
   .myInit('foo', ({ data }) => {
     expectType<{
-      readonly prop1: string
-      readonly prop2: string
+      prop1: string
+      prop2: string
     }>(data)
   })
   .registerComponent()

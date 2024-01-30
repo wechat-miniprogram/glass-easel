@@ -147,8 +147,9 @@ export class BaseBehaviorBuilder<
     P extends typeUtils.ObserverDataPathStrings<
       typeUtils.DataWithPropertyValues<TPrevData, TProperty>
     >,
-    V = typeUtils.DeepReadonly<
-      typeUtils.GetFromObserverPathString<typeUtils.DataWithPropertyValues<TPrevData, TProperty>, P>
+    V = typeUtils.GetFromObserverPathString<
+      typeUtils.DataWithPropertyValues<TPrevData, TProperty>,
+      P
     >,
   >(
     paths: P,
@@ -160,11 +161,9 @@ export class BaseBehaviorBuilder<
       typeUtils.DataWithPropertyValues<TPrevData, TProperty>
     >[],
     V = {
-      [K in keyof P]: typeUtils.DeepReadonly<
-        typeUtils.GetFromObserverPathString<
-          typeUtils.DataWithPropertyValues<TPrevData, TProperty>,
-          P[K]
-        >
+      [K in keyof P]: typeUtils.GetFromObserverPathString<
+        typeUtils.DataWithPropertyValues<TPrevData, TProperty>,
+        P[K]
       >
     },
   >(

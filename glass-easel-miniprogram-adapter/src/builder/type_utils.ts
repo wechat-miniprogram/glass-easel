@@ -55,7 +55,7 @@ export interface BuilderContext<
   TMethodCaller,
 > extends ThisType<TMethodCaller> {
   self: TMethodCaller
-  data: typeUtils.DeepReadonly<typeUtils.DataWithPropertyValues<TPrevData, TProperty>>
+  data: typeUtils.Merge<typeUtils.DataWithPropertyValues<TPrevData, TProperty>>
   setData: (newData: Partial<typeUtils.SetDataSetter<TPrevData>>, callback?: () => void) => void
   implement: <TIn extends { [x: string]: any }>(
     traitBehavior: TraitBehavior<TIn, any>,
@@ -69,8 +69,9 @@ export interface BuilderContext<
     P extends typeUtils.ObserverDataPathStrings<
       typeUtils.DataWithPropertyValues<TPrevData, TProperty>
     >,
-    V = typeUtils.DeepReadonly<
-      typeUtils.GetFromObserverPathString<typeUtils.DataWithPropertyValues<TPrevData, TProperty>, P>
+    V = typeUtils.GetFromObserverPathString<
+      typeUtils.DataWithPropertyValues<TPrevData, TProperty>,
+      P
     >,
   >(
     paths: P,
@@ -81,11 +82,9 @@ export interface BuilderContext<
       typeUtils.DataWithPropertyValues<TPrevData, TProperty>
     >[],
     V = {
-      [K in keyof P]: typeUtils.DeepReadonly<
-        typeUtils.GetFromObserverPathString<
-          typeUtils.DataWithPropertyValues<TPrevData, TProperty>,
-          P[K]
-        >
+      [K in keyof P]: typeUtils.GetFromObserverPathString<
+        typeUtils.DataWithPropertyValues<TPrevData, TProperty>,
+        P[K]
       >
     },
   >(

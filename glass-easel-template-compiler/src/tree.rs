@@ -98,9 +98,16 @@ pub(crate) enum TmplVirtualType {
 }
 
 #[derive(Debug, Clone)]
+pub(crate) struct TmplLocation {
+    pub(crate) start: usize,
+    pub(crate) end: usize,
+}
+
+#[derive(Debug, Clone)]
 pub(crate) struct TmplAttr {
     pub(crate) kind: TmplAttrKind,
     pub(crate) value: TmplAttrValue,
+    pub(crate) loc: Option<TmplLocation>
 }
 
 #[derive(Debug, Clone)]
@@ -301,120 +308,77 @@ impl TmplTree {
                      has_scripts: bool| {
                         w.expr_stmt(|w| {
                             write!(w, "H[{key}]=", key = gen_lit_str(key))?;
-                            w.paren(|w| {
-                                w.function(|w| {
-                                    let mut writer = JsTopScopeWriter::new(String::new());
-                                    writer.function_scope(|w| {
-                                        w.set_var_on_top_scope("L")?;
-                                        w.set_var_on_top_scope("M")?;
-                                        w.set_var_on_top_scope("O")?;
-                                        w.set_var_on_top_scope("A")?;
-                                        w.set_var_on_top_scope("K")?;
-                                        w.set_var_on_top_scope("R")?;
-                                        w.set_var_on_top_scope("D")?;
-                                        w.set_var_on_top_scope("U")?;
-                                        let define_root_ident = w.declare_var_on_top_scope_init(|w, define_root_ident| {
-                                            TmplNode::to_proc_gen_define_children(
-                                                &mut children.iter(),
-                                                w,
-                                                scopes,
-                                                |args, w, var_slot_map, scopes| {
-                                                    w.function_args(args, |w| {
-                                                        TmplNode::to_proc_gen_define_children_content(
-                                                            &children,
-                                                            &var_slot_map,
-                                                            w,
-                                                            scopes,
-                                                            bmc,
-                                                            group,
-                                                            &self.path,
-                                                        )
-                                                    })
-                                                },
-                                            )?;
-                                            Ok(define_root_ident)
-                                        })?;
-                                        let var_proc_gen_wrapper = w.gen_ident();
-                                        let var_data_value = w.gen_ident();
-                                        let var_update_path_tree = w.gen_ident();
-                                        w.expr_stmt(|w| {
-                                            write!(w, "return")?;
-                                            w.function_args(
-                                                &format!(
-                                                    "{},C,{},{}",
-                                                    var_proc_gen_wrapper,
-                                                    var_data_value,
-                                                    var_update_path_tree
-                                                ),
-                                                |w| {
-                                                    macro_rules! declare_shortcut {
-                                                        ($d:expr, $v:expr) => {
-                                                            w.expr_stmt(|w| {
-                                                                write!(w, "{}={}", $d, $v)?;
-                                                                Ok(())
-                                                            })?;
-                                                        };
-                                                    }
-                                                    declare_shortcut!("R", var_proc_gen_wrapper);
-                                                    declare_shortcut!("D", var_data_value);
-                                                    declare_shortcut!("U", var_update_path_tree);
-                                                    if has_scripts {
-                                                        w.expr_stmt(|w| {
-                                                            write!(w, "R.setFnFilter(Q.A,Q.B)")?;
-                                                            Ok(())
-                                                        })?;
-                                                    }
-                                                    declare_shortcut!("L", "R.c");
-                                                    declare_shortcut!("M", "R.m");
-                                                    declare_shortcut!("O", "R.r");
-                                                    w.expr_stmt(|w| {
-                                                        write!(w, "A={{")?;
-                                                        for (index, (key, size)) in
-                                                            bmc.list_fields().enumerate()
-                                                        {
-                                                            if index > 0 {
-                                                                write!(w, ",")?;
-                                                            }
-                                                            write!(
-                                                                w,
-                                                                "{}:new Array({})",
-                                                                gen_lit_str(key),
-                                                                size
-                                                            )?;
-                                                        }
-                                                        write!(w, "}}")?;
-                                                        Ok(())
-                                                    })?;
-                                                    w.expr_stmt(|w| {
-                                                        write!(w, "K=U===true")?;
-                                                        Ok(())
-                                                    })?;
-                                                    w.expr_stmt(|w| {
-                                                        write!(
-                                                            w,
-                                                            "return {{C:{},B:A}}",
-                                                            define_root_ident
-                                                        )?;
-                                                        Ok(())
-                                                    })?;
-                                                    Ok(())
-                                                },
-                                            )
-                                        })
-                                    })?;
+                            w.function_args("R,C,D,U", |w| {
+                                if has_scripts {
                                     w.expr_stmt(|w| {
-                                        write!(w, "{}", &writer.finish())?;
+                                        write!(w, "R.setFnFilter(Q.A,Q.B)")?;
                                         Ok(())
+                                    })?;
+                                }
+                                let mut writer = JsTopScopeWriter::new(String::new());
+                                writer.align(w);
+                                let define_root_ident = writer.function_scope(|w| {
+                                    macro_rules! declare_shortcut {
+                                        ($d:expr, $v:expr) => {
+                                            w.set_var_on_top_scope_init($d, |w| {
+                                                write!(w, $v)?;
+                                                Ok(())
+                                            })?;
+                                        };
+                                    }
+                                    declare_shortcut!("L", "R.c");
+                                    declare_shortcut!("M", "R.m");
+                                    declare_shortcut!("O", "R.r");
+                                    w.set_var_on_top_scope_init("A", |w| {
+                                        write!(w, "{{")?;
+                                        for (index, (key, size)) in bmc.list_fields().enumerate() {
+                                            if index > 0 {
+                                                write!(w, ",")?;
+                                            }
+                                            write!(w, "{}:new Array({})", gen_lit_str(key), size)?;
+                                        }
+                                        write!(w, "}}")?;
+                                        Ok(())
+                                    })?;
+                                    declare_shortcut!("K", "U===true");
+                                    w.declare_var_on_top_scope_init(|w, define_root_ident| {
+                                        TmplNode::to_proc_gen_define_children(
+                                            &mut children.iter(),
+                                            w,
+                                            scopes,
+                                            |args, w, var_slot_map, scopes| {
+                                                w.function_args(args, |w| {
+                                                    TmplNode::to_proc_gen_define_children_content(
+                                                        &children,
+                                                        &var_slot_map,
+                                                        w,
+                                                        scopes,
+                                                        bmc,
+                                                        group,
+                                                        &self.path,
+                                                    )
+                                                })
+                                            },
+                                        )?;
+                                        Ok(define_root_ident)
                                     })
-                                })
-                            })?;
-                            w.paren(|_| Ok(()))
+                                })?;
+                                w.expr_stmt(|w| {
+                                    write!(w, "{}", &writer.finish())?;
+                                    Ok(())
+                                })?;
+                                w.expr_stmt(|w| {
+                                    write!(w, "return {{C:{},B:A}}", define_root_ident)?;
+                                    Ok(())
+                                })?;
+                                Ok(())
+                            })
                         })
                     };
                 let scopes = &mut vec![];
                 let has_scripts = if self.scripts.len() > 0 {
                     for script in &self.scripts {
-                        let ident = w.gen_private_ident();
+                        let ident = w.gen_ident();
                         let lvalue_path = match script {
                             TmplScript::GlobalRef {
                                 module_name: _,
@@ -697,7 +661,7 @@ impl TmplElement {
         self.tag_name == tag_name
     }
 
-    pub(crate) fn add_attr(&mut self, name: &str, value: TmplAttrValue) {
+    pub(crate) fn add_attr(&mut self, name: &str, value: TmplAttrValue, loc: Option<TmplLocation>) {
         let kind = if let Some((prefix, name)) = name.split_once(':') {
             let name = name.to_string();
             match prefix {
@@ -773,7 +737,7 @@ impl TmplElement {
                 },
             }
         };
-        self.attrs.push(TmplAttr { kind, value });
+        self.attrs.push(TmplAttr { kind, value, loc });
     }
 
     pub(crate) fn append_text_node(&mut self, child: TmplTextNode) {

@@ -27,7 +27,7 @@ const definitionInstance = glassEasel.createElement(
 )
 
 expectType<string>(definitionInstance.data.propStr)
-expectType<{ readonly foo: string }>(definitionInstance.data.foo)
+expectType<{ foo: string }>(definitionInstance.data.foo)
 expectType<string>(definitionInstance.func())
 
 const definitionGeneralInstance = glassEasel.createElement(
@@ -44,7 +44,7 @@ const definitionGeneralInstance = glassEasel.createElement(
     .general(),
 )
 
-expectType<{ readonly [x: string]: any }>(definitionGeneralInstance.data)
+expectType<{ [x: string]: any }>(definitionGeneralInstance.data)
 
 /**
  * Chaining createElement
@@ -66,7 +66,7 @@ const chainingInstance = glassEasel.createElement(
 )
 
 expectType<string>(chainingInstance.data.propStr)
-expectType<{ readonly foo: string }>(chainingInstance.data.foo)
+expectType<{ foo: string }>(chainingInstance.data.foo)
 expectType<string>(chainingInstance.func())
 
 const chainingGeneralInstance = glassEasel.createElement(
@@ -81,4 +81,4 @@ const chainingGeneralInstance = glassEasel.createElement(
     .general(),
 )
 
-expectType<{ readonly [x: string]: any }>(chainingGeneralInstance.data)
+expectType<{ [x: string]: any }>(chainingGeneralInstance.data)

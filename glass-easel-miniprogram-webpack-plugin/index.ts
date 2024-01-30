@@ -23,6 +23,8 @@ type PluginConfig = {
   path: string
   resourceFilePattern: RegExp
   defaultEntry: string
+  customBootstrap: boolean
+  disableClassPrefix: boolean
 }
 
 type GlobalStaticConfig = {
@@ -67,6 +69,11 @@ class StyleSheetManager {
   map = Object.create(null) as { [path: string]: { scopeName: string; srcPath: string } }
   enableStyleScope = Object.create(null) as { [path: string]: boolean }
   scopeNameInc = 0
+  disableClassPrefix: boolean
+
+  constructor(disableClassPrefix: boolean) {
+    this.disableClassPrefix = disableClassPrefix
+  }
 
   add(compPath: string, srcPath: string) {
     let scopeNameNum = this.scopeNameInc
@@ -97,6 +104,7 @@ class StyleSheetManager {
   }
 
   getScopeName(compPath: string) {
+    if (this.disableClassPrefix) return undefined
     if (this.enableStyleScope[compPath]) {
       return this.map[compPath]?.scopeName
     }
@@ -123,16 +131,20 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
   path: string
   resourceFilePattern: RegExp
   defaultEntry: string
+  customBootstrap: boolean
+  disableClassPrefix: boolean
   // eslint-disable-next-line @typescript-eslint/no-unsafe-call
   virtualModules = new VirtualModulesPlugin() as {
     apply: (compiler: Compiler) => void
     writeModule: (p: string, c: string) => void
   }
 
-  constructor(options: PluginConfig) {
+  constructor(options: Partial<PluginConfig>) {
     this.path = options.path || './src'
     this.resourceFilePattern = options.resourceFilePattern || /\.(jpg|jpeg|png|gif)$/
     this.defaultEntry = options.defaultEntry || 'pages/index/index'
+    this.customBootstrap = options.customBootstrap || false
+    this.disableClassPrefix = options.disableClassPrefix || false
   }
 
   apply(compiler: Compiler) {
@@ -145,7 +157,7 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
     let globalStaticConfig = {} as GlobalStaticConfig
     let appEntry: 'app.js' | 'app.ts' | null = null
     const depsTmplGroup = new TmplGroup()
-    const styleSheetManager = new StyleSheetManager()
+    const styleSheetManager = new StyleSheetManager(this.disableClassPrefix)
 
     // cleanup wasm modules
     compiler.hooks.shutdown.tap(PLUGIN_NAME, () => {
@@ -361,8 +373,8 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
                 if (x.loader === GlassEaselMiniprogramWxmlLoader) {
                   x.options = {
                     addTemplate(content: string) {
-                      depsTmplGroup.addTmpl(compPath, content)
                       wxmlContentMap[compPath] = content
+                      depsTmplGroup.addTmpl(compPath, content)
                       const deps = depsTmplGroup
                         .getDirectDependencies(compPath)
                         .concat(depsTmplGroup.getScriptDependencies(compPath))
@@ -486,12 +498,6 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
           var glassEasel = adapter.glassEasel
           var env = new adapter.MiniProgramEnv()
           exports.env = env
-          var backend = new glassEasel.CurrentWindowBackendContext()
-          backend.onEvent((target, type, detail, options) => {
-            glassEasel.triggerEvent(target, type, detail, options)
-          })
-          var ab = env.associateBackend(backend)
-          ;(${styleSheetManager.toCodeString()})(ab)
           var codeSpace = env.createCodeSpace('', true)
           codeSpace.addStyleSheet('app', 'app')
           exports.codeSpace = codeSpace
@@ -507,20 +513,40 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
           })()
         `
         const entryFooter = `
-          var root = ab.createRoot('glass-easel-root', codeSpace, '${escapeJsString(
-            this.defaultEntry,
-          )}')
-          var placeholder = document.createElement('span')
-          document.body.appendChild(placeholder)
-          root.attach(document.body, placeholder)
+          var initWithBackend = function (backend) {
+            var ab = env.associateBackend(backend)
+            ;(${styleSheetManager.toCodeString()})(ab)
+            return ab
+          }
+          exports.initWithBackend = initWithBackend
+          var registerGlobalEventListener = function (backend) {
+            backend.onEvent((target, type, detail, options) => {
+              glassEasel.triggerEvent(target, type, detail, options)
+            })
+          }
+          exports.registerGlobalEventListener = registerGlobalEventListener
         `
+        const bootstrap = this.customBootstrap
+          ? ''
+          : `
+            var backend = new glassEasel.CurrentWindowBackendContext()
+            registerGlobalEventListener(backend)
+            var ab = initWithBackend(backend)
+            var root = ab.createRoot('glass-easel-root', codeSpace, '${escapeJsString(
+              this.defaultEntry,
+            )}')
+            var placeholder = document.createElement('span')
+            document.body.appendChild(placeholder)
+            root.attach(document.body, placeholder)
+          `
         const entries = Object.values(compInfoMap).map((compInfo) => compInfo.main)
         if (appEntry) entries.unshift(appEntry)
         virtualModules.writeModule(
           path.join(codeRoot, 'index.js'),
           entryHeader +
             entries.map((p) => `require('./${escapeJsString(p)}')\n`).join('') +
-            entryFooter,
+            entryFooter +
+            bootstrap,
         )
       }
       updateVirtualIndexFile()
