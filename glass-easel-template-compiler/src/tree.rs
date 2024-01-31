@@ -1233,10 +1233,23 @@ impl TmplElement {
             }
             TmplVirtualType::Slot { name, props } => {
                 let slot_kind = SlotKind::new(&self.slot, w, scopes)?;
-                let slot_value_init = if let Some(props) = props {
-                    let var_slot_value_init = w.gen_private_ident();
-                    w.expr_stmt(|w| {
-                        write!(w, "var {}=", var_slot_value_init)?;
+                let name = StaticStrOrProcGen::new(name, w, scopes)?;
+                w.expr_stmt(|w| {
+                    write!(w, "S(")?;
+                    match name {
+                        StaticStrOrProcGen::Static(s) => {
+                            write!(w, "{}", gen_lit_str(s))?;
+                        }
+                        StaticStrOrProcGen::Dynamic(p) => {
+                            write!(w, r#"C||K||"#)?;
+                            p.lvalue_state_expr(w, scopes)?;
+                            write!(w, r#"?Y("#)?;
+                            p.value_expr(w)?;
+                            write!(w, "):undefined")?;
+                        }
+                    }
+                    if let Some(props) = props {
+                        write!(w, r#","#)?;
                         w.function_args("N", |w| {
                             for prop in props {
                                 match &prop.kind {
@@ -1267,6 +1280,11 @@ impl TmplElement {
                                             }
                                         }
                                     }
+                                    TmplAttrKind::Event { .. }
+                                    | TmplAttrKind::Data { .. }
+                                    | TmplAttrKind::Mark { .. } => {
+                                        prop.to_proc_gen(w, scopes, bmc)?;
+                                    }
                                     _ => {
                                         // TODO warn unused attr
                                     }
@@ -1274,34 +1292,10 @@ impl TmplElement {
                             }
                             Ok(())
                         })?;
-                        Ok(())
-                    })?;
-                    format!("{}", var_slot_value_init)
-                } else {
-                    String::new()
-                };
-                let name = StaticStrOrProcGen::new(name, w, scopes)?;
-                w.expr_stmt(|w| {
-                    write!(w, "S(")?;
-                    match name {
-                        StaticStrOrProcGen::Static(s) => {
-                            write!(w, "{}", gen_lit_str(s))?;
-                        },
-                        StaticStrOrProcGen::Dynamic(p) => {
-                            write!(w, r#"C||K||"#)?;
-                            p.lvalue_state_expr(w, scopes)?;
-                            write!(w, r#"?Y("#)?;
-                            p.value_expr(w)?;
-                            write!(w, "):undefined")?;
-                        },
-                    }
-                    if slot_value_init.len() > 0 {
-                        write!(w, r#",{}"#, slot_value_init)?;
+                    } else if (!slot_kind.is_none()) {
+                        write!(w, r#",undefined"#)?;
                     }
                     if !slot_kind.is_none() {
-                        if slot_value_init.len() == 0 {
-                            write!(w, r#",undefined"#)?;
-                        }
                         slot_kind.write_as_extra_argument(w)?;
                     }
                     write!(w, ")")?;
