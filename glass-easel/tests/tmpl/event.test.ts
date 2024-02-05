@@ -269,7 +269,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     ])
   })
 
-  test('event function bindings', () => {
+  test('change property bindings', () => {
     const abc = glassEasel.registerElement({
       properties: { abc: String },
     })
@@ -296,7 +296,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect((a as unknown as { _test: string })._test).toBe('456:123')
   })
 
-  test('change property bindings', () => {
+  test('event function bindings', () => {
     const abc = glassEasel.registerElement({
       lifetimes: {
         attached() {
@@ -319,6 +319,40 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     glassEasel.Element.pretendAttached(elem)
     const a = elem.getShadowRoot()!.getElementById('a')!
     expect((a as unknown as { _test: string })._test).toBe(123)
+  })
+
+  test('event function bindings (with conditional expression)', () => {
+    const abc = glassEasel.registerElement({
+      lifetimes: {
+        attached() {
+          this.triggerEvent('abc')
+        },
+      },
+    })
+    const def = glassEasel.registerElement({
+      using: { abc: abc.general() },
+      template: tmpl(`
+        <wxs module="modA">
+          exports.fA = function (ev) {
+            ev.target._test = 123
+          }
+          exports.fB = function (ev) {
+            ev.target._test = 456
+          }
+        </wxs>
+        <abc id="a" bind:abc="{{ cond ? modA.fB : modA.fA }}" />
+      `),
+      data: {
+        cond: false,
+      },
+    })
+    const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
+    glassEasel.Element.pretendAttached(elem)
+    const a = elem.getShadowRoot()!.getElementById('a')!
+    expect((a as unknown as { _test: string })._test).toBe(123)
+    elem.setData({ cond: true })
+    a.triggerEvent('abc')
+    expect((a as unknown as { _test: string })._test).toBe(456)
   })
 
   test('worklet directives', () => {
