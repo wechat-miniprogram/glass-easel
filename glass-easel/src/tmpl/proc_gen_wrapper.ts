@@ -1028,13 +1028,17 @@ export class ProcGenWrapper {
       const nodeDataProxy = Component.getDataProxy(elem)
       const camelName = dashToCamelCase(name)
       if (nodeDataProxy.replaceProperty(camelName, v)) {
-        if (modelLvaluePath) {
-          nodeDataProxy.setModelBindingListener(camelName, (value) => {
-            const host = elem.ownerShadowRoot!.getHostNode()
-            const nodeDataProxy = Component.getDataProxy(host)
-            nodeDataProxy.replaceDataOnPath(modelLvaluePath, value)
-            nodeDataProxy.applyDataUpdates(false)
-          })
+        if (modelLvaluePath !== undefined) {
+          if (modelLvaluePath === null) {
+            nodeDataProxy.setModelBindingListener(camelName, () => {})
+          } else {
+            nodeDataProxy.setModelBindingListener(camelName, (value) => {
+              const host = elem.ownerShadowRoot!.getHostNode()
+              const nodeDataProxy = Component.getDataProxy(host)
+              nodeDataProxy.replaceDataOnPath(modelLvaluePath, value)
+              nodeDataProxy.applyDataUpdates(false)
+            })
+          }
         }
         const tmplArgs = getTmplArgs(elem)
         if (tmplArgs.changeProp?.[name]) {

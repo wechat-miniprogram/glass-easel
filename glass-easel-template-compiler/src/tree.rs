@@ -1562,7 +1562,7 @@ impl TmplAttr {
                                 }
                             } else if maybe_event_binding(&name) {
                                 if p.has_script_lvalue_path(scopes) {
-                                    write!(w, ",null,")?;
+                                    write!(w, ",undefined,")?;
                                     p.lvalue_path(w, scopes, Some(false))?;
                                 }
                             }
@@ -1583,7 +1583,7 @@ impl TmplAttr {
                                             }
                                         } else if maybe_event_binding(&name) {
                                             if p.has_script_lvalue_path(scopes) {
-                                                write!(w, ",null,")?;
+                                                write!(w, ",undefined,")?;
                                                 p.lvalue_path(w, scopes, Some(false))?;
                                             }
                                         }

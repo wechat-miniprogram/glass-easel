@@ -65,6 +65,77 @@ describe('model value binding', () => {
     expect(elem.data.a).toEqual({ b: [30, 300] })
   })
 
+  test('model value binding on conditional expression', () => {
+    const subComp = glassEasel.registerElement({
+      template: tmpl(`
+        <div id="a" data-a="{{ propA }}">
+          <slot />
+        </div>
+      `),
+      properties: {
+        propA: Number,
+      },
+    })
+    const def = glassEasel.registerElement({
+      using: {
+        comp: subComp.general(),
+      },
+      template: tmpl(`
+        <comp id="comp" model:prop-a="{{ cond2 ? 9 : cond ? b : a }}" />
+        <comp id="comp2" model:prop-a="{{ (cond ? subB : subA).f }}" />
+      `),
+      data: {
+        cond: false,
+        cond2: false,
+        a: 12,
+        b: 34,
+        subA: { f: 21 },
+        subB: { f: 43 },
+      },
+    })
+    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const comp = elem.getShadowRoot()!.getElementById('comp')! as glassEasel.GeneralComponent
+    const comp2 = elem.getShadowRoot()!.getElementById('comp2')! as glassEasel.GeneralComponent
+    expect(comp.getShadowRoot()!.getElementById('a')!.dataset.a).toBe(12)
+    expect(comp2.getShadowRoot()!.getElementById('a')!.dataset.a).toBe(21)
+
+    comp.setData({ propA: 56 })
+    expect(comp.getShadowRoot()!.getElementById('a')!.dataset.a).toBe(56)
+    expect(elem.data.a).toBe(56)
+    expect(elem.data.b).toBe(34)
+    comp2.setData({ propA: 65 })
+    expect(comp2.getShadowRoot()!.getElementById('a')!.dataset.a).toBe(65)
+    expect(elem.data.subA.f).toBe(65)
+    expect(elem.data.subB.f).toBe(43)
+
+    elem.setData({ cond: true })
+    expect(comp.getShadowRoot()!.getElementById('a')!.dataset.a).toBe(34)
+    expect(elem.data.a).toBe(56)
+    expect(elem.data.b).toBe(34)
+    expect(comp2.getShadowRoot()!.getElementById('a')!.dataset.a).toBe(43)
+    expect(elem.data.subA.f).toBe(65)
+    expect(elem.data.subB.f).toBe(43)
+
+    comp.setData({ propA: 78 })
+    expect(comp.getShadowRoot()!.getElementById('a')!.dataset.a).toBe(78)
+    expect(elem.data.a).toBe(56)
+    expect(elem.data.b).toBe(78)
+    comp2.setData({ propA: 87 })
+    expect(comp2.getShadowRoot()!.getElementById('a')!.dataset.a).toBe(87)
+    expect(elem.data.subA.f).toBe(65)
+    expect(elem.data.subB.f).toBe(87)
+
+    elem.setData({ cond2: true })
+    expect(comp.getShadowRoot()!.getElementById('a')!.dataset.a).toBe(9)
+    expect(elem.data.a).toBe(56)
+    expect(elem.data.b).toBe(78)
+
+    comp.setData({ propA: 999 })
+    expect(comp.getShadowRoot()!.getElementById('a')!.dataset.a).toBe(999)
+    expect(elem.data.a).toBe(56)
+    expect(elem.data.b).toBe(78)
+  })
+
   test('model value binding for items', () => {
     const subComp = glassEasel.registerElement({
       template: tmpl('{{propB}}:{{propA}}'),
