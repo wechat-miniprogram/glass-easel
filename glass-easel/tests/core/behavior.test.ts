@@ -585,8 +585,8 @@ describe('chaining-form interface', () => {
   test('chaining filter', () => {
     const beh = componentSpace
       .define()
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       .chainingFilter<{ myData<T>(this: T): T }, never>((chain) =>
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
         Object.create(chain, {
           myData: {
             value() {

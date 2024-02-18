@@ -356,11 +356,7 @@ export class ProcGenWrapper {
       },
 
       // slot node
-      (
-        slotName: string | undefined,
-        slotValueInit?: (elem: Element) => void,
-        slot?: string,
-      ) => {
+      (slotName: string | undefined, slotValueInit?: (elem: Element) => void, slot?: string) => {
         const elem = this.shadowRoot.createVirtualNode('slot')
         elem.destroyBackendElementOnDetach()
         Element.setSlotName(elem, dataValueToString(slotName))
@@ -630,11 +626,7 @@ export class ProcGenWrapper {
       },
 
       // slot node
-      (
-        slotName: string | undefined,
-        slotValueInit?: (elem: Element) => void,
-        slot?: string,
-      ) => {
+      (slotName: string | undefined, slotValueInit?: (elem: Element) => void, slot?: string) => {
         const elem = childNodes[index] as Element
         index += 1
         if (slotName !== undefined) {

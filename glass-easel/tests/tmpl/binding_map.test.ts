@@ -99,9 +99,9 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         },
       })
       const elem = glassEasel.Component.createWithContext('root', def, testBackend)
-      const child = (elem.getShadowRoot()!.childNodes[0] as glassEasel.GeneralComponent).asInstanceOf(
-        subComp,
-      )!
+      const child = (
+        elem.getShadowRoot()!.childNodes[0] as glassEasel.GeneralComponent
+      ).asInstanceOf(subComp)!
       expect(domHtml(elem)).toBe('<sub-comp><div>abc</div></sub-comp>')
       elem.setData({ c: 'def' })
       expect(domHtml(elem)).toBe('<sub-comp><div>def</div></sub-comp>')

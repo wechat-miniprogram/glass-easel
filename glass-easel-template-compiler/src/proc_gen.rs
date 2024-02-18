@@ -250,6 +250,7 @@ impl<'a, W: fmt::Write> JsFunctionScopeWriter<'a, W> {
         })
     }
 
+    #[allow(dead_code)]
     pub(crate) fn set_var_on_top_scope(&mut self, name: &str) -> Result<(), TmplError> {
         self.top_scope.declare_on_top(name)
     }

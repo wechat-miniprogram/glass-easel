@@ -1301,7 +1301,7 @@ impl TmplElement {
                             }
                             Ok(())
                         })?;
-                    } else if (!slot_kind.is_none()) {
+                    } else if !slot_kind.is_none() {
                         write!(w, r#",undefined"#)?;
                     }
                     if !slot_kind.is_none() {
@@ -1421,6 +1421,7 @@ impl TmplAttr {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn is_any_property(&self) -> bool {
         match &self.kind {
             TmplAttrKind::PropertyOrExternalClass { .. } => true,
