@@ -1,9 +1,6 @@
 #[allow(unused_imports)]
 #[macro_use]
 extern crate log;
-extern crate pest;
-#[macro_use]
-extern crate pest_derive;
 #[macro_use]
 extern crate lazy_static;
 
@@ -13,7 +10,6 @@ pub(crate) use tree::*;
 mod expr;
 pub(crate) use expr::*;
 mod parser;
-pub use parser::*;
 mod group;
 pub use group::*;
 mod binding_map;
