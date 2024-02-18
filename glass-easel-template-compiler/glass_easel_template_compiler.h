@@ -79,6 +79,10 @@ StrRef tmpl_group_get_runtime_string(const TmplGroup *self);
 
 StrRef tmpl_group_get_runtime_var_list();
 
+StrRefArray tmpl_group_get_script_dependencies(const TmplGroup *self,
+                                               const uint8_t *path_buf,
+                                               size_t path_len);
+
 StrRef tmpl_group_get_tmpl_gen_object(const TmplGroup *self,
                                       const uint8_t *path_buf,
                                       size_t path_len);
