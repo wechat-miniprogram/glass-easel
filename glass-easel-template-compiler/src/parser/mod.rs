@@ -1,20 +1,115 @@
 use std::ops::Range;
 
-/// The source code.
-pub struct SourceCode<'s> {
-    s: &'s str,
+mod tag;
+mod expr;
+
+pub(crate) trait TemplateStructure {
+    fn position(&self) -> Range<Position>;
 }
 
-impl<'s> SourceCode<'s> {
-    /// A new `SourceCode` from string.
-    pub fn new(s: impl AsRef<str>) -> Self {
-        Self { s: s.as_ref() }
+struct ParseState<'s> {
+    s: &'s str,
+    cur: u32,
+    warnings: Vec<ParseError>,
+    errors: Vec<ParseError>,
+}
+
+impl<'s> ParseState<'s> {
+    fn new(s: impl AsRef<str>) -> Self {
+        let s = if s.len() >= u32::MAX as usize {
+            log::error!("Source code too long. Truncated to `u32::MAX - 1` .");
+            &s[..u32::MAX]
+        } else {
+            s
+        };
+        Self {
+            s: s.as_ref(),
+            cur: 0,
+            warnings: vec![],
+            errors: vec![],
+        }
     }
 
-    /// Do parsing.
-    pub fn parse(self) -> Tmpl<'s> {
-        // TODO
+    fn add_warning(&mut self, message: impl ToString, location: Range<Position>) {
+        self.warnings.push(ParseError { message, location })
     }
+
+    fn add_error(&mut self, message: impl ToString, location: Range<Position>) {
+        self.warnings.push(ParseError { message, location })
+    }
+
+    fn warnings(&self) -> impl Iterator<Item = &ParseError> {
+        self.warnings.iter()
+    }
+
+    fn errors(&self) -> impl Iterator<Item = &ParseError> {
+        self.errors.iter()
+    }
+
+    fn peek_chars(&self) -> impl 's + Iterator<Item = char> {
+        self.s[self.cur as usize..].chars()
+    }
+
+    fn peek_with_whitespace(&self) -> Option<char> {
+        self.peek_chars().next()
+    }
+
+    fn peek(&self) -> Option<char> {
+        let mut i = self.peek_chars();
+        loop {
+            let next = i.next()?;
+            if !char::is_whitespace(next) {
+                return Some(next);
+            }
+        }
+    }
+
+    fn next_with_whitespace(&mut self) -> Option<&'s str> {
+        let prev = self.cur;
+        let mut cur = prev + 1;
+        if cur > self.s.len() {
+            return None;
+        }
+        loop {
+            if self.s.is_char_boundary(cur as usize) {
+                break;
+            }
+            cur += 1;
+        }
+        self.cur = cur;
+        Some(&self.s[prev..cur])
+    }
+
+    fn skip_whitespace(&mut self) {
+        let mut i = self.s[self.cur as usize..].char_indices();
+        self.cur = loop {
+            let Some((index, c)) = i.next() else {
+                break self.s.len();
+            };
+            if !char::is_whitespace(c) {
+                break index;
+            }
+        };
+    }
+
+    fn next(&mut self) -> Option<&'s str> {
+        self.skip_whitespace();
+        self.next_with_whitespace()
+    }
+
+    fn cur(&self) -> usize {
+        self.cur as usize
+    }
+
+    fn position(&self) -> Position {
+        
+    }
+}
+
+pub(crate) fn parse<'s>(path: &str, source: &'s str) -> (tag::Template, ParseState<'s>) {
+    let mut state = ParseState::new(source);
+    let template = tag::Template::parse(path, &mut state);
+    (template, state)
 }
 
 /// A location in source code.

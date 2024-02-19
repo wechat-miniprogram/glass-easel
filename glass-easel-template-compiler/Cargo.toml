@@ -35,6 +35,7 @@ console_log = "0.2"
 env_logger = "0.9"
 clap = "2"
 cbindgen = { version = "0.21", optional = true }
+compact_str = "0.7"
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = false
