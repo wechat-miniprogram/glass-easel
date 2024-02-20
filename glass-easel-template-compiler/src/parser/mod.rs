@@ -2,40 +2,48 @@ use std::ops::Range;
 
 mod tag;
 mod expr;
+mod binding_map;
 
 pub(crate) trait TemplateStructure {
-    fn position(&self) -> Range<Position>;
+    fn location(&self) -> Range<Position>;
 }
 
 struct ParseState<'s> {
+    path: &'s str,
     s: &'s str,
-    cur: u32,
+    cur: usize,
+    line: u32,
+    utf16_col: u32,
     warnings: Vec<ParseError>,
     errors: Vec<ParseError>,
 }
 
 impl<'s> ParseState<'s> {
-    fn new(s: impl AsRef<str>) -> Self {
+    fn new(path: &'s str, content: &'s str) -> Self {
+        let s = content;
         let s = if s.len() >= u32::MAX as usize {
             log::error!("Source code too long. Truncated to `u32::MAX - 1` .");
-            &s[..u32::MAX]
+            &s[..(u32::MAX as usize - 1)]
         } else {
             s
         };
         Self {
-            s: s.as_ref(),
+            path,
+            s,
             cur: 0,
+            line: 1,
+            utf16_col: 0,
             warnings: vec![],
             errors: vec![],
         }
     }
 
-    fn add_warning(&mut self, message: impl ToString, location: Range<Position>) {
-        self.warnings.push(ParseError { message, location })
+    fn add_warning(&mut self, kind: ParseErrorKind, location: Range<Position>) {
+        self.warnings.push(ParseError { path: self.path.to_string(), kind, location })
     }
 
-    fn add_error(&mut self, message: impl ToString, location: Range<Position>) {
-        self.warnings.push(ParseError { message, location })
+    fn add_error(&mut self, kind: ParseErrorKind, location: Range<Position>) {
+        self.warnings.push(ParseError { path: self.path.to_string(), kind, location })
     }
 
     fn warnings(&self) -> impl Iterator<Item = &ParseError> {
@@ -46,42 +54,118 @@ impl<'s> ParseState<'s> {
         self.errors.iter()
     }
 
+    fn try_parse<T>(&mut self, f: impl FnOnce(&mut Self) -> Option<T>) -> Option<T> {
+        let prev = self.cur;
+        let prev_line = self.line;
+        let prev_utf16_col = self.utf16_col;
+        let ret = f(self);
+        if ret.is_none() {
+            self.cur = prev;
+            self.line = prev_line;
+            self.utf16_col = prev_utf16_col;
+        }
+        ret
+    }
+
+    fn skip_until_after(&mut self, until: &str) -> &'s str {
+        let (ret, skipped) = if let Some(index) = self.s[self.cur..].find(until) {
+            let ret = &self.s[self.cur..index];
+            let skipped = &self.s[self.cur..(index + until.len())];
+            self.cur = index + until.len();
+            (ret, skipped)
+        } else {
+            let ret = &self.s[self.cur..];
+            self.cur = self.s.len();
+            (ret, ret)
+        };
+        {
+            // adjust position
+            let line_wrap_count = skipped.as_bytes().into_iter().filter(|x| **x == b'\n').count();
+            self.line += line_wrap_count as u32;
+            if line_wrap_count > 0 {
+                let last_line_start = skipped.rfind('\n').unwrap() + 1;
+                self.utf16_col = skipped[last_line_start..].encode_utf16().count() as u32;
+            } else {
+                self.utf16_col += skipped.encode_utf16().count() as u32;
+            }
+        }
+        ret
+    }
+
     fn peek_chars(&self) -> impl 's + Iterator<Item = char> {
         self.s[self.cur as usize..].chars()
     }
 
-    fn peek_with_whitespace(&self) -> Option<char> {
-        self.peek_chars().next()
+    fn peek_n_with_whitespace<const N: usize>(&self) -> Option<[char; N]> {
+        let mut ret: [char; N] = ['\x00'; N];
+        let mut iter = self.peek_chars();
+        for i in 0..N {
+            ret[i] = iter.next()?;
+        }
+        Some(ret)
     }
 
-    fn peek(&self) -> Option<char> {
-        let mut i = self.peek_chars();
-        loop {
-            let next = i.next()?;
+    fn peek_n<const N: usize>(&self) -> Option<[char; N]> {
+        let mut ret: [char; N] = ['\x00'; N];
+        let mut iter = self.peek_chars();
+        let next = loop {
+            let next = iter.next()?;
             if !char::is_whitespace(next) {
-                return Some(next);
+                break next;
             }
+        };
+        ret[0] = next;
+        for i in 1..N {
+            ret[i] = iter.next()?;
         }
+        Some(ret)
     }
 
-    fn next_with_whitespace(&mut self) -> Option<&'s str> {
-        let prev = self.cur;
-        let mut cur = prev + 1;
-        if cur > self.s.len() {
-            return None;
+    fn peek_with_whitespace<const Index: usize>(&self) -> Option<char> {
+        let mut iter = self.peek_chars();
+        for _ in 0..Index {
+            iter.next()?;
         }
-        loop {
-            if self.s.is_char_boundary(cur as usize) {
-                break;
+        iter.next()
+    }
+
+    fn peek<const Index: usize>(&self) -> Option<char> {
+        let mut iter = self.peek_chars();
+        let next = loop {
+            let next = iter.next()?;
+            if !char::is_whitespace(next) {
+                break next;
             }
-            cur += 1;
+        };
+        if Index == 0 {
+            return Some(next);
         }
-        self.cur = cur;
-        Some(&self.s[prev..cur])
+        for i in 1..Index {
+            iter.next()?;
+        }
+        iter.next()
+    }
+
+    fn next_with_whitespace(&mut self) -> Option<char> {
+        let mut i = self.s[self.cur..].char_indices();
+        let (_, ret) = i.next()?;
+        self.cur = i.next().map(|(p, _)| p).unwrap_or(self.cur);
+        if ret == '\n' {
+            self.line += 1;
+            self.utf16_col = 0;
+        } else {
+            self.utf16_col += ret.encode_utf16(&mut [0; 2]).len() as u32;
+        }
+        Some(ret)
+    }
+
+    fn next(&mut self) -> Option<char> {
+        self.skip_whitespace();
+        self.next_with_whitespace()
     }
 
     fn skip_whitespace(&mut self) {
-        let mut i = self.s[self.cur as usize..].char_indices();
+        let mut i = self.s[self.cur..].char_indices();
         self.cur = loop {
             let Some((index, c)) = i.next() else {
                 break self.s.len();
@@ -89,43 +173,45 @@ impl<'s> ParseState<'s> {
             if !char::is_whitespace(c) {
                 break index;
             }
+            if c == '\n' {
+                self.line += 1;
+                self.utf16_col = 0;
+            } else {
+                self.utf16_col += c.encode_utf16(&mut [0; 2]).len() as u32;
+            }
         };
     }
 
-    fn next(&mut self) -> Option<&'s str> {
-        self.skip_whitespace();
-        self.next_with_whitespace()
+    fn code_slice(&self, range: Range<usize>) -> &'s str {
+        &self.s[range]
     }
 
-    fn cur(&self) -> usize {
+    fn cur_index(&self) -> usize {
         self.cur as usize
     }
 
     fn position(&self) -> Position {
-        
+        Position {
+            line: self.line,
+            utf16_col: self.utf16_col,
+        }
     }
 }
 
 pub(crate) fn parse<'s>(path: &str, source: &'s str) -> (tag::Template, ParseState<'s>) {
-    let mut state = ParseState::new(source);
-    let template = tag::Template::parse(path, &mut state);
+    let mut state = ParseState::new(path, source);
+    let template = tag::Template::parse(&mut state);
     (template, state)
 }
 
 /// A location in source code.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Position {
-    utf8_index: u32,
     line: u32,
     utf16_col: u32,
 }
 
 impl Position {
-    /// Get the UTF-8 byte offsets in the source code.
-    pub fn utf8_index(&self) -> usize {
-        self.utf8_index as usize
-    }
-
     /// Get the line-column offsets (in UTF-16) in the source code.
     pub fn line_col_utf16<'s>(&self) -> (usize, usize) {
         (self.line as usize, self.utf16_col as usize)
@@ -133,25 +219,61 @@ impl Position {
 }
 
 /// Template parsing error object.
+#[derive(Debug, Clone)]
 pub struct ParseError {
-    pub message: String,
+    pub path: String,
+    pub kind: ParseErrorKind,
     pub location: Range<Position>,
-}
-
-impl std::fmt::Debug for ParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "Template parsing error (at {}:{}:{}): {}",
-            self.filename, self.start_pos.0, self.start_pos.1, self.message
-        )
-    }
 }
 
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(
+            f,
+            "template parsing error at {}:{}:{}-{}:{}: {}",
+            self.path,
+            self.location.start.line + 1,
+            self.location.start.utf16_col + 1,
+            self.location.end.line + 1,
+            self.location.end.utf16_col + 1,
+            self.kind,
+        )
     }
 }
 
 impl std::error::Error for ParseError {}
+
+#[derive(Clone)]
+pub enum ParseErrorKind {
+    IllegalCharacter = 0x10001,
+    UnrecognizedTag,
+    IllegalExpression,
+    IllegalEntity,
+    IncompleteTag,
+    MissingEndTag,
+}
+
+impl ParseErrorKind {
+    fn static_message(&self) -> &'static str {
+        match self {
+            Self::IllegalCharacter => "illegal character",
+            Self::UnrecognizedTag => "unrecognized tag",
+            Self::IllegalExpression => "illegal expression",
+            Self::IllegalEntity => "illegal entity",
+            Self::IncompleteTag => "incomplete tag",
+            Self::MissingEndTag => "missing end tag",
+        }
+    }
+}
+
+impl std::fmt::Debug for ParseErrorKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self.static_message())
+    }
+}
+
+impl std::fmt::Display for ParseErrorKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.static_message())
+    }
+}

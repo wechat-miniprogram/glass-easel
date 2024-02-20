@@ -92,8 +92,8 @@ impl TmplParseResult {
     }
 }
 
-impl From<parser::TmplParseError> for TmplParseResult {
-    fn from(e: parser::TmplParseError) -> Self {
+impl From<parser::ParseError> for TmplParseResult {
+    fn from(e: parser::ParseError) -> Self {
         Self {
             success: false,
             message: e.message.into(),
