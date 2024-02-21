@@ -83,7 +83,7 @@ impl Node {
                     }
                     continue;
                 }
-                ['<', x] if ('a'..='z').contains(&x) || ('A'..='Z').contains(&x) => {
+                ['<', x] if Name::is_start_char(x) => {
                     // an element
                     Self::Element(Element::parse(ps, globals))
                 }
@@ -105,25 +105,29 @@ pub struct Element {
 #[derive(Debug, Clone)]
 pub enum ElementKind {
     Normal {
-        tag_name: CompactString,
+        tag_name: Name,
         attributes: Vec<Attribute>,
         class: ClassAttribute,
         style: StyleAttribute,
+        event_binding: Vec<EventBinding>,
+        mark: Vec<(Name, Value)>,
         children: Vec<Node>,
-        generics: HashMap<CompactString, CompactString>,
-        extra_attr: HashMap<CompactString, CompactString>,
-        slot: Value,
-        slot_value_refs: Vec<(CompactString, CompactString)>,
+        generics: Vec<(Name, LitStr)>,
+        extra_attr: Vec<(Name, LitStr)>,
+        slot: Option<Value>,
+        slot_value_refs: Vec<(Name, Name)>,
     },
     Pure {
+        event_binding: Vec<EventBinding>,
+        mark: Vec<(Name, Value)>,
         children: Vec<Node>,
         slot: Value,
     },
     For {
         list: Value,
-        item_name: CompactString,
-        index_name: CompactString,
-        key: CompactString,
+        item_name: Name,
+        index_name: Name,
+        key: Name,
         children: Vec<Node>,
     },
     If {
@@ -135,7 +139,7 @@ pub enum ElementKind {
         slot: Value,
     },
     Include {
-        path: CompactString,
+        path: Name,
         slot: Value,
     },
     Slot {
@@ -146,34 +150,113 @@ pub enum ElementKind {
 
 impl Element {
     fn parse(ps: &mut ParseState, globals: &mut TemplateGlobals) -> Self {
-        // parse `<xxx `
+        // parse `<xxx`
         let start_angle_start = ps.position();
         assert_eq!(ps.next(), Some('<'));
-        let mut start_angle_end = start_angle_start;
-        let mut tag_name = CompactString::new_inline("");
-        while let Some(ch) = ps.next_with_whitespace() {
-            if char::is_whitespace(ch) {
-                break;
+        let start_angle_location = start_angle_start..ps.position();
+        let mut tag_name_slices = Name::parse_colon_separated(ps);
+        assert_ne!(tag_name_slices.len(), 0);
+        let tag_name = if tag_name_slices.len() > 1 {
+            let end = tag_name_slices.pop().unwrap();
+            for x in tag_name_slices {
+                ps.add_warning(ParseErrorKind::IllegalNamePrefix, x.location());
             }
-            start_angle_end = ps.position();
-            tag_name.push(ch);
-        }
-        let start_angle_location = start_angle_start..start_angle_end;
+            Name {
+                name: CompactString::new_inline("wx-x"),
+                location: end.location(),
+            }
+        } else {
+            tag_name_slices[0]
+        };
 
         // parse attributes
+        let mut wx_if = None;
+        let mut wx_for = None;
+        let mut wx_for_index = None;
+        let mut wx_for_item = None;
+        let mut wx_key = None;
+        let mut normal_attrs = Vec::with_capacity(0);
+        let mut class_attr = ClassAttribute::None;
+        let mut style_attr = StyleAttribute::None;
+        let mut children = Vec::with_capacity(0);
+        let mut generics = Vec::with_capacity(0);
+        let mut extra_attr = Vec::with_capacity(0);
+        let mut slot = None;
+        let mut slot_value_refs = Vec::with_capacity(0);
         loop {
-            let Some(peek) = ps.peek::<0>() else { break };
+            ps.skip_whitespace();
+            let Some(peek) = ps.peek_with_whitespace::<0>() else { break };
             if peek == '/' {
                 // maybe self-close
-                if ps.peek::<1>() == Some('>') {
+                if ps.peek_with_whitespace::<1>() == Some('>') {
                     break;
                 }
                 let pos = ps.position();
-                ps.next(); // '/'
+                ps.next_with_whitespace(); // '/'
                 ps.add_error(ParseErrorKind::IllegalCharacter, pos..ps.position());
-            } else if peek == '_' || peek == ':' || ('a'..='z').contains(&peek) || ('A'..='Z').contains(&peek) {
+            } else if Name::is_start_char(peek) {
                 // attribute name
-                // TODO
+                let segs = Name::parse_colon_separated(ps);
+                let name = segs.pop().unwrap();
+                enum AttrPrefixKind {
+                    Normal,
+                    WxIf,
+                    WxFor,
+                    WxForIndex,
+                    WxForItem,
+                    WxKey,
+                    Model,
+                    Change,
+                    Worklet,
+                    Data,
+                    Class,
+                    Style,
+                    Bind,
+                    MutBind,
+                    Catch,
+                    CaptureBind,
+                    CaptureMutBind,
+                    CaptureCatch,
+                    Mark,
+                    Generic,
+                    ExtraAttr,
+                    SlotDataRef,
+                }
+                let prefix = match segs.pop() {
+                    None => AttrPrefixKind::Normal,
+                    Some("wx") => {
+                        match name {
+                            "if" => AttrPrefixKind::WxIf,
+                            "for" => AttrPrefixKind::WxFor,
+                            "for-index" => AttrPrefixKind::WxForIndex,
+                            "for-item" => AttrPrefixKind::WxForItem,
+                            "key" => AttrPrefixKind::WxKey,
+                        }
+                    }
+                    "model" => AttrPrefixKind::Model,
+                    "change" => AttrPrefixKind::Change,
+                    "worklet" => AttrPrefixKind::Worklet,
+                    "data" => AttrPrefixKind::Data,
+                    "class" => AttrPrefixKind::Class,
+                    "style" => AttrPrefixKind::Style,
+                    "bind" => AttrPrefixKind::Bind,
+                    "mut-bind" => AttrPrefixKind::MutBind,
+                    "catch" => AttrPrefixKind::Catch,
+                    "capture-bind" => AttrPrefixKind::CaptureBind,
+                    "capture-mut-bind" => AttrPrefixKind::CaptureMutBind,
+                    "capture-catch" => AttrPrefixKind::CaptureCatch,
+                    "mark" => AttrPrefixKind::Mark,
+                    "generic" => AttrPrefixKind::Generic,
+                    "extra-attr" => AttrPrefixKind::ExtraAttr,
+                    "slot" => AttrPrefixKind::SlotDataRef,
+                };
+                if ps.peek_with_whitespace::<0>() == Some('=') {
+                    let eq_pos = ps.position();
+                    ps.next_with_whitespace(); // '='
+                    let value = match ps.peek_with_whitespace::<0>() {
+                        // TODO
+                    }
+                }
             }
         }
 
@@ -213,23 +296,100 @@ impl Element {
 
 #[derive(Debug, Clone)]
 pub struct Attribute {
-    name: CompactString,
-    value: Value,
-    name_location: Range<Position>,
-    eq_location: Range<Position>,
-    value_location: Range<Position>,
+    pub kind: AttributeKind,
+    pub name: Name,
+    pub value: Value,
+}
+
+#[derive(Debug, Clone)]
+pub enum AttributeKind {
+    Normal,
+    Model(Range<Position>),
+    Change(Range<Position>),
+    Worklet(Range<Position>),
+    Data(Range<Position>),
 }
 
 #[derive(Debug, Clone)]
 pub enum ClassAttribute {
+    None,
     String(Value),
     Multiple(Attribute),
 }
 
 #[derive(Debug, Clone)]
 pub enum StyleAttribute {
+    None,
     String(Value),
     Multiple(Attribute),
+}
+
+#[derive(Debug, Clone)]
+pub struct EventBinding {
+    pub name: Name,
+    pub value: Value,
+    pub is_catch: bool,
+    pub is_mut: bool,
+    pub is_capture: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct Name {
+    pub name: CompactString,
+    pub location: Range<Position>,
+}
+
+impl TemplateStructure for Name {
+    fn location(&self) -> Range<Position> {
+        self.location.clone()
+    }
+}
+
+impl Name {
+    fn is_start_char(ch: char) -> bool {
+        ('a'..='z').contains(&ch) || ('A'..='Z').contains(&ch) || ch == '_' || ch == ':'
+    }
+
+    fn is_following_char(ch: char) -> bool {
+        Self::is_start_char(ch) || ('0'..='9').contains(&ch) || ch == '-' || ch == '.'
+    }
+
+    fn is_empty(&self) -> bool {
+        self.name.is_empty()
+    }
+
+    fn new_empty(pos: Position) -> Self {
+        Self {
+            name: CompactString::new_inline(""),
+            location: pos..pos,
+        }
+    }
+
+    fn parse_colon_separated(ps: &mut ParseState) -> Vec<Self> {
+        let peek = ps.peek_with_whitespace::<0>() else {
+            return Vec::with_capacity(0);
+        };
+        if !Self::is_start_char(peek) {
+            return Vec::with_capacity(0);
+        }
+        let mut ret = Vec::with_capacity(2);
+        let mut cur_name = Self::new_empty(ps.position());
+        loop {
+            match ps.next_with_whitespace().unwrap() {
+                ':' => {
+                    let prev = std::mem::replace(&mut cur_name, Self::new_empty(ps.position()));
+                    ret.push(prev);
+                }
+                ch => {
+                    cur_name.name.push(ch);
+                    cur_name.location.end = ps.position();
+                }
+            }
+            let peek = ps.peek_with_whitespace() else { break };
+            if !Self::is_following_char(peek) { break };
+        }
+        ret
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -277,8 +437,15 @@ impl Value {
                     let expr = Expression::parse(ps);
                     ps.skip_whitespace();
                     let end_pos = ps.position();
-                    if ps.skip_until_after("}}").len() > 0 {
-                        ps.add_error(ParseErrorKind::IllegalExpression, end_pos..ps.position());
+                    match ps.skip_until_after("}}") {
+                        None => {
+                            ps.add_error(ParseErrorKind::MissingExpressionEnd, end_pos..ps.position());
+                        }
+                        Some(s) => {
+                            if s.len() > 0 {
+                                ps.add_error(ParseErrorKind::IllegalExpression, end_pos..ps.position());
+                            }
+                        }
                     }
                     Some(expr)
                 });

@@ -42,16 +42,8 @@ impl<'s> ParseState<'s> {
         self.warnings.push(ParseError { path: self.path.to_string(), kind, location })
     }
 
-    fn add_error(&mut self, kind: ParseErrorKind, location: Range<Position>) {
-        self.warnings.push(ParseError { path: self.path.to_string(), kind, location })
-    }
-
     fn warnings(&self) -> impl Iterator<Item = &ParseError> {
         self.warnings.iter()
-    }
-
-    fn errors(&self) -> impl Iterator<Item = &ParseError> {
-        self.errors.iter()
     }
 
     fn try_parse<T>(&mut self, f: impl FnOnce(&mut Self) -> Option<T>) -> Option<T> {
@@ -67,16 +59,16 @@ impl<'s> ParseState<'s> {
         ret
     }
 
-    fn skip_until_after(&mut self, until: &str) -> &'s str {
+    fn skip_until_after(&mut self, until: &str) -> Option<&'s str> {
         let (ret, skipped) = if let Some(index) = self.s[self.cur..].find(until) {
             let ret = &self.s[self.cur..index];
             let skipped = &self.s[self.cur..(index + until.len())];
             self.cur = index + until.len();
-            (ret, skipped)
+            (Some(ret), skipped)
         } else {
             let ret = &self.s[self.cur..];
             self.cur = self.s.len();
-            (ret, ret)
+            (None, ret)
         };
         {
             // adjust position
@@ -105,7 +97,7 @@ impl<'s> ParseState<'s> {
         Some(ret)
     }
 
-    fn peek_n<const N: usize>(&self) -> Option<[char; N]> {
+    fn peek_n_without_whitespace<const N: usize>(&self) -> Option<[char; N]> {
         let mut ret: [char; N] = ['\x00'; N];
         let mut iter = self.peek_chars();
         let next = loop {
@@ -129,7 +121,7 @@ impl<'s> ParseState<'s> {
         iter.next()
     }
 
-    fn peek<const Index: usize>(&self) -> Option<char> {
+    fn peek_without_whitespace<const Index: usize>(&self) -> Option<char> {
         let mut iter = self.peek_chars();
         let next = loop {
             let next = iter.next()?;
@@ -159,7 +151,7 @@ impl<'s> ParseState<'s> {
         Some(ret)
     }
 
-    fn next(&mut self) -> Option<char> {
+    fn next_without_whitespace(&mut self) -> Option<char> {
         self.skip_whitespace();
         self.next_with_whitespace()
     }
@@ -248,9 +240,11 @@ pub enum ParseErrorKind {
     IllegalCharacter = 0x10001,
     UnrecognizedTag,
     IllegalExpression,
+    MissingExpressionEnd,
     IllegalEntity,
     IncompleteTag,
     MissingEndTag,
+    IllegalNamePrefix,
 }
 
 impl ParseErrorKind {
@@ -259,9 +253,11 @@ impl ParseErrorKind {
             Self::IllegalCharacter => "illegal character",
             Self::UnrecognizedTag => "unrecognized tag",
             Self::IllegalExpression => "illegal expression",
+            Self::MissingExpressionEnd => "missing expression end",
             Self::IllegalEntity => "illegal entity",
             Self::IncompleteTag => "incomplete tag",
             Self::MissingEndTag => "missing end tag",
+            Self::IllegalNamePrefix => "illegal name prefix",
         }
     }
 }
