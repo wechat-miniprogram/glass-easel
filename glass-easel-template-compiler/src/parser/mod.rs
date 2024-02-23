@@ -42,6 +42,11 @@ impl<'s> ParseState<'s> {
         self.warnings.push(ParseError { path: self.path.to_string(), kind, location })
     }
 
+    fn add_warning_at_current_position(&mut self, kind: ParseErrorKind) {
+        let pos = self.position();
+        self.add_warning(kind, pos..pos)
+    }
+
     fn warnings(&self) -> impl Iterator<Item = &ParseError> {
         self.warnings.iter()
     }
@@ -138,6 +143,29 @@ impl<'s> ParseState<'s> {
         iter.next()
     }
 
+    fn next_char_as_str(&mut self) -> &'s str {
+        if self.cur < self.s.len() {
+            let mut i = self.cur;
+            loop {
+                i += 1;
+                if self.s.is_char_boundary(i) {
+                    break;
+                }
+            }
+            let ret = &self.s[self.cur..i];
+            self.cur = i;
+            if ret == "\n" {
+                self.line += 1;
+                self.utf16_col = 0;
+            } else {
+                self.utf16_col += ret.encode_utf16().count() as u32;
+            }
+            ret
+        } else {
+            ""
+        }
+    }
+
     fn next_with_whitespace(&mut self) -> Option<char> {
         let mut i = self.s[self.cur..].char_indices();
         let (_, ret) = i.next()?;
@@ -156,7 +184,8 @@ impl<'s> ParseState<'s> {
         self.next_with_whitespace()
     }
 
-    fn skip_whitespace(&mut self) {
+    fn skip_whitespace(&mut self) -> Option<Range<Position>> {
+        let mut start_pos = None;
         let mut i = self.s[self.cur..].char_indices();
         self.cur = loop {
             let Some((index, c)) = i.next() else {
@@ -165,6 +194,9 @@ impl<'s> ParseState<'s> {
             if !char::is_whitespace(c) {
                 break index;
             }
+            if start_pos.is_none() {
+                start_pos = Some(self.position());
+            }
             if c == '\n' {
                 self.line += 1;
                 self.utf16_col = 0;
@@ -172,6 +204,7 @@ impl<'s> ParseState<'s> {
                 self.utf16_col += c.encode_utf16(&mut [0; 2]).len() as u32;
             }
         };
+        start_pos.map(|x| x..self.position())
     }
 
     fn code_slice(&self, range: Range<usize>) -> &'s str {
@@ -199,8 +232,8 @@ pub(crate) fn parse<'s>(path: &str, source: &'s str) -> (tag::Template, ParseSta
 /// A location in source code.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Position {
-    line: u32,
-    utf16_col: u32,
+    pub line: u32,
+    pub utf16_col: u32,
 }
 
 impl Position {
@@ -244,7 +277,12 @@ pub enum ParseErrorKind {
     IllegalEntity,
     IncompleteTag,
     MissingEndTag,
-    IllegalNamePrefix,
+    IllegalTagNamePrefix,
+    IllegalAttributePrefix,
+    UnexpectedWhitespace,
+    MissingAttributeValue,
+    DataBindingNotAllowed,
+    InvalidIdentifier,
 }
 
 impl ParseErrorKind {
@@ -257,7 +295,12 @@ impl ParseErrorKind {
             Self::IllegalEntity => "illegal entity",
             Self::IncompleteTag => "incomplete tag",
             Self::MissingEndTag => "missing end tag",
-            Self::IllegalNamePrefix => "illegal name prefix",
+            Self::IllegalTagNamePrefix => "illegal tag name prefix",
+            Self::IllegalAttributePrefix => "illegal attribute prefix",
+            Self::UnexpectedWhitespace => "unexpected whitespace",
+            Self::MissingAttributeValue => "missing attribute value",
+            Self::DataBindingNotAllowed => "data binding is not allowed for this attribute",
+            Self::InvalidIdentifier => "not a valid identifier",
         }
     }
 }

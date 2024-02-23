@@ -65,72 +65,51 @@ impl Drop for StrRefArray {
 }
 
 #[repr(C)]
-struct TmplParseResult {
-    success: bool,
+struct TmplParseWarning {
     message: StrRef,
-    start_row: usize,
-    start_col: usize,
-    end_row: usize,
-    end_col: usize,
+    start_line: u32,
+    start_col: u32,
+    end_line: u32,
+    end_col: u32,
 }
 
-impl TmplParseResult {
-    fn ok() -> Self {
-        TmplParseResult {
-            success: true,
-            message: "".into(),
-            start_row: 0,
-            start_col: 0,
-            end_row: 0,
-            end_col: 0,
-        }
-    }
-
+impl TmplParseWarning {
     #[no_mangle]
-    pub extern "C" fn tmpl_parser_result_free(self) {
+    pub extern "C" fn tmpl_parse_warning_free(self) {
         // empty
     }
 }
 
-impl From<parser::ParseError> for TmplParseResult {
+impl From<parser::ParseError> for TmplParseWarning {
     fn from(e: parser::ParseError) -> Self {
         Self {
-            success: false,
-            message: e.message.into(),
-            start_row: e.start_pos.0,
-            start_col: e.start_pos.1,
-            end_row: e.end_pos.0,
-            end_col: e.end_pos.1,
+            message: e.kind.to_string().into(),
+            start_line: e.location.start.line,
+            start_col: e.location.start.utf16_col,
+            end_line: e.location.end.line,
+            end_col: e.location.end.utf16_col,
         }
     }
 }
 
 #[repr(C)]
-struct TmplResult {
-    success: bool,
-    message: StrRef,
+struct TmplParseWarningArray {
+    buf: *mut TmplParseWarning,
+    len: usize,
 }
 
-impl TmplResult {
-    fn ok() -> Self {
-        TmplResult {
-            success: true,
-            message: "".into(),
-        }
-    }
-
+impl TmplParseWarningArray {
     #[no_mangle]
-    pub extern "C" fn tmpl_result_free(self) {
+    pub extern "C" fn tmpl_parse_warning_array_free(self) {
         // empty
     }
 }
 
-impl From<group::TmplError> for TmplResult {
-    fn from(e: group::TmplError) -> Self {
-        Self {
-            success: false,
-            message: e.message.into(),
-        }
+impl Drop for TmplParseWarningArray {
+    fn drop(&mut self) {
+        let _: Box<[TmplParseWarning]> = unsafe {
+            Box::from_raw(slice::from_raw_parts_mut(self.buf, self.len) as *mut [TmplParseWarning])
+        };
     }
 }
 

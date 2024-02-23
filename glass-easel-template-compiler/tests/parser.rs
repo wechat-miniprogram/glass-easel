@@ -32,4 +32,10 @@ fn tag_parsing() {
     case!("<div/ ></div>", r#"<div></div>"#, ParseErrorKind::IllegalCharacter, 4..5);
     case!("<div a:mark:c/>", r#"<div></div>"#, ParseErrorKind::IllegalNamePrefix, 5..6);
     case!("<div marks:c/>", r#"<div></div>"#, ParseErrorKind::IllegalNamePrefix, 5..10);
+    case!("<div a =""/>", r#"<div a=""></div>"#, ParseErrorKind::UnexpectedWhitespace, 6..7);
+    case!("<div a= ""/>", r#"<div a=""></div>"#, ParseErrorKind::UnexpectedWhitespace, 7..8);
+    case!("<div a= {{b}}/>", r#"<div a={{b}}></div>"#, ParseErrorKind::UnexpectedWhitespace, 7..8);
+    case!("<div a=>", r#"<div></div>"#, ParseErrorKind::MissingAttributeValue, 7..7);
+    case!("<div a=/>", r#"<div></div>"#, ParseErrorKind::MissingAttributeValue, 7..7);
+    case!("<div a=", r#"<div></div>"#, ParseErrorKind::IncompleteTag, 7..7);
 }
