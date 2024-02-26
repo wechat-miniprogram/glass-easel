@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
+// eslint-disable-next-line import/no-extraneous-dependencies
 import { expectType } from 'tsd-lite'
 import * as glassEasel from '../../src'
 

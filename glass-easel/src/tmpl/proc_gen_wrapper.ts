@@ -357,11 +357,7 @@ export class ProcGenWrapper {
       },
 
       // slot node
-      (
-        slotName: string | undefined,
-        slotValueInit?: (elem: Element) => void,
-        slot?: string,
-      ) => {
+      (slotName: string | undefined, slotValueInit?: (elem: Element) => void, slot?: string) => {
         const elem = this.shadowRoot.createVirtualNode('slot')
         elem.destroyBackendElementOnDetach()
         Element.setSlotName(elem, dataValueToString(slotName))
@@ -631,11 +627,7 @@ export class ProcGenWrapper {
       },
 
       // slot node
-      (
-        slotName: string | undefined,
-        slotValueInit?: (elem: Element) => void,
-        slot?: string,
-      ) => {
+      (slotName: string | undefined, slotValueInit?: (elem: Element) => void, slot?: string) => {
         const elem = childNodes[index] as Element
         index += 1
         if (slotName !== undefined) {
@@ -1030,13 +1022,17 @@ export class ProcGenWrapper {
       const nodeDataProxy = Component.getDataProxy(elem)
       const camelName = dashToCamelCase(name)
       if (nodeDataProxy.replaceProperty(camelName, v)) {
-        if (modelLvaluePath) {
-          nodeDataProxy.setModelBindingListener(camelName, (value) => {
-            const host = elem.ownerShadowRoot!.getHostNode()
-            const nodeDataProxy = Component.getDataProxy(host)
-            nodeDataProxy.replaceDataOnPath(modelLvaluePath, value)
-            nodeDataProxy.applyDataUpdates(false)
-          })
+        if (modelLvaluePath !== undefined) {
+          if (modelLvaluePath === null) {
+            nodeDataProxy.setModelBindingListener(camelName, () => {})
+          } else {
+            nodeDataProxy.setModelBindingListener(camelName, (value) => {
+              const host = elem.ownerShadowRoot!.getHostNode()
+              const nodeDataProxy = Component.getDataProxy(host)
+              nodeDataProxy.replaceDataOnPath(modelLvaluePath, value)
+              nodeDataProxy.applyDataUpdates(false)
+            })
+          }
         }
         const tmplArgs = getTmplArgs(elem)
         if (tmplArgs.changeProp?.[name]) {

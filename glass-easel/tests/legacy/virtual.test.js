@@ -604,6 +604,56 @@ const testCases = function (testBackend) {
       expect(c2.parentNode).toBe(null)
       expect(c2.childNodes.length).toBe(0)
     })
+
+    it('should trigger lifetimes correctly', function () {
+      const lifetimeCalls = []
+      const createElement = name => {
+        const def = componentSpace.defineComponent({
+          is: `self-replace-with-${name}`,
+          lifetimes: {
+            attached() { lifetimeCalls.push(`${name}#attached`) },
+            moved() { lifetimeCalls.push(`${name}#moved`) },
+            detached() { lifetimeCalls.push(`${name}#detached`) },
+          }
+        })
+        return glassEasel.Component.createWithContext(name, def, testBackend)
+      }
+
+      const parent = createElement('parent')
+      const elem = createElement('elem')
+      const child1 = createElement('child1')
+      const child2 = createElement('child2')
+      const childOfChild = createElement('child-of-child')
+
+      parent.appendChild(elem)
+      elem.appendChild(child1)
+      elem.appendChild(child2)
+      child1.appendChild(childOfChild)
+
+      glassEasel.Element.pretendAttached(parent)
+
+      matchElementWithDom(parent)
+      expect(lifetimeCalls).toEqual([
+        'parent#attached',
+        'elem#attached',
+        'child1#attached',
+        'child-of-child#attached',
+        'child2#attached',
+      ])
+      lifetimeCalls.length = 0
+
+      const replacer = createElement('replacer')
+      elem.selfReplaceWith(replacer)
+      
+      matchElementWithDom(parent)
+      expect(lifetimeCalls).toEqual([
+        'elem#detached',
+        'replacer#attached',
+        'child-of-child#moved',
+        'child1#moved',
+        'child2#moved',
+      ])
+    })
   })
 
   describe('component virtualHost', function () {

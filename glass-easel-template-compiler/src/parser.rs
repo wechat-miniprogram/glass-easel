@@ -725,7 +725,13 @@ impl<'a> TmplParseTask<'a> {
                             for attr in old_attrs.into_iter() {
                                 if attr.is_property("name") {
                                     name = attr.value;
-                                } else if attr.is_any_property() {
+                                } else if match attr.kind {
+                                    TmplAttrKind::PropertyOrExternalClass { .. }
+                                    | TmplAttrKind::Data { .. }
+                                    | TmplAttrKind::Mark { .. }
+                                    | TmplAttrKind::Event { .. } => true,
+                                    _ => false,
+                                } {
                                     if let Some(arr) = &mut props {
                                         arr.push(attr);
                                     } else {

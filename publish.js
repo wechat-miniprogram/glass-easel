@@ -19,6 +19,43 @@ if (!/[0-9]+\.[0-9]+\.[0-9]+/.test(version)) {
   throw new Error('version illegal')
 }
 
+// avoid rust warnings
+console.info('Run cargo check')
+if (
+  childProcess.spawnSync('cargo', ['check'], {
+    env: { RUSTFLAGS: '-D warnings', ...process.env },
+    stdio: 'inherit',
+  }).status !== 0
+) {
+  throw new Error('failed to check rust modules (are there rust warnings or errors?)')
+}
+
+// avoid eslint warnings
+;[
+  'glass-easel',
+  'glass-easel-miniprogram-adapter',
+  'glass-easel-miniprogram-webpack-plugin',
+].forEach((p) => {
+  console.info(`Run eslint on ${p}`)
+  if (
+    childProcess.spawnSync('npx', ['eslint', '-c', '../.eslintrc.js', '.'], {
+      cwd: p,
+      stdio: 'inherit',
+    }).status !== 0
+  ) {
+    throw new Error('failed to lint modules (are there eslint warnings or errors?)')
+  }
+})
+console.info('Run eslint on glass-easel-miniprogram-template')
+if (
+  childProcess.spawnSync('npx', ['eslint', '-c', '.eslintrc.js', '.'], {
+    cwd: 'glass-easel-miniprogram-template',
+    stdio: 'inherit',
+  }).status !== 0
+) {
+  throw new Error('failed to lint modules (are there eslint warnings or errors?)')
+}
+
 // check git status
 const gitStatusRes = childProcess.spawnSync('git', ['diff', '--name-only'], { encoding: 'utf8' })
 if (gitStatusRes.status !== 0 || gitStatusRes.stdout.length > 0) {

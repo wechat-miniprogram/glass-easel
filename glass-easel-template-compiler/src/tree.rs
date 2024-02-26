@@ -1041,9 +1041,19 @@ impl TmplElement {
                 let lvalue_path_from_data_scope = match &list_expr {
                     ListExpr::Static(_) => None,
                     ListExpr::Dynamic(p) => {
-                        let has_model_lvalue_path = p.is_model_lvalue_path(scopes);
-                        let has_lvalue_path = p.is_general_lvalue_path(scopes);
-                        has_lvalue_path.then_some(has_model_lvalue_path)
+                        let has_model_lvalue_path = p.has_model_lvalue_path(scopes);
+                        let has_script_lvalue_path = p.has_script_lvalue_path(scopes);
+                        if has_model_lvalue_path && has_script_lvalue_path {
+                            // simply drop it if we cannot decide it is script or not
+                            // this may happens when conditional expression is used
+                            None
+                        } else if has_model_lvalue_path {
+                            Some(true)
+                        } else if has_script_lvalue_path {
+                            Some(false)
+                        } else {
+                            None
+                        }
                     }
                 };
 
@@ -1131,9 +1141,8 @@ impl TmplElement {
                             )?;
                             p.lvalue_state_expr(w, scopes)?;
                             write!(w, ":undefined,")?;
-                            let has_lvalue_path = p.is_general_lvalue_path(scopes);
-                            if has_lvalue_path {
-                                p.lvalue_path(w, scopes, false)?;
+                            if lvalue_path_from_data_scope.is_some() {
+                                p.lvalue_path(w, scopes, None)?;
                             } else {
                                 write!(w, "null")?;
                             }
@@ -1233,10 +1242,23 @@ impl TmplElement {
             }
             TmplVirtualType::Slot { name, props } => {
                 let slot_kind = SlotKind::new(&self.slot, w, scopes)?;
-                let slot_value_init = if let Some(props) = props {
-                    let var_slot_value_init = w.gen_private_ident();
-                    w.expr_stmt(|w| {
-                        write!(w, "var {}=", var_slot_value_init)?;
+                let name = StaticStrOrProcGen::new(name, w, scopes)?;
+                w.expr_stmt(|w| {
+                    write!(w, "S(")?;
+                    match name {
+                        StaticStrOrProcGen::Static(s) => {
+                            write!(w, "{}", gen_lit_str(s))?;
+                        }
+                        StaticStrOrProcGen::Dynamic(p) => {
+                            write!(w, r#"C||K||"#)?;
+                            p.lvalue_state_expr(w, scopes)?;
+                            write!(w, r#"?Y("#)?;
+                            p.value_expr(w)?;
+                            write!(w, "):undefined")?;
+                        }
+                    }
+                    if let Some(props) = props {
+                        write!(w, r#","#)?;
                         w.function_args("N", |w| {
                             for prop in props {
                                 match &prop.kind {
@@ -1267,6 +1289,11 @@ impl TmplElement {
                                             }
                                         }
                                     }
+                                    TmplAttrKind::Event { .. }
+                                    | TmplAttrKind::Data { .. }
+                                    | TmplAttrKind::Mark { .. } => {
+                                        prop.to_proc_gen(w, scopes, bmc)?;
+                                    }
                                     _ => {
                                         // TODO warn unused attr
                                     }
@@ -1274,34 +1301,10 @@ impl TmplElement {
                             }
                             Ok(())
                         })?;
-                        Ok(())
-                    })?;
-                    format!("{}", var_slot_value_init)
-                } else {
-                    String::new()
-                };
-                let name = StaticStrOrProcGen::new(name, w, scopes)?;
-                w.expr_stmt(|w| {
-                    write!(w, "S(")?;
-                    match name {
-                        StaticStrOrProcGen::Static(s) => {
-                            write!(w, "{}", gen_lit_str(s))?;
-                        },
-                        StaticStrOrProcGen::Dynamic(p) => {
-                            write!(w, r#"C||K||"#)?;
-                            p.lvalue_state_expr(w, scopes)?;
-                            write!(w, r#"?Y("#)?;
-                            p.value_expr(w)?;
-                            write!(w, "):undefined")?;
-                        },
-                    }
-                    if slot_value_init.len() > 0 {
-                        write!(w, r#",{}"#, slot_value_init)?;
+                    } else if !slot_kind.is_none() {
+                        write!(w, r#",undefined"#)?;
                     }
                     if !slot_kind.is_none() {
-                        if slot_value_init.len() == 0 {
-                            write!(w, r#",undefined"#)?;
-                        }
                         slot_kind.write_as_extra_argument(w)?;
                     }
                     write!(w, ")")?;
@@ -1418,6 +1421,7 @@ impl TmplAttr {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn is_any_property(&self) -> bool {
         match &self.kind {
             TmplAttrKind::PropertyOrExternalClass { .. } => true,
@@ -1553,14 +1557,14 @@ impl TmplAttr {
                             write!(w, ")O(N,{},", attr_name)?;
                             p.value_expr(w)?;
                             if let TmplAttrKind::ModelProperty { .. } = &self.kind {
-                                if p.is_model_lvalue_path(scopes) {
+                                if p.has_model_lvalue_path(scopes) {
                                     write!(w, ",")?;
-                                    p.lvalue_path(w, scopes, true)?;
+                                    p.lvalue_path(w, scopes, Some(true))?;
                                 }
                             } else if maybe_event_binding(&name) {
-                                if p.is_general_lvalue_path(scopes) && !p.is_model_lvalue_path(scopes) {
-                                    write!(w, ",null,")?;
-                                    p.lvalue_path(w, scopes, false)?;
+                                if p.has_script_lvalue_path(scopes) {
+                                    write!(w, ",undefined,")?;
+                                    p.lvalue_path(w, scopes, Some(false))?;
                                 }
                             }
                             write!(w, ")")?;
@@ -1574,14 +1578,14 @@ impl TmplAttr {
                                         write!(w, "O(N,{},", attr_name)?;
                                         p.value_expr(w)?;
                                         if let TmplAttrKind::ModelProperty { .. } = &self.kind {
-                                            if p.is_model_lvalue_path(scopes) {
+                                            if p.has_model_lvalue_path(scopes) {
                                                 write!(w, ",")?;
-                                                p.lvalue_path(w, scopes, true)?;
+                                                p.lvalue_path(w, scopes, Some(true))?;
                                             }
                                         } else if maybe_event_binding(&name) {
-                                            if p.is_general_lvalue_path(scopes) && !p.is_model_lvalue_path(scopes) {
-                                                write!(w, ",null,")?;
-                                                p.lvalue_path(w, scopes, false)?;
+                                            if p.has_script_lvalue_path(scopes) {
+                                                write!(w, ",undefined,")?;
+                                                p.lvalue_path(w, scopes, Some(false))?;
                                             }
                                         }
                                         write!(w, ")")?;
@@ -1611,9 +1615,9 @@ impl TmplAttr {
                             p.lvalue_state_expr(w, scopes)?;
                             write!(w, ")R.p(N,{},", attr_name)?;
                             p.value_expr(w)?;
-                            if p.is_general_lvalue_path(scopes) && !p.is_model_lvalue_path(scopes) {
+                            if p.has_script_lvalue_path(scopes) {
                                 write!(w, ",")?;
-                                p.lvalue_path(w, scopes, false)?;
+                                p.lvalue_path(w, scopes, Some(false))?;
                             }
                             write!(w, ")")?;
                             Ok(())
@@ -1625,9 +1629,9 @@ impl TmplAttr {
                                     w.expr_stmt(|w| {
                                         write!(w, "R.p(N,{},", attr_name)?;
                                         p.value_expr(w)?;
-                                        if p.is_general_lvalue_path(scopes) && !p.is_model_lvalue_path(scopes) {
+                                        if p.has_script_lvalue_path(scopes) {
                                             write!(w, ",")?;
-                                            p.lvalue_path(w, scopes, false)?;
+                                            p.lvalue_path(w, scopes, Some(false))?;
                                         }
                                         write!(w, ")")?;
                                         Ok(())
@@ -1719,9 +1723,9 @@ impl TmplAttr {
                             if *mut_bind { "!0" } else { "!1" },
                             if *capture { "!0" } else { "!1" },
                         )?;
-                        if p.is_general_lvalue_path(scopes) && !p.is_model_lvalue_path(scopes) {
+                        if p.has_script_lvalue_path(scopes) {
                             write!(w, ",")?;
-                            p.lvalue_path(w, scopes, false)?;
+                            p.lvalue_path(w, scopes, Some(false))?;
                         }
                         write!(w, ")")?;
                         Ok(())
@@ -1740,9 +1744,9 @@ impl TmplAttr {
                                         if *mut_bind { "!0" } else { "!1" },
                                         if *capture { "!0" } else { "!1" },
                                     )?;
-                                    if p.is_general_lvalue_path(scopes) && !p.is_model_lvalue_path(scopes) {
+                                    if p.has_script_lvalue_path(scopes) {
                                         write!(w, ",")?;
-                                        p.lvalue_path(w, scopes, false)?;
+                                        p.lvalue_path(w, scopes, Some(false))?;
                                     }
                                     Ok(())
                                 })

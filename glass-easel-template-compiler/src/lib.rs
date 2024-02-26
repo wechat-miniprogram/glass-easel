@@ -20,7 +20,6 @@ mod binding_map;
 mod entities;
 mod escape;
 mod js_bindings;
-pub use js_bindings::*;
 #[cfg(feature = "c_bindings")]
 pub mod cbinding;
 mod proc_gen;

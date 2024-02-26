@@ -1408,7 +1408,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
             `),
           )
           .registerComponent()
-      
+
         const child = componentSpace
           .define()
           .options({
@@ -1425,7 +1425,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           )
           .property('s', String)
           .registerComponent()
-      
+
         const parent = componentSpace
           .define()
           .usingComponents({ child })
@@ -1440,15 +1440,13 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
             s: '',
           }))
           .registerComponent()
-      
+
         const parentElem = glassEasel.Component.createWithContext(
           'root',
           parent.general(),
           testBackend,
         )
-        expect(domHtml(parentElem)).toBe(
-          '<child><comp><div>comp</div></comp></child>',
-        )
+        expect(domHtml(parentElem)).toBe('<child><comp><div>comp</div></comp></child>')
 
         parentElem.setData({
           s: 'comp-slot',
@@ -1460,11 +1458,9 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         parentElem.setData({
           s: 'invalid',
         })
-        expect(domHtml(parentElem)).toBe(
-          '<child><comp><div>comp</div></comp></child>',
-        )
+        expect(domHtml(parentElem)).toBe('<child><comp><div>comp</div></comp></child>')
       })
-      
+
       test('should support slot as slot content with virtual host and placeholder', () => {
         const placeholder = componentSpace
           .define()
@@ -1479,7 +1475,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
             `),
           )
           .registerComponent()
-      
+
         const child = componentSpace
           .define()
           .options({
@@ -1497,7 +1493,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
             `),
           )
           .registerComponent()
-      
+
         const parent = componentSpace
           .define()
           .usingComponents({ child })
@@ -1509,14 +1505,14 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
             `),
           )
           .registerComponent()
-      
+
         const parentElem = glassEasel.Component.createWithContext(
           'root',
           parent.general(),
           testBackend,
         )
         expect(domHtml(parentElem)).toBe('<div>placeholder</div><div>content</div>')
-      
+
         componentSpace
           .define('comp')
           .options({
@@ -1529,7 +1525,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
             `),
           )
           .registerComponent()
-      
+
         expect(domHtml(parentElem)).toBe('<comp><div>comp</div><div>content</div></comp>')
       })
     })

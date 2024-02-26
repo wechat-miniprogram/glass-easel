@@ -1,15 +1,15 @@
 import {
   Component,
-  GeneralComponent,
-  ExternalShadowRoot,
+  type GeneralComponent,
+  type ExternalShadowRoot,
   ShadowRoot,
   Element,
-  domlikeBackend,
-  backend,
+  type domlikeBackend,
+  type backend,
   TextNode,
   BackendMode,
 } from '../../src'
-import { DoubleLinkedList } from '../../src/element'
+import { type DoubleLinkedList } from '../../src/element'
 
 // check internal structure of an external component (with its child nodes given)
 export const native = (structure: {

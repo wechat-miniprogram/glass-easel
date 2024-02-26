@@ -3,7 +3,7 @@ import nodeResolve from '@rollup/plugin-node-resolve'
 import replace from '@rollup/plugin-replace'
 import terser from '@rollup/plugin-terser'
 import typescript from '@rollup/plugin-typescript'
-import { ModuleFormat, RollupOptions } from 'rollup'
+import type { ModuleFormat, RollupOptions } from 'rollup'
 import dts from 'rollup-plugin-dts'
 
 const jobs: string[] = []

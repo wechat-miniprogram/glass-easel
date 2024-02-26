@@ -398,6 +398,7 @@ pub(crate) enum PathSlice {
     IndirectValue(JsIdent),
     CombineObj(Vec<(Option<String>, PathAnalysisState, Vec<PathSliceList>)>),
     CombineArr(Vec<(PathAnalysisState, Vec<PathSliceList>)>),
+    Condition(JsIdent, (PathAnalysisState, Vec<PathSliceList>), (PathAnalysisState, Vec<PathSliceList>)),
 }
 
 #[derive(Debug)]
@@ -429,27 +430,45 @@ impl PathSliceList {
         Ok(())
     }
 
-    fn is_legal_lvalue_path(&self, scopes: &Vec<ScopeVar>, model_only: bool) -> bool {
+    fn is_legal_lvalue_path(&self, scopes: &Vec<ScopeVar>, model: Option<bool>) -> bool {
         let mut iter = self.0.iter();
         match iter.next() {
             None => return false,
-            Some(PathSlice::Ident(_)) => {}
+            Some(PathSlice::Ident(_)) => {
+                if model == Some(false) { return false }
+            }
             Some(PathSlice::ScopeIndex(i)) => {
                 match &scopes[*i].lvalue_path {
                     ScopeVarLvaluePath::Invalid => return false,
                     ScopeVarLvaluePath::Var { from_data_scope, .. } => {
-                        if model_only && !from_data_scope { return false }
+                        if let Some(model) = model {
+                            if model && !*from_data_scope { return false }
+                            if !model && *from_data_scope { return false }
+                        }
                     }
-                    ScopeVarLvaluePath::Script {..} => {
-                        if model_only { return false }
+                    ScopeVarLvaluePath::Script {..} | ScopeVarLvaluePath::InlineScript {..} => {
+                        if model == Some(true) { return false }
                     }
-                    ScopeVarLvaluePath::InlineScript {..} => {
-                        if model_only { return false }
-                    }
+                }
+            }
+            Some(PathSlice::Condition(_, (true_pas, _), (false_pas, _))) => {
+                let true_br_res = if let PathAnalysisState::InPath(x) = true_pas {
+                    x.is_legal_lvalue_path(scopes, model)
+                } else {
+                    false
+                };
+                let false_br_res = if let PathAnalysisState::InPath(x) = false_pas {
+                    x.is_legal_lvalue_path(scopes, model)
+                } else {
+                    false
+                };
+                if !true_br_res && !false_br_res {
+                    return false
                 }
             }
             _ => return false,
         }
+        // TODO split the first segment as another type to avoid this check
         for x in iter {
             match x {
                 PathSlice::StaticMember(_) | PathSlice::IndirectValue(_) => {}
@@ -461,51 +480,86 @@ impl PathSliceList {
 
     fn to_lvalue_path_arr<W: Write>(
         &self,
-        w: &mut W,
+        w: &mut JsExprWriter<W>,
         scopes: &Vec<ScopeVar>,
-        model_only: bool,
+        model: Option<bool>,
     ) -> Result<(), TmplError> {
-        write!(w, "[")?;
-        let mut iter = self.0.iter();
-        let write_items = || -> Result<_, TmplError> {
-            let mut need_slice_1 = false;
-            if model_only {
-                match iter.next() {
-                    Some(PathSlice::Ident(s)) => write!(w, r#"{}"#, gen_lit_str(s))?,
-                    Some(PathSlice::ScopeIndex(i)) => match &scopes[*i].lvalue_path {
-                        ScopeVarLvaluePath::Var { var_name, from_data_scope } if *from_data_scope => {
-                            write!(w, r#"...{}"#, var_name)?;
-                            need_slice_1 = true;
+        let br = |w: &mut JsExprWriter<W>| -> Result<(), TmplError> {
+            write!(w, "[")?;
+            let mut write_items = || -> Result<bool, TmplError> {
+                let mut iter = self.0.iter();
+                let mut need_slice_1 = false;
+                let mut need_comma = true;
+                if model == Some(true) {
+                    match iter.next() {
+                        Some(PathSlice::Ident(s)) => write!(w, r#"{}"#, gen_lit_str(s))?,
+                        Some(PathSlice::ScopeIndex(i)) => match &scopes[*i].lvalue_path {
+                            ScopeVarLvaluePath::Var { var_name, from_data_scope } if *from_data_scope => {
+                                write!(w, r#"...{}"#, var_name)?;
+                                need_slice_1 = true;
+                            }
+                            _ => return Ok(false),
+                        },
+                        Some(PathSlice::Condition(..)) => {
+                            need_comma = false;
                         }
                         _ => return Ok(false),
-                    },
-                    _ => return Ok(false),
+                    }
+                } else {
+                    match iter.next() {
+                        Some(PathSlice::Ident(s)) => write!(w, r#"0,{}"#, gen_lit_str(s))?,
+                        Some(PathSlice::ScopeIndex(i)) => match &scopes[*i].lvalue_path {
+                            ScopeVarLvaluePath::Invalid => return Ok(false),
+                            ScopeVarLvaluePath::Var { var_name, .. } => write!(w, r#"...{}"#, var_name)?,
+                            ScopeVarLvaluePath::Script { abs_path } => write!(w, r#"1,{}"#, gen_lit_str(abs_path))?,
+                            ScopeVarLvaluePath::InlineScript { path, mod_name } => write!(w, r#"2,{},{}"#, gen_lit_str(path), gen_lit_str(mod_name))?,
+                        },
+                        _ => return Ok(false),
+                    }
                 }
-            } else {
-                match iter.next() {
-                    Some(PathSlice::Ident(s)) => write!(w, r#"0,{}"#, gen_lit_str(s))?,
-                    Some(PathSlice::ScopeIndex(i)) => match &scopes[*i].lvalue_path {
-                        ScopeVarLvaluePath::Invalid => return Ok(false),
-                        ScopeVarLvaluePath::Var { var_name, .. } => write!(w, r#"...{}"#, var_name)?,
-                        ScopeVarLvaluePath::Script { abs_path } => write!(w, r#"1,{}"#, gen_lit_str(abs_path))?,
-                        ScopeVarLvaluePath::InlineScript { path, mod_name } => write!(w, r#"2,{},{}"#, gen_lit_str(path), gen_lit_str(mod_name))?,
-                    },
-                    _ => return Ok(false),
+                for x in iter {
+                    if need_comma {
+                        write!(w, ",")?;
+                    } else {
+                        need_comma = true;
+                    }
+                    match x {
+                        PathSlice::StaticMember(s) => write!(w, "{}", gen_lit_str(s))?,
+                        PathSlice::IndirectValue(i) => write!(w, "{}", i)?,
+                        _ => break,
+                    }
                 }
+                Ok(need_slice_1)
+            };
+            let need_slice_1 = write_items()?;
+            write!(w, "]")?;
+            if need_slice_1 {
+                write!(w, ".slice(1)")?;
             }
-            for x in iter {
-                match x {
-                    PathSlice::StaticMember(s) => write!(w, ",{}", gen_lit_str(s))?,
-                    PathSlice::IndirectValue(i) => write!(w, ",{}", i)?,
-                    _ => break,
-                }
-            }
-            Ok(need_slice_1)
+            Ok(())
         };
-        let need_slice_1 = write_items()?;
-        write!(w, "]")?;
-        if need_slice_1 {
-            write!(w, ".slice(1)")?;
+        if let Some(PathSlice::Condition(cond, (true_br, _), (false_br, _))) = self.0.first() {
+            if self.0.len() == 1 {
+                write!(w, r#"{}?"#, cond)?;
+                true_br.write_lvalue_path(w, scopes, model)?;
+                write!(w, r#":"#)?;
+                false_br.write_lvalue_path(w, scopes, model)?;
+            } else {
+                write!(w, r#"{}?"#, cond)?;
+                if true_br.write_lvalue_path(w, scopes, model)?.is_some() {
+                    write!(w, r#".concat("#)?;
+                    br(w)?;
+                    write!(w, r#")"#)?;
+                }
+                write!(w, r#":"#)?;
+                if false_br.write_lvalue_path(w, scopes, model)?.is_some() {
+                    write!(w, r#".concat("#)?;
+                    br(w)?;
+                    write!(w, r#")"#)?;
+                }
+            }
+        } else {
+            br(w)?;
         }
         Ok(())
     }
@@ -577,6 +631,17 @@ impl PathSliceList {
                     }
                     write!(ret, "]")?;
                 }
+                PathSlice::Condition(cond, (true_pas, true_p), (false_pas, false_p)) => {
+                    write!(ret, "({}?", cond)?;
+                    if true_pas.to_path_analysis_str(true_p, &mut ret, scopes)?.is_none() {
+                        write!(ret, "undefined")?;
+                    }
+                    write!(ret, ":")?;
+                    if false_pas.to_path_analysis_str(false_p, &mut ret, scopes)?.is_none() {
+                        write!(ret, "undefined")?;
+                    }
+                    write!(ret, ")")?;
+                }
             }
         }
         Ok(ret)
@@ -586,7 +651,6 @@ impl PathSliceList {
 #[derive(Debug)]
 pub(crate) enum PathAnalysisState {
     InPath(PathSliceList),
-    InScriptPath(PathSliceList),
     NotInPath,
 }
 
@@ -604,7 +668,7 @@ impl PathAnalysisState {
                 write!(w, "{}", s)?;
                 Some(())
             }
-            PathAnalysisState::NotInPath | PathAnalysisState::InScriptPath(..) => {
+            PathAnalysisState::NotInPath => {
                 if sub_p.len() > 0 {
                     write!(w, "undefined")?;
                     Some(())
@@ -614,6 +678,24 @@ impl PathAnalysisState {
             }
         };
         Ok(ret)
+    }
+
+    fn write_lvalue_path<W: Write>(
+        &self,
+        w: &mut JsExprWriter<W>,
+        scopes: &Vec<ScopeVar>,
+        model: Option<bool>,
+    ) -> Result<Option<()>, TmplError> {
+        match &self {
+            PathAnalysisState::InPath(psl) if psl.is_legal_lvalue_path(scopes, model) => {
+                psl.to_lvalue_path_arr(w, scopes, model)?;
+                Ok(Some(()))
+            }
+            _ => {
+                write!(w, "null")?;
+                Ok(None)
+            }
+        }
     }
 }
 
@@ -631,7 +713,7 @@ impl TmplExpr {
             PathAnalysisState::InPath(path_slices) => {
                 path_calc.push(path_slices);
             }
-            PathAnalysisState::NotInPath | PathAnalysisState::InScriptPath(..) => {}
+            PathAnalysisState::NotInPath => {}
         }
         Ok(())
     }
@@ -668,7 +750,7 @@ impl TmplExpr {
                 write!(value, "{}", scope.var)?;
                 match scope.lvalue_path {
                     ScopeVarLvaluePath::Script { .. } | ScopeVarLvaluePath::InlineScript { .. } => {
-                        PathAnalysisState::InScriptPath(PathSliceList(vec![PathSlice::ScopeIndex(*index)]))
+                        PathAnalysisState::InPath(PathSliceList(vec![PathSlice::ScopeIndex(*index)]))
                     }
                     ScopeVarLvaluePath::Invalid | ScopeVarLvaluePath::Var { .. } => {
                         if scope.update_path_tree.is_some() {
@@ -778,7 +860,7 @@ impl TmplExpr {
                     x.to_proc_gen_rec(w, scopes, TmplExprLevel::Cond, path_calc, value)?;
                 write!(value, ").{}", y)?;
                 match &mut pas {
-                    PathAnalysisState::InPath(path_slices) | PathAnalysisState::InScriptPath(path_slices) => {
+                    PathAnalysisState::InPath(path_slices) => {
                         path_slices.0.push(PathSlice::StaticMember(y.clone()));
                     }
                     PathAnalysisState::NotInPath => {
@@ -809,7 +891,7 @@ impl TmplExpr {
                     x.to_proc_gen_rec(w, scopes, TmplExprLevel::Cond, path_calc, value)?;
                 write!(value, ")[{}]", ident)?;
                 match &mut pas {
-                    PathAnalysisState::InPath(path_slices) | PathAnalysisState::InScriptPath(path_slices) => {
+                    PathAnalysisState::InPath(path_slices) => {
                         path_slices.0.push(PathSlice::IndirectValue(ident));
                     }
                     PathAnalysisState::NotInPath => {
@@ -1077,18 +1159,31 @@ impl TmplExpr {
             }
 
             TmplExpr::Cond(x, y, z) => {
-                x.to_proc_gen_rec_and_end_path(
-                    w,
-                    scopes,
-                    TmplExprLevel::LogicOr,
-                    path_calc,
-                    value,
-                )?;
-                write!(value, "?")?;
-                y.to_proc_gen_rec_and_end_path(w, scopes, TmplExprLevel::Cond, path_calc, value)?;
+                let ident = {
+                    let ident = w.gen_private_ident();
+                    let mut s = String::new();
+                    x.to_proc_gen_rec_and_end_path(
+                        w,
+                        scopes,
+                        TmplExprLevel::Cond,
+                        path_calc,
+                        &mut s,
+                    )?;
+                    w.expr_stmt(|w| {
+                        write!(w, "var {}={}", ident, s)?;
+                        Ok(())
+                    })?;
+                    ident
+                };
+                write!(value, "{}?", ident)?;
+                let true_br = y.to_proc_gen_rec_and_combine_paths(w, scopes, TmplExprLevel::Cond, value)?;
                 write!(value, ":")?;
-                z.to_proc_gen_rec_and_end_path(w, scopes, TmplExprLevel::Cond, path_calc, value)?;
-                PathAnalysisState::NotInPath
+                let false_br = z.to_proc_gen_rec_and_combine_paths(w, scopes, TmplExprLevel::Cond, value)?;
+                PathAnalysisState::InPath(PathSliceList(vec![PathSlice::Condition(
+                    ident,
+                    true_br,
+                    false_br,
+                )]))
             }
         };
         Ok(path_analysis_state)
@@ -1293,20 +1388,28 @@ pub(crate) struct TmplExprProcGen {
 }
 
 impl TmplExprProcGen {
-    pub(crate) fn is_model_lvalue_path(&self, scopes: &Vec<ScopeVar>) -> bool {
+    pub(crate) fn has_model_lvalue_path(&self, scopes: &Vec<ScopeVar>) -> bool {
         if let PathAnalysisState::InPath(psl) = &self.pas {
-            psl.is_legal_lvalue_path(scopes, true)
+            psl.is_legal_lvalue_path(scopes, Some(true))
         } else {
             false
         }
     }
 
-    pub(crate) fn is_general_lvalue_path(&self, scopes: &Vec<ScopeVar>) -> bool {
-        match &self.pas {
-            PathAnalysisState::InPath(psl) | PathAnalysisState::InScriptPath(psl) => {
-                psl.is_legal_lvalue_path(scopes, false)
-            }
-            _ => false,
+    pub(crate) fn has_script_lvalue_path(&self, scopes: &Vec<ScopeVar>) -> bool {
+        if let PathAnalysisState::InPath(psl) = &self.pas {
+            psl.is_legal_lvalue_path(scopes, Some(false))
+        } else {
+            false
+        }
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn has_general_lvalue_path(&self, scopes: &Vec<ScopeVar>) -> bool {
+        if let PathAnalysisState::InPath(psl) = &self.pas {
+            psl.is_legal_lvalue_path(scopes, None)
+        } else {
+            false
         }
     }
 
@@ -1314,14 +1417,9 @@ impl TmplExprProcGen {
         &self,
         w: &mut JsExprWriter<W>,
         scopes: &Vec<ScopeVar>,
-        model_only: bool,
+        model: Option<bool>,
     ) -> Result<(), TmplError> {
-        match &self.pas {
-            PathAnalysisState::InPath(psl) | PathAnalysisState::InScriptPath(psl) => {
-                psl.to_lvalue_path_arr(w, scopes, model_only)?
-            }
-            _ => write!(w, "null")?,
-        }
+        self.pas.write_lvalue_path(w, scopes, model)?;
         Ok(())
     }
 

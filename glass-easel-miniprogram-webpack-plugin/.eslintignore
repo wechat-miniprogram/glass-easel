@@ -1,0 +1,6 @@
+/node_modules
+/dist
+/docs
+/coverage
+/index.js
+/helpers.js

@@ -124,42 +124,66 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
 
     const single = glassEasel.registerElement({
       template: tmpl(`
-        <div capture-bind:customEv="on0c" bind:customEv="on0"><slot /></div>
-        <div capture-bind:customEv="on1c" bind:customEv="on1"><slot name="a" /></div>
+        <div capture-bind:customEv="on0c" bind:customEv="on0">
+          <slot capture-bind:customEv="on1c" bind:customEv="on1" />
+        </div>
+        <div capture-bind:customEv="on2c" bind:customEv="on2">
+          <slot name="a" capture-bind:customEv="on3c" bind:customEv="on3" />
+        </div>
       `),
       methods: {
         on0: () => ops.push('s0'),
         on1: () => ops.push('s1'),
+        on2: () => ops.push('s2'),
+        on3: () => ops.push('s3'),
         on0c: () => ops.push('s0c'),
         on1c: () => ops.push('s1c'),
+        on2c: () => ops.push('s2c'),
+        on3c: () => ops.push('s3c'),
       },
     })
 
     const multi = glassEasel.registerElement({
       options: { multipleSlots: true },
       template: tmpl(`
-        <div capture-bind:customEv="on0c" bind:customEv="on0"><slot /></div>
-        <div capture-bind:customEv="on1c" bind:customEv="on1"><slot name="a" /></div>
+        <div capture-bind:customEv="on0c" bind:customEv="on0">
+          <slot capture-bind:customEv="on1c" bind:customEv="on1" />
+        </div>
+        <div capture-bind:customEv="on2c" bind:customEv="on2">
+          <slot name="a" capture-bind:customEv="on3c" bind:customEv="on3" />
+        </div>
       `),
       methods: {
         on0: () => ops.push('m0'),
         on1: () => ops.push('m1'),
+        on2: () => ops.push('m2'),
+        on3: () => ops.push('m3'),
         on0c: () => ops.push('m0c'),
         on1c: () => ops.push('m1c'),
+        on2c: () => ops.push('m2c'),
+        on3c: () => ops.push('m3c'),
       },
     })
 
     const dynamic = glassEasel.registerElement({
       options: { dynamicSlots: true },
       template: tmpl(`
-        <div capture-bind:customEv="on0c" bind:customEv="on0"><slot /></div>
-        <div capture-bind:customEv="on1c" bind:customEv="on1"><slot name="a" /></div>
+        <div capture-bind:customEv="on0c" bind:customEv="on0">
+          <slot capture-bind:customEv="on1c" bind:customEv="on1" />
+        </div>
+        <div capture-bind:customEv="on2c" bind:customEv="on2">
+          <slot name="a" capture-bind:customEv="on3c" bind:customEv="on3" />
+        </div>
       `),
       methods: {
         on0: () => ops.push('d0'),
         on1: () => ops.push('d1'),
+        on2: () => ops.push('d2'),
+        on3: () => ops.push('d3'),
         on0c: () => ops.push('d0c'),
         on1c: () => ops.push('d1c'),
+        on2c: () => ops.push('d2c'),
+        on3c: () => ops.push('d3c'),
       },
     })
 
@@ -220,26 +244,32 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect(ops).toEqual([
       'p0c',
       's0c',
+      's1c',
       'p3c',
       'p3',
+      's1',
       's0',
       'p0',
       'p1c',
-      'm1c',
+      'm2c',
+      'm3c',
       'p4c',
       'p4',
-      'm1',
+      'm3',
+      'm2',
       'p1',
       'p2c',
-      'd1c',
+      'd2c',
+      'd3c',
       'p5c',
       'p5',
-      'd1',
+      'd3',
+      'd2',
       'p2',
     ])
   })
 
-  test('event function bindings', () => {
+  test('change property bindings', () => {
     const abc = glassEasel.registerElement({
       properties: { abc: String },
     })
@@ -266,7 +296,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect((a as unknown as { _test: string })._test).toBe('456:123')
   })
 
-  test('change property bindings', () => {
+  test('event function bindings', () => {
     const abc = glassEasel.registerElement({
       lifetimes: {
         attached() {
@@ -289,6 +319,40 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     glassEasel.Element.pretendAttached(elem)
     const a = elem.getShadowRoot()!.getElementById('a')!
     expect((a as unknown as { _test: string })._test).toBe(123)
+  })
+
+  test('event function bindings (with conditional expression)', () => {
+    const abc = glassEasel.registerElement({
+      lifetimes: {
+        attached() {
+          this.triggerEvent('abc')
+        },
+      },
+    })
+    const def = glassEasel.registerElement({
+      using: { abc: abc.general() },
+      template: tmpl(`
+        <wxs module="modA">
+          exports.fA = function (ev) {
+            ev.target._test = 123
+          }
+          exports.fB = function (ev) {
+            ev.target._test = 456
+          }
+        </wxs>
+        <abc id="a" bind:abc="{{ cond ? modA.fB : modA.fA }}" />
+      `),
+      data: {
+        cond: false,
+      },
+    })
+    const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
+    glassEasel.Element.pretendAttached(elem)
+    const a = elem.getShadowRoot()!.getElementById('a')!
+    expect((a as unknown as { _test: string })._test).toBe(123)
+    elem.setData({ cond: true })
+    a.triggerEvent('abc')
+    expect((a as unknown as { _test: string })._test).toBe(456)
   })
 
   test('worklet directives', () => {
