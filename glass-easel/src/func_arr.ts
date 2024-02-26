@@ -131,7 +131,7 @@ export function safeCallback<F extends GeneralFuncType>(
   method: F,
   caller: ThisParameterType<F>,
   args: Parameters<F>,
-  relatedComponent?: AnyComponent,
+  relatedComponent?: AnyComponent | string,
 ): ReturnType<F> | undefined {
   try {
     if (ENV.DEV)

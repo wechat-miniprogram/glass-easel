@@ -43,7 +43,7 @@ export const getDevtool = (): DevtoolInterface | null | undefined => {
 
 export const performanceMeasureStart = (
   type: string,
-  comp: AnyComponent | null = null,
+  comp: AnyComponent | string | null = null,
   data?: Record<string, unknown>,
 ) => {
   getDevtool()?.addTimelinePerformanceMeasureStart(getDevtool()!.now(), type, comp, data)

@@ -159,7 +159,7 @@ export class BehaviorBuilder<
   /** @internal */
   _$staticData: { [field: string]: any } | undefined = undefined
   /** @internal */
-  _$data: ((component: GeneralComponent) => { [field: string]: any })[] = []
+  _$data: (() => { [field: string]: any })[] = []
   /** @internal */
   _$properties?: { name: string; def: PropertyListItem<PropertyType, unknown> }[]
   /** @internal */
@@ -353,7 +353,7 @@ export class BehaviorBuilder<
     BehaviorBuilder<T, TData & T, TProperty, TMethod, TChainingFilter, TPendingChainingFilter>,
     TChainingFilter
   > {
-    this._$data.push((component) => safeCallback('Data Generator', gen, null, [], component) ?? {})
+    this._$data.push(() => safeCallback('Data Generator', gen, null, [], this._$is) ?? {})
     return this as any
   }
 
@@ -574,9 +574,7 @@ export class BehaviorBuilder<
     const rawData = def.data
     if (rawData !== undefined) {
       if (typeof rawData === 'function') {
-        this._$data.push(
-          (component) => safeCallback('Data Generator', rawData, null, [], component) ?? {},
-        )
+        this._$data.push(() => safeCallback('Data Generator', rawData, null, [], this._$is) ?? {})
       } else {
         this._$staticData = rawData
       }
@@ -748,7 +746,7 @@ export class Behavior<
   /** @internal */
   _$staticData?: DataList
   /** @internal */
-  _$data: ((component: GeneralComponent) => { [field: string]: any })[]
+  _$data: (() => { [field: string]: any })[]
   /** @internal */
   _$propertyMap: { [name: string]: PropertyDefinition }
   /** @internal */
@@ -1200,11 +1198,11 @@ export class Behavior<
           func: d.default === undefined ? () => simpleDeepCopy(d.value) : d.default,
         })
       }
-      this._$data.push((component) => {
+      this._$data.push(() => {
         const ret: DataList = {}
         for (let i = 0; i < initValueFuncs.length; i += 1) {
           const { name, func } = initValueFuncs[i]!
-          ret[name] = safeCallback(`Property "${name}" Default`, func, null, [], component)
+          ret[name] = safeCallback(`Property "${name}" Default`, func, null, [], is)
         }
         return ret
       })
