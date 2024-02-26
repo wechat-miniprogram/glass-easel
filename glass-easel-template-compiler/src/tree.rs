@@ -653,7 +653,7 @@ impl TmplElement {
             generics: None,
             extra_attr: None,
             slot: None,
-            slot_values: Vec::with_capacity(0),
+            slot_values: vec![],
         }
     }
 

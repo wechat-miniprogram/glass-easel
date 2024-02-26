@@ -522,7 +522,7 @@ impl<'a> TmplParseTask<'a> {
                     let mut attr_for_index = None;
                     let mut attr_key = None;
                     let mut attr_slot = None;
-                    let mut slot_values: Vec<(String, String)> = Vec::with_capacity(0);
+                    let mut slot_values: Vec<(String, String)> = vec![];
                     let mut generics: Option<HashMap<String, String>> = None;
 
                     // extract attrs

@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, ops::Range};
+use std::{borrow::Cow, collections::HashMap, ops::Range, panic::Location};
 
 use compact_str::CompactString;
 
@@ -25,10 +25,10 @@ pub struct TemplateGlobals {
 impl Template {
     pub(super) fn parse(ps: &mut ParseState) -> Self {
         let mut globals = TemplateGlobals {
-            imports: Vec::with_capacity(0),
-            includes: Vec::with_capacity(0),
+            imports: vec![],
+            includes: vec![],
             sub_templates: HashMap::with_capacity(0),
-            scripts: Vec::with_capacity(0),
+            scripts: vec![],
         };
         let mut content = vec![];
         Node::parse_vec_node(ps, &mut globals, &mut content);
@@ -109,8 +109,11 @@ pub enum ElementKind {
         attributes: Vec<Attribute>,
         class: ClassAttribute,
         style: StyleAttribute,
+        change_attributes: Vec<Attribute>,
+        worklet_attributes: Vec<(Name, CompactString, Range<Position>)>,
         event_binding: Vec<EventBinding>,
         mark: Vec<(Name, Value)>,
+        data: Vec<(Name, Value)>,
         children: Vec<Node>,
         generics: Vec<(Name, CompactString, Range<Position>)>,
         extra_attr: Vec<(Name, CompactString, Range<Position>)>,
@@ -121,7 +124,7 @@ pub enum ElementKind {
         event_binding: Vec<EventBinding>,
         mark: Vec<(Name, Value)>,
         children: Vec<Node>,
-        slot: Value,
+        slot: Option<Value>,
     },
     For {
         list: Value,
@@ -136,14 +139,21 @@ pub enum ElementKind {
     TemplateRef {
         target: Value,
         data: Value,
-        slot: Value,
+        event_binding: Vec<EventBinding>,
+        mark: Vec<(Name, Value)>,
+        slot: Option<Value>,
     },
     Include {
         path: Name,
-        slot: Value,
+        event_binding: Vec<EventBinding>,
+        mark: Vec<(Name, Value)>,
+        slot: Option<Value>,
     },
     Slot {
-        name: Value,
+        event_binding: Vec<EventBinding>,
+        mark: Vec<(Name, Value)>,
+        slot: Option<Value>,
+        name: Option<Value>,
         values: Vec<Attribute>,
     },
 }
@@ -168,6 +178,63 @@ impl Element {
         } else {
             tag_name_slices[0]
         };
+        
+        // create an empty element
+        let default_attr_position = tag_name.location.end;
+        let mut element = match tag_name.name.as_str() {
+            "block" => {
+                ElementKind::Pure {
+                    event_binding: vec![],
+                    mark: vec![],
+                    children: vec![],
+                    slot: None,
+                }
+            }
+            "template" => {
+                ElementKind::TemplateRef {
+                    target: Value::new_empty(default_attr_position),
+                    data: Value::new_empty(default_attr_position),
+                    event_binding: vec![],
+                    mark: vec![],
+                    slot: None,
+                }
+            }
+            "include" => {
+                ElementKind::Include {
+                    path: Name::new_empty(default_attr_position),
+                    event_binding: vec![],
+                    mark: vec![],
+                    slot: None,
+                }
+            }
+            "slot" => {
+                ElementKind::Slot {
+                    event_binding: vec![],
+                    mark: vec![],
+                    slot: None,
+                    name: None,
+                    values: vec![],
+                }
+            }
+            _ => {
+                ElementKind::Normal {
+                    tag_name,
+                    attributes: vec![],
+                    class: ClassAttribute::None,
+                    style: StyleAttribute::None,
+                    change_attributes: vec![],
+                    worklet_attributes: vec![],
+                    event_binding: vec![],
+                    mark: vec![],
+                    data: vec![],
+                    children: vec![],
+                    generics: vec![],
+                    extra_attr: vec![],
+                    slot: None,
+                    slot_value_refs: vec![],
+                }
+            }
+        };
 
         // parse attributes
         let mut wx_if = None;
@@ -175,17 +242,13 @@ impl Element {
         let mut wx_for_index = None;
         let mut wx_for_item = None;
         let mut wx_key = None;
-        let mut normal_attrs = Vec::with_capacity(0);
-        let mut class_attr = ClassAttribute::None;
-        let mut style_attr = StyleAttribute::None;
-        let mut children = Vec::with_capacity(0);
-        let mut generics = Vec::with_capacity(0);
-        let mut extra_attr = Vec::with_capacity(0);
-        let mut slot = None;
-        let mut slot_value_refs = Vec::with_capacity(0);
+        let mut template_name = None;
         loop {
             ps.skip_whitespace();
             let Some(peek) = ps.peek_with_whitespace::<0>() else { break };
+            if peek == '>' {
+                break;
+            }
             if peek == '/' {
                 // maybe self-close
                 if ps.peek_with_whitespace::<1>() == Some('>') {
@@ -195,8 +258,7 @@ impl Element {
                 ps.next_with_whitespace(); // '/'
                 ps.add_warning(ParseErrorKind::IllegalCharacter, pos..ps.position());
             } else if Name::is_start_char(peek) {
-                // resolve attribute according to its kind
-                #[derive(Debug, PartialEq)]
+                // decide the attribute kind
                 enum AttrPrefixKind {
                     Normal,
                     WxIf,
@@ -204,61 +266,73 @@ impl Element {
                     WxForIndex,
                     WxForItem,
                     WxKey,
-                    Model,
-                    Change,
-                    Worklet,
-                    Data,
-                    Class,
-                    Style,
-                    Bind,
-                    MutBind,
-                    Catch,
-                    CaptureBind,
-                    CaptureMutBind,
-                    CaptureCatch,
-                    Mark,
-                    Generic,
-                    ExtraAttr,
-                    SlotDataRef,
-                    Invalid,
+                    TemplateName,
+                    TemplateIs,
+                    TemplateData,
+                    IncludeSrc,
+                    Model(Range<Position>),
+                    Change(Range<Position>),
+                    Worklet(Range<Position>),
+                    Data(Range<Position>),
+                    Class(Range<Position>),
+                    Style(Range<Position>),
+                    Bind(Range<Position>),
+                    MutBind(Range<Position>),
+                    Catch(Range<Position>),
+                    CaptureBind(Range<Position>),
+                    CaptureMutBind(Range<Position>),
+                    CaptureCatch(Range<Position>),
+                    Mark(Range<Position>),
+                    Generic(Range<Position>),
+                    ExtraAttr(Range<Position>),
+                    SlotDataRef(Range<Position>),
+                    Invalid(Range<Position>),
                 }
                 let segs = Name::parse_colon_separated(ps);
-                let name = segs.pop().unwrap();
+                let attr_name = segs.pop().unwrap();
                 let prefix = if segs.len() <= 1 {
                     match segs.first() {
-                        None => AttrPrefixKind::Normal,
+                        None => {
+                            match (&element, attr_name.name.as_str()) {
+                                (ElementKind::TemplateRef { .. }, "name") => AttrPrefixKind::TemplateName,
+                                (ElementKind::TemplateRef { .. }, "is") => AttrPrefixKind::TemplateIs,
+                                (ElementKind::TemplateRef { .. }, "data") => AttrPrefixKind::TemplateData,
+                                (ElementKind::Include { .. }, "src") => AttrPrefixKind::IncludeSrc,
+                                _ => AttrPrefixKind::Normal,
+                            }
+                        }
                         Some(x) => match x.name.as_str() {
-                            "wx" => match name.name.as_str() {
+                            "wx" => match attr_name.name.as_str() {
                                 "if" => AttrPrefixKind::WxIf,
                                 "for" => AttrPrefixKind::WxFor,
                                 "for-index" => AttrPrefixKind::WxForIndex,
                                 "for-item" => AttrPrefixKind::WxForItem,
                                 "key" => AttrPrefixKind::WxKey,
                             },
-                            "model" => AttrPrefixKind::Model,
-                            "change" => AttrPrefixKind::Change,
-                            "worklet" => AttrPrefixKind::Worklet,
-                            "data" => AttrPrefixKind::Data,
-                            "class" => AttrPrefixKind::Class,
-                            "style" => AttrPrefixKind::Style,
-                            "bind" => AttrPrefixKind::Bind,
-                            "mut-bind" => AttrPrefixKind::MutBind,
-                            "catch" => AttrPrefixKind::Catch,
-                            "capture-bind" => AttrPrefixKind::CaptureBind,
-                            "capture-mut-bind" => AttrPrefixKind::CaptureMutBind,
-                            "capture-catch" => AttrPrefixKind::CaptureCatch,
-                            "mark" => AttrPrefixKind::Mark,
-                            "generic" => AttrPrefixKind::Generic,
-                            "extra-attr" => AttrPrefixKind::ExtraAttr,
-                            "slot" => AttrPrefixKind::SlotDataRef,
-                            _ => AttrPrefixKind::Invalid,
+                            "model" => AttrPrefixKind::Model(x.location()),
+                            "change" => AttrPrefixKind::Change(x.location()),
+                            "worklet" => AttrPrefixKind::Worklet(x.location()),
+                            "data" => AttrPrefixKind::Data(x.location()),
+                            "class" => AttrPrefixKind::Class(x.location()),
+                            "style" => AttrPrefixKind::Style(x.location()),
+                            "bind" => AttrPrefixKind::Bind(x.location()),
+                            "mut-bind" => AttrPrefixKind::MutBind(x.location()),
+                            "catch" => AttrPrefixKind::Catch(x.location()),
+                            "capture-bind" => AttrPrefixKind::CaptureBind(x.location()),
+                            "capture-mut-bind" => AttrPrefixKind::CaptureMutBind(x.location()),
+                            "capture-catch" => AttrPrefixKind::CaptureCatch(x.location()),
+                            "mark" => AttrPrefixKind::Mark(x.location()),
+                            "generic" => AttrPrefixKind::Generic(x.location()),
+                            "extra-attr" => AttrPrefixKind::ExtraAttr(x.location()),
+                            "slot" => AttrPrefixKind::SlotDataRef(x.location()),
+                            _ => AttrPrefixKind::Invalid(x.location()),
                         }
                     }
                 } else {
-                    AttrPrefixKind::Invalid
+                    AttrPrefixKind::Invalid(segs.first().unwrap().location())
                 };
-                if prefix == AttrPrefixKind::Invalid {
-                    ps.add_warning(ParseErrorKind::IllegalAttributePrefix, segs.first().unwrap().location());
+                if let AttrPrefixKind::Invalid(location) = &prefix {
+                    ps.add_warning(ParseErrorKind::IllegalAttributePrefix, location.clone());
                 }
                 #[derive(Debug, PartialEq)]
                 enum AttrPrefixParseKind {
@@ -273,33 +347,50 @@ impl Element {
                     AttrPrefixKind::WxForIndex => AttrPrefixParseKind::ScopeName,
                     AttrPrefixKind::WxForItem => AttrPrefixParseKind::ScopeName,
                     AttrPrefixKind::WxKey => AttrPrefixParseKind::StaticStr,
-                    AttrPrefixKind::Model => AttrPrefixParseKind::Value,
-                    AttrPrefixKind::Change => AttrPrefixParseKind::Value,
-                    AttrPrefixKind::Worklet => AttrPrefixParseKind::Value,
-                    AttrPrefixKind::Data => AttrPrefixParseKind::Value,
-                    AttrPrefixKind::Class => AttrPrefixParseKind::Value,
-                    AttrPrefixKind::Style => AttrPrefixParseKind::Value,
-                    AttrPrefixKind::Bind => AttrPrefixParseKind::Value,
-                    AttrPrefixKind::MutBind => AttrPrefixParseKind::Value,
-                    AttrPrefixKind::Catch => AttrPrefixParseKind::Value,
-                    AttrPrefixKind::CaptureBind => AttrPrefixParseKind::Value,
-                    AttrPrefixKind::CaptureMutBind => AttrPrefixParseKind::Value,
-                    AttrPrefixKind::CaptureCatch => AttrPrefixParseKind::Value,
-                    AttrPrefixKind::Mark => AttrPrefixParseKind::Value,
-                    AttrPrefixKind::Generic => AttrPrefixParseKind::StaticStr,
-                    AttrPrefixKind::ExtraAttr => AttrPrefixParseKind::Value,
-                    AttrPrefixKind::SlotDataRef => AttrPrefixParseKind::ScopeName,
-                    AttrPrefixKind::Invalid => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::TemplateName => AttrPrefixParseKind::StaticStr,
+                    AttrPrefixKind::TemplateIs => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::TemplateData => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::IncludeSrc => AttrPrefixParseKind::StaticStr,
+                    AttrPrefixKind::Model(_) => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::Change(_) => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::Worklet(_) => AttrPrefixParseKind::StaticStr,
+                    AttrPrefixKind::Data(_) => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::Class(_) => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::Style(_) => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::Bind(_) => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::MutBind(_) => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::Catch(_) => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::CaptureBind(_) => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::CaptureMutBind(_) => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::CaptureCatch(_) => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::Mark(_) => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::Generic(_) => AttrPrefixParseKind::StaticStr,
+                    AttrPrefixKind::ExtraAttr(_) => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::SlotDataRef(_) => AttrPrefixParseKind::ScopeName,
+                    AttrPrefixKind::Invalid(_) => AttrPrefixParseKind::Value,
                 };
-                let value = if ps.peek_without_whitespace::<0>() == Some('=') {
+
+                // actually parse the value
+                enum AttrPrefixParseResult {
+                    Invalid,
+                    Value(Value),
+                    StaticStr(CompactString, Range<Position>),
+                    ScopeName(Name),
+                }
+                let attr_value = if ps.peek_without_whitespace::<0>() == Some('=') {
                     if let Some(range) = ps.skip_whitespace() {
                         ps.add_warning(ParseErrorKind::UnexpectedWhitespace, range);
                     }
                     ps.next_with_whitespace(); // '='
                     match ps.peek_without_whitespace::<0>() {
-                        None => {
-                            ps.add_warning_at_current_position(ParseErrorKind::UnexpectedWhitespace);
-                            Some(Value::new_empty(ps.position()))
+                        None | Some('>') | Some('/') => {
+                            let pos = ps.position();
+                            ps.add_warning_at_current_position(ParseErrorKind::MissingAttributeValue);
+                            match parse_kind {
+                                AttrPrefixParseKind::Value => AttrPrefixParseResult::Value(Value::new_empty(pos)),
+                                AttrPrefixParseKind::StaticStr => AttrPrefixParseResult::StaticStr(CompactString::new_inline(""), pos..pos),
+                                AttrPrefixParseKind::ScopeName => AttrPrefixParseResult::ScopeName(Name::new_empty(pos)),
+                            }
                         }
                         Some(ch) if ch == '"' || ch == '\'' => {
                             // parse as `"..."`
@@ -307,64 +398,288 @@ impl Element {
                                 ps.add_warning(ParseErrorKind::UnexpectedWhitespace, range);
                             }
                             ps.next_with_whitespace(); // ch
-                            let value = match &mut parse_kind {
-                                AttrPrefixParseKind::Value => Value::parse_until_before(ps, ch),
+                            let value = match parse_kind {
+                                AttrPrefixParseKind::Value => AttrPrefixParseResult::Value(Value::parse_until_before(ps, ch)),
                                 AttrPrefixParseKind::StaticStr => {
-                                    let value = Name::parse_identifier_like_until_before(ps, |x| x == ch);
-                                    if value.name.as_str().contains("{{") {
-                                        ps.add_warning(ParseErrorKind::DataBindingNotAllowed, value.location());
+                                    let v = Name::parse_identifier_like_until_before(ps, |x| x == ch);
+                                    if v.name.as_str().contains("{{") {
+                                        ps.add_warning(ParseErrorKind::DataBindingNotAllowed, v.location());
                                     }
-                                    value
+                                    AttrPrefixParseResult::StaticStr(v.name, v.location)
                                 },
                                 AttrPrefixParseKind::ScopeName => {
-                                    let value = Name::parse_identifier_like_until_before(ps, |x| x == ch);
-                                    let mut chars = value.name.chars();
-                                    let first = chars.next();
-                                    let invalid = match first {
-                                        None => true,
-                                        Some(ch) if !Name::is_start_char(ch) => true,
-                                        Some(_) => {
-                                            chars.find(|ch| !Name::is_following_char(*ch)).is_some()
-                                        }
-                                    };
-                                    if invalid {
-                                        ps.add_warning(ParseErrorKind::DataBindingNotAllowed, value.location());
+                                    let v = Name::parse_identifier_like_until_before(ps, |x| x == ch);
+                                    if !v.is_valid_identifier() {
+                                        ps.add_warning(ParseErrorKind::InvalidIdentifier, v.location());
                                     }
-                                    value
+                                    AttrPrefixParseResult::ScopeName(v)
                                 },
                             };
                             ps.next_with_whitespace(); // ch
-                            Some(value)
+                            value
                         }
                         Some('{') if ps.peek_without_whitespace::<1>() == Some('{') => {
                             // parse `{{...}}`
                             if let Some(range) = ps.skip_whitespace() {
                                 ps.add_warning(ParseErrorKind::UnexpectedWhitespace, range);
                             }
-                            let value = Value::parse_data_binding(ps)
-                                .map(Value::from_expression);
-                            if parse_kind != AttrPrefixParseKind::Value {
-                                if let Some(value) = value.as_ref() {
-                                    ps.add_warning(ParseErrorKind::DataBindingNotAllowed, value.location());
+                            let value = Value::parse_data_binding(ps).map(Value::from_expression);
+                            if let Some(value) = value {
+                                match parse_kind {
+                                    AttrPrefixParseKind::Value => {
+                                        AttrPrefixParseResult::Value(value)
+                                    }
+                                    AttrPrefixParseKind::StaticStr | AttrPrefixParseKind::ScopeName => {
+                                        ps.add_warning(ParseErrorKind::DataBindingNotAllowed, value.location());
+                                        AttrPrefixParseResult::Invalid
+                                    }
                                 }
+                            } else {
+                                AttrPrefixParseResult::Invalid
                             }
-                            value
-                        }
-                        Some('>') | Some('/') => {
-                            ps.add_warning_at_current_position(ParseErrorKind::MissingAttributeValue);
-                            Some(Value::new_empty(ps.position()))
                         }
                         Some(_) => {
-                            let value = Name::parse_identifier_like_until_before(ps, |x| char::is_whitespace(x));
-                            Some(value)
+                            let v = Name::parse_identifier_like_until_before(ps, |x| !Name::is_following_char(x));
+                            match parse_kind {
+                                AttrPrefixParseKind::Value => AttrPrefixParseResult::Value(Value::Static { value: v.name, location: v.location }),
+                                AttrPrefixParseKind::StaticStr => AttrPrefixParseResult::StaticStr(v.name, v.location),
+                                AttrPrefixParseKind::ScopeName => AttrPrefixParseResult::ScopeName(v),
+                            }
                         }
                     }
                 } else {
-                    None
+                    let pos = attr_name.location.end;
+                    match parse_kind {
+                        AttrPrefixParseKind::Value => AttrPrefixParseResult::Value(Value::new_empty(pos)),
+                        AttrPrefixParseKind::StaticStr => AttrPrefixParseResult::StaticStr(CompactString::new_inline(""), pos..pos),
+                        AttrPrefixParseKind::ScopeName => AttrPrefixParseResult::ScopeName(Name::new_empty(pos)),
+                    }
                 };
+
+                // apply attribute value according to its kind
+                match prefix {
+                    AttrPrefixKind::Normal => {
+                        match &mut element {
+                            ElementKind::Normal { attributes, .. } => {
+                                if let AttrPrefixParseResult::Value(value) = attr_value {
+                                    if attributes.iter().find(|x| x.name.name_eq(&attr_name)).is_some() {
+                                        ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
+                                    } else {
+                                        let attr = Attribute { kind: AttributeKind::Normal, name: attr_name, value };
+                                        attributes.push(attr);
+                                    }
+                                }
+                            }
+                            ElementKind::Slot { values, .. } => {
+                                if let AttrPrefixParseResult::Value(value) = attr_value {
+                                    if values.iter().find(|x| x.name.name_eq(&attr_name)).is_some() {
+                                        ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
+                                    } else {
+                                        let attr = Attribute { kind: AttributeKind::Normal, name: attr_name, value };
+                                        values.push(attr);
+                                    }
+                                }
+                            }
+                            ElementKind::Pure { .. } | ElementKind::For { .. } | ElementKind::If { .. } | ElementKind::TemplateRef { .. } | ElementKind::Include { .. } => {
+                                ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
+                            }
+                        }
+                    }
+                    AttrPrefixKind::WxIf => {
+                        if let AttrPrefixParseResult::Value(value) = attr_value {
+                            if wx_if.is_some() {
+                                ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
+                            } else {
+                                wx_if = Some(value);
+                            }
+                        }
+                    }
+                    AttrPrefixKind::WxFor => {
+                        if let AttrPrefixParseResult::Value(value) = attr_value {
+                            if wx_for.is_some() {
+                                ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
+                            } else {
+                                wx_for = Some(value);
+                            }
+                        }
+                    }
+                    AttrPrefixKind::WxForIndex => {
+                        if let AttrPrefixParseResult::ScopeName(s) = attr_value {
+                            if wx_for_index.is_some() {
+                                ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
+                            } else {
+                                wx_for_index = Some(s);
+                            }
+                        }
+                    }
+                    AttrPrefixKind::WxForItem => {
+                        if let AttrPrefixParseResult::ScopeName(s) = attr_value {
+                            if wx_for_item.is_some() {
+                                ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
+                            } else {
+                                wx_for_item = Some(s);
+                            }
+                        }
+                    }
+                    AttrPrefixKind::WxKey => {
+                        if let AttrPrefixParseResult::StaticStr(s, location) = attr_value {
+                            if wx_key.is_some() {
+                                ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
+                            } else {
+                                wx_key = Some((s, location));
+                            }
+                        }
+                    }
+                    AttrPrefixKind::TemplateName => {
+                        if let AttrPrefixParseResult::StaticStr(s, location) = attr_value {
+                            if template_name.is_some() {
+                                ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
+                            } else {
+                                template_name = Some((s, location));
+                            }
+                        }
+                    }
+                    AttrPrefixKind::TemplateIs => {
+                        match &mut element {
+                            ElementKind::TemplateRef { target, .. } => {
+                                if let AttrPrefixParseResult::Value(value) = attr_value {
+                                    if target.location().end != default_attr_position {
+                                        ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
+                                    } else {
+                                        *target = value;
+                                    }
+                                }
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
+                    AttrPrefixKind::TemplateData => {
+                        match &mut element {
+                            ElementKind::TemplateRef { data, .. } => {
+                                if let AttrPrefixParseResult::Value(value) = attr_value {
+                                    if data.location().end != default_attr_position {
+                                        ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
+                                    } else {
+                                        *data = value;
+                                    }
+                                }
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
+                    AttrPrefixKind::IncludeSrc => {
+                        match &mut element {
+                            ElementKind::Include { path, .. } => {
+                                if let AttrPrefixParseResult::StaticStr(s, location) = attr_value {
+                                    if path.location().end != default_attr_position {
+                                        ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
+                                    } else {
+                                        *path = Name { name: s, location };
+                                    }
+                                }
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
+                    AttrPrefixKind::Model(prefix_location) => {
+                        match &mut element {
+                            ElementKind::Normal { attributes, .. } => {
+                                if let AttrPrefixParseResult::Value(value) = attr_value {
+                                    if attributes.iter().find(|x| x.name.name_eq(&attr_name)).is_some() {
+                                        ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
+                                    } else {
+                                        let attr = Attribute { kind: AttributeKind::Model(prefix_location), name: attr_name, value };
+                                        attributes.push(attr);
+                                    }
+                                }
+                            }
+                            ElementKind::Slot { .. } | ElementKind::Pure { .. } | ElementKind::For { .. } | ElementKind::If { .. } | ElementKind::TemplateRef { .. } | ElementKind::Include { .. } => {
+                                ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
+                            }
+                        }
+                    }
+                    AttrPrefixKind::Change(prefix_location) => {
+                        match &mut element {
+                            ElementKind::Normal { change_attributes, .. } => {
+                                if let AttrPrefixParseResult::Value(value) = attr_value {
+                                    if change_attributes.iter().find(|x| x.name.name_eq(&attr_name)).is_some() {
+                                        ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
+                                    } else {
+                                        let attr = Attribute { kind: AttributeKind::Normal, name: attr_name, value };
+                                        change_attributes.push(attr);
+                                    }
+                                }
+                            }
+                            ElementKind::Slot { .. } | ElementKind::Pure { .. } | ElementKind::For { .. } | ElementKind::If { .. } | ElementKind::TemplateRef { .. } | ElementKind::Include { .. } => {
+                                ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
+                            }
+                        }
+                    }
+                    AttrPrefixKind::Worklet(prefix_location) => {
+                        match &mut element {
+                            ElementKind::Normal { worklet_attributes, .. } => {
+                                if let AttrPrefixParseResult::StaticStr(s, location) = attr_value {
+                                    if worklet_attributes.iter().find(|(x, _, _)| x.name_eq(&attr_name)).is_some() {
+                                        ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
+                                    } else {
+                                        worklet_attributes.push((attr_name, s, location));
+                                    }
+                                }
+                            }
+                            ElementKind::Slot { .. } | ElementKind::Pure { .. } | ElementKind::For { .. } | ElementKind::If { .. } | ElementKind::TemplateRef { .. } | ElementKind::Include { .. } => {
+                                ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
+                            }
+                        }
+                    }
+                    AttrPrefixKind::Data(prefix_location) => {
+                        match &mut element {
+                            ElementKind::Normal { data, .. } => {
+                                if let AttrPrefixParseResult::Value(value) = attr_value {
+                                    if data.iter().find(|(x, _)| x.name_eq(&attr_name)).is_some() {
+                                        ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
+                                    } else {
+                                        let attr = Attribute { kind: AttributeKind::Normal, name: attr_name, value };
+                                        data.push((attr_name, value));
+                                    }
+                                }
+                            }
+                            ElementKind::Slot { .. } | ElementKind::Pure { .. } | ElementKind::For { .. } | ElementKind::If { .. } | ElementKind::TemplateRef { .. } | ElementKind::Include { .. } => {
+                                ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
+                            }
+                        }
+                    }
+                    AttrPrefixKind::Class(prefix_location) => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::Style(prefix_location) => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::Bind(prefix_location) => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::MutBind(prefix_location) => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::Catch(prefix_location) => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::CaptureBind(prefix_location) => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::CaptureMutBind(prefix_location) => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::CaptureCatch(prefix_location) => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::Mark(prefix_location) => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::Generic(prefix_location) => AttrPrefixParseKind::StaticStr,
+                    AttrPrefixKind::ExtraAttr(prefix_location) => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::SlotDataRef(prefix_location) => AttrPrefixParseKind::ScopeName,
+                    AttrPrefixKind::Invalid(_) => {}
+                }
+
+                // validate class & style attributes
                 // TODO
+            } else {
+                let pos = ps.position();
+                loop {
+                    ps.next_without_whitespace();
+                    let Some(peek) = ps.peek_without_whitespace::<0>() else { break };
+                    if peek == '/' || peek == '>' || Name::is_start_char(peek) {
+                        break
+                    }
+                }
+                ps.add_warning(ParseErrorKind::IllegalAttributeName, pos..ps.position());
             }
         }
+
+        // extract `<template name>` and validate `<template is data>`
+        // TODO
 
         // end the start tag
         match ps.peek_without_whitespace() {
@@ -433,9 +748,6 @@ pub struct Attribute {
 pub enum AttributeKind {
     Normal,
     Model(Range<Position>),
-    Change(Range<Position>),
-    Worklet(Range<Position>),
-    Data(Range<Position>),
 }
 
 #[derive(Debug, Clone)]
@@ -486,6 +798,10 @@ impl Name {
         self.name.is_empty()
     }
 
+    fn name_eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+
     fn new_empty(pos: Position) -> Self {
         Self {
             name: CompactString::new_inline(""),
@@ -495,10 +811,10 @@ impl Name {
 
     fn parse_colon_separated(ps: &mut ParseState) -> Vec<Self> {
         let Some(peek) = ps.peek_with_whitespace::<0>() else {
-            return Vec::with_capacity(0);
+            return vec![];
         };
         if !Self::is_start_char(peek) {
-            return Vec::with_capacity(0);
+            return vec![];
         }
         let mut ret = Vec::with_capacity(2);
         let mut cur_name = Self::new_empty(ps.position());
@@ -609,6 +925,18 @@ impl Name {
             location: start_pos..ps.position(),
         }
     }
+
+    fn is_valid_identifier(&self) -> bool {
+        let mut chars = self.name.chars();
+        let first = chars.next();
+        match first {
+            None => false,
+            Some(ch) if !Name::is_start_char(ch) => false,
+            Some(_) => {
+                chars.find(|ch| !Name::is_following_char(*ch)).is_none()
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -646,7 +974,7 @@ impl Value {
         if ps.peek_with_whitespace() != Some('{') {
             return None;
         }
-        let expr = Expression::parse(ps);
+        let expr = Expression::parse_expression_or_object_inner(ps);
         ps.skip_whitespace();
         let end_pos = ps.position();
         match ps.skip_until_after("}}") {

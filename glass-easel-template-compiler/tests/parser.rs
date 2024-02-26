@@ -37,5 +37,8 @@ fn tag_parsing() {
     case!("<div a= {{b}}/>", r#"<div a={{b}}></div>"#, ParseErrorKind::UnexpectedWhitespace, 7..8);
     case!("<div a=>", r#"<div></div>"#, ParseErrorKind::MissingAttributeValue, 7..7);
     case!("<div a=/>", r#"<div></div>"#, ParseErrorKind::MissingAttributeValue, 7..7);
-    case!("<div a=", r#"<div></div>"#, ParseErrorKind::IncompleteTag, 7..7);
+    case!("<div a=", r#"<div></div>"#, ParseErrorKind::MissingAttributeValue, 7..7);
+    case!("<div #@></div>", r#"<div></div>"#, ParseErrorKind::MissingAttributeValue, 5..7);
+    case!("<div a a></div>", r#"<div></div>"#, ParseErrorKind::DuplicatedAttribute, 7..8);
+    case!("<block a=""></block>", r#"<block></block>"#, ParseErrorKind::InvalidAttribute, 7..8);
 }
