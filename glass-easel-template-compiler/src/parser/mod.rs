@@ -286,6 +286,7 @@ pub enum ParseErrorKind {
     MissingAttributeValue,
     DataBindingNotAllowed,
     InvalidIdentifier,
+    ChildNodesNotAllowed,
 }
 
 impl ParseErrorKind {
@@ -305,8 +306,9 @@ impl ParseErrorKind {
             Self::DuplicatedAttribute => "duplicated attribute",
             Self::UnexpectedWhitespace => "unexpected whitespace",
             Self::MissingAttributeValue => "missing attribute value",
-            Self::DataBindingNotAllowed => "data binding is not allowed for this attribute",
+            Self::DataBindingNotAllowed => "data bindings are not allowed for this attribute",
             Self::InvalidIdentifier => "not a valid identifier",
+            Self::ChildNodesNotAllowed => "child nodes are not allowed for this element",
         }
     }
 }
