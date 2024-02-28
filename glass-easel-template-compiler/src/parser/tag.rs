@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, ops::Range};
+use std::{borrow::Cow, ops::Range};
 
 use compact_str::CompactString;
 
@@ -18,7 +18,7 @@ pub struct Template {
 pub struct TemplateGlobals {
     pub imports: Vec<String>,
     pub includes: Vec<String>,
-    pub sub_templates: HashMap<CompactString, Vec<Node>>,
+    pub sub_templates: Vec<(Name, Vec<Node>)>,
     pub scripts: Vec<Script>,
 }
 
@@ -27,7 +27,7 @@ impl Template {
         let mut globals = TemplateGlobals {
             imports: vec![],
             includes: vec![],
-            sub_templates: HashMap::with_capacity(0),
+            sub_templates: vec![],
             scripts: vec![],
         };
         let mut content = vec![];
@@ -61,7 +61,7 @@ impl Node {
     fn parse_vec_node(ps: &mut ParseState, globals: &mut TemplateGlobals, ret: &mut Vec<Node>) {
         loop {
             let Some(peek) = ps.peek_n_without_whitespace::<2>() else { return };
-            let node = match peek {
+            match peek {
                 ['<', '/'] => {
                     // tag end, returns
                     break;
@@ -85,11 +85,12 @@ impl Node {
                 }
                 ['<', x] if Name::is_start_char(x) => {
                     // an element
-                    Self::Element(Element::parse(ps, globals))
+                    Element::parse(ps, globals, ret);
                 }
-                _ => Self::Text(Value::parse_until_before(ps, '<')),
-            };
-            ret.push(node);
+                _ => {
+                    ret.push(Node::Text(Value::parse_until_before(ps, '<')));
+                }
+            }
         }
     }
 }
@@ -110,13 +111,13 @@ pub enum ElementKind {
         class: ClassAttribute,
         style: StyleAttribute,
         change_attributes: Vec<Attribute>,
-        worklet_attributes: Vec<(Name, CompactString, Range<Position>)>,
+        worklet_attributes: Vec<(Name, Name)>,
         event_bindings: Vec<EventBinding>,
         mark: Vec<(Name, Value)>,
         data: Vec<(Name, Value)>,
         children: Vec<Node>,
-        generics: Vec<(Name, CompactString, Range<Position>)>,
-        extra_attr: Vec<(Name, CompactString, Range<Position>)>,
+        generics: Vec<(Name, Name)>,
+        extra_attr: Vec<(Name, Name)>,
         slot: Option<(Range<Position>, Value)>,
         slot_value_refs: Vec<(Name, Name)>,
     },
@@ -127,17 +128,15 @@ pub enum ElementKind {
         slot: Option<(Range<Position>, Value)>,
     },
     For {
-        list: Value,
-        item_name: Name,
-        index_name: Name,
+        list: (Range<Position>, Value),
+        item_name: (Range<Position>, Name),
+        index_name: (Range<Position>, Name),
         key: Name,
         children: Vec<Node>,
     },
     If {
-        branches: Vec<(Value, Vec<Node>)>,
-    },
-    TemplateDefinition {
-        name: Name,
+        branches: Vec<(Range<Position>, Value, Vec<Node>)>,
+        else_branch: Option<(Range<Position>, Vec<Node>)>,
     },
     TemplateRef {
         target: Value,
@@ -165,7 +164,7 @@ pub enum ElementKind {
 }
 
 impl Element {
-    fn parse(ps: &mut ParseState, globals: &mut TemplateGlobals) -> Self {
+    fn parse(ps: &mut ParseState, globals: &mut TemplateGlobals, ret: &mut Vec<Node>) {
         // parse `<xxx`
         let start_angle_start = ps.position();
         assert_eq!(ps.next_without_whitespace(), Some('<'));
@@ -243,14 +242,16 @@ impl Element {
         };
 
         // parse attributes
-        let mut wx_if = None;
-        let mut wx_for = None;
-        let mut wx_for_index = None;
-        let mut wx_for_item = None;
-        let mut wx_key = None;
-        let mut template_name = None;
-        let mut class_attrs: Vec<(Name, Value)> = vec![];
-        let mut style_attrs: Vec<(Name, Value)> = vec![];
+        let mut wx_if: Option<(Range<Position>, Value)> = None;
+        let mut wx_elif: Option<(Range<Position>, Value)> = None;
+        let mut wx_else: Option<Range<Position>> = None;
+        let mut wx_for: Option<(Range<Position>, Value)> = None;
+        let mut wx_for_index: Option<(Range<Position>, Name)> = None;
+        let mut wx_for_item: Option<(Range<Position>, Name)> = None;
+        let mut wx_key: Option<(Range<Position>, Name)> = None;
+        let mut template_name: Option<(Range<Position>, Name)> = None;
+        let mut class_attrs: Vec<(Range<Position>, Name, Value)> = vec![];
+        let mut style_attrs: Vec<(Range<Position>, Name, Value)> = vec![];
         loop {
             ps.skip_whitespace();
             let Some(peek) = ps.peek_with_whitespace::<0>() else { break };
@@ -270,6 +271,8 @@ impl Element {
                 enum AttrPrefixKind {
                     Normal,
                     WxIf,
+                    WxElif,
+                    WxElse,
                     WxFor,
                     WxForIndex,
                     WxForItem,
@@ -313,6 +316,8 @@ impl Element {
                         Some(x) => match x.name.as_str() {
                             "wx" => match attr_name.name.as_str() {
                                 "if" => AttrPrefixKind::WxIf,
+                                "elif" => AttrPrefixKind::WxElif,
+                                "else" => AttrPrefixKind::WxElse,
                                 "for" => AttrPrefixKind::WxFor,
                                 "for-index" => AttrPrefixKind::WxForIndex,
                                 "for-item" => AttrPrefixKind::WxForItem,
@@ -352,6 +357,8 @@ impl Element {
                 let parse_kind = match prefix {
                     AttrPrefixKind::Normal => AttrPrefixParseKind::Value,
                     AttrPrefixKind::WxIf => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::WxElif => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::WxElse => AttrPrefixParseKind::StaticStr,
                     AttrPrefixKind::WxFor => AttrPrefixParseKind::Value,
                     AttrPrefixKind::WxForIndex => AttrPrefixParseKind::ScopeName,
                     AttrPrefixKind::WxForItem => AttrPrefixParseKind::ScopeName,
@@ -383,7 +390,7 @@ impl Element {
                 enum AttrPrefixParseResult {
                     Invalid,
                     Value(Value),
-                    StaticStr(CompactString, Range<Position>),
+                    StaticStr(Name),
                     ScopeName(Name),
                 }
                 let attr_value = if ps.peek_without_whitespace::<0>() == Some('=') {
@@ -397,7 +404,7 @@ impl Element {
                             ps.add_warning_at_current_position(ParseErrorKind::MissingAttributeValue);
                             match parse_kind {
                                 AttrPrefixParseKind::Value => AttrPrefixParseResult::Value(Value::new_empty(pos)),
-                                AttrPrefixParseKind::StaticStr => AttrPrefixParseResult::StaticStr(CompactString::new_inline(""), pos..pos),
+                                AttrPrefixParseKind::StaticStr => AttrPrefixParseResult::StaticStr(Name::new_empty(pos)),
                                 AttrPrefixParseKind::ScopeName => AttrPrefixParseResult::ScopeName(Name::new_empty(pos)),
                             }
                         }
@@ -414,7 +421,7 @@ impl Element {
                                     if v.name.as_str().contains("{{") {
                                         ps.add_warning(ParseErrorKind::DataBindingNotAllowed, v.location());
                                     }
-                                    AttrPrefixParseResult::StaticStr(v.name, v.location)
+                                    AttrPrefixParseResult::StaticStr(v)
                                 },
                                 AttrPrefixParseKind::ScopeName => {
                                     let v = Name::parse_identifier_like_until_before(ps, |x| x == ch);
@@ -451,7 +458,7 @@ impl Element {
                             let v = Name::parse_identifier_like_until_before(ps, |x| !Name::is_following_char(x));
                             match parse_kind {
                                 AttrPrefixParseKind::Value => AttrPrefixParseResult::Value(Value::Static { value: v.name, location: v.location }),
-                                AttrPrefixParseKind::StaticStr => AttrPrefixParseResult::StaticStr(v.name, v.location),
+                                AttrPrefixParseKind::StaticStr => AttrPrefixParseResult::StaticStr(v),
                                 AttrPrefixParseKind::ScopeName => AttrPrefixParseResult::ScopeName(v),
                             }
                         }
@@ -460,7 +467,7 @@ impl Element {
                     let pos = attr_name.location.end;
                     match parse_kind {
                         AttrPrefixParseKind::Value => AttrPrefixParseResult::Value(Value::new_empty(pos)),
-                        AttrPrefixParseKind::StaticStr => AttrPrefixParseResult::StaticStr(CompactString::new_inline(""), pos..pos),
+                        AttrPrefixParseKind::StaticStr => AttrPrefixParseResult::StaticStr(Name::new_empty(pos)),
                         AttrPrefixParseKind::ScopeName => AttrPrefixParseResult::ScopeName(Name::new_empty(pos)),
                     }
                 };
@@ -497,7 +504,6 @@ impl Element {
                         }
                         ElementKind::For { .. } |
                         ElementKind::If { .. } |
-                        ElementKind::TemplateDefinition { .. } |
                         ElementKind::Import { .. } => {
                             ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
                         }
@@ -529,7 +535,6 @@ impl Element {
                             ElementKind::Pure { .. } |
                             ElementKind::For { .. } |
                             ElementKind::If { .. } |
-                            ElementKind::TemplateDefinition { .. } |
                             ElementKind::TemplateRef { .. } |
                             ElementKind::Include { .. } |
                             ElementKind::Import { .. } => {
@@ -542,7 +547,28 @@ impl Element {
                             if wx_if.is_some() {
                                 ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
                             } else {
-                                wx_if = Some(value);
+                                wx_if = Some((attr_name.location(), value));
+                            }
+                        }
+                    }
+                    AttrPrefixKind::WxElif => {
+                        if let AttrPrefixParseResult::Value(value) = attr_value {
+                            if wx_elif.is_some() {
+                                ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
+                            } else {
+                                wx_elif = Some((attr_name.location(), value));
+                            }
+                        }
+                    }
+                    AttrPrefixKind::WxElse => {
+                        if let AttrPrefixParseResult::StaticStr(value) = attr_value {
+                            if wx_elif.is_some() {
+                                ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
+                            } else {
+                                if value.name.len() > 0 {
+                                    ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
+                                }
+                                wx_else = Some(attr_name.location());
                             }
                         }
                     }
@@ -551,7 +577,7 @@ impl Element {
                             if wx_for.is_some() {
                                 ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
                             } else {
-                                wx_for = Some(value);
+                                wx_for = Some((attr_name.location(), value));
                             }
                         }
                     }
@@ -560,7 +586,7 @@ impl Element {
                             if wx_for_index.is_some() {
                                 ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
                             } else {
-                                wx_for_index = Some(s);
+                                wx_for_index = Some((attr_name.location(), s));
                             }
                         }
                     }
@@ -569,25 +595,25 @@ impl Element {
                             if wx_for_item.is_some() {
                                 ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
                             } else {
-                                wx_for_item = Some(s);
+                                wx_for_item = Some((attr_name.location(), s));
                             }
                         }
                     }
                     AttrPrefixKind::WxKey => {
-                        if let AttrPrefixParseResult::StaticStr(s, location) = attr_value {
+                        if let AttrPrefixParseResult::StaticStr(s) = attr_value {
                             if wx_key.is_some() {
                                 ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
                             } else {
-                                wx_key = Some((s, location));
+                                wx_key = Some((attr_name.location(), s));
                             }
                         }
                     }
                     AttrPrefixKind::TemplateName => {
-                        if let AttrPrefixParseResult::StaticStr(s, location) = attr_value {
+                        if let AttrPrefixParseResult::StaticStr(s) = attr_value {
                             if template_name.is_some() {
                                 ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
                             } else {
-                                template_name = Some(Name { name: s, location });
+                                template_name = Some((attr_name.location(), s));
                             }
                         }
                     }
@@ -623,11 +649,11 @@ impl Element {
                         match &mut element {
                             ElementKind::Include { path, .. } |
                             ElementKind::Import { path, .. } => {
-                                if let AttrPrefixParseResult::StaticStr(s, location) = attr_value {
+                                if let AttrPrefixParseResult::StaticStr(s) = attr_value {
                                     if path.location().end != default_attr_position {
                                         ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                                     } else {
-                                        *path = Name { name: s, location };
+                                        *path = s;
                                     }
                                 }
                             }
@@ -650,7 +676,6 @@ impl Element {
                             ElementKind::Pure { .. } |
                             ElementKind::For { .. } |
                             ElementKind::If { .. } |
-                            ElementKind::TemplateDefinition { .. } |
                             ElementKind::TemplateRef { .. } |
                             ElementKind::Include { .. } |
                             ElementKind::Import { .. } => {
@@ -674,7 +699,6 @@ impl Element {
                             ElementKind::Pure { .. } |
                             ElementKind::For { .. } |
                             ElementKind::If { .. } |
-                            ElementKind::TemplateDefinition { .. } |
                             ElementKind::TemplateRef { .. } |
                             ElementKind::Include { .. } |
                             ElementKind::Import { .. } => {
@@ -685,11 +709,11 @@ impl Element {
                     AttrPrefixKind::Worklet(prefix_location) => {
                         match &mut element {
                             ElementKind::Normal { worklet_attributes, .. } => {
-                                if let AttrPrefixParseResult::StaticStr(s, location) = attr_value {
-                                    if worklet_attributes.iter().find(|(x, _, _)| x.name_eq(&attr_name)).is_some() {
+                                if let AttrPrefixParseResult::StaticStr(s) = attr_value {
+                                    if worklet_attributes.iter().find(|(x, _)| x.name_eq(&attr_name)).is_some() {
                                         ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                                     } else {
-                                        worklet_attributes.push((attr_name, s, location));
+                                        worklet_attributes.push((attr_name, s));
                                     }
                                 }
                             }
@@ -697,7 +721,6 @@ impl Element {
                             ElementKind::Pure { .. } |
                             ElementKind::For { .. } |
                             ElementKind::If { .. } |
-                            ElementKind::TemplateDefinition { .. } |
                             ElementKind::TemplateRef { .. } |
                             ElementKind::Include { .. } |
                             ElementKind::Import { .. } => {
@@ -720,7 +743,6 @@ impl Element {
                             ElementKind::Pure { .. } |
                             ElementKind::For { .. } |
                             ElementKind::If { .. } |
-                            ElementKind::TemplateDefinition { .. } |
                             ElementKind::TemplateRef { .. } |
                             ElementKind::Include { .. } |
                             ElementKind::Import { .. } => {
@@ -732,10 +754,10 @@ impl Element {
                         match &mut element {
                             ElementKind::Normal { .. } => {
                                 if let AttrPrefixParseResult::Value(value) = attr_value {
-                                    if class_attrs.iter().find(|(x, _)| x.name_eq(&attr_name)).is_some() {
+                                    if class_attrs.iter().find(|(_, x, _)| x.name_eq(&attr_name)).is_some() {
                                         ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                                     } else {
-                                        class_attrs.push((attr_name, value));
+                                        class_attrs.push((prefix_location, attr_name, value));
                                     }
                                 }
                             }
@@ -743,7 +765,6 @@ impl Element {
                             ElementKind::Pure { .. } |
                             ElementKind::For { .. } |
                             ElementKind::If { .. } |
-                            ElementKind::TemplateDefinition { .. } |
                             ElementKind::TemplateRef { .. } |
                             ElementKind::Include { .. } |
                             ElementKind::Import { .. } => {
@@ -755,10 +776,10 @@ impl Element {
                         match &mut element {
                             ElementKind::Normal { .. } => {
                                 if let AttrPrefixParseResult::Value(value) = attr_value {
-                                    if class_attrs.iter().find(|(x, _)| x.name_eq(&attr_name)).is_some() {
+                                    if class_attrs.iter().find(|(_, x, _)| x.name_eq(&attr_name)).is_some() {
                                         ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                                     } else {
-                                        class_attrs.push((attr_name, value));
+                                        class_attrs.push((prefix_location, attr_name, value));
                                     }
                                 }
                             }
@@ -766,7 +787,6 @@ impl Element {
                             ElementKind::Pure { .. } |
                             ElementKind::For { .. } |
                             ElementKind::If { .. } |
-                            ElementKind::TemplateDefinition { .. } |
                             ElementKind::TemplateRef { .. } |
                             ElementKind::Include { .. } |
                             ElementKind::Import { .. } => {
@@ -809,7 +829,6 @@ impl Element {
                             }
                             ElementKind::For { .. } |
                             ElementKind::If { .. } |
-                            ElementKind::TemplateDefinition { .. } |
                             ElementKind::Import { .. } => {
                                 ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
                             }
@@ -818,11 +837,11 @@ impl Element {
                     AttrPrefixKind::Generic(prefix_location) => {
                         match &mut element {
                             ElementKind::Normal { generics, .. } => {
-                                if let AttrPrefixParseResult::StaticStr(s, location) = attr_value {
-                                    if generics.iter().find(|(x, _, _)| x.name_eq(&attr_name)).is_some() {
+                                if let AttrPrefixParseResult::StaticStr(s) = attr_value {
+                                    if generics.iter().find(|(x, _)| x.name_eq(&attr_name)).is_some() {
                                         ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                                     } else {
-                                        generics.push((attr_name, s, location));
+                                        generics.push((attr_name, s));
                                     }
                                 }
                             }
@@ -830,7 +849,6 @@ impl Element {
                             ElementKind::Pure { .. } |
                             ElementKind::For { .. } |
                             ElementKind::If { .. } |
-                            ElementKind::TemplateDefinition { .. } |
                             ElementKind::TemplateRef { .. } |
                             ElementKind::Include { .. } |
                             ElementKind::Import { .. } => {
@@ -841,11 +859,11 @@ impl Element {
                     AttrPrefixKind::ExtraAttr(prefix_location) => {
                         match &mut element {
                             ElementKind::Normal { extra_attr, .. } => {
-                                if let AttrPrefixParseResult::StaticStr(s, location) = attr_value {
-                                    if extra_attr.iter().find(|(x, _, _)| x.name_eq(&attr_name)).is_some() {
+                                if let AttrPrefixParseResult::StaticStr(s) = attr_value {
+                                    if extra_attr.iter().find(|(x, _)| x.name_eq(&attr_name)).is_some() {
                                         ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                                     } else {
-                                        extra_attr.push((attr_name, s, location));
+                                        extra_attr.push((attr_name, s));
                                     }
                                 }
                             }
@@ -853,7 +871,6 @@ impl Element {
                             ElementKind::Pure { .. } |
                             ElementKind::For { .. } |
                             ElementKind::If { .. } |
-                            ElementKind::TemplateDefinition { .. } |
                             ElementKind::TemplateRef { .. } |
                             ElementKind::Include { .. } |
                             ElementKind::Import { .. } => {
@@ -876,7 +893,6 @@ impl Element {
                             ElementKind::Pure { .. } |
                             ElementKind::For { .. } |
                             ElementKind::If { .. } |
-                            ElementKind::TemplateDefinition { .. } |
                             ElementKind::TemplateRef { .. } |
                             ElementKind::Include { .. } |
                             ElementKind::Import { .. } => {
@@ -902,9 +918,8 @@ impl Element {
         // validate class & style attributes
         // TODO
 
-        // extract `<template name>` and validate `<template is data>`
-        if let Some(template_name) = template_name {
-            let old_element = std::mem::replace(&mut element, ElementKind::TemplateDefinition { name: template_name });
+        // check `<template name>` and validate `<template is data>`
+        if template_name.is_some() {
             let ElementKind::TemplateRef { target, data, event_bindings, mark, slot } = element else {
                 unreachable!();
             };
@@ -925,20 +940,79 @@ impl Element {
             }
         }
 
-        // extract `wx:for` as an independent layer
+        // extract if conditions
+        enum IfCondition {
+            None,
+            If(Range<Position>, Value),
+            Elif(Range<Position>, Value),
+            Else(Range<Position>),
+        }
+        let if_condition = if template_name.is_some() {
+            if let Some((location, _)) = wx_if {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            if let Some((location, _)) = wx_elif {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            if let Some(location) = wx_else {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            IfCondition::None
+        } else if wx_for.is_some() {
+            if let Some((location, _)) = wx_elif {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            if let Some(location) = wx_else {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            if let Some((location, value)) = wx_if {
+                IfCondition::If(location, value)
+            } else {
+                IfCondition::None
+            }
+        } else if let Some((location, value)) = wx_if {
+            if let Some((location, _)) = wx_elif {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            if let Some(location) = wx_else {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            IfCondition::If(location, value)
+        } else if let Some((location, value)) = wx_elif {
+            if let Some(location) = wx_else {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            IfCondition::Elif(location, value)
+        } else if let Some(location) = wx_else {
+            IfCondition::Else(location)
+        } else {
+            IfCondition::None
+        };
+        let if_need_extra_element = match &element {
+            ElementKind::Pure { event_bindings, mark, slot, .. } => {
+                !event_bindings.is_empty() || !mark.is_empty() || slot.is_some()
+            }
+            _ => true
+        };
+
+        // extract `wx:for`
+        enum ForCondition {
+            None,
+            For {
+                list: (Range<Position>, Value),
+                item_name: (Range<Position>, Name),
+                index_name: (Range<Position>, Name),
+                key: Name,
+            },
+        }
         // TODO
 
         // end the start tag
-        let start_tag_end_location = match ps.peek_without_whitespace() {
+        let (self_close_location, start_tag_end_location) = match ps.peek_without_whitespace() {
             None => {
                 ps.add_warning(ParseErrorKind::IncompleteTag, start_tag_start_location);
                 let pos = ps.position();
-                return Element {
-                    kind: element,
-                    start_tag_location: (start_tag_start_location, pos..pos),
-                    close_location: pos..pos,
-                    end_tag_location: None,
-                };
+                (Some(pos..pos), pos..pos)
             }
             Some('/') => {
                 let close_pos = ps.position();
@@ -947,92 +1021,75 @@ impl Element {
                 let close_location = close_pos..start_tag_end_pos.clone();
                 assert_eq!(ps.next_with_whitespace(), Some('>'));
                 let start_tag_end_location = start_tag_end_pos..ps.position();
-                return Element {
-                    kind: element,
-                    start_tag_location: (start_tag_start_location, start_tag_end_location),
-                    close_location,
-                    end_tag_location: None,
-                };
+                (Some(close_location), start_tag_end_location)
             }
             Some('>') => {
                 let pos = ps.position();
                 ps.next_without_whitespace(); // '>'
-                pos..ps.position()
+                (None, pos..ps.position())
             }
             _ => unreachable!()
         };
 
         // parse children
-        let mut new_children = vec![];
-        Node::parse_vec_node(ps, globals, &mut new_children);
-        match &mut element {
-            ElementKind::Normal { children, .. } |
-            ElementKind::Pure { children, .. } |
-            ElementKind::For { children, .. } => {
-                *children = new_children;
-            }
-            ElementKind::If { branches } => {
-                // TODO
-                todo!()
-            }
-            ElementKind::TemplateDefinition { name } => {
-                globals.sub_templates.insert(name.name.clone(), new_children);
-            }
-            ElementKind::TemplateRef { .. } |
-            ElementKind::Include { .. } |
-            ElementKind::Slot { .. } |
-            ElementKind::Import { .. } => {
-                if let Some(child) = new_children.first() {
-                    ps.add_warning(ParseErrorKind::ChildNodesNotAllowed, child.location());
-                }
-            }
-        }
+        let new_children = if self_close_location.is_none() {
+            let mut new_children = vec![];
+            Node::parse_vec_node(ps, globals, &mut new_children);
+            new_children
+        } else {
+            vec![]
+        };
 
         // parse end tag
-        let close_with_end_tag_location = ps.try_parse(|ps| {
-            ps.skip_whitespace();
-            if ps.peek_with_whitespace().is_none() {
-                ps.add_warning(ParseErrorKind::MissingEndTag, start_tag_start_location);
-                return None;
-            }
-            let end_tag_start_pos = ps.position();
-            assert_eq!(ps.next_with_whitespace(), Some('<'));
-            let close_pos = ps.position();
-            let end_tag_start_location = end_tag_start_pos..close_pos;
-            assert_eq!(ps.next_with_whitespace(), Some('/'));
-            let close_location = close_pos..ps.position();
-            let mut tag_name_slices = Name::parse_colon_separated(ps);
-            let end_tag_name = if tag_name_slices.len() > 1 {
-                let end = tag_name_slices.pop().unwrap();
-                for x in tag_name_slices {
-                    ps.add_warning(ParseErrorKind::IllegalTagNamePrefix, x.location());
+        let (close_location, end_tag_location) = if let Some(close_location) = self_close_location {
+            (close_location, None)
+        } else {
+            let close_with_end_tag_location = ps.try_parse(|ps| {
+                ps.skip_whitespace();
+                if ps.peek_with_whitespace().is_none() {
+                    ps.add_warning(ParseErrorKind::MissingEndTag, start_tag_start_location);
+                    return None;
                 }
-                Name {
-                    name: CompactString::new_inline("wx-x"),
-                    location: end.location(),
+                let end_tag_start_pos = ps.position();
+                assert_eq!(ps.next_with_whitespace(), Some('<'));
+                let close_pos = ps.position();
+                let end_tag_start_location = end_tag_start_pos..close_pos;
+                assert_eq!(ps.next_with_whitespace(), Some('/'));
+                let close_location = close_pos..ps.position();
+                let mut tag_name_slices = Name::parse_colon_separated(ps);
+                let end_tag_name = if tag_name_slices.len() > 1 {
+                    let end = tag_name_slices.pop().unwrap();
+                    for x in tag_name_slices {
+                        ps.add_warning(ParseErrorKind::IllegalTagNamePrefix, x.location());
+                    }
+                    Name {
+                        name: CompactString::new_inline("wx-x"),
+                        location: end.location(),
+                    }
+                } else {
+                    tag_name_slices[0]
+                };
+                if end_tag_name.name != tag_name.name {
+                    return None;
                 }
-            } else {
-                tag_name_slices[0]
-            };
-            if end_tag_name.name != tag_name.name {
-                return None;
+                ps.skip_whitespace();
+                let mut end_tag_end_pos = ps.position();
+                if let Some(s) = ps.skip_until_after(">") {
+                    ps.add_warning(ParseErrorKind::IllegalCharacter, end_tag_end_pos..ps.position());
+                }
+                let end_tag_location = (end_tag_start_location, end_tag_end_pos..ps.position());
+                Some((close_location, end_tag_location))
+            });
+            if close_with_end_tag_location.is_none() {
+                ps.add_warning(ParseErrorKind::MissingEndTag, tag_name.location);
             }
-            ps.skip_whitespace();
-            let mut end_tag_end_pos = ps.position();
-            if let Some(s) = ps.skip_until_after(">") {
-                ps.add_warning(ParseErrorKind::IllegalCharacter, end_tag_end_pos..ps.position());
-            }
-            let end_tag_location = (end_tag_start_location, end_tag_end_pos..ps.position());
-            Some((close_location, end_tag_location))
-        });
-        if close_with_end_tag_location.is_none() {
-            ps.add_warning(ParseErrorKind::MissingEndTag, tag_name.location);
-        }
-        let close_location = close_with_end_tag_location
-            .as_ref()
-            .map(|(x, _)| x.clone())
-            .unwrap_or_else(|| start_tag_end_location);
-        let end_tag_location = close_with_end_tag_location.map(|(_, x)| x);
+            let close_location = close_with_end_tag_location
+                .as_ref()
+                .map(|(x, _)| x.clone())
+                .unwrap_or_else(|| start_tag_end_location);
+            let end_tag_location = close_with_end_tag_location.map(|(_, x)| x);
+            (close_location, end_tag_location)
+        };
 
         // collect include and import sources
         match &element {
@@ -1045,11 +1102,88 @@ impl Element {
             _ => {}
         }
 
-        Element {
-            kind: element,
-            start_tag_location: (start_tag_start_location, start_tag_end_location),
-            close_location,
-            end_tag_location,
+        // write the parsed element
+        if let Some((_, name)) = template_name {
+            if globals.sub_templates.iter().find(|(x, _)| x.name_eq(&name)).is_some() {
+                ps.add_warning(ParseErrorKind::DuplicatedAttribute, name.location());
+            } else {
+                globals.sub_templates.push((name, new_children));
+            }
+        } else {
+            let wrap_if_children = |new_children: Vec<Node>| -> Vec<Node> {
+                if if_need_extra_element {
+                    vec![Node::Element(Element {
+                        kind: element,
+                        start_tag_location: (start_tag_start_location, start_tag_end_location),
+                        close_location,
+                        end_tag_location,
+                    })]
+                } else {
+                    new_children
+                }
+            };
+            let as_normal_node = match if_condition {
+                IfCondition::None => Some(new_children),
+                IfCondition::If(location, value) => {
+                    let branch = (location, value, wrap_if_children(new_children));
+                    let elem = Element {
+                        kind: ElementKind::If { branches: vec![branch], else_branch: None },
+                        start_tag_location: (start_tag_start_location, start_tag_end_location),
+                        close_location,
+                        end_tag_location,
+                    };
+                    ret.push(Node::Element(elem));
+                    None
+                }
+                IfCondition::Elif(location, value) => {
+                    if let Some(Node::Element(Element { kind: ElementKind::If { branches, .. }, .. })) = ret.last_mut() {
+                        let branch = (location, value, wrap_if_children(new_children));
+                        branches.push(branch);
+                        None
+                    } else {
+                        ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+                        Some(new_children)
+                    }
+                }
+                IfCondition::Else(location) => {
+                    if let Some(Node::Element(Element { kind: ElementKind::If { else_branch, .. }, .. })) = ret.last_mut() {
+                        let branch = (location, wrap_if_children(new_children));
+                        *else_branch = Some(branch);
+                        None
+                    } else {
+                        ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+                        Some(new_children)
+                    }
+                }
+            };
+            if let Some(new_children) = as_normal_node {
+                match &mut element {
+                    ElementKind::Normal { children, .. } |
+                    ElementKind::Pure { children, .. } |
+                    ElementKind::For { children, .. } => {
+                        // TODO
+                        todo!()
+                    }
+                    ElementKind::If { .. } => {
+                        unreachable!()
+                    }
+                    ElementKind::TemplateRef { .. } |
+                    ElementKind::Include { .. } |
+                    ElementKind::Slot { .. } |
+                    ElementKind::Import { .. } => {
+                        if let Some(child) = new_children.first() {
+                            ps.add_warning(ParseErrorKind::ChildNodesNotAllowed, child.location());
+                        }
+                    }
+                }
+                let elem = Element {
+                    kind: element,
+                    start_tag_location: (start_tag_start_location, start_tag_end_location),
+                    close_location,
+                    end_tag_location,
+                };
+                ret.push(Node::Element(elem));
+            }
         }
     }
 }

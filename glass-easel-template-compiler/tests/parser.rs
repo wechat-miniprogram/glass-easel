@@ -40,7 +40,9 @@ fn tag_parsing() {
     case!("<div a=", r#"<div></div>"#, ParseErrorKind::MissingAttributeValue, 7..7);
     case!("<div #@></div>", r#"<div></div>"#, ParseErrorKind::IllegalAttributeName, 5..7);
     case!("<div a a></div>", r#"<div></div>"#, ParseErrorKind::DuplicatedAttribute, 7..8);
+    case!("<template name='a'/><template name='a'/>", r#"<block wx:if=""></block><block wx:else></block>"#, ParseErrorKind::DuplicatedName, 36..37);
     case!("<block a=''></block>", r#"<block></block>"#, ParseErrorKind::InvalidAttribute, 7..8);
+    case!("<block wx:if=''/><block wx:else=' '/>", r#"<block wx:if=""></block><block wx:else></block>"#, ParseErrorKind::InvalidAttributeValue, 33..34);
     case!("<slot><div/></slot>", r#"<slot></slot>"#, ParseErrorKind::InvalidAttribute, 6..12);
     case!("<div></div  a=''>", r#"<slot></slot>"#, ParseErrorKind::IllegalCharacter, 12..16);
 }
