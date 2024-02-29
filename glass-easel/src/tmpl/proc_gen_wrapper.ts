@@ -139,7 +139,6 @@ type DefineSlot = (
 
 type DefinePureVirtualNode = (children: DefineChildren, slot: string | undefined) => void
 
-
 export class ProcGenWrapper {
   shadowRoot: ShadowRoot
   procGen: ProcGen

@@ -40,7 +40,7 @@ export {
   PropertyChange,
 } from './data_proxy'
 export * as dataUtils from './data_utils'
-export { Element, StyleSegmentIndex, setRevertEventDefaultPrevented } from './element'
+export { Element, StyleSegmentIndex } from './element'
 export { ElementIterator, ElementIteratorType } from './element_iterator'
 export {
   Event,
