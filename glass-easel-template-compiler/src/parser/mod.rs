@@ -1,11 +1,21 @@
 use std::ops::Range;
 
+use compact_str::CompactString;
+
 mod tag;
 mod expr;
 mod binding_map;
 
 pub(crate) trait TemplateStructure {
     fn location(&self) -> Range<Position>;
+
+    fn location_start(&self) -> Position {
+        self.location().start
+    }
+
+    fn location_end(&self) -> Position {
+        self.location().end
+    }
 }
 
 struct ParseState<'s> {
@@ -14,6 +24,7 @@ struct ParseState<'s> {
     cur: usize,
     line: u32,
     utf16_col: u32,
+    scopes: Vec<(CompactString, Range<Position>)>,
     warnings: Vec<ParseError>,
     errors: Vec<ParseError>,
 }
@@ -33,6 +44,7 @@ impl<'s> ParseState<'s> {
             cur: 0,
             line: 1,
             utf16_col: 0,
+            scopes: vec![],
             warnings: vec![],
             errors: vec![],
         }
@@ -49,6 +61,20 @@ impl<'s> ParseState<'s> {
 
     fn warnings(&self) -> impl Iterator<Item = &ParseError> {
         self.warnings.iter()
+    }
+
+    fn parse_with_scope<T>(&mut self, ident: CompactString, location: Range<Position>, f: impl FnOnce(&mut Self) -> T) -> T {
+        self.scopes.push((ident, location));
+        let ret = f(self);
+        self.scopes.pop();
+        ret
+    }
+
+    fn parse_with_no_scopes<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        let old_scopes = std::mem::replace(&mut self.scopes, vec![]);
+        let ret = f(self);
+        self.scopes = old_scopes;
+        ret
     }
 
     fn try_parse<T>(&mut self, f: impl FnOnce(&mut Self) -> Option<T>) -> Option<T> {
@@ -289,6 +315,7 @@ pub enum ParseErrorKind {
     DataBindingNotAllowed,
     InvalidIdentifier,
     ChildNodesNotAllowed,
+    IllegalEscapeSequence,
 }
 
 impl ParseErrorKind {
@@ -313,6 +340,7 @@ impl ParseErrorKind {
             Self::DataBindingNotAllowed => "data bindings are not allowed for this attribute",
             Self::InvalidIdentifier => "not a valid identifier",
             Self::ChildNodesNotAllowed => "child nodes are not allowed for this element",
+            Self::IllegalEscapeSequence => "illegal escape sequence",
         }
     }
 }

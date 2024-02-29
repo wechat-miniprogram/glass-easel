@@ -9,6 +9,9 @@ fn value_parsing() {
     case!("{{ b }} a ", r#"{{b+' a '}}"#);
     case!("{{ a }}{{ b }}", r#"{{a+b}}"#);
 
+    case!("{{ '", "", ParseErrorKind::MissingExpressionEnd, 4..4);
+    case!(r#"{{ 'a\n\u0041\x4f\x4E' }}"#, "{{\"a\nAON\"}}");
+
     case!("&#xG;", r#"&#xG;"#, ParseErrorKind::IllegalEntity, 0..4);
     case!("&#x ", r#"&#x "#, ParseErrorKind::IllegalEntity, 0..3);
     case!("&#x41;", r#"A"#);
@@ -45,4 +48,7 @@ fn tag_parsing() {
     case!("<block wx:if=''/><block wx:else=' '/>", r#"<block wx:if=""></block><block wx:else></block>"#, ParseErrorKind::InvalidAttributeValue, 33..34);
     case!("<slot><div/></slot>", r#"<slot></slot>"#, ParseErrorKind::InvalidAttribute, 6..12);
     case!("<div></div  a=''>", r#"<slot></slot>"#, ParseErrorKind::IllegalCharacter, 12..16);
+    case!("<template name='a' wx:for='' />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 22..25);
+    case!("<template name='a' wx:if='' />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 22..24);
+    case!("<div wx:for='' wx:else />", r#"<div wx:for=''/>"#, ParseErrorKind::InvalidAttribute, 18..22);
 }

@@ -131,7 +131,7 @@ pub enum ElementKind {
         list: (Range<Position>, Value),
         item_name: (Range<Position>, Name),
         index_name: (Range<Position>, Name),
-        key: Name,
+        key: (Range<Position>, Name),
         children: Vec<Node>,
     },
     If {
@@ -161,6 +161,15 @@ pub enum ElementKind {
     Import {
         path: Name,
     },
+}
+
+impl TemplateStructure for Element {
+    fn location(&self) -> std::ops::Range<Position> {
+        match self.end_tag_location.as_ref() {
+            None => self.start_tag_location.0.start..self.start_tag_location.1.end,
+            Some((_, x)) => self.start_tag_location.0.start..x.end,
+        }
+    }
 }
 
 impl Element {
@@ -916,7 +925,7 @@ impl Element {
         }
 
         // validate class & style attributes
-        // TODO
+        // TODO support `class:xxx` and `style:xxx`
 
         // check `<template name>` and validate `<template is data>`
         if template_name.is_some() {
@@ -939,73 +948,6 @@ impl Element {
                 ps.add_warning(ParseErrorKind::InvalidAttribute, x);
             }
         }
-
-        // extract if conditions
-        enum IfCondition {
-            None,
-            If(Range<Position>, Value),
-            Elif(Range<Position>, Value),
-            Else(Range<Position>),
-        }
-        let if_condition = if template_name.is_some() {
-            if let Some((location, _)) = wx_if {
-                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
-            }
-            if let Some((location, _)) = wx_elif {
-                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
-            }
-            if let Some(location) = wx_else {
-                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
-            }
-            IfCondition::None
-        } else if wx_for.is_some() {
-            if let Some((location, _)) = wx_elif {
-                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
-            }
-            if let Some(location) = wx_else {
-                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
-            }
-            if let Some((location, value)) = wx_if {
-                IfCondition::If(location, value)
-            } else {
-                IfCondition::None
-            }
-        } else if let Some((location, value)) = wx_if {
-            if let Some((location, _)) = wx_elif {
-                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
-            }
-            if let Some(location) = wx_else {
-                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
-            }
-            IfCondition::If(location, value)
-        } else if let Some((location, value)) = wx_elif {
-            if let Some(location) = wx_else {
-                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
-            }
-            IfCondition::Elif(location, value)
-        } else if let Some(location) = wx_else {
-            IfCondition::Else(location)
-        } else {
-            IfCondition::None
-        };
-        let if_need_extra_element = match &element {
-            ElementKind::Pure { event_bindings, mark, slot, .. } => {
-                !event_bindings.is_empty() || !mark.is_empty() || slot.is_some()
-            }
-            _ => true
-        };
-
-        // extract `wx:for`
-        enum ForCondition {
-            None,
-            For {
-                list: (Range<Position>, Value),
-                item_name: (Range<Position>, Name),
-                index_name: (Range<Position>, Name),
-                key: Name,
-            },
-        }
-        // TODO
 
         // end the start tag
         let (self_close_location, start_tag_end_location) = match ps.peek_without_whitespace() {
@@ -1102,6 +1044,92 @@ impl Element {
             _ => {}
         }
 
+        // extract `wx:for`
+        enum ForList {
+            None,
+            For {
+                list: (Range<Position>, Value),
+                item_name: (Range<Position>, Name),
+                index_name: (Range<Position>, Name),
+                key: (Range<Position>, Name),
+            },
+        }
+        let for_list = if template_name.is_some() || wx_for.is_none() {
+            if let Some((location, _)) = wx_for {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            if let Some((location, _)) = wx_for_item {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            if let Some((location, _)) = wx_for_index {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            if let Some((location, _)) = wx_key {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            ForList::None
+        } else {
+            let (for_location, for_value) = wx_for.unwrap();
+            let item_name = wx_for_item.unwrap_or_else(|| (for_location.clone(), Name::new_empty(for_location.end.clone())));
+            let index_name = wx_for_index.unwrap_or_else(|| (for_location.clone(), Name::new_empty(for_location.end.clone())));
+            let key = wx_key.unwrap_or_else(|| (for_location.clone(), Name::new_empty(for_location.end.clone())));
+            ForList::For {
+                list: (for_location, for_value),
+                item_name,
+                index_name,
+                key,
+            }
+        };
+
+        // extract if conditions
+        enum IfCondition {
+            None,
+            If(Range<Position>, Value),
+            Elif(Range<Position>, Value),
+            Else(Range<Position>),
+        }
+        let if_condition = if template_name.is_some() {
+            if let Some((location, _)) = wx_if {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            if let Some((location, _)) = wx_elif {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            if let Some(location) = wx_else {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            IfCondition::None
+        } else if let ForList::For { .. } = &for_list {
+            if let Some((location, _)) = wx_elif {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            if let Some(location) = wx_else {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            if let Some((location, value)) = wx_if {
+                IfCondition::If(location, value)
+            } else {
+                IfCondition::None
+            }
+        } else if let Some((location, value)) = wx_if {
+            if let Some((location, _)) = wx_elif {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            if let Some(location) = wx_else {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            IfCondition::If(location, value)
+        } else if let Some((location, value)) = wx_elif {
+            if let Some(location) = wx_else {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            IfCondition::Elif(location, value)
+        } else if let Some(location) = wx_else {
+            IfCondition::Else(location)
+        } else {
+            IfCondition::None
+        };
+
         // write the parsed element
         if let Some((_, name)) = template_name {
             if globals.sub_templates.iter().find(|(x, _)| x.name_eq(&name)).is_some() {
@@ -1110,60 +1138,28 @@ impl Element {
                 globals.sub_templates.push((name, new_children));
             }
         } else {
-            let wrap_if_children = |new_children: Vec<Node>| -> Vec<Node> {
-                if if_need_extra_element {
-                    vec![Node::Element(Element {
-                        kind: element,
-                        start_tag_location: (start_tag_start_location, start_tag_end_location),
-                        close_location,
-                        end_tag_location,
-                    })]
-                } else {
-                    new_children
-                }
-            };
-            let as_normal_node = match if_condition {
-                IfCondition::None => Some(new_children),
-                IfCondition::If(location, value) => {
-                    let branch = (location, value, wrap_if_children(new_children));
-                    let elem = Element {
-                        kind: ElementKind::If { branches: vec![branch], else_branch: None },
-                        start_tag_location: (start_tag_start_location, start_tag_end_location),
-                        close_location,
-                        end_tag_location,
-                    };
-                    ret.push(Node::Element(elem));
-                    None
-                }
-                IfCondition::Elif(location, value) => {
-                    if let Some(Node::Element(Element { kind: ElementKind::If { branches, .. }, .. })) = ret.last_mut() {
-                        let branch = (location, value, wrap_if_children(new_children));
-                        branches.push(branch);
-                        None
-                    } else {
-                        ps.add_warning(ParseErrorKind::InvalidAttribute, location);
-                        Some(new_children)
+            let wrap_children = |element: Element| -> Vec<Node> {
+                match element.kind {
+                    ElementKind::Pure { event_bindings, mark, slot, children } => {
+                        if !event_bindings.is_empty() || !mark.is_empty() || slot.is_some() {
+                            // empty
+                        } else {
+                            return children;
+                        }
                     }
+                    _ => {}
                 }
-                IfCondition::Else(location) => {
-                    if let Some(Node::Element(Element { kind: ElementKind::If { else_branch, .. }, .. })) = ret.last_mut() {
-                        let branch = (location, wrap_if_children(new_children));
-                        *else_branch = Some(branch);
-                        None
-                    } else {
-                        ps.add_warning(ParseErrorKind::InvalidAttribute, location);
-                        Some(new_children)
-                    }
-                }
+                vec![Node::Element(element)]
             };
-            if let Some(new_children) = as_normal_node {
+
+            // generate normal element
+            let wrapped_element = {
                 match &mut element {
                     ElementKind::Normal { children, .. } |
-                    ElementKind::Pure { children, .. } |
-                    ElementKind::For { children, .. } => {
-                        // TODO
-                        todo!()
+                    ElementKind::Pure { children, .. } => {
+                        *children = new_children;
                     }
+                    ElementKind::For { .. } |
                     ElementKind::If { .. } => {
                         unreachable!()
                     }
@@ -1176,13 +1172,67 @@ impl Element {
                         }
                     }
                 }
-                let elem = Element {
+                Element {
                     kind: element,
-                    start_tag_location: (start_tag_start_location, start_tag_end_location),
-                    close_location,
-                    end_tag_location,
-                };
-                ret.push(Node::Element(elem));
+                    start_tag_location: (start_tag_start_location.clone(), start_tag_end_location.clone()),
+                    close_location: close_location.clone(),
+                    end_tag_location: end_tag_location.clone(),
+                }
+            };
+
+            // wrap if condition
+            let wrapped_element = match if_condition {
+                IfCondition::None => Some(wrapped_element),
+                IfCondition::If(location, value) => {
+                    let branch = (location, value, wrap_children(wrapped_element));
+                    let elem = Element {
+                        kind: ElementKind::If { branches: vec![branch], else_branch: None },
+                        start_tag_location: (start_tag_start_location.clone(), start_tag_end_location.clone()),
+                        close_location: close_location.clone(),
+                        end_tag_location: end_tag_location.clone(),
+                    };
+                    Some(elem)
+                }
+                IfCondition::Elif(location, value) => {
+                    if let Some(Node::Element(Element { kind: ElementKind::If { branches, .. }, .. })) = ret.last_mut() {
+                        let branch = (location, value, wrap_children(wrapped_element));
+                        branches.push(branch);
+                        None
+                    } else {
+                        ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+                        Some(wrapped_element)
+                    }
+                }
+                IfCondition::Else(location) => {
+                    if let Some(Node::Element(Element { kind: ElementKind::If { else_branch, .. }, .. })) = ret.last_mut() {
+                        let branch = (location, wrap_children(wrapped_element));
+                        *else_branch = Some(branch);
+                        None
+                    } else {
+                        ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+                        Some(wrapped_element)
+                    }
+                }
+            };
+
+            // wrap for list
+            let wrapped_element = match for_list {
+                ForList::None => wrapped_element,
+                ForList::For { list, item_name, index_name, key } => {
+                    let children = wrap_children(wrapped_element.unwrap());
+                    let elem = Element {
+                        kind: ElementKind::For { list, item_name, index_name, key, children },
+                        start_tag_location: (start_tag_start_location.clone(), start_tag_end_location.clone()),
+                        close_location: close_location.clone(),
+                        end_tag_location: end_tag_location.clone(),
+                    };
+                    Some(elem)
+                }
+            };
+
+            // end element
+            if let Some(wrapped_element) = wrapped_element {
+                ret.push(Node::Element(wrapped_element));
             }
         }
     }
@@ -1397,7 +1447,7 @@ pub enum Value {
         location: Range<Position>,
     },
     Dynamic {
-        expr: Box<Expression>,
+        expression: Box<Expression>,
         binding_map_keys: Option<BindingMapKeys>,
     },
 }
@@ -1406,7 +1456,7 @@ impl TemplateStructure for Value {
     fn location(&self) -> Range<Position> {
         match self {
             Self::Static { value: _, location } => location.clone(),
-            Self::Dynamic { expr, binding_map_keys: _ } => expr.location(),
+            Self::Dynamic { expression, binding_map_keys: _ } => expression.location(),
         }
     }
 }
@@ -1416,8 +1466,8 @@ impl Value {
         Self::Static { value: CompactString::new_inline(""), location: pos..pos }
     }
 
-    fn from_expression(expr: Box<Expression>) -> Self {
-        Self::Dynamic { expr, binding_map_keys: None }
+    fn from_expression(expression: Box<Expression>) -> Self {
+        Self::Dynamic { expression, binding_map_keys: None }
     }
 
     fn parse_data_binding(ps: &mut ParseState) -> Option<Box<Expression>> {
@@ -1425,7 +1475,10 @@ impl Value {
         if ps.peek_with_whitespace() != Some('{') {
             return None;
         }
-        let expr = Expression::parse_expression_or_object_inner(ps);
+        let Some(expr) = Expression::parse_expression_or_object_inner(ps) else {
+            ps.skip_until_after("}}");
+            return None;
+        };
         ps.skip_whitespace();
         let end_pos = ps.position();
         match ps.skip_until_after("}}") {
@@ -1449,6 +1502,16 @@ impl Value {
                 start_pos..start_pos
             },
         };
+        fn has_wrapped_to_string(expr: &Expression) -> bool {
+            match expr {
+                Expression::ToStringWithoutUndefined { .. } => true,
+                _ => false,
+            }
+        }
+        fn wrap_to_string(expr: Box<Expression>, location: Range<Position>) -> Box<Expression> {
+            if has_wrapped_to_string(&expr) { return expr; }
+            Box::new(Expression::ToStringWithoutUndefined { value: expr, location })
+        }
         loop {
             let Some(peek) = ps.peek_with_whitespace() else { break };
             if peek == until { break };
@@ -1457,23 +1520,30 @@ impl Value {
             // try parse `{{ ... }}`
             if peek == '{' {
                 if let Some(expr) = ps.try_parse(Self::parse_data_binding) {
-                    let (new_expr, binding_map_keys) = match ret {
+                    let expression = match ret {
                         Self::Static { value, location } => {
-                            let left = Box::new(Expression::LitStr { value, location });
-                            (Expression::Plus { left, right: expr, location: start_pos..start_pos }, None)
+                            if value.is_empty() {
+                                expr
+                            } else {
+                                let left = Box::new(Expression::LitStr { value, location });
+                                let right = wrap_to_string(expr, start_pos..start_pos);
+                                Box::new(Expression::Plus { left, right, location: start_pos..start_pos })
+                            }
                         }
-                        Self::Dynamic { expr: left, binding_map_keys } => {
-                            (Expression::Plus { left, right: expr, location: start_pos..start_pos }, binding_map_keys)
+                        Self::Dynamic { expression: left, binding_map_keys } => {
+                            let left = wrap_to_string(left, start_pos..start_pos);
+                            let right = wrap_to_string(expr, start_pos..start_pos);
+                            Box::new(Expression::Plus { left, right, location: start_pos..start_pos })
                         }
                     };
-                    ret = Self::Dynamic { expr: Box::new(new_expr), binding_map_keys };
+                    ret = Self::Dynamic { expression, binding_map_keys: None };
                     continue;
                 }
             }
 
             // convert `Self` format if needed
-            ret = if let Self::Dynamic { expr, binding_map_keys } = ret {
-                let need_convert = if let Expression::Plus { right, .. } = &*expr {
+            ret = if let Self::Dynamic { expression, binding_map_keys } = ret {
+                let need_convert = if let Expression::Plus { right, .. } = &*expression {
                     if let Expression::LitStr { .. } = &**right {
                         false
                     } else {
@@ -1483,19 +1553,20 @@ impl Value {
                     true
                 };
                 if need_convert {
+                    let left = wrap_to_string(expression, start_pos..start_pos);
                     let right = Box::new(Expression::LitStr { value: CompactString::new_inline(""), location: start_pos..start_pos });
-                    let expr = Box::new(Expression::Plus { left: expr, right, location: start_pos..start_pos });
-                    Self::Dynamic { expr, binding_map_keys }
+                    let expr = Box::new(Expression::Plus { left, right, location: start_pos..start_pos });
+                    Self::Dynamic { expression, binding_map_keys }
                 } else {
-                    Self::Dynamic { expr, binding_map_keys }
+                    Self::Dynamic { expression, binding_map_keys }
                 }
             } else {
                 ret
             };
             let (ret_value, ret_location) = match &mut ret {
                 Self::Static { value, location } => (value, location),
-                Self::Dynamic { expr, .. } => {
-                    if let Expression::Plus { right, .. } = &mut **expr {
+                Self::Dynamic { expression, .. } => {
+                    if let Expression::Plus { right, .. } = &mut **expression {
                         if let Expression::LitStr { value, location } = &mut **right {
                             (value, location)
                         } else {

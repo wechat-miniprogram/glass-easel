@@ -132,7 +132,7 @@ lit_str = ${
 }
 lit_str_q = @{ (!"\"" ~ !"\\" ~ ANY)+ }
 lit_str_sq = @{ (!"\'" ~ !"\\" ~ ANY)+ }
-lit_str_escaped = @{ "\\" ~ ("u" ~ ASCII_DIGIT{4} | "x" ~ ASCII_DIGIT{2} | ANY) }
+lit_str_escaped = @{ "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4} | "x" ~ ASCII_HEX_DIGIT{2} | ANY) }
 
 lit_number = ${
     "0x" ~ lit_number_hex
