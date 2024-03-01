@@ -9,10 +9,6 @@ fn value_parsing() {
     case!("{{ b }} a ", r#"{{b+' a '}}"#);
     case!("{{ a }}{{ b }}", r#"{{a+b}}"#);
 
-    case!("{{ '", "", ParseErrorKind::MissingExpressionEnd, 4..4);
-    case!(r#"{{ 'a\n\u0041\x4f\x4E' }}"#, "{{\"a\nAON\"}}");
-    case!(r#"{{ 'a\n\u0' }}"#, "{{\"a\nAON\"}}");
-
     case!("&#xG;", r#"&#xG;"#, ParseErrorKind::IllegalEntity, 0..4);
     case!("&#x ", r#"&#x "#, ParseErrorKind::IllegalEntity, 0..3);
     case!("&#x41;", r#"A"#);
@@ -52,4 +48,36 @@ fn tag_parsing() {
     case!("<template name='a' wx:for='' />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 22..25);
     case!("<template name='a' wx:if='' />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 22..24);
     case!("<div wx:for='' wx:else />", r#"<div wx:for=''/>"#, ParseErrorKind::InvalidAttribute, 18..22);
+}
+
+#[test]
+fn lit_parsing() {
+    case!("{{ '", "", ParseErrorKind::MissingExpressionEnd, 4..4);
+    case!(r#"{{ 'a\n\u0041\x4f\x4E' }}"#, "{{\"a\nAON\"}}");
+    case!(r#"{{ 'a\n\u0' }}"#, "{{\"a\nAON\"}}");
+
+    case!(r#"{{ 0 }}"#, r#"{{0}}"#);
+    case!(r#"{{ 08 }}"#, r#"{&#38; 08 }}"#, ParseErrorKind::IllegalCharacter, 4..4);
+    case!(r#"{{ 010 }}"#, r#"{{8}}"#);
+    case!(r#"{{ 0x }}"#, r#"{&#38; 0x }}"#, ParseErrorKind::IllegalCharacter, 5..5);
+    case!(r#"{{ 0xaB }}"#, r#"{{171}}"#);
+    case!(r#"{{ 0e }}"#, r#"{&#38; 0e }}"#, ParseErrorKind::IllegalCharacter, 5..5);
+    case!(r#"{{ 0e- }}"#, r#"{&#38; 0e- }}"#, ParseErrorKind::IllegalCharacter, 6..6);
+    case!(r#"{{ 0e12 }}"#, r#"{{0}}"#);
+    case!(r#"{{ 102 }}"#, r#"{{102}}"#);
+    case!(r#"{{ 0.1 }}"#, r#"{{0.1}}"#);
+    case!(r#"{{ .1 }}"#, r#"{{0.1}}"#);
+    case!(r#"{{ 1. }}"#, r#"{{1.0}}"#);
+    case!(r#"{{ 1.2e1 }}"#, r#"{{12}}"#);
+    case!(r#"{{ 1.2e01 }}"#, r#"{{12}}"#);
+    case!(r#"{{ 1.2e-1 }}"#, r#"{{0.12}}"#);
+
+    case!(r#"{{ a }}"#, r#"{{{a:a}}}"#);
+    case!(r#"{{ { } }}"#, r#"{{{}}}"#);
+    case!(r#"{{ {,} }}"#, r#"{{{}}}"#, ParseErrorKind::IllegalCharacter, 4..4);
+    case!(r#"{{ a: 1, a: 2 }}"#, r#"{{{a:1,a:2}}}"#, ParseErrorKind::DuplicatedName, 3..4);
+    case!(r#"{{ a: 1 }}"#, r#"{{{a:1}}}"#);
+    case!(r#"{{ a: 2, }}"#, r#"{{{a:2}}}"#);
+    case!(r#"{{ a: 2, b: 3 }}"#, r#"{{{a:2,b:3}}}"#);
+    case!(r#"{{ a, }}"#, r#"{{{a:a}}}"#);
 }
