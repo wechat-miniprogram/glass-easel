@@ -11,6 +11,7 @@ fn value_parsing() {
 
     case!("{{ '", "", ParseErrorKind::MissingExpressionEnd, 4..4);
     case!(r#"{{ 'a\n\u0041\x4f\x4E' }}"#, "{{\"a\nAON\"}}");
+    case!(r#"{{ 'a\n\u0' }}"#, "{{\"a\nAON\"}}");
 
     case!("&#xG;", r#"&#xG;"#, ParseErrorKind::IllegalEntity, 0..4);
     case!("&#x ", r#"&#x "#, ParseErrorKind::IllegalEntity, 0..3);
