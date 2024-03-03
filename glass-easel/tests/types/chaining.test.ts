@@ -134,7 +134,7 @@ componentSpace
   .property('prop', String)
   .data(function () {
     // @ts-expect-error
-    expect(this).type.toBeAny()
+    expect(this.prop).type.toBeAny()
     return {}
   })
 
