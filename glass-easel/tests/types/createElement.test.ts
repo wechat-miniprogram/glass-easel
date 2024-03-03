@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable no-param-reassign */
 /* eslint-disable @typescript-eslint/ban-ts-comment */
+
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { expectType } from 'tsd-lite'
+import { expect } from 'tstyche'
 import * as glassEasel from '../../src'
 
 const componentSpace = glassEasel.getDefaultComponentSpace()
@@ -27,9 +28,9 @@ const definitionInstance = glassEasel.createElement(
   }),
 )
 
-expectType<string>(definitionInstance.data.propStr)
-expectType<{ foo: string }>(definitionInstance.data.foo)
-expectType<string>(definitionInstance.func())
+expect(definitionInstance.data.propStr).type.toBeString()
+expect(definitionInstance.data.foo).type.toEqual<{ foo: string }>()
+expect(definitionInstance.func()).type.toBeString()
 
 const definitionGeneralInstance = glassEasel.createElement(
   'comp',
@@ -45,7 +46,7 @@ const definitionGeneralInstance = glassEasel.createElement(
     .general(),
 )
 
-expectType<{ [x: string]: any }>(definitionGeneralInstance.data)
+expect(definitionGeneralInstance.data).type.toEqual<{ [x: string]: any }>()
 
 /**
  * Chaining createElement
@@ -66,9 +67,9 @@ const chainingInstance = glassEasel.createElement(
     .registerComponent(),
 )
 
-expectType<string>(chainingInstance.data.propStr)
-expectType<{ foo: string }>(chainingInstance.data.foo)
-expectType<string>(chainingInstance.func())
+expect(chainingInstance.data.propStr).type.toBeString()
+expect(chainingInstance.data.foo).type.toEqual<{ foo: string }>()
+expect(chainingInstance.func()).type.toBeString()
 
 const chainingGeneralInstance = glassEasel.createElement(
   'comp',
@@ -82,4 +83,4 @@ const chainingGeneralInstance = glassEasel.createElement(
     .general(),
 )
 
-expectType<{ [x: string]: any }>(chainingGeneralInstance.data)
+expect(chainingGeneralInstance.data).type.toEqual<{ [x: string]: any }>()

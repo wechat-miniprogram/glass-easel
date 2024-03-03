@@ -22,6 +22,7 @@
     "dev": "GLASS_EASEL_ARGS=--dev npm run build",
     "lint": "eslint --ext .js,.ts src",
     "test": "jest -c jest.config.js",
+    "test:types": "tstyche",
     "coverage": "jest -c jest.config.js --collect-coverage"
   },
   "devDependencies": {

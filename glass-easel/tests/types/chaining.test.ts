@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable no-param-reassign */
 /* eslint-disable @typescript-eslint/ban-ts-comment */
+
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { expectType } from 'tsd-lite'
+import { expect } from 'tstyche'
 import * as glassEasel from '../../src'
 
 const componentSpace = glassEasel.getDefaultComponentSpace()
@@ -20,10 +21,10 @@ componentSpace
     type: Object,
     value: { foo: 'foo' },
     observer: (newProp, oldProp) => {
-      expectType<{ foo: string }>(newProp)
-      expectType<string>(newProp.foo)
-      expectType<{ foo: string }>(oldProp)
-      expectType<string>(oldProp.foo)
+      expect(newProp).type.toEqual<{ foo: string }>()
+      expect(newProp.foo).type.toBeString()
+      expect(oldProp).type.toEqual<{ foo: string }>()
+      expect(oldProp.foo).type.toBeString()
     },
   })
   .property('propObjBar', {
@@ -48,26 +49,25 @@ componentSpace
 
   .property('propNull', null)
   .init(({ data }) => {
-    expectType<string>(data.propStr)
-    expectType<number>(data.propNum)
-    expectType<boolean>(data.propBool)
-    expectType<Record<string, any> | null>(data.propObj)
-    expectType<{ foo: string }>(data.propObjFoo)
-    expectType<string>(data.propObjFoo.foo)
-    expectType<{ bar: string }>(data.propObjBar)
-    expectType<string>(data.propObjBar.bar)
-    expectType<(...args: any[]) => any>(data.propFunc)
-    expectType<() => 'foo'>(data.propFuncFoo)
-    expectType<any[]>(data.propArr)
-    expectType<{ name: string }[]>(data.propArrBooks)
+    expect(data.propStr).type.toBeString()
+    expect(data.propNum).type.toBeNumber()
+    expect(data.propBool).type.toBeBoolean()
+    expect(data.propObj).type.toEqual<Record<string, any> | null>()
+    expect(data.propObjFoo).type.toEqual<{ foo: string }>()
+    expect(data.propObjFoo.foo).type.toBeString()
+    expect(data.propObjBar).type.toEqual<{ bar: string }>()
+    expect(data.propObjBar.bar).type.toBeString()
+    expect(data.propFunc).type.toEqual<(...args: any[]) => any>()
+    expect(data.propFuncFoo).type.toEqual<() => 'foo'>()
+    expect(data.propArr).type.toEqual<any[]>()
+    expect(data.propArrBooks).type.toEqual<{ name: string }[]>()
 
-    expectType<string | number | boolean>(data.propOptional)
-    expectType<number | boolean | 'foo'>(data.propOptionalFoo)
+    expect(data.propOptional).type.toEqual<string | number | boolean>()
+    expect(data.propOptionalFoo).type.toEqual<number | boolean | 'foo'>()
 
-    expectType<any>(data.propNull)
+    expect(data.propNull).type.toBeAny()
 
-    // @ts-expect-error
-    expectType<any>(data.nonExists)
+    expect(data).type.not.toHaveProperty('nonExists')
 
     data.propStr = '123'
     data.propObjFoo.foo = '123'
@@ -95,8 +95,7 @@ componentSpace.define().property('invalid', {
 })
 
 componentSpace.define().init(({ data }) => {
-  // @ts-expect-error
-  expectType<any>(data.non_exists)
+  expect(data).type.not.toHaveProperty('nonExists')
 })
 
 /**
@@ -116,16 +115,15 @@ componentSpace
     books: [{ name: 'book' }],
   }))
   .init(({ data }) => {
-    expectType<string>(data.str)
-    expectType<number>(data.num)
-    expectType<boolean>(data.bool)
-    expectType<{ foo: string }>(data.foo)
-    expectType<() => 'foo'>(data.func)
-    expectType<number[]>(data.arr)
-    expectType<{ name: string }[]>(data.books)
+    expect(data.str).type.toBeString()
+    expect(data.num).type.toBeNumber()
+    expect(data.bool).type.toBeBoolean()
+    expect(data.foo).type.toEqual<{ foo: string }>()
+    expect(data.func).type.toEqual<() => 'foo'>()
+    expect(data.arr).type.toEqual<number[]>()
+    expect(data.books).type.toEqual<{ name: string }[]>()
 
-    // @ts-expect-error
-    expectType<any>(data.nonExists)
+    expect(data).type.not.toHaveProperty('nonExists')
 
     data.str = '123'
     data.foo.foo = '123'
@@ -136,7 +134,7 @@ componentSpace
   .property('prop', String)
   .data(function () {
     // @ts-expect-error
-    expectType<any>(this.prop)
+    expect(this).type.toBeAny()
     return {}
   })
 
@@ -309,39 +307,39 @@ componentSpace
   }))
   .init(({ observer }) => {
     observer('str', (newValue) => {
-      expectType<string>(newValue)
+      expect(newValue).type.toBeString()
     })
 
     observer('objFoo', (newValue) => {
-      expectType<{ foo: string }>(newValue)
-      expectType<string>(newValue.foo)
+      expect(newValue).type.toEqual<{ foo: string }>()
+      expect(newValue.foo).type.toBeString()
     })
 
     observer('objFoo.foo', (newValue) => {
-      expectType<string>(newValue)
+      expect(newValue).type.toBeString()
     })
 
     observer('objFoo.**', (newValue) => {
-      expectType<{ foo: string }>(newValue)
+      expect(newValue).type.toEqual<{ foo: string }>()
     })
 
     observer(['str', 'objFoo'], (str, objFoo) => {
-      expectType<string>(str)
-      expectType<{ foo: string }>(objFoo)
+      expect(str).type.toBeString()
+      expect(objFoo).type.toEqual<{ foo: string }>()
     })
 
     observer(['str', 'objFoo.**'], (str, objFoo) => {
-      expectType<string>(str)
-      expectType<{ foo: string }>(objFoo)
+      expect(str).type.toBeString()
+      expect(objFoo).type.toEqual<{ foo: string }>()
     })
 
     observer('**', (newValue) => {
-      expectType<{
+      expect(newValue).type.toEqual<{
         str: string
         objFoo: {
           foo: string
         }
-      }>(newValue)
+      }>()
     })
 
     // @ts-expect-error
@@ -365,39 +363,39 @@ componentSpace
     objFoo: { foo: 'foo' },
   }))
   .observer('str', (newValue) => {
-    expectType<string>(newValue)
+    expect(newValue).type.toBeString()
   })
 
   .observer('objFoo', (newValue) => {
-    expectType<{ foo: string }>(newValue)
-    expectType<string>(newValue.foo)
+    expect(newValue).type.toEqual<{ foo: string }>()
+    expect(newValue.foo).type.toBeString()
   })
 
   .observer('objFoo.foo', (newValue) => {
-    expectType<string>(newValue)
+    expect(newValue).type.toBeString()
   })
 
   .observer('objFoo.**', (newValue) => {
-    expectType<{ foo: string }>(newValue)
+    expect(newValue).type.toEqual<{ foo: string }>()
   })
 
   .observer(['str', 'objFoo'], (str, objFoo) => {
-    expectType<string>(str)
-    expectType<{ foo: string }>(objFoo)
+    expect(str).type.toBeString()
+    expect(objFoo).type.toEqual<{ foo: string }>()
   })
 
   .observer(['str', 'objFoo.**'], (str, objFoo) => {
-    expectType<string>(str)
-    expectType<{ foo: string }>(objFoo)
+    expect(str).type.toBeString()
+    expect(objFoo).type.toEqual<{ foo: string }>()
   })
 
   .observer('**', (newValue) => {
-    expectType<{
+    expect(newValue).type.toEqual<{
       str: string
       objFoo: {
         foo: string
       }
-    }>(newValue)
+    }>()
   })
 
 componentSpace
@@ -444,12 +442,12 @@ componentSpace.define().init(({ relation }) => {
     target: FormControl,
     linked(target) {
       const impl = target.traitBehavior(FormControl)!
-      expectType<string>(impl.getName())
-      expectType<{ foo: string }>(impl.getValue())
+      expect(impl.getName()).type.toBeString()
+      expect(impl.getValue()).type.toEqual<{ foo: string }>()
     },
   })
-  expectType<any[]>(rel.list())
-  expectType<SimpleFormControlInterface[]>(rel.listAsTrait())
+  expect(rel.list()).type.toEqual<any[]>()
+  expect(rel.listAsTrait()).type.toEqual<SimpleFormControlInterface[]>()
 })
 
 componentSpace.define().init(({ implement, relation }) => {
@@ -461,8 +459,8 @@ componentSpace.define().init(({ implement, relation }) => {
     type: 'ancestor',
     target: FormControl,
   })
-  expectType<any[]>(rel.list())
-  expectType<SimpleFormControlInterface[]>(rel.listAsTrait())
+  expect(rel.list()).type.toEqual<any[]>()
+  expect(rel.listAsTrait()).type.toEqual<SimpleFormControlInterface[]>()
 })
 
 /**
@@ -485,14 +483,12 @@ componentSpace
   .behavior(beh)
   .property('propB', String)
   .init(({ data }) => {
-    expectType<number>(data.propA)
-    expectType<string>(data.propB)
+    expect(data.propA).type.toBeNumber()
+    expect(data.propB).type.toBeString()
 
-    // @ts-expect-error
-    expectType<any>(data.behaviorData)
+    expect(data).type.not.toHaveProperty('behaviorData')
 
-    // @ts-expect-error
-    expectType<any>(data.nonExists)
+    expect(data).type.not.toHaveProperty('nonExists')
   })
   .registerComponent()
 
@@ -520,10 +516,10 @@ componentSpace
   .behavior(propCheck)
   .property('prop2', String)
   .myInit('foo', ({ data }) => {
-    expectType<{
+    expect(data).type.toEqual<{
       prop1: string
       prop2: string
-    }>(data)
+    }>()
   })
   .registerComponent()
 
@@ -540,11 +536,11 @@ componentSpace
     const foo = method(() => data.num)
 
     const bar = listener<{ bar: string }>((e) => {
-      expectType<{ bar: string }>(e.detail)
+      expect(e.detail).type.toEqual<{ bar: string }>()
       return false
     })
 
-    expectType<number>(foo())
+    expect(foo()).type.toBeNumber()
 
     return {
       foo,
@@ -552,7 +548,7 @@ componentSpace
     }
   })
   .lifetime('created', function () {
-    expectType<number>(this.foo())
+    expect(this.foo()).type.toBeNumber()
   })
   .registerComponent()
 
@@ -562,10 +558,10 @@ componentSpace
 componentSpace
   .define()
   .lifetime('listenerChange', (isAdd, name, func, options) => {
-    expectType<boolean>(isAdd)
-    expectType<string>(name)
-    expectType<glassEasel.EventListener<unknown>>(func)
-    expectType<glassEasel.EventListenerOptions | undefined>(options)
+    expect(isAdd).type.toBeBoolean()
+    expect(name).type.toBeString()
+    expect(func).type.toEqual<glassEasel.EventListener<unknown>>()
+    expect(options).type.toEqual<glassEasel.EventListenerOptions | undefined>()
   })
   .registerComponent()
 
