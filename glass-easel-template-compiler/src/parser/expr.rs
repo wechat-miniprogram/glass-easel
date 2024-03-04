@@ -42,11 +42,11 @@ pub enum Expression {
         location: Range<Position>,
     },
     LitObj {
-        fields: Vec<(Option<(CompactString, Range<Position>)>, Expression)>, // None refers to spread op
+        fields: Vec<ObjectFieldKind>, // None refers to spread op
         brace_location: (Range<Position>, Range<Position>),
     },
     LitArr {
-        fields: Vec<Expression>,
+        fields: Vec<ArrayFieldKind>,
         bracket_location: (Range<Position>, Range<Position>),
     },
 
@@ -193,6 +193,29 @@ pub enum Expression {
     },
 }
 
+#[derive(Debug, Clone)]
+enum ObjectFieldKind {
+    Named {
+        name: CompactString,
+        location: Range<Position>,
+        value: Expression,
+    },
+    Spread {
+        value: Expression,
+    },
+}
+
+#[derive(Debug, Clone)]
+enum ArrayFieldKind {
+    Normal {
+        value: Expression,
+    },
+    Spread {
+        value: Expression,
+    },
+    EmptySlot,
+}
+
 impl TemplateStructure for Expression {
     fn location(&self) -> Range<Position> {
         self.location_start()..self.location_end()
@@ -293,7 +316,7 @@ impl Expression {
         ps.try_parse(|ps| -> Option<()> {
             // try parse as an object
             Self::try_parse_field_name(ps)?;
-            let peek = ps.peek_without_whitespace()?;
+            let peek = ps.peek_skip_whitespace()?;
             if peek == ':' || peek == ',' {
                 is_object_inner = true
             } else if peek == '.' {
@@ -315,9 +338,8 @@ impl Expression {
     }
 
     fn try_parse_field_name(ps: &mut ParseState) -> Option<(CompactString, Range<Position>)> {
-        let peek = ps.peek_without_whitespace()?;
+        let peek = ps.peek_skip_whitespace()?;
         if is_ident_char(peek) {
-            ps.skip_whitespace();
             let pos = ps.position();
             let mut name = CompactString::new_inline("");
             loop {
@@ -335,80 +357,190 @@ impl Expression {
         }
     }
 
-    // fn parse_ident_or_keyword(ps: &mut ParseState) -> Option<Box<Self>> {
-    //     let (name, location) = Self::try_parse_field_name(ps)?;
-    //     let ret = match name.as_str() {
-    //         "undefined" => Expression::LitUndefined { location },
-    //         "null" => Expression::LitNull { location },
-    //         "true" => Expression::LitBool { value: true, location },
-    //         "false" => Expression::LitBool { value: false, location },
-    //     };
-    //     Some(Box::new(ret))
-    // }
+    // NOTE
+    // each `parse_*` fn should return `None` if failed.
+    // Unless the input is ended, a warning should be added before returns.
 
-    fn parse_object_inner(ps: &mut ParseState) -> Option<Vec<(Option<(CompactString, Range<Position>)>, Self)>> {
+    fn parse_ident_or_keyword(ps: &mut ParseState) -> Option<Box<Self>> {
+        let (name, location) = Self::try_parse_field_name(ps)?;
+        if (b'0'..=b'9').contains(&name.as_bytes()[0]) {
+            ps.add_warning(ParseErrorKind::InvalidIdentifier, location);
+            return None; 
+        }
+        let ret = match name.as_str() {
+            "undefined" => Expression::LitUndefined { location },
+            "null" => Expression::LitNull { location },
+            "true" => Expression::LitBool { value: true, location },
+            "false" => Expression::LitBool { value: false, location },
+        };
+        Some(Box::new(ret))
+    }
+
+    fn parse_object_inner(ps: &mut ParseState) -> Option<Vec<ObjectFieldKind>> {
         let mut fields = vec![];
         loop {
-            let Some(peek) = ps.peek_without_whitespace() else {
+            let Some(peek) = ps.peek_skip_whitespace() else {
                 break
             };
             if peek == '}' { break };
-            ps.skip_whitespace();
 
             // parse `...xxx`
             if peek == '.' {
-                if ps.peek_n_without_whitespace::<3>() != Some(['.', '.', '.']) {
-                    ps.add_warning_at_current_position(ParseErrorKind::IllegalCharacter);
+                if ps.peek_n_with_whitespace::<3>() != Some(['.', '.', '.']) {
+                    ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
                     return None;
                 }
                 ps.skip_until_after("...");
-                let value = Self::parse_cond(ps)?;
-                fields.push((None, value));
-                continue;
+                let value = *Self::parse_cond(ps)?;
+                fields.push(ObjectFieldKind::Spread { value });
+                let peek = ps.peek_skip_whitespace()?;
+                if peek == '}' { break };
+                if peek == ',' {
+                    ps.next_with_whitespace(); // ','
+                } else {
+                    ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
+                    return None;
+                }
             }
 
             // parse field name
             let Some((name, location)) = Self::try_parse_field_name(ps) else {
-                ps.add_warning_at_current_position(ParseErrorKind::IllegalCharacter);
+                ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
                 return None;
             };
-            let Some(peek) = ps.peek_with_whitespace() else { break };
-            if peek == '}' { break };
-            if peek == ':' {
-                ps.next_with_whitespace(); // ':'
+            let dup_name = fields.iter().find_map(|x| match x {
+                ObjectFieldKind::Named { name: x, location, .. } => (x == &name).then_some(location.clone()),
+                ObjectFieldKind::Spread { .. } => None,
+            });
+            if let Some(location) = dup_name {
+                ps.add_warning(ParseErrorKind::DuplicatedName, location);
+            };
 
-                // parse field value
-                let value = Self::parse_cond(ps)?;
-                if let Some(location) = fields.iter().find_map(|((s, l), _)| (s == name.as_str()).then_some(l)) {
-                    ps.add_warning(ParseErrorKind::DuplicatedName, location);
-                };
-                fields.push((Some((name, location)), value));
-                ps.skip_whitespace();
-                let peek = ps.peek_with_whitespace()?;
-                if peek == '}' { break };
-                if peek == ',' {
-                    ps.next_with_whitespace(); // ','
-                    continue;
+            // parse field value if needed
+            let peek = ps.peek_skip_whitespace();
+            match peek {
+                Some(':') => {
+                    ps.next_with_whitespace(); // ':'
+                    let value = *Self::parse_cond(ps)?;
+                    fields.push(ObjectFieldKind::Named { name, location, value });
+                    let peek = ps.peek_skip_whitespace()?;
+                    if peek == '}' { break };
+                    if peek == ',' {
+                        ps.next_with_whitespace(); // ','
+                    } else {
+                        ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
+                        return None;
+                    }
                 }
-                ps.add_warning_at_current_position(ParseErrorKind::IllegalCharacter);
-                return None;
+                None | Some('}') | Some(',') => {
+                    let value = Expression::Ident { name, location };
+                    fields.push(ObjectFieldKind::Named { name, location, value });
+                    if peek == Some(',') {
+                        ps.next_with_whitespace(); // ','
+                    }
+                }
+                _ => {
+                    ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
+                    return None;
+                }
             }
-            if peek == ',' {
-                let value = Expression::Ident { name, location };
-                fields.push((Some((name, location)), value));
-                ps.next_with_whitespace(); // ','
-                continue;
-            }
-            ps.add_warning_at_current_position(ParseErrorKind::IllegalCharacter);
-            return None;
         }
         Some(fields)
     }
 
+    fn parse_lit_object(ps: &mut ParseState) -> Option<Box<Self>> {
+        let peek = ps.peek_skip_whitespace()?;
+        if peek != '{' { return None; }
+        let pos = ps.position();
+        ps.next_with_whitespace(); // '{'
+        let brace_start_location = pos..ps.position();
+        let fields = Self::parse_object_inner(ps)?;
+        if ps.peek_skip_whitespace()? != '}' {
+            ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
+            return None;
+        }
+        let pos = ps.position();
+        ps.next_with_whitespace(); // '}'
+        let brace_end_location = pos..ps.position();
+        Some(Box::new(Self::LitObj { fields, brace_location: (brace_start_location, brace_end_location) }))
+    }
+
+    fn parse_array_inner(ps: &mut ParseState) -> Option<Vec<ArrayFieldKind>> {
+        let mut items = vec![];
+        loop {
+            let Some(peek) = ps.peek_skip_whitespace() else {
+                break
+            };
+            if peek == ']' { break };
+
+            // parse empty slot
+            if peek == ',' {
+                items.push(ArrayFieldKind::EmptySlot);
+                ps.next_with_whitespace(); // ','
+                continue;
+            }
+
+            // parse `...xxx`
+            if peek == '.' {
+                if ps.peek_n_with_whitespace::<3>() != Some(['.', '.', '.']) {
+                    ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
+                    return None;
+                }
+                ps.skip_until_after("...");
+                let value = *Self::parse_cond(ps)?;
+                items.push(ArrayFieldKind::Spread { value });
+                let peek = ps.peek_skip_whitespace()?;
+                if peek == ']' { break };
+                if peek == ',' {
+                    ps.next_with_whitespace(); // ','
+                } else {
+                    ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
+                    return None;
+                }
+                continue;
+            }
+
+            // parse item
+            let value = *Self::parse_cond(ps)?;
+            items.push(ArrayFieldKind::Normal { value });
+            let peek = ps.peek_skip_whitespace()?;
+            if peek == ']' { break };
+            if peek == ',' {
+                ps.next_with_whitespace(); // ','
+            } else {
+                ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
+                return None;
+            }
+        }
+        Some(items)
+    }
+
+    fn parse_lit_array(ps: &mut ParseState) -> Option<Box<Self>> {
+        let peek = ps.peek_skip_whitespace()?;
+        if peek != '[' {
+            ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
+            return None;
+        }
+        let pos = ps.position();
+        ps.next_with_whitespace(); // '['
+        let brace_start_location = pos..ps.position();
+        let fields = Self::parse_object_inner(ps)?;
+        if ps.peek_skip_whitespace()? != ']' {
+            ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
+            return None;
+        }
+        let pos = ps.position();
+        ps.next_with_whitespace(); // ']'
+        let brace_end_location = pos..ps.position();
+        Some(Box::new(Self::LitObj { fields, brace_location: (brace_start_location, brace_end_location) }))
+    }
+
     fn parse_lit_str(ps: &mut ParseState) -> Option<Box<Self>> {
-        let peek = ps.peek_without_whitespace()?;
-        if peek != '"' && peek != '\'' { return None; }
-        ps.skip_whitespace();
+        let peek = ps.peek_skip_whitespace()?;
+        if peek != '"' && peek != '\'' {
+            ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
+            return None;
+        }
         let pos = ps.position();
         ps.next_with_whitespace(); // peek
         let mut ret = CompactString::new_inline("");
@@ -475,9 +607,11 @@ impl Expression {
     }
 
     fn parse_number(ps: &mut ParseState) -> Option<Box<Self>> {
-        let peek = ps.peek_without_whitespace()?;
-        if !('0'..='9').contains(&peek) && peek != '.' { return None; }
-        ps.skip_whitespace();
+        let peek = ps.peek_skip_whitespace()?;
+        if !('0'..='9').contains(&peek) && peek != '.' {
+            ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
+            return None;
+        }
         let pos = ps.position();
         let start_index = ps.cur_index();
         ps.next_with_whitespace(); // peek
@@ -497,7 +631,7 @@ impl Expression {
                         let Some(peek) = ps.peek_with_whitespace() else { break };
                         if !is_ident_char(peek) { break }
                         if !('0'..='7').contains(&peek) {
-                            ps.add_warning_at_current_position(ParseErrorKind::IllegalCharacter);
+                            ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
                             return None;
                         }
                     }
@@ -509,7 +643,7 @@ impl Expression {
                     let mut num = 0i64;
                     let peek = ps.peek_with_whitespace()?;
                     if !('0'..='9').contains(&peek) && !('a'..='z').contains(&peek) && !('A'..='Z').contains(&peek) {
-                        ps.add_warning_at_current_position(ParseErrorKind::IllegalCharacter);
+                        ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
                         return None;
                     }
                     loop {
@@ -536,7 +670,7 @@ impl Expression {
                         let Some(peek) = ps.peek_with_whitespace() else { break };
                         if !is_ident_char(peek) { break }
                         if !('0'..='9').contains(&peek) && !('a'..='z').contains(&peek) && !('A'..='Z').contains(&peek) {
-                            ps.add_warning_at_current_position(ParseErrorKind::IllegalCharacter);
+                            ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
                             return None;
                         }
                     }
@@ -546,7 +680,7 @@ impl Expression {
                     // parse as `0eXX` , do nothing
                 }
                 _ => {
-                    ps.add_warning_at_current_position(ParseErrorKind::IllegalCharacter);
+                    ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
                     return None;
                 }
             }
@@ -564,7 +698,7 @@ impl Expression {
                 }
                 let peek = ps.peek_with_whitespace()?;
                 if !('0'..='9').contains(&peek) {
-                    ps.add_warning_at_current_position(ParseErrorKind::IllegalCharacter);
+                    ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
                     return None;
                 }
                 loop {
@@ -572,7 +706,7 @@ impl Expression {
                     let Some(peek) = ps.peek_with_whitespace() else { break };
                     if !is_ident_char(peek) { break; }
                     if !('0'..='9').contains(&peek) {
-                        ps.add_warning_at_current_position(ParseErrorKind::IllegalCharacter);
+                        ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
                         return None;
                     }
                 }
@@ -592,14 +726,14 @@ impl Expression {
             if ('0'..='9').contains(&peek) || (int.is_some() && peek == '.') || peek == 'e' {
                 // empty
             } else {
-                ps.add_warning_at_current_position(ParseErrorKind::IllegalCharacter);
+                ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
                 return None;
             }
         }
         let num = match int {
             None => {
                 let Ok(num) = ps.code_slice(start_index..ps.cur_index()).parse::<f64>() else {
-                    ps.add_warning_at_current_position(ParseErrorKind::IllegalCharacter);
+                    ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
                     return None;
                 };
                 Expression::LitFloat { value: num, location: pos..ps.position() }
@@ -607,6 +741,11 @@ impl Expression {
             Some(int) => Expression::LitInt { value: int, location: pos..ps.position() },
         };
         Some(Box::new(num))
+    }
+
+    fn parse_cond(ps: &mut ParseState) -> Option<Box<Self>> {
+        // TODO
+        todo!()
     }
 }
 

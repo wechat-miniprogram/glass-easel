@@ -29,7 +29,7 @@ fn tag_parsing() {
     case!("<div>", r#"<div></div>"#, ParseErrorKind::MissingEndTag, 5..5);
     case!("<div >", r#"<div></div>"#, ParseErrorKind::MissingEndTag, 6..6);
     case!("<a:div/>", r#"<wx-x></wx-x>"#, ParseErrorKind::IllegalNamePrefix, 1..2);
-    case!("<div/ ></div>", r#"<div></div>"#, ParseErrorKind::IllegalCharacter, 4..5);
+    case!("<div/ ></div>", r#"<div></div>"#, ParseErrorKind::UnexpectedCharacter, 4..5);
     case!("<div a:mark:c/>", r#"<div></div>"#, ParseErrorKind::IllegalNamePrefix, 5..6);
     case!("<div marks:c/>", r#"<div></div>"#, ParseErrorKind::IllegalNamePrefix, 5..10);
     case!("<div a =''/>", r#"<div a=""></div>"#, ParseErrorKind::UnexpectedWhitespace, 6..7);
@@ -44,7 +44,7 @@ fn tag_parsing() {
     case!("<block a=''></block>", r#"<block></block>"#, ParseErrorKind::InvalidAttribute, 7..8);
     case!("<block wx:if=''/><block wx:else=' '/>", r#"<block wx:if=""></block><block wx:else></block>"#, ParseErrorKind::InvalidAttributeValue, 33..34);
     case!("<slot><div/></slot>", r#"<slot></slot>"#, ParseErrorKind::InvalidAttribute, 6..12);
-    case!("<div></div  a=''>", r#"<slot></slot>"#, ParseErrorKind::IllegalCharacter, 12..16);
+    case!("<div></div  a=''>", r#"<slot></slot>"#, ParseErrorKind::UnexpectedCharacter, 12..16);
     case!("<template name='a' wx:for='' />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 22..25);
     case!("<template name='a' wx:if='' />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 22..24);
     case!("<div wx:for='' wx:else />", r#"<div wx:for=''/>"#, ParseErrorKind::InvalidAttribute, 18..22);
@@ -57,12 +57,12 @@ fn lit_parsing() {
     case!(r#"{{ 'a\n\u0' }}"#, "{{\"a\nAON\"}}");
 
     case!(r#"{{ 0 }}"#, r#"{{0}}"#);
-    case!(r#"{{ 08 }}"#, r#"{&#38; 08 }}"#, ParseErrorKind::IllegalCharacter, 4..4);
+    case!(r#"{{ 08 }}"#, r#"{&#38; 08 }}"#, ParseErrorKind::UnexpectedCharacter, 4..4);
     case!(r#"{{ 010 }}"#, r#"{{8}}"#);
-    case!(r#"{{ 0x }}"#, r#"{&#38; 0x }}"#, ParseErrorKind::IllegalCharacter, 5..5);
+    case!(r#"{{ 0x }}"#, r#"{&#38; 0x }}"#, ParseErrorKind::UnexpectedCharacter, 5..5);
     case!(r#"{{ 0xaB }}"#, r#"{{171}}"#);
-    case!(r#"{{ 0e }}"#, r#"{&#38; 0e }}"#, ParseErrorKind::IllegalCharacter, 5..5);
-    case!(r#"{{ 0e- }}"#, r#"{&#38; 0e- }}"#, ParseErrorKind::IllegalCharacter, 6..6);
+    case!(r#"{{ 0e }}"#, r#"{&#38; 0e }}"#, ParseErrorKind::UnexpectedCharacter, 5..5);
+    case!(r#"{{ 0e- }}"#, r#"{&#38; 0e- }}"#, ParseErrorKind::UnexpectedCharacter, 6..6);
     case!(r#"{{ 0e12 }}"#, r#"{{0}}"#);
     case!(r#"{{ 102 }}"#, r#"{{102}}"#);
     case!(r#"{{ 0.1 }}"#, r#"{{0.1}}"#);
@@ -73,11 +73,25 @@ fn lit_parsing() {
     case!(r#"{{ 1.2e-1 }}"#, r#"{{0.12}}"#);
 
     case!(r#"{{ a }}"#, r#"{{{a:a}}}"#);
+    case!(r#"{{ { a# } }}"#, r#"{&#38; { a# } }}"#, ParseErrorKind::UnexpectedCharacter, 6..6);
+    case!(r#"{{ { a:# } }}"#, r#"{&#38; { a:# } }}"#, ParseErrorKind::UnexpectedCharacter, 7..7);
     case!(r#"{{ { } }}"#, r#"{{{}}}"#);
-    case!(r#"{{ {,} }}"#, r#"{{{}}}"#, ParseErrorKind::IllegalCharacter, 4..4);
+    case!(r#"{{ {,} }}"#, r#"{&#38; {,} }}"#, ParseErrorKind::UnexpectedCharacter, 4..4);
     case!(r#"{{ a: 1, a: 2 }}"#, r#"{{{a:1,a:2}}}"#, ParseErrorKind::DuplicatedName, 3..4);
+    case!(r#"{{ a: 1, a }}"#, r#"{{{a:1,a}}}"#, ParseErrorKind::DuplicatedName, 3..4);
     case!(r#"{{ a: 1 }}"#, r#"{{{a:1}}}"#);
     case!(r#"{{ a: 2, }}"#, r#"{{{a:2}}}"#);
     case!(r#"{{ a: 2, b: 3 }}"#, r#"{{{a:2,b:3}}}"#);
     case!(r#"{{ a, }}"#, r#"{{{a:a}}}"#);
+    case!(r#"{{ ...a, ...b }}"#, r#"{{{...a,...b}}}"#);
+    case!(r#"{{ {...} }}"#, r#"{&#38; {...} }}"#, ParseErrorKind::UnexpectedCharacter, 7..7);
+
+    case!(r#"{{ [ a, ] }}"#, r#"{{[a]}}"#);
+    case!(r#"{{ [ a# ] }}"#, r#"{&#38; [ a# ] }}"#, ParseErrorKind::UnexpectedCharacter, 6..6);
+    case!(r#"{{ [ , ] }}"#, r#"{{[,]}}"#);
+    case!(r#"{{ [ , , ] }}"#, r#"{{[,,]}}"#);
+    case!(r#"{{ [ c, a + b ] }}"#, r#"{{[c,a+b]}}"#);
+    case!(r#"{{ [ ...a, ] }}"#, r#"{{[...a]}}"#);
+    case!(r#"{{ [ ...a, ...b ] }}"#, r#"{{[...a,...b]}}"#);
+    case!(r#"{{ [...] }}"#, r#"{{[...]}}"#, ParseErrorKind::UnexpectedCharacter, 7..7);
 }

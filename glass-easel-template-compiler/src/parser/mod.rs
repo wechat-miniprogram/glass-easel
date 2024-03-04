@@ -152,6 +152,11 @@ impl<'s> ParseState<'s> {
         iter.next()
     }
 
+    fn peek_skip_whitespace<const Index: usize>(&self) -> Option<char> {
+        self.skip_whitespace();
+        self.peek_with_whitespace::<Index>()
+    }
+
     fn peek_without_whitespace<const Index: usize>(&self) -> Option<char> {
         let mut iter = self.peek_chars();
         let next = loop {
@@ -296,7 +301,7 @@ impl std::error::Error for ParseError {}
 
 #[derive(Clone)]
 pub enum ParseErrorKind {
-    IllegalCharacter = 0x10001,
+    UnexpectedCharacter = 0x10001,
     UnrecognizedTag,
     IllegalExpression,
     MissingExpressionEnd,
@@ -321,7 +326,7 @@ pub enum ParseErrorKind {
 impl ParseErrorKind {
     fn static_message(&self) -> &'static str {
         match self {
-            Self::IllegalCharacter => "illegal character",
+            Self::UnexpectedCharacter => "unexpected character",
             Self::UnrecognizedTag => "unrecognized tag",
             Self::IllegalExpression => "illegal expression",
             Self::MissingExpressionEnd => "missing expression end",

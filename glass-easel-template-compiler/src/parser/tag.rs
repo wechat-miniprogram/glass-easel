@@ -230,6 +230,10 @@ impl Element {
                     values: vec![],
                 }
             }
+            "wxs" => {
+                // TODO
+                todo!()
+            }
             _ => {
                 ElementKind::Normal {
                     tag_name,
@@ -274,7 +278,7 @@ impl Element {
                 }
                 let pos = ps.position();
                 ps.next_with_whitespace(); // '/'
-                ps.add_warning(ParseErrorKind::IllegalCharacter, pos..ps.position());
+                ps.add_warning(ParseErrorKind::UnexpectedCharacter, pos..ps.position());
             } else if Name::is_start_char(peek) {
                 // decide the attribute kind
                 enum AttrPrefixKind {
@@ -1017,7 +1021,7 @@ impl Element {
                 ps.skip_whitespace();
                 let mut end_tag_end_pos = ps.position();
                 if let Some(s) = ps.skip_until_after(">") {
-                    ps.add_warning(ParseErrorKind::IllegalCharacter, end_tag_end_pos..ps.position());
+                    ps.add_warning(ParseErrorKind::UnexpectedCharacter, end_tag_end_pos..ps.position());
                 }
                 let end_tag_location = (end_tag_start_location, end_tag_end_pos..ps.position());
                 Some((close_location, end_tag_location))
