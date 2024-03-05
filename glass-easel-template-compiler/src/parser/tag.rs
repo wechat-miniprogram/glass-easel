@@ -60,36 +60,33 @@ impl TemplateStructure for Node {
 impl Node {
     fn parse_vec_node(ps: &mut ParseState, globals: &mut TemplateGlobals, ret: &mut Vec<Node>) {
         loop {
-            let Some(peek) = ps.peek_n_without_whitespace::<2>() else { return };
-            match peek {
-                ['<', '/'] => {
-                    // tag end, returns
-                    break;
+            if ps.peek_str("</") {
+                // tag end, returns
+                break;
+            }
+            if let Some(range) = ps.consume_str("<!") {
+                // special tags
+                // currently we only support comments
+                // report a warning on other cases
+                if ps.consume_str("--").is_some() {
+                    ps.skip_until_after("-->");
+                } else {
+                    ps.skip_until_after(">");
+                    ps.add_warning(ParseErrorKind::UnrecognizedTag, range.start..ps.position());
                 }
-                ['<', '!'] => {
-                    // special tags
-                    // currently we only support comments
-                    // report a warning on other cases
-                    let start_pos = ps.position();
-                    ps.next_without_whitespace(); // '<'
-                    ps.next_with_whitespace(); // '!'
-                    if ps.peek_n_with_whitespace::<2>() == Some(['-', '-']) {
-                        ps.next_with_whitespace(); // '-'
-                        ps.next_with_whitespace(); // '-'
-                        ps.skip_until_after("-->");
-                    } else {
-                        ps.skip_until_after(">");
-                        ps.add_warning(ParseErrorKind::UnrecognizedTag, start_pos..ps.position());
-                    }
+                continue;
+            }
+            if let Some([peek, peek2]) = ps.peek_n() {
+                if peek == '<' && Name::is_start_char(peek2) {
+                    Element::parse(ps, globals, ret);
                     continue;
                 }
-                ['<', x] if Name::is_start_char(x) => {
-                    // an element
-                    Element::parse(ps, globals, ret);
-                }
-                _ => {
-                    ret.push(Node::Text(Value::parse_until_before(ps, '<')));
-                }
+            }
+            let value = Value::parse_until_before(ps, '<');
+            if let Some(Node::Text(v)) = &mut ret.last_mut() {
+                v.append(value);
+            } else {
+                ret.push(Node::Text(value));
             }
         }
     }
@@ -175,11 +172,9 @@ impl TemplateStructure for Element {
 impl Element {
     fn parse(ps: &mut ParseState, globals: &mut TemplateGlobals, ret: &mut Vec<Node>) {
         // parse `<xxx`
-        let start_angle_start = ps.position();
-        assert_eq!(ps.next_without_whitespace(), Some('<'));
-        let start_tag_start_location = start_angle_start..ps.position();
+        let start_tag_start_location = ps.consume_str("<").unwrap();
         let mut tag_name_slices = Name::parse_colon_separated(ps);
-        assert_ne!(tag_name_slices.len(), 0);
+        debug_assert_ne!(tag_name_slices.len(), 0);
         let tag_name = if tag_name_slices.len() > 1 {
             let end = tag_name_slices.pop().unwrap();
             for x in tag_name_slices {
@@ -192,7 +187,8 @@ impl Element {
         } else {
             tag_name_slices[0]
         };
-        
+        ps.skip_whitespace();
+
         // create an empty element
         let default_attr_position = tag_name.location.end;
         let mut element = match tag_name.name.as_str() {
@@ -266,19 +262,15 @@ impl Element {
         let mut class_attrs: Vec<(Range<Position>, Name, Value)> = vec![];
         let mut style_attrs: Vec<(Range<Position>, Name, Value)> = vec![];
         loop {
-            ps.skip_whitespace();
-            let Some(peek) = ps.peek_with_whitespace::<0>() else { break };
+            let Some(peek) = ps.peek::<0>() else { break };
             if peek == '>' {
                 break;
             }
             if peek == '/' {
                 // maybe self-close
-                if ps.peek_with_whitespace::<1>() == Some('>') {
-                    break;
+                if !ps.peek_str("/>") {
+                    ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
                 }
-                let pos = ps.position();
-                ps.next_with_whitespace(); // '/'
-                ps.add_warning(ParseErrorKind::UnexpectedCharacter, pos..ps.position());
             } else if Name::is_start_char(peek) {
                 // decide the attribute kind
                 enum AttrPrefixKind {
@@ -406,15 +398,16 @@ impl Element {
                     StaticStr(Name),
                     ScopeName(Name),
                 }
-                let attr_value = if ps.peek_without_whitespace::<0>() == Some('=') {
-                    if let Some(range) = ps.skip_whitespace() {
+                let ws_before_eq = ps.skip_whitespace();
+                let attr_value = if let Some(eq_range) = ps.consume_str("=") {
+                    if let Some(range) = ws_before_eq {
                         ps.add_warning(ParseErrorKind::UnexpectedWhitespace, range);
                     }
-                    ps.next_with_whitespace(); // '='
-                    match ps.peek_without_whitespace::<0>() {
+                    let ws_after_eq = ps.skip_whitespace();
+                    let attr_value = match ps.peek::<0>() {
                         None | Some('>') | Some('/') => {
-                            let pos = ps.position();
-                            ps.add_warning_at_current_position(ParseErrorKind::MissingAttributeValue);
+                            let pos = eq_range.end;
+                            ps.add_warning(ParseErrorKind::MissingAttributeValue, eq_range);
                             match parse_kind {
                                 AttrPrefixParseKind::Value => AttrPrefixParseResult::Value(Value::new_empty(pos)),
                                 AttrPrefixParseKind::StaticStr => AttrPrefixParseResult::StaticStr(Name::new_empty(pos)),
@@ -423,10 +416,10 @@ impl Element {
                         }
                         Some(ch) if ch == '"' || ch == '\'' => {
                             // parse as `"..."`
-                            if let Some(range) = ps.skip_whitespace() {
+                            if let Some(range) = ws_after_eq {
                                 ps.add_warning(ParseErrorKind::UnexpectedWhitespace, range);
                             }
-                            ps.next_with_whitespace(); // ch
+                            ps.next(); // ch
                             let value = match parse_kind {
                                 AttrPrefixParseKind::Value => AttrPrefixParseResult::Value(Value::parse_until_before(ps, ch)),
                                 AttrPrefixParseKind::StaticStr => {
@@ -444,12 +437,12 @@ impl Element {
                                     AttrPrefixParseResult::ScopeName(v)
                                 },
                             };
-                            ps.next_with_whitespace(); // ch
+                            ps.next(); // ch
                             value
                         }
-                        Some('{') if ps.peek_without_whitespace::<1>() == Some('{') => {
+                        Some('{') if ps.peek_str("{{") => {
                             // parse `{{...}}`
-                            if let Some(range) = ps.skip_whitespace() {
+                            if let Some(range) = ws_after_eq {
                                 ps.add_warning(ParseErrorKind::UnexpectedWhitespace, range);
                             }
                             let value = Value::parse_data_binding(ps).map(Value::from_expression);
@@ -467,7 +460,7 @@ impl Element {
                                 AttrPrefixParseResult::Invalid
                             }
                         }
-                        Some(_) => {
+                        Some(_) if ws_after_eq.is_none() => {
                             let v = Name::parse_identifier_like_until_before(ps, |x| !Name::is_following_char(x));
                             match parse_kind {
                                 AttrPrefixParseKind::Value => AttrPrefixParseResult::Value(Value::Static { value: v.name, location: v.location }),
@@ -475,7 +468,18 @@ impl Element {
                                 AttrPrefixParseKind::ScopeName => AttrPrefixParseResult::ScopeName(v),
                             }
                         }
-                    }
+                        _ => {
+                            let pos = eq_range.end;
+                            ps.add_warning(ParseErrorKind::MissingAttributeValue, eq_range);
+                            match parse_kind {
+                                AttrPrefixParseKind::Value => AttrPrefixParseResult::Value(Value::new_empty(pos)),
+                                AttrPrefixParseKind::StaticStr => AttrPrefixParseResult::StaticStr(Name::new_empty(pos)),
+                                AttrPrefixParseKind::ScopeName => AttrPrefixParseResult::ScopeName(Name::new_empty(pos)),
+                            }
+                        }
+                    };
+                    ps.skip_whitespace();
+                    attr_value
                 } else {
                     let pos = attr_name.location.end;
                     match parse_kind {
@@ -918,13 +922,13 @@ impl Element {
             } else {
                 let pos = ps.position();
                 loop {
-                    ps.next_without_whitespace();
-                    let Some(peek) = ps.peek_without_whitespace::<0>() else { break };
-                    if peek == '/' || peek == '>' || Name::is_start_char(peek) {
+                    let Some(peek) = ps.peek::<0>() else { break };
+                    if peek == '/' || peek == '>' || Name::is_start_char(peek) || char::is_whitespace(peek) {
                         break
                     }
                 }
                 ps.add_warning(ParseErrorKind::IllegalAttributeName, pos..ps.position());
+                ps.skip_whitespace();
             }
         }
 
@@ -954,25 +958,19 @@ impl Element {
         }
 
         // end the start tag
-        let (self_close_location, start_tag_end_location) = match ps.peek_without_whitespace() {
+        let (self_close_location, start_tag_end_location) = match ps.peek::<0>() {
             None => {
                 ps.add_warning(ParseErrorKind::IncompleteTag, start_tag_start_location);
                 let pos = ps.position();
                 (Some(pos..pos), pos..pos)
             }
             Some('/') => {
-                let close_pos = ps.position();
-                ps.next_without_whitespace(); // '/'
-                let start_tag_end_pos = ps.position();
-                let close_location = close_pos..start_tag_end_pos.clone();
-                assert_eq!(ps.next_with_whitespace(), Some('>'));
-                let start_tag_end_location = start_tag_end_pos..ps.position();
+                let close_location = ps.consume_str("/").unwrap();
+                let start_tag_end_location = ps.consume_str(">").unwrap();
                 (Some(close_location), start_tag_end_location)
             }
             Some('>') => {
-                let pos = ps.position();
-                ps.next_without_whitespace(); // '>'
-                (None, pos..ps.position())
+                (None, ps.consume_str(">").unwrap())
             }
             _ => unreachable!()
         };
@@ -992,16 +990,12 @@ impl Element {
         } else {
             let close_with_end_tag_location = ps.try_parse(|ps| {
                 ps.skip_whitespace();
-                if ps.peek_with_whitespace().is_none() {
+                if ps.peek::<0>().is_none() {
                     ps.add_warning(ParseErrorKind::MissingEndTag, start_tag_start_location);
                     return None;
                 }
-                let end_tag_start_pos = ps.position();
-                assert_eq!(ps.next_with_whitespace(), Some('<'));
-                let close_pos = ps.position();
-                let end_tag_start_location = end_tag_start_pos..close_pos;
-                assert_eq!(ps.next_with_whitespace(), Some('/'));
-                let close_location = close_pos..ps.position();
+                let end_tag_start_location = ps.consume_str("<").unwrap();
+                let close_location = ps.consume_str("/").unwrap();
                 let mut tag_name_slices = Name::parse_colon_separated(ps);
                 let end_tag_name = if tag_name_slices.len() > 1 {
                     let end = tag_name_slices.pop().unwrap();
@@ -1315,7 +1309,7 @@ impl Name {
     }
 
     fn parse_colon_separated(ps: &mut ParseState) -> Vec<Self> {
-        let Some(peek) = ps.peek_with_whitespace::<0>() else {
+        let Some(peek) = ps.peek::<0>() else {
             return vec![];
         };
         if !Self::is_start_char(peek) {
@@ -1324,7 +1318,7 @@ impl Name {
         let mut ret = Vec::with_capacity(2);
         let mut cur_name = Self::new_empty(ps.position());
         loop {
-            match ps.next_with_whitespace().unwrap() {
+            match ps.next().unwrap() {
                 ':' => {
                     let prev = std::mem::replace(&mut cur_name, Self::new_empty(ps.position()));
                     ret.push(prev);
@@ -1334,25 +1328,25 @@ impl Name {
                     cur_name.location.end = ps.position();
                 }
             }
-            let Some(peek) = ps.peek_with_whitespace() else { break };
+            let Some(peek) = ps.peek() else { break };
             if !Self::is_following_char(peek) { break };
         }
         ret
     }
 
     fn parse_next_entity<'s>(ps: &mut ParseState<'s>) -> Cow<'s, str> {
-        if ps.peek_with_whitespace() == Some('&') {
+        if ps.peek_str("&") {
             let s = ps.try_parse(|ps| {
                 let start = ps.cur_index();
                 let start_pos = ps.position();
-                ps.next_with_whitespace(); // '&'
-                let next = ps.next_with_whitespace()?;
+                ps.next(); // '&'
+                let next = ps.next()?;
                 if next == '#' {
-                    let next = ps.next_with_whitespace()?;
+                    let next = ps.next()?;
                     if next == 'x' {
                         // parse `&#x...;`
                         loop {
-                            let Some(next) = ps.next_with_whitespace() else {
+                            let Some(next) = ps.next() else {
                                 ps.add_warning(ParseErrorKind::IllegalEntity, start_pos..ps.position());
                                 return None;
                             };
@@ -1368,7 +1362,7 @@ impl Name {
                     } else if ('0'..='9').contains(&next) {
                         // parse `&#...;`
                         loop {
-                            let Some(next) = ps.next_with_whitespace() else {
+                            let Some(next) = ps.next() else {
                                 ps.add_warning(ParseErrorKind::IllegalEntity, start_pos..ps.position());
                                 return None;
                             };
@@ -1388,7 +1382,7 @@ impl Name {
                 } else if ('a'..='z').contains(&next) || ('A'..='Z').contains(&next) {
                     // parse `&...;`
                     loop {
-                        let next = ps.next_with_whitespace()?;
+                        let next = ps.next()?;
                         match next {
                             ';' => break,
                             'a'..='z' | 'A'..='Z' => {}
@@ -1417,7 +1411,7 @@ impl Name {
         let mut name = CompactString::new_inline("");
         let start_pos = ps.position();
         loop {
-            match ps.peek_with_whitespace() {
+            match ps.peek() {
                 None => break,
                 Some(ch) if until(ch) => break,
                 Some(ch) => {
@@ -1475,8 +1469,10 @@ impl Value {
     }
 
     fn parse_data_binding(ps: &mut ParseState) -> Option<Box<Expression>> {
-        ps.next_with_whitespace(); // '{'
-        if ps.peek_with_whitespace() != Some('{') {
+        if ps.consume_str("{{").is_none() {
+            return None;
+        }
+        if ps.peek() != Some('{') {
             return None;
         }
         let Some(expr) = Expression::parse_expression_or_object_inner(ps) else {
@@ -1517,7 +1513,7 @@ impl Value {
             Box::new(Expression::ToStringWithoutUndefined { value: expr, location })
         }
         loop {
-            let Some(peek) = ps.peek_with_whitespace() else { break };
+            let Some(peek) = ps.peek() else { break };
             if peek == until { break };
             let start_pos = ps.position();
 
@@ -1587,6 +1583,11 @@ impl Value {
             ret_location.end = ps.position();
         }
         ret
+    }
+
+    fn append(&mut self, other: Self) {
+        // TODO
+        todo!()
     }
 }
 
