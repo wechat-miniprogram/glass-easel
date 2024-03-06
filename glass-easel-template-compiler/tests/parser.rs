@@ -95,3 +95,9 @@ fn lit_parsing() {
     case!(r#"{{ [ ...a, ...b ] }}"#, r#"{{[...a,...b]}}"#);
     case!(r#"{{ [...] }}"#, r#"{{[...]}}"#, ParseErrorKind::UnexpectedCharacter, 7..7);
 }
+
+#[test]
+fn expr_parsing() {
+    case!("{{ a ? b }}", "", ParseErrorKind::IncompleteConditionExpression, 9..9);
+    case!("{{ a ? b : c }}", "{{a?b:c}}");
+}

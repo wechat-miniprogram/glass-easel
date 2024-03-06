@@ -990,7 +990,7 @@ impl Element {
         } else {
             let close_with_end_tag_location = ps.try_parse(|ps| {
                 ps.skip_whitespace();
-                if ps.peek::<0>().is_none() {
+                if ps.ended() {
                     ps.add_warning(ParseErrorKind::MissingEndTag, start_tag_start_location);
                     return None;
                 }

@@ -69,6 +69,10 @@ impl<'s> ParseState<'s> {
         &self.whole_str[self.cur_index..]
     }
 
+    fn ended(&self) -> bool {
+        self.cur_str().len() == 0
+    }
+
     fn parse_on_auto_whitespace<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
         let prev = self.auto_skip_whitespace;
         self.auto_skip_whitespace = true;
@@ -164,15 +168,42 @@ impl<'s> ParseState<'s> {
         self.cur_str().starts_with(s)
     }
 
-    fn consume_str(&self, s: &str) -> Option<Range<Position>> {
-        if self.peek_str(s) {
-            let start = self.position();
-            self.skip_bytes(s.len());
-            let end = self.position();
-            Some(start..end)
-        } else {
-            None
+    fn consume_str_except_followed<const N: usize>(&self, s: &str, excepts: [&str; N]) -> Option<Range<Position>> {
+        if !self.peek_str(s) {
+            return None;
         }
+        let s_followed = &self.cur_str()[s.len()..];
+        for except in excepts {
+            if s_followed.starts_with(except) {
+                return None;
+            }
+        }
+        let start = self.position();
+        self.skip_bytes(s.len());
+        let end = self.position();
+        Some(start..end)
+    }
+
+    fn consume_str_before_whitespace<const N: usize>(&self, s: &str) -> Option<Range<Position>> {
+        if !self.peek_str(s) {
+            return None;
+        }
+        match self.peek::<0>() {
+            None => {}
+            Some(ch) => {
+                if !char::is_whitespace(ch) {
+                    return None;
+                }
+            }
+        }
+        let start = self.position();
+        self.skip_bytes(s.len());
+        let end = self.position();
+        Some(start..end)
+    }
+
+    fn consume_str(&self, s: &str) -> Option<Range<Position>> {
+        self.consume_str_except_followed(s, [])
     }
 
     fn next_char_as_str(&mut self) -> &'s str {
@@ -314,6 +345,9 @@ pub enum ParseErrorKind {
     InvalidIdentifier,
     ChildNodesNotAllowed,
     IllegalEscapeSequence,
+    IncompleteConditionExpression,
+    UnmatchedBracket,
+    UnmatchedParenthesis,
 }
 
 impl ParseErrorKind {
@@ -339,6 +373,9 @@ impl ParseErrorKind {
             Self::InvalidIdentifier => "not a valid identifier",
             Self::ChildNodesNotAllowed => "child nodes are not allowed for this element",
             Self::IllegalEscapeSequence => "illegal escape sequence",
+            Self::IncompleteConditionExpression => "incomplete condition expression",
+            Self::UnmatchedBracket => "unmatched bracket",
+            Self::UnmatchedParenthesis => "unmatched parenthesis",
         }
     }
 }

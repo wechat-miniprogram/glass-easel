@@ -53,6 +53,7 @@ pub enum Expression {
     StaticMember {
         obj: Box<Expression>,
         field_name: CompactString,
+        dot_location: Range<Position>,
         field_location: Range<Position>,
     },
     DynamicMember {
@@ -101,7 +102,7 @@ pub enum Expression {
         right: Box<Expression>,
         location: Range<Position>,
     },
-    Mod {
+    Remainer {
         left: Box<Expression>,
         right: Box<Expression>,
         location: Range<Position>,
@@ -137,6 +138,12 @@ pub enum Expression {
         right: Box<Expression>,
         location: Range<Position>,
     },
+    InstanceOf {
+        left: Box<Expression>,
+        right: Box<Expression>,
+        location: Range<Position>,
+    },
+
     Eq {
         left: Box<Expression>,
         right: Box<Expression>,
@@ -179,6 +186,11 @@ pub enum Expression {
         location: Range<Position>,
     },
     LogicOr {
+        left: Box<Expression>,
+        right: Box<Expression>,
+        location: Range<Position>,
+    },
+    NullishCoalescing {
         left: Box<Expression>,
         right: Box<Expression>,
         location: Range<Position>,
@@ -247,13 +259,14 @@ impl TemplateStructure for Expression {
             Self::Void { location, .. } => location.start,
             Self::Multiply { left, .. } => left.location_start(),
             Self::Divide { left, .. } => left.location_start(),
-            Self::Mod { left, .. } => left.location_start(),
+            Self::Remainer { left, .. } => left.location_start(),
             Self::Plus { left, .. } => left.location_start(),
             Self::Minus { left, .. } => left.location_start(),
             Self::Lt { left, .. } => left.location_start(),
             Self::Gt { left, .. } => left.location_start(),
             Self::Lte { left, .. } => left.location_start(),
             Self::Gte { left, .. } => left.location_start(),
+            Self::InstanceOf { left, .. } => left.location_start(),
             Self::Eq { left, .. } => left.location_start(),
             Self::Ne { left, .. } => left.location_start(),
             Self::EqFull { left, .. } => left.location_start(),
@@ -263,6 +276,7 @@ impl TemplateStructure for Expression {
             Self::BitOr { left, .. } => left.location_start(),
             Self::LogicAnd { left, .. } => left.location_start(),
             Self::LogicOr { left, .. } => left.location_start(),
+            Self::NullishCoalescing { left, .. } => left.location_start(),
             Self::Cond { cond, .. } => cond.location_start(),
         }
     }
@@ -291,13 +305,14 @@ impl TemplateStructure for Expression {
             Self::Void { location, .. } => location.end,
             Self::Multiply { right, .. } => right.location_end(),
             Self::Divide { right, .. } => right.location_end(),
-            Self::Mod { right, .. } => right.location_end(),
+            Self::Remainer { right, .. } => right.location_end(),
             Self::Plus { right, .. } => right.location_end(),
             Self::Minus { right, .. } => right.location_end(),
             Self::Lt { right, .. } => right.location_end(),
             Self::Gt { right, .. } => right.location_end(),
             Self::Lte { right, .. } => right.location_end(),
             Self::Gte { right, .. } => right.location_end(),
+            Self::InstanceOf { right, .. } => right.location_end(),
             Self::Eq { right, .. } => right.location_end(),
             Self::Ne { right, .. } => right.location_end(),
             Self::EqFull { right, .. } => right.location_end(),
@@ -307,6 +322,7 @@ impl TemplateStructure for Expression {
             Self::BitOr { right, .. } => right.location_end(),
             Self::LogicAnd { right, .. } => right.location_end(),
             Self::LogicOr { right, .. } => right.location_end(),
+            Self::NullishCoalescing { right, .. } => right.location_end(),
             Self::Cond { false_br, .. } => false_br.location_end(),
         }
     }
@@ -343,7 +359,7 @@ impl Expression {
 
     fn try_parse_field_name(ps: &mut ParseState) -> Option<(CompactString, Range<Position>)> {
         let peek = ps.peek::<0>()?;
-        if is_ident_char(peek) {
+        if is_ident_start_char(peek) {
             ps.parse_off_auto_whitespace(|ps| {
                 let pos = ps.position();
                 let mut name = CompactString::new_inline("");
@@ -365,14 +381,13 @@ impl Expression {
 
     // NOTE
     // each `parse_*` fn should return `None` if failed.
-    // Unless the input is ended, a warning should be added before returns.
+    // Unless the input is ended, a warning should be added before returns `None` .
 
     fn parse_ident_or_keyword(ps: &mut ParseState) -> Option<Box<Self>> {
-        let (name, location) = Self::try_parse_field_name(ps)?;
-        if (b'0'..=b'9').contains(&name.as_bytes()[0]) {
-            ps.add_warning(ParseErrorKind::InvalidIdentifier, location);
+        let Some((name, location)) = Self::try_parse_field_name(ps) else {
+            ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
             return None; 
-        }
+        };
         let ret = match name.as_str() {
             "undefined" => Expression::LitUndefined { location },
             "null" => Expression::LitNull { location },
@@ -737,11 +752,224 @@ impl Expression {
         })
     }
 
+    fn parse_lit(ps: &mut ParseState) -> Option<Box<Self>> {
+        let ch = ps.peek::<0>()?;
+        if is_ident_start_char(ch) {
+            return Self::parse_ident_or_keyword(ps);
+        }
+        if ch == '"' || ch == '\'' {
+            return Self::parse_lit_str(ps);
+        }
+        if ('0'..='9').contains(&ch) || ch == '.' {
+            return Self::parse_number(ps);
+        }
+        if ch == '{' {
+            return Self::parse_lit_object(ps);
+        }
+        if ch == '[' {
+            return Self::parse_lit_object(ps);
+        }
+        ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
+        None
+    }
+
+    fn parse_member(ps: &mut ParseState) -> Option<Box<Self>> {
+        let mut obj = Self::parse_lit(ps)?;
+        loop {
+            if let Some(dot_location) = ParseOperator::static_member(ps) {
+                let Some((field_name, field_location)) = Self::try_parse_field_name(ps) else {
+                    ps.add_warning_at_current_position(ParseErrorKind::InvalidIdentifier);
+                    return None;
+                };
+                obj = Box::new(Self::StaticMember { obj, field_name, dot_location, field_location});
+                continue;
+            }
+            if let Some(start) = ParseOperator::dynamic_member(ps) {
+                let field_name = Self::parse_cond(ps)?;
+                let Some(end) = ParseOperator::dynamic_member_end(ps) else {
+                    if !ps.ended() {
+                        ps.add_warning_at_current_position(ParseErrorKind::UnmatchedBracket);
+                    }
+                    return None;
+                };
+                obj = Box::new(Self::DynamicMember { obj, field_name, bracket_location: (start, end)});
+                continue;
+            }
+            if let Some(start) = ParseOperator::func_call(ps) {
+                let mut args = vec![];
+                loop {
+                    if ps.peek::<0>()? == ')' {
+                        break;
+                    }
+                    let value = *Self::parse_cond(ps)?;
+                    args.push(value);
+                    if ps.consume_str(",").is_none() {
+                        break;
+                    }
+                }
+                let Some(end) = ParseOperator::func_call_end(ps) else {
+                    if !ps.ended() {
+                        ps.add_warning_at_current_position(ParseErrorKind::UnmatchedParenthesis);
+                    }
+                    return None;
+                };
+                obj = Box::new(Self::FuncCall { func: obj, args, paren_location: (start, end)});
+                continue;
+            }
+            break;
+        }
+        Some(obj)
+    }
+
+    fn parse_reverse(ps: &mut ParseState) -> Option<Box<Self>> {
+        if let Some(location) = ParseOperator::reverse(ps) {
+            let value = Self::parse_reverse(ps)?;
+            return Some(Box::new(Self::Reverse { value, location }));
+        }
+        if let Some(location) = ParseOperator::bit_reverse(ps) {
+            let value = Self::parse_reverse(ps)?;
+            return Some(Box::new(Self::BitReverse { value, location }));
+        }
+        if let Some(location) = ParseOperator::positive(ps) {
+            let value = Self::parse_reverse(ps)?;
+            return Some(Box::new(Self::Positive { value, location }));
+        }
+        if let Some(location) = ParseOperator::negative(ps) {
+            let value = Self::parse_reverse(ps)?;
+            return Some(Box::new(Self::Negative { value, location }));
+        }
+        if let Some(location) = ParseOperator::r#typeof(ps) {
+            let value = Self::parse_reverse(ps)?;
+            return Some(Box::new(Self::TypeOf { value, location }));
+        }
+        if let Some(location) = ParseOperator::void(ps) {
+            let value = Self::parse_reverse(ps)?;
+            return Some(Box::new(Self::Void { value, location }));
+        }
+        Self::parse_member(ps)
+    }
+
     fn parse_cond(ps: &mut ParseState) -> Option<Box<Self>> {
-        // TODO
-        todo!()
+        let cond = Self::parse_logic_or(ps)?;
+        let Some(question_location) = ParseOperator::condition(ps) else {
+            return Some(cond);
+        };
+        let true_br = Self::parse_cond(ps)?;
+        let Some(colon_location) = ParseOperator::condition_end(ps) else {
+            ps.add_warning_at_current_position(ParseErrorKind::IncompleteConditionExpression);
+            return None;
+        };
+        let false_br = Self::parse_cond(ps)?;
+        Some(Box::new(Self::Cond { cond, true_br, false_br, question_location, colon_location }))
     }
 }
+
+macro_rules! parse_left_to_right {
+    ($cur_level:ident, $next_level:ident, $($op:ident => $br:ident),*) => {
+        impl Expression {
+            fn $cur_level(ps: &mut ParseState) -> Option<Box<Self>> {
+                let mut left = Self::$next_level(ps)?;
+                loop {
+                    $(
+                        if let Some(location) = ParseOperator::$op(ps) {
+                            let right = Self::$next_level(ps)?;
+                            left = Box::new(Expression::$br { left, right, location });
+                            continue;
+                        }
+                    )*
+                    break;
+                }
+                Some(left)
+            }
+        }
+    };
+}
+
+parse_left_to_right!(parse_multiply, parse_reverse, multiply => Multiply, divide => Divide, remainer => Remainer);
+parse_left_to_right!(parse_plus, parse_multiply, plus => Plus, minus => Minus);
+parse_left_to_right!(parse_cmp, parse_plus, lt => Lt, gt => Gt, lte => Lte, gte => Gte, instanceof => InstanceOf);
+parse_left_to_right!(parse_eq, parse_cmp, eq => Eq, ne => Ne, eq_full => EqFull, ne_full => NeFull);
+parse_left_to_right!(parse_bit_and, parse_eq, bit_and => BitAnd);
+parse_left_to_right!(parse_bit_xor, parse_bit_and, bit_xor => BitXor);
+parse_left_to_right!(parse_bit_or, parse_bit_xor, bit_or => BitOr);
+parse_left_to_right!(parse_logic_and, parse_bit_or, logic_and => LogicAnd);
+parse_left_to_right!(parse_logic_or, parse_logic_and, logic_or => LogicOr, nullish_coalescing => NullishCoalescing);
+
+struct ParseOperator();
+
+macro_rules! define_operator {
+    ($name:ident, $s:expr, $excepts:expr) => {
+        impl ParseOperator {
+            fn $name(ps: &mut ParseState) -> Option<Range<Position>> {
+                ps.consume_str_except_followed($s, $excepts)
+            }
+        }
+    };
+    ($name:ident, $s:expr) => {
+        impl ParseOperator {
+            fn $name(ps: &mut ParseState) -> Option<Range<Position>> {
+                ps.consume_str_before_whitespace($s)
+            }
+        }
+    };
+}
+
+define_operator!(static_member, ".", [".."]);
+define_operator!(dynamic_member, "[", []);
+define_operator!(dynamic_member_end, "]", []);
+define_operator!(func_call, "(", []);
+define_operator!(func_call_end, ")", []);
+// `?.` is not supported
+// `new` is treated as an identifier
+
+// `++` `--` are not allowed
+
+define_operator!(reverse, "!", []);
+define_operator!(bit_reverse, "~", []);
+define_operator!(positive, "+", ["+", "="]);
+define_operator!(negative, "-", ["-", "="]);
+define_operator!(r#typeof, "typeof");
+define_operator!(void, "void");
+// `delete` `await` are treated as identifiers
+
+// `**` is not supported
+
+define_operator!(multiply, "*", ["*", "="]);
+define_operator!(divide, "/", ["/", "="]);
+define_operator!(remainer, "%", ["="]);
+
+define_operator!(plus, "+", ["+", "="]);
+define_operator!(minus, "-", ["-", "="]);
+
+// `<<` `>>` `>>>` are not supported
+
+define_operator!(lt, "<", ["<", "="]);
+define_operator!(lte, "<=", []);
+define_operator!(gt, ">", [">", "="]);
+define_operator!(gte, ">=", []);
+define_operator!(instanceof, "instanceof");
+// `in` is treated as an identifier
+
+define_operator!(eq, "==", ["="]);
+define_operator!(ne, "!=", ["="]);
+define_operator!(eq_full, "===", []);
+define_operator!(ne_full, "!==", []);
+
+define_operator!(bit_and, "&", ["&", "="]);
+
+define_operator!(bit_xor, "^", ["="]);
+
+define_operator!(bit_or, "|", ["|", "="]);
+
+define_operator!(logic_and, "&&", ["="]);
+
+define_operator!(logic_or, "||", ["="]);
+define_operator!(nullish_coalescing, "??", ["="]);
+
+define_operator!(condition, "?", ["?", "."]);
+define_operator!(condition_end, ":", []);
+
+// `=` `+=` `-=` `**=` `*=` `/=` `%=` `<<=` `>>=` `>>>=` `&=` `^=` `|=` `&&=` `||=` `??=` are not allowed
 
 fn is_ident_char(ch: char) -> bool {
     ch == '_' || ch == '$' || ('a'..='z').contains(&ch) || ('A'..='Z').contains(&ch) || ('0'..='9').contains(&ch)
