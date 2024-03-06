@@ -206,7 +206,7 @@ pub enum Expression {
 }
 
 #[derive(Debug, Clone)]
-enum ObjectFieldKind {
+pub enum ObjectFieldKind {
     Named {
         name: CompactString,
         location: Range<Position>,
@@ -219,7 +219,7 @@ enum ObjectFieldKind {
 }
 
 #[derive(Debug, Clone)]
-enum ArrayFieldKind {
+pub enum ArrayFieldKind {
     Normal {
         value: Expression,
     },
@@ -335,7 +335,7 @@ impl Expression {
             ps.try_parse(|ps| -> Option<()> {
                 // try parse as an object
                 Self::try_parse_field_name(ps)?;
-                let peek = ps.peek()?;
+                let peek = ps.peek::<0>()?;
                 if peek == ':' || peek == ',' {
                     is_object_inner = true
                 } else if peek == '.' {
@@ -393,6 +393,7 @@ impl Expression {
             "null" => Expression::LitNull { location },
             "true" => Expression::LitBool { value: true, location },
             "false" => Expression::LitBool { value: false, location },
+            _ => Expression::Ident { name, location },
         };
         Some(Box::new(ret))
     }
@@ -413,7 +414,7 @@ impl Expression {
                 };
                 let value = *Self::parse_cond(ps)?;
                 fields.push(ObjectFieldKind::Spread { location, value });
-                let peek = ps.peek()?;
+                let peek = ps.peek::<0>()?;
                 if peek == '}' { break };
                 if peek == ',' {
                     ps.next(); // ','
@@ -453,7 +454,7 @@ impl Expression {
                     }
                 }
                 None | Some('}') | Some(',') => {
-                    let value = Expression::Ident { name, location };
+                    let value = Expression::Ident { name: name.clone(), location: location.clone() };
                     fields.push(ObjectFieldKind::Named { name, location, value });
                     if peek == Some(',') {
                         ps.next(); // ','
@@ -518,7 +519,7 @@ impl Expression {
             // parse item
             let value = *Self::parse_cond(ps)?;
             items.push(ArrayFieldKind::Normal { value });
-            let peek = ps.peek()?;
+            let peek = ps.peek::<0>()?;
             if peek == ']' { break };
             if peek == ',' {
                 ps.next(); // ','
@@ -535,12 +536,12 @@ impl Expression {
             ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
             return None;
         };
-        let fields = Self::parse_object_inner(ps)?;
+        let fields = Self::parse_array_inner(ps)?;
         let Some(brace_end_location) = ps.consume_str("]") else {
             ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
             return None;
         };
-        Some(Box::new(Self::LitObj { fields, brace_location: (brace_start_location, brace_end_location) }))
+        Some(Box::new(Self::LitArr { fields, bracket_location: (brace_start_location, brace_end_location) }))
     }
 
     fn parse_lit_str(ps: &mut ParseState) -> Option<Box<Self>> {
@@ -629,7 +630,7 @@ impl Expression {
 
             // parse zero-leading sequence
             if peek == '0' {
-                match ps.peek() {
+                match ps.peek::<0>() {
                     None => {
                         return Some(Box::new(Expression::LitInt { value: 0, location: pos..ps.position() }));
                     },
@@ -639,7 +640,7 @@ impl Expression {
                         loop {
                             let d = ps.next().unwrap() as i64 - '0' as i64;
                             num = num * 8 + d;
-                            let Some(peek) = ps.peek() else { break };
+                            let Some(peek) = ps.peek::<0>() else { break };
                             if !is_ident_char(peek) { break }
                             if !('0'..='7').contains(&peek) {
                                 ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
@@ -652,7 +653,7 @@ impl Expression {
                         // parse as HEX
                         ps.next(); // 'x'
                         let mut num = 0i64;
-                        let peek = ps.peek()?;
+                        let peek = ps.peek::<0>()?;
                         if !('0'..='9').contains(&peek) && !('a'..='z').contains(&peek) && !('A'..='Z').contains(&peek) {
                             ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
                             return None;
@@ -676,9 +677,10 @@ impl Expression {
                                 'd' | 'D' => 13,
                                 'e' | 'E' => 14,
                                 'f' | 'F' => 15,
+                                _ => unreachable!(),
                             };
                             num = num * 16 + d;
-                            let Some(peek) = ps.peek() else { break };
+                            let Some(peek) = ps.peek::<0>() else { break };
                             if !is_ident_char(peek) { break }
                             if !('0'..='9').contains(&peek) && !('a'..='z').contains(&peek) && !('A'..='Z').contains(&peek) {
                                 ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
@@ -767,7 +769,7 @@ impl Expression {
             return Self::parse_lit_object(ps);
         }
         if ch == '[' {
-            return Self::parse_lit_object(ps);
+            return Self::parse_lit_array(ps);
         }
         ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
         None
@@ -977,4 +979,70 @@ fn is_ident_char(ch: char) -> bool {
 
 fn is_ident_start_char(ch: char) -> bool {
     ch == '_' || ch == '$' || ('a'..='z').contains(&ch) || ('A'..='Z').contains(&ch)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn lit_parsing() {
+        case!("{{ '", "", ParseErrorKind::MissingExpressionEnd, 4..4);
+        case!(r#"{{ 'a\n\u0041\x4f\x4E' }}"#, "{{\"a\nAON\"}}");
+        case!(r#"{{ 'a\n\u0' }}"#, "{{\"a\nAON\"}}");
+        case!(r#"{{ "" }}"#, "{{\"\"}}");
+
+        case!(r#"{{ 0 }}"#, r#"{{0}}"#);
+        case!(r#"{{ 08 }}"#, r#"{&#38; 08 }}"#, ParseErrorKind::UnexpectedCharacter, 4..4);
+        case!(r#"{{ 010 }}"#, r#"{{8}}"#);
+        case!(r#"{{ 0x }}"#, r#"{&#38; 0x }}"#, ParseErrorKind::UnexpectedCharacter, 5..5);
+        case!(r#"{{ 0xaB }}"#, r#"{{171}}"#);
+        case!(r#"{{ 0e }}"#, r#"{&#38; 0e }}"#, ParseErrorKind::UnexpectedCharacter, 5..5);
+        case!(r#"{{ 0e- }}"#, r#"{&#38; 0e- }}"#, ParseErrorKind::UnexpectedCharacter, 6..6);
+        case!(r#"{{ 0e12 }}"#, r#"{{0}}"#);
+        case!(r#"{{ 102 }}"#, r#"{{102}}"#);
+        case!(r#"{{ 0.1 }}"#, r#"{{0.1}}"#);
+        case!(r#"{{ .1 }}"#, r#"{{0.1}}"#);
+        case!(r#"{{ 1. }}"#, r#"{{1.0}}"#);
+        case!(r#"{{ 1.2e1 }}"#, r#"{{12}}"#);
+        case!(r#"{{ 1.2e01 }}"#, r#"{{12}}"#);
+        case!(r#"{{ 1.2e-1 }}"#, r#"{{0.12}}"#);
+
+        case!(r#"{{ a }}"#, r#"{{{a:a}}}"#);
+        case!(r#"{{ { a# } }}"#, r#"{&#38; { a# } }}"#, ParseErrorKind::UnexpectedCharacter, 6..6);
+        case!(r#"{{ { a:# } }}"#, r#"{&#38; { a:# } }}"#, ParseErrorKind::UnexpectedCharacter, 7..7);
+        case!(r#"{{ { } }}"#, r#"{{{}}}"#);
+        case!(r#"{{ {,} }}"#, r#"{&#38; {,} }}"#, ParseErrorKind::UnexpectedCharacter, 4..4);
+        case!(r#"{{ a: 1, a: 2 }}"#, r#"{{{a:1,a:2}}}"#, ParseErrorKind::DuplicatedName, 3..4);
+        case!(r#"{{ a: 1, a }}"#, r#"{{{a:1,a}}}"#, ParseErrorKind::DuplicatedName, 3..4);
+        case!(r#"{{ a: 1 }}"#, r#"{{{a:1}}}"#);
+        case!(r#"{{ a: 2, }}"#, r#"{{{a:2}}}"#);
+        case!(r#"{{ a: 2, b: 3 }}"#, r#"{{{a:2,b:3}}}"#);
+        case!(r#"{{ a, }}"#, r#"{{{a:a}}}"#);
+        case!(r#"{{ ...a, ...b }}"#, r#"{{{...a,...b}}}"#);
+        case!(r#"{{ {...} }}"#, r#"{&#38; {...} }}"#, ParseErrorKind::UnexpectedCharacter, 7..7);
+
+        case!(r#"{{ [ a, ] }}"#, r#"{{[a]}}"#);
+        case!(r#"{{ [ a# ] }}"#, r#"{&#38; [ a# ] }}"#, ParseErrorKind::UnexpectedCharacter, 6..6);
+        case!(r#"{{ [ , ] }}"#, r#"{{[,]}}"#);
+        case!(r#"{{ [ , , ] }}"#, r#"{{[,,]}}"#);
+        case!(r#"{{ [ c, a + b ] }}"#, r#"{{[c,a+b]}}"#);
+        case!(r#"{{ [ ...a, ] }}"#, r#"{{[...a]}}"#);
+        case!(r#"{{ [ ...a, ...b ] }}"#, r#"{{[...a,...b]}}"#);
+        case!(r#"{{ [...] }}"#, r#"{{[...]}}"#, ParseErrorKind::UnexpectedCharacter, 7..7);
+    }
+
+    #[test]
+    fn ident_parsing() {
+        case!("{{ $ }}", "{{$}}");
+        case!("{{ $_ }}", "{{$_}}");
+        case!("{{ a0 }}", "{{a0}}");
+    }
+
+    #[test]
+    fn expr_parsing() {
+        // TODO
+        case!("{{ a ? b }}", "", ParseErrorKind::IncompleteConditionExpression, 9..9);
+        case!("{{ a ? b : c }}", "{{a?b:c}}");
+    }
 }

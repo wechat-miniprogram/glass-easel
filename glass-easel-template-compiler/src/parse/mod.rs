@@ -2,9 +2,25 @@ use std::ops::Range;
 
 use compact_str::CompactString;
 
+#[cfg(test)]
+macro_rules! case {
+    ($src:expr, $expect:expr $(, $msg:expr, $range:expr)*) => {
+        let (template, ps) = $crate::parse::parse($src, "TEST");
+        // TODO stringify template
+        let mut warnings = ps.warnings();
+        $(
+            let err = warnings.next().unwrap();
+            assert_eq!(err.kind, $msg);
+            assert_eq!(err.location.start.utf16_col..err.location.end.utf16_col, $range);
+        )*
+        assert!(warnings.next().is_none());
+    };
+}
+
 mod tag;
 mod expr;
-mod binding_map;
+
+use super::binding_map;
 
 pub(crate) trait TemplateStructure {
     fn location(&self) -> Range<Position>;
@@ -18,8 +34,9 @@ pub(crate) trait TemplateStructure {
     }
 }
 
-struct ParseState<'s> {
-    path: &'s str,
+/// Some meta information of the parsing.
+pub struct ParseState<'s> {
+    path: String,
     whole_str: &'s str,
     cur_index: usize,
     line: u32,
@@ -31,7 +48,7 @@ struct ParseState<'s> {
 }
 
 impl<'s> ParseState<'s> {
-    fn new(path: &'s str, content: &'s str) -> Self {
+    fn new(path: &str, content: &'s str) -> Self {
         let s = content;
         let s = if s.len() >= u32::MAX as usize {
             log::error!("Source code too long. Truncated to `u32::MAX - 1` .");
@@ -40,7 +57,7 @@ impl<'s> ParseState<'s> {
             s
         };
         Self {
-            path,
+            path: path.to_string(),
             whole_str: s,
             cur_index: 0,
             line: 1,
@@ -61,7 +78,8 @@ impl<'s> ParseState<'s> {
         self.add_warning(kind, pos..pos)
     }
 
-    fn warnings(&self) -> impl Iterator<Item = &ParseError> {
+    /// List warnings.
+    pub fn warnings(&self) -> impl Iterator<Item = &ParseError> {
         self.warnings.iter()
     }
 
@@ -146,7 +164,7 @@ impl<'s> ParseState<'s> {
         self.cur_str().chars()
     }
 
-    fn peek_n<const N: usize>(&self) -> Option<[char; N]> {
+    fn peek_n<const N: usize>(&mut self) -> Option<[char; N]> {
         let mut ret: [char; N] = ['\x00'; N];
         let mut iter = self.peek_chars();
         for i in 0..N {
@@ -155,20 +173,20 @@ impl<'s> ParseState<'s> {
         Some(ret)
     }
 
-    fn peek<const Index: usize>(&self) -> Option<char> {
+    fn peek<const I: usize>(&mut self) -> Option<char> {
         let mut iter = self.peek_chars();
-        for _ in 0..Index {
+        for _ in 0..I {
             iter.next()?;
         }
         iter.next()
     }
 
-    fn peek_str(&self, s: &str) -> bool {
+    fn peek_str(&mut self, s: &str) -> bool {
         if self.auto_skip_whitespace { self.skip_whitespace(); }
         self.cur_str().starts_with(s)
     }
 
-    fn consume_str_except_followed<const N: usize>(&self, s: &str, excepts: [&str; N]) -> Option<Range<Position>> {
+    fn consume_str_except_followed<const N: usize>(&mut self, s: &str, excepts: [&str; N]) -> Option<Range<Position>> {
         if !self.peek_str(s) {
             return None;
         }
@@ -184,7 +202,7 @@ impl<'s> ParseState<'s> {
         Some(start..end)
     }
 
-    fn consume_str_before_whitespace<const N: usize>(&self, s: &str) -> Option<Range<Position>> {
+    fn consume_str_before_whitespace(&mut self, s: &str) -> Option<Range<Position>> {
         if !self.peek_str(s) {
             return None;
         }
@@ -202,7 +220,7 @@ impl<'s> ParseState<'s> {
         Some(start..end)
     }
 
-    fn consume_str(&self, s: &str) -> Option<Range<Position>> {
+    fn consume_str(&mut self, s: &str) -> Option<Range<Position>> {
         self.consume_str_except_followed(s, [])
     }
 
@@ -278,14 +296,14 @@ impl<'s> ParseState<'s> {
     }
 }
 
-pub(crate) fn parse<'s>(path: &str, source: &'s str) -> (tag::Template, ParseState<'s>) {
+pub fn parse<'s>(path: &str, source: &'s str) -> (tag::Template, ParseState<'s>) {
     let mut state = ParseState::new(path, source);
     let template = tag::Template::parse(&mut state);
     (template, state)
 }
 
 /// A location in source code.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Position {
     pub line: u32,
     pub utf16_col: u32,
@@ -323,7 +341,7 @@ impl std::fmt::Display for ParseError {
 
 impl std::error::Error for ParseError {}
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum ParseErrorKind {
     UnexpectedCharacter = 0x10001,
     UnrecognizedTag,
@@ -332,7 +350,7 @@ pub enum ParseErrorKind {
     IllegalEntity,
     IncompleteTag,
     MissingEndTag,
-    IllegalTagNamePrefix,
+    IllegalNamePrefix,
     IllegalAttributePrefix,
     IllegalAttributeName,
     IllegalAttributeValue,
@@ -360,7 +378,7 @@ impl ParseErrorKind {
             Self::IllegalEntity => "illegal entity",
             Self::IncompleteTag => "incomplete tag",
             Self::MissingEndTag => "missing end tag",
-            Self::IllegalTagNamePrefix => "illegal tag name prefix",
+            Self::IllegalNamePrefix => "illegal name prefix",
             Self::IllegalAttributePrefix => "illegal attribute prefix",
             Self::IllegalAttributeName => "illegal attribute name",
             Self::IllegalAttributeValue => "illegal attribute value",

@@ -178,14 +178,14 @@ impl Element {
         let tag_name = if tag_name_slices.len() > 1 {
             let end = tag_name_slices.pop().unwrap();
             for x in tag_name_slices {
-                ps.add_warning(ParseErrorKind::IllegalTagNamePrefix, x.location());
+                ps.add_warning(ParseErrorKind::IllegalNamePrefix, x.location());
             }
             Name {
                 name: CompactString::new_inline("wx-x"),
                 location: end.location(),
             }
         } else {
-            tag_name_slices[0]
+            tag_name_slices.pop().unwrap()
         };
         ps.skip_whitespace();
 
@@ -232,7 +232,7 @@ impl Element {
             }
             _ => {
                 ElementKind::Normal {
-                    tag_name,
+                    tag_name: tag_name.clone(),
                     attributes: vec![],
                     class: ClassAttribute::None,
                     style: StyleAttribute::None,
@@ -327,6 +327,7 @@ impl Element {
                                 "for-index" => AttrPrefixKind::WxForIndex,
                                 "for-item" => AttrPrefixKind::WxForItem,
                                 "key" => AttrPrefixKind::WxKey,
+                                _ => AttrPrefixKind::Invalid(segs.first().unwrap().location())
                             },
                             "model" => AttrPrefixKind::Model(x.location()),
                             "change" => AttrPrefixKind::Change(x.location()),
@@ -580,10 +581,10 @@ impl Element {
                     AttrPrefixKind::WxElse => {
                         if let AttrPrefixParseResult::StaticStr(value) = attr_value {
                             if wx_elif.is_some() {
-                                ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
+                                ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location());
                             } else {
                                 if value.name.len() > 0 {
-                                    ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
+                                    ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location());
                                 }
                                 wx_else = Some(attr_name.location());
                             }
@@ -700,7 +701,7 @@ impl Element {
                             }
                         }
                     }
-                    AttrPrefixKind::Change(prefix_location) => {
+                    AttrPrefixKind::Change(_prefix_location) => {
                         match &mut element {
                             ElementKind::Normal { change_attributes, .. } => {
                                 if let AttrPrefixParseResult::Value(value) = attr_value {
@@ -723,7 +724,7 @@ impl Element {
                             }
                         }
                     }
-                    AttrPrefixKind::Worklet(prefix_location) => {
+                    AttrPrefixKind::Worklet(_prefix_location) => {
                         match &mut element {
                             ElementKind::Normal { worklet_attributes, .. } => {
                                 if let AttrPrefixParseResult::StaticStr(s) = attr_value {
@@ -745,7 +746,7 @@ impl Element {
                             }
                         }
                     }
-                    AttrPrefixKind::Data(prefix_location) => {
+                    AttrPrefixKind::Data(_prefix_location) => {
                         match &mut element {
                             ElementKind::Normal { data, .. } => {
                                 if let AttrPrefixParseResult::Value(value) = attr_value {
@@ -811,25 +812,25 @@ impl Element {
                             }
                         }
                     }
-                    AttrPrefixKind::Bind(prefix_location) => {
+                    AttrPrefixKind::Bind(_prefix_location) => {
                         add_element_event_binding(ps, &mut element, attr_name, attr_value, false, false, false);
                     }
-                    AttrPrefixKind::MutBind(prefix_location) => {
+                    AttrPrefixKind::MutBind(_prefix_location) => {
                         add_element_event_binding(ps, &mut element, attr_name, attr_value, false, true, false);
                     }
-                    AttrPrefixKind::Catch(prefix_location) => {
+                    AttrPrefixKind::Catch(_prefix_location) => {
                         add_element_event_binding(ps, &mut element, attr_name, attr_value, true, false, false);
                     }
-                    AttrPrefixKind::CaptureBind(prefix_location) => {
+                    AttrPrefixKind::CaptureBind(_prefix_location) => {
                         add_element_event_binding(ps, &mut element, attr_name, attr_value, false, false, true);
                     }
-                    AttrPrefixKind::CaptureMutBind(prefix_location) => {
+                    AttrPrefixKind::CaptureMutBind(_prefix_location) => {
                         add_element_event_binding(ps, &mut element, attr_name, attr_value, false, true, true);
                     }
-                    AttrPrefixKind::CaptureCatch(prefix_location) => {
+                    AttrPrefixKind::CaptureCatch(_prefix_location) => {
                         add_element_event_binding(ps, &mut element, attr_name, attr_value, true, false, true);
                     }
-                    AttrPrefixKind::Mark(prefix_location) => {
+                    AttrPrefixKind::Mark(_prefix_location) => {
                         match &mut element {
                             ElementKind::Normal { mark, .. } |
                             ElementKind::Pure { mark, .. } |
@@ -851,7 +852,7 @@ impl Element {
                             }
                         }
                     }
-                    AttrPrefixKind::Generic(prefix_location) => {
+                    AttrPrefixKind::Generic(_prefix_location) => {
                         match &mut element {
                             ElementKind::Normal { generics, .. } => {
                                 if let AttrPrefixParseResult::StaticStr(s) = attr_value {
@@ -873,7 +874,7 @@ impl Element {
                             }
                         }
                     }
-                    AttrPrefixKind::ExtraAttr(prefix_location) => {
+                    AttrPrefixKind::ExtraAttr(_prefix_location) => {
                         match &mut element {
                             ElementKind::Normal { extra_attr, .. } => {
                                 if let AttrPrefixParseResult::StaticStr(s) = attr_value {
@@ -895,7 +896,7 @@ impl Element {
                             }
                         }
                     }
-                    AttrPrefixKind::SlotDataRef(prefix_location) => {
+                    AttrPrefixKind::SlotDataRef(_prefix_location) => {
                         match &mut element {
                             ElementKind::Normal { slot_value_refs, .. } => {
                                 if let AttrPrefixParseResult::ScopeName(s) = attr_value {
@@ -937,7 +938,7 @@ impl Element {
 
         // check `<template name>` and validate `<template is data>`
         if template_name.is_some() {
-            let ElementKind::TemplateRef { target, data, event_bindings, mark, slot } = element else {
+            let ElementKind::TemplateRef { target, data, event_bindings, mark, slot } = &element else {
                 unreachable!();
             };
             if target.location().end != default_attr_position {
@@ -953,14 +954,14 @@ impl Element {
                 ps.add_warning(ParseErrorKind::InvalidAttribute, x.location());
             }
             if let Some((x, _)) = slot {
-                ps.add_warning(ParseErrorKind::InvalidAttribute, x);
+                ps.add_warning(ParseErrorKind::InvalidAttribute, x.clone());
             }
         }
 
         // end the start tag
         let (self_close_location, start_tag_end_location) = match ps.peek::<0>() {
             None => {
-                ps.add_warning(ParseErrorKind::IncompleteTag, start_tag_start_location);
+                ps.add_warning(ParseErrorKind::IncompleteTag, start_tag_start_location.clone());
                 let pos = ps.position();
                 (Some(pos..pos), pos..pos)
             }
@@ -991,7 +992,7 @@ impl Element {
             let close_with_end_tag_location = ps.try_parse(|ps| {
                 ps.skip_whitespace();
                 if ps.ended() {
-                    ps.add_warning(ParseErrorKind::MissingEndTag, start_tag_start_location);
+                    ps.add_warning(ParseErrorKind::MissingEndTag, start_tag_start_location.clone());
                     return None;
                 }
                 let end_tag_start_location = ps.consume_str("<").unwrap();
@@ -1000,21 +1001,21 @@ impl Element {
                 let end_tag_name = if tag_name_slices.len() > 1 {
                     let end = tag_name_slices.pop().unwrap();
                     for x in tag_name_slices {
-                        ps.add_warning(ParseErrorKind::IllegalTagNamePrefix, x.location());
+                        ps.add_warning(ParseErrorKind::IllegalNamePrefix, x.location());
                     }
                     Name {
                         name: CompactString::new_inline("wx-x"),
                         location: end.location(),
                     }
                 } else {
-                    tag_name_slices[0]
+                    tag_name_slices.pop().unwrap()
                 };
                 if end_tag_name.name != tag_name.name {
                     return None;
                 }
                 ps.skip_whitespace();
-                let mut end_tag_end_pos = ps.position();
-                if let Some(s) = ps.skip_until_after(">") {
+                let end_tag_end_pos = ps.position();
+                if let Some(_) = ps.skip_until_after(">") {
                     ps.add_warning(ParseErrorKind::UnexpectedCharacter, end_tag_end_pos..ps.position());
                 }
                 let end_tag_location = (end_tag_start_location, end_tag_end_pos..ps.position());
@@ -1026,7 +1027,7 @@ impl Element {
             let close_location = close_with_end_tag_location
                 .as_ref()
                 .map(|(x, _)| x.clone())
-                .unwrap_or_else(|| start_tag_end_location);
+                .unwrap_or_else(|| start_tag_end_location.clone());
             let end_tag_location = close_with_end_tag_location.map(|(_, x)| x);
             (close_location, end_tag_location)
         };
@@ -1136,13 +1137,13 @@ impl Element {
                 globals.sub_templates.push((name, new_children));
             }
         } else {
-            let wrap_children = |element: Element| -> Vec<Node> {
-                match element.kind {
+            let wrap_children = |mut element: Element| -> Vec<Node> {
+                match &mut element.kind {
                     ElementKind::Pure { event_bindings, mark, slot, children } => {
                         if !event_bindings.is_empty() || !mark.is_empty() || slot.is_some() {
                             // empty
                         } else {
-                            return children;
+                            return std::mem::replace(children, vec![]);
                         }
                     }
                     _ => {}
@@ -1328,7 +1329,7 @@ impl Name {
                     cur_name.location.end = ps.position();
                 }
             }
-            let Some(peek) = ps.peek() else { break };
+            let Some(peek) = ps.peek::<0>() else { break };
             if !Self::is_following_char(peek) { break };
         }
         ret
@@ -1411,7 +1412,7 @@ impl Name {
         let mut name = CompactString::new_inline("");
         let start_pos = ps.position();
         loop {
-            match ps.peek() {
+            match ps.peek::<0>() {
                 None => break,
                 Some(ch) if until(ch) => break,
                 Some(ch) => {
@@ -1472,7 +1473,7 @@ impl Value {
         if ps.consume_str("{{").is_none() {
             return None;
         }
-        if ps.peek() != Some('{') {
+        if ps.peek::<0>() != Some('{') {
             return None;
         }
         let Some(expr) = Expression::parse_expression_or_object_inner(ps) else {
@@ -1513,7 +1514,7 @@ impl Value {
             Box::new(Expression::ToStringWithoutUndefined { value: expr, location })
         }
         loop {
-            let Some(peek) = ps.peek() else { break };
+            let Some(peek) = ps.peek::<0>() else { break };
             if peek == until { break };
             let start_pos = ps.position();
 
@@ -1555,7 +1556,7 @@ impl Value {
                 if need_convert {
                     let left = wrap_to_string(expression, start_pos..start_pos);
                     let right = Box::new(Expression::LitStr { value: CompactString::new_inline(""), location: start_pos..start_pos });
-                    let expr = Box::new(Expression::Plus { left, right, location: start_pos..start_pos });
+                    let expression = Box::new(Expression::Plus { left, right, location: start_pos..start_pos });
                     Self::Dynamic { expression, binding_map_keys }
                 } else {
                     Self::Dynamic { expression, binding_map_keys }
@@ -1601,4 +1602,59 @@ pub enum Script {
         module_name: CompactString,
         rel_path: String,
     },
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn value_parsing() {
+        case!("{ {", r#"{ {"#);
+        case!("{{ a } }", "", ParseErrorKind::MissingExpressionEnd, 8..8);
+        case!("{{ a b }}", "", ParseErrorKind::IllegalExpression, 5..7);
+        case!(" a\t{{ b }}", r#"{{"a\t"+b}}"#);
+        case!("{{ b }} a ", r#"{{b+' a '}}"#);
+        case!("{{ a }}{{ b }}", r#"{{a+b}}"#);
+
+        case!("&#xG;", r#"&#xG;"#, ParseErrorKind::IllegalEntity, 0..4);
+        case!("&#x ", r#"&#x "#, ParseErrorKind::IllegalEntity, 0..3);
+        case!("&#x41;", r#"A"#);
+        case!("&#A;", r#"&#a;"#, ParseErrorKind::IllegalEntity, 0..3);
+        case!("&# ", r#"&# "#, ParseErrorKind::IllegalEntity, 0..2);
+        case!("&#97;", r#"a"#);
+        case!("&lt", r#"&lt"#);
+        case!("&lt ", r#"&lt "#);
+        case!("&lt;", r#"<"#);
+    }
+
+    #[test]
+    fn tag_parsing() {
+        case!("<", r#"<"#);
+        case!("<-", r#"<-"#);
+        case!("<div", r#"<div></div>"#, ParseErrorKind::IncompleteTag, 4..4);
+        case!("<div ", r#"<div></div>"#, ParseErrorKind::IncompleteTag, 5..5);
+        case!("<div>", r#"<div></div>"#, ParseErrorKind::MissingEndTag, 5..5);
+        case!("<div >", r#"<div></div>"#, ParseErrorKind::MissingEndTag, 6..6);
+        case!("<a:div/>", r#"<wx-x></wx-x>"#, ParseErrorKind::IllegalNamePrefix, 1..2);
+        case!("<div/ ></div>", r#"<div></div>"#, ParseErrorKind::UnexpectedCharacter, 4..5);
+        case!("<div a:mark:c/>", r#"<div></div>"#, ParseErrorKind::IllegalNamePrefix, 5..6);
+        case!("<div marks:c/>", r#"<div></div>"#, ParseErrorKind::IllegalNamePrefix, 5..10);
+        case!("<div a =''/>", r#"<div a=""></div>"#, ParseErrorKind::UnexpectedWhitespace, 6..7);
+        case!("<div a= ''/>", r#"<div a=""></div>"#, ParseErrorKind::UnexpectedWhitespace, 7..8);
+        case!("<div a= {{b}}/>", r#"<div a={{b}}></div>"#, ParseErrorKind::UnexpectedWhitespace, 7..8);
+        case!("<div a=>", r#"<div></div>"#, ParseErrorKind::MissingAttributeValue, 7..7);
+        case!("<div a=/>", r#"<div></div>"#, ParseErrorKind::MissingAttributeValue, 7..7);
+        case!("<div a=", r#"<div></div>"#, ParseErrorKind::MissingAttributeValue, 7..7);
+        case!("<div #@></div>", r#"<div></div>"#, ParseErrorKind::IllegalAttributeName, 5..7);
+        case!("<div a a></div>", r#"<div></div>"#, ParseErrorKind::DuplicatedAttribute, 7..8);
+        case!("<template name='a'/><template name='a'/>", r#"<block wx:if=""></block><block wx:else></block>"#, ParseErrorKind::DuplicatedName, 36..37);
+        case!("<block a=''></block>", r#"<block></block>"#, ParseErrorKind::InvalidAttribute, 7..8);
+        case!("<block wx:if=''/><block wx:else=' '/>", r#"<block wx:if=""></block><block wx:else></block>"#, ParseErrorKind::IllegalAttributeValue, 33..34);
+        case!("<slot><div/></slot>", r#"<slot></slot>"#, ParseErrorKind::InvalidAttribute, 6..12);
+        case!("<div></div  a=''>", r#"<slot></slot>"#, ParseErrorKind::UnexpectedCharacter, 12..16);
+        case!("<template name='a' wx:for='' />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 22..25);
+        case!("<template name='a' wx:if='' />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 22..24);
+        case!("<div wx:for='' wx:else />", r#"<div wx:for=''/>"#, ParseErrorKind::InvalidAttribute, 18..22);
+    }
 }

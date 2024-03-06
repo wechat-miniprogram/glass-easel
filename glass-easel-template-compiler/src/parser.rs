@@ -1,6 +1,7 @@
 //! The basic parser logic
 
 use pest::{Parser, Position};
+use pest_derive::Parser;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt;
@@ -286,7 +287,7 @@ impl<'a> TmplParseTask<'a> {
                         is_dynamic = true;
                         TextEntity::Dynamic(self.parse_expr_or_obj(pair))
                     }
-                    Rule::entity => TextEntity::Static(entities::decode(pair.as_str())),
+                    Rule::entity => TextEntity::Static(entities::decode(pair.as_str()).unwrap()),
                     Rule::pure_text => TextEntity::Static(Cow::Borrowed(pair.as_str())),
                     _ => unreachable!(),
                 }
@@ -405,7 +406,7 @@ impl<'a> TmplParseTask<'a> {
                                                         .into_inner()
                                                         .map(|pair| match pair.as_rule() {
                                                             Rule::entity => {
-                                                                entities::decode(pair.as_str())
+                                                                entities::decode(pair.as_str()).unwrap()
                                                             }
                                                             Rule::pure_text => {
                                                                 Cow::Borrowed(pair.as_str())

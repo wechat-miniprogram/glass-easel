@@ -6,6 +6,8 @@ use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Write;
 
+use self::parser::{parse_tmpl, TmplParseError};
+
 use super::*;
 
 // PRESERVED one-letter vars

@@ -38,5 +38,5 @@ pub(crate) fn decode(entity: &str) -> Option<Cow<'static, str>> {
         }
         return None;
     }
-    ENTITIES_MAPPING.get(entity).map(|x| Cow::Borrowed(x))
+    ENTITIES_MAPPING.get(entity).map(|x| Cow::Borrowed(*x))
 }
