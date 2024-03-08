@@ -147,16 +147,24 @@ impl<'s> ParseState<'s> {
         }
     }
 
-    fn skip_until_after(&mut self, until: &str) -> Option<&'s str> {
+    fn skip_until_before(&mut self, until: &str) -> Option<&'s str> {
         let s = self.cur_str();
         if let Some(index) = s.find(until) {
             let ret = &s[..index];
-            self.skip_bytes(index + until.len());
+            self.skip_bytes(index);
             Some(ret)
         } else {
             self.skip_bytes(s.len());
             None
         }
+    }
+
+    fn skip_until_after(&mut self, until: &str) -> Option<&'s str> {
+        let ret = self.skip_until_before(until);
+        if ret.is_some() {
+            self.skip_bytes(until.len());
+        }
+        ret
     }
 
     fn peek_chars(&mut self) -> impl 's + Iterator<Item = char> {
@@ -202,14 +210,14 @@ impl<'s> ParseState<'s> {
         Some(start..end)
     }
 
-    fn consume_str_before_whitespace(&mut self, s: &str) -> Option<Range<Position>> {
+    fn consume_str_except_followed_char(&mut self, s: &str, reject_followed: impl FnOnce(char) -> bool) -> Option<Range<Position>> {
         if !self.peek_str(s) {
             return None;
         }
         match self.peek::<0>() {
             None => {}
             Some(ch) => {
-                if !char::is_whitespace(ch) {
+                if reject_followed(ch) {
                     return None;
                 }
             }
@@ -366,6 +374,8 @@ pub enum ParseErrorKind {
     IncompleteConditionExpression,
     UnmatchedBracket,
     UnmatchedParenthesis,
+    MissingModuleName,
+    MissingSourcePath,
 }
 
 impl ParseErrorKind {
@@ -394,6 +404,8 @@ impl ParseErrorKind {
             Self::IncompleteConditionExpression => "incomplete condition expression",
             Self::UnmatchedBracket => "unmatched bracket",
             Self::UnmatchedParenthesis => "unmatched parenthesis",
+            Self::MissingModuleName => "missing module name",
+            Self::MissingSourcePath => "missing source path",
         }
     }
 }

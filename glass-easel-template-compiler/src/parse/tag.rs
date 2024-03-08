@@ -16,8 +16,8 @@ pub struct Template {
 
 #[derive(Debug, Clone)]
 pub struct TemplateGlobals {
-    pub imports: Vec<String>,
-    pub includes: Vec<String>,
+    pub imports: Vec<Name>,
+    pub includes: Vec<Name>,
     pub sub_templates: Vec<(Name, Vec<Node>)>,
     pub scripts: Vec<Script>,
 }
@@ -46,6 +46,8 @@ impl Template {
 pub enum Node {
     Text(Value),
     Element(Element),
+    Comment(String, Range<Position>),
+    UnknownMetaTag(String, Range<Position>),
 }
 
 impl TemplateStructure for Node {
@@ -53,6 +55,8 @@ impl TemplateStructure for Node {
         match self {
             Self::Text(x) => x.location(),
             Self::Element(x) => x.location(),
+            Self::Comment(_, location) => location.clone(),
+            Self::UnknownMetaTag(_, location) => location.clone(),
         }
     }
 }
@@ -69,10 +73,14 @@ impl Node {
                 // currently we only support comments
                 // report a warning on other cases
                 if ps.consume_str("--").is_some() {
-                    ps.skip_until_after("-->");
+                    let s = ps.skip_until_after("-->").unwrap_or("");
+                    let location = range.start..ps.position();
+                    ret.push(Node::Comment(s.to_string(), location));
                 } else {
-                    ps.skip_until_after(">");
-                    ps.add_warning(ParseErrorKind::UnrecognizedTag, range.start..ps.position());
+                    let s = ps.skip_until_after(">").unwrap_or("");
+                    let location = range.start..ps.position();
+                    ps.add_warning(ParseErrorKind::UnrecognizedTag, location.clone());
+                    ret.push(Node::UnknownMetaTag(s.to_string(), location));
                 }
                 continue;
             }
@@ -82,12 +90,13 @@ impl Node {
                     continue;
                 }
             }
-            let value = Value::parse_until_before(ps, '<');
-            if let Some(Node::Text(v)) = &mut ret.last_mut() {
-                v.append(value);
-            } else {
-                ret.push(Node::Text(value));
-            }
+            let value = Value::parse_until_before(ps, |ps| {
+                if ps.peek::<0>() != Some('<') { return false; }
+                let Some(ch) = ps.peek::<1>() else { return false };
+                if ch == '/' || ch == '!' || Name::is_start_char(ch) { return true; }
+                false
+            });
+            ret.push(Node::Text(value));
         }
     }
 }
@@ -155,9 +164,6 @@ pub enum ElementKind {
         name: Option<Value>,
         values: Vec<Attribute>,
     },
-    Import {
-        path: Name,
-    },
 }
 
 impl TemplateStructure for Element {
@@ -191,7 +197,10 @@ impl Element {
 
         // create an empty element
         let default_attr_position = tag_name.location.end;
-        let mut element = match tag_name.name.as_str() {
+        let tag_name_str = tag_name.name.as_str();
+        let is_script_tag = tag_name_str == "wxs";
+        let is_import_tag = tag_name_str == "import";
+        let mut element = match tag_name_str {
             "block" => {
                 ElementKind::Pure {
                     event_bindings: vec![],
@@ -209,7 +218,7 @@ impl Element {
                     slot: None,
                 }
             }
-            "include" => {
+            "include" | "wxs" | "import" => {
                 ElementKind::Include {
                     path: Name::new_empty(default_attr_position),
                     event_bindings: vec![],
@@ -225,10 +234,6 @@ impl Element {
                     name: None,
                     values: vec![],
                 }
-            }
-            "wxs" => {
-                // TODO
-                todo!()
             }
             _ => {
                 ElementKind::Normal {
@@ -259,6 +264,7 @@ impl Element {
         let mut wx_for_item: Option<(Range<Position>, Name)> = None;
         let mut wx_key: Option<(Range<Position>, Name)> = None;
         let mut template_name: Option<(Range<Position>, Name)> = None;
+        let mut script_module: Option<(Range<Position>, Name)> = None;
         let mut class_attrs: Vec<(Range<Position>, Name, Value)> = vec![];
         let mut style_attrs: Vec<(Range<Position>, Name, Value)> = vec![];
         loop {
@@ -286,6 +292,7 @@ impl Element {
                     TemplateIs,
                     TemplateData,
                     Src,
+                    Module,
                     Model(Range<Position>),
                     Change(Range<Position>),
                     Worklet(Range<Position>),
@@ -314,7 +321,12 @@ impl Element {
                                 (ElementKind::TemplateRef { .. }, "is") => AttrPrefixKind::TemplateIs,
                                 (ElementKind::TemplateRef { .. }, "data") => AttrPrefixKind::TemplateData,
                                 (ElementKind::Include { .. }, "src") => AttrPrefixKind::Src,
-                                (ElementKind::Import { .. }, "src") => AttrPrefixKind::Src,
+                                (ElementKind::Include { .. }, "module") => {
+                                    match is_script_tag {
+                                        false => AttrPrefixKind::Normal,
+                                        true => AttrPrefixKind::Module,
+                                    }
+                                }
                                 _ => AttrPrefixKind::Normal,
                             }
                         }
@@ -373,6 +385,7 @@ impl Element {
                     AttrPrefixKind::TemplateIs => AttrPrefixParseKind::Value,
                     AttrPrefixKind::TemplateData => AttrPrefixParseKind::Value,
                     AttrPrefixKind::Src => AttrPrefixParseKind::StaticStr,
+                    AttrPrefixKind::Module => AttrPrefixParseKind::ScopeName,
                     AttrPrefixKind::Model(_) => AttrPrefixParseKind::Value,
                     AttrPrefixKind::Change(_) => AttrPrefixParseKind::Value,
                     AttrPrefixKind::Worklet(_) => AttrPrefixParseKind::StaticStr,
@@ -421,18 +434,19 @@ impl Element {
                                 ps.add_warning(ParseErrorKind::UnexpectedWhitespace, range);
                             }
                             ps.next(); // ch
+                            let until = |ps: &mut ParseState| ps.peek::<0>() == Some(ch);
                             let value = match parse_kind {
-                                AttrPrefixParseKind::Value => AttrPrefixParseResult::Value(Value::parse_until_before(ps, ch)),
+                                AttrPrefixParseKind::Value => AttrPrefixParseResult::Value(Value::parse_until_before(ps, until)),
                                 AttrPrefixParseKind::StaticStr => {
-                                    let v = Name::parse_identifier_like_until_before(ps, |x| x == ch);
+                                    let v = Name::parse_identifier_like_until_before(ps, until);
                                     if v.name.as_str().contains("{{") {
                                         ps.add_warning(ParseErrorKind::DataBindingNotAllowed, v.location());
                                     }
                                     AttrPrefixParseResult::StaticStr(v)
                                 },
                                 AttrPrefixParseKind::ScopeName => {
-                                    let v = Name::parse_identifier_like_until_before(ps, |x| x == ch);
-                                    if !v.is_valid_identifier() {
+                                    let v = Name::parse_identifier_like_until_before(ps, until);
+                                    if !v.is_valid_js_identifier() {
                                         ps.add_warning(ParseErrorKind::InvalidIdentifier, v.location());
                                     }
                                     AttrPrefixParseResult::ScopeName(v)
@@ -462,7 +476,12 @@ impl Element {
                             }
                         }
                         Some(_) if ws_after_eq.is_none() => {
-                            let v = Name::parse_identifier_like_until_before(ps, |x| !Name::is_following_char(x));
+                            let v = Name::parse_identifier_like_until_before(ps, |ps| {
+                                match ps.peek::<0>() {
+                                    None => true,
+                                    Some(ch) => !Name::is_following_char(ch),
+                                }
+                            });
                             match parse_kind {
                                 AttrPrefixParseKind::Value => AttrPrefixParseResult::Value(Value::Static { value: v.name, location: v.location }),
                                 AttrPrefixParseKind::StaticStr => AttrPrefixParseResult::StaticStr(v),
@@ -521,8 +540,7 @@ impl Element {
                             }
                         }
                         ElementKind::For { .. } |
-                        ElementKind::If { .. } |
-                        ElementKind::Import { .. } => {
+                        ElementKind::If { .. } => {
                             ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
                         }
                     }
@@ -554,8 +572,7 @@ impl Element {
                             ElementKind::For { .. } |
                             ElementKind::If { .. } |
                             ElementKind::TemplateRef { .. } |
-                            ElementKind::Include { .. } |
-                            ElementKind::Import { .. } => {
+                            ElementKind::Include { .. } => {
                                 ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
                             }
                         }
@@ -665,8 +682,7 @@ impl Element {
                     }
                     AttrPrefixKind::Src => {
                         match &mut element {
-                            ElementKind::Include { path, .. } |
-                            ElementKind::Import { path, .. } => {
+                            ElementKind::Include { path, .. } => {
                                 if let AttrPrefixParseResult::StaticStr(s) = attr_value {
                                     if path.location().end != default_attr_position {
                                         ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
@@ -676,6 +692,15 @@ impl Element {
                                 }
                             }
                             _ => unreachable!(),
+                        }
+                    }
+                    AttrPrefixKind::Module => {
+                        if let AttrPrefixParseResult::ScopeName(s) = attr_value {
+                            if wx_for_item.is_some() {
+                                ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
+                            } else {
+                                script_module = Some((attr_name.location(), s));
+                            }
                         }
                     }
                     AttrPrefixKind::Model(prefix_location) => {
@@ -695,8 +720,7 @@ impl Element {
                             ElementKind::For { .. } |
                             ElementKind::If { .. } |
                             ElementKind::TemplateRef { .. } |
-                            ElementKind::Include { .. } |
-                            ElementKind::Import { .. } => {
+                            ElementKind::Include { .. } => {
                                 ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
                             }
                         }
@@ -718,8 +742,7 @@ impl Element {
                             ElementKind::For { .. } |
                             ElementKind::If { .. } |
                             ElementKind::TemplateRef { .. } |
-                            ElementKind::Include { .. } |
-                            ElementKind::Import { .. } => {
+                            ElementKind::Include { .. } => {
                                 ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
                             }
                         }
@@ -740,8 +763,7 @@ impl Element {
                             ElementKind::For { .. } |
                             ElementKind::If { .. } |
                             ElementKind::TemplateRef { .. } |
-                            ElementKind::Include { .. } |
-                            ElementKind::Import { .. } => {
+                            ElementKind::Include { .. } => {
                                 ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
                             }
                         }
@@ -762,8 +784,7 @@ impl Element {
                             ElementKind::For { .. } |
                             ElementKind::If { .. } |
                             ElementKind::TemplateRef { .. } |
-                            ElementKind::Include { .. } |
-                            ElementKind::Import { .. } => {
+                            ElementKind::Include { .. } => {
                                 ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
                             }
                         }
@@ -784,8 +805,7 @@ impl Element {
                             ElementKind::For { .. } |
                             ElementKind::If { .. } |
                             ElementKind::TemplateRef { .. } |
-                            ElementKind::Include { .. } |
-                            ElementKind::Import { .. } => {
+                            ElementKind::Include { .. } => {
                                 ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
                             }
                         }
@@ -797,7 +817,7 @@ impl Element {
                                     if class_attrs.iter().find(|(_, x, _)| x.name_eq(&attr_name)).is_some() {
                                         ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                                     } else {
-                                        class_attrs.push((prefix_location, attr_name, value));
+                                        style_attrs.push((prefix_location, attr_name, value));
                                     }
                                 }
                             }
@@ -806,8 +826,7 @@ impl Element {
                             ElementKind::For { .. } |
                             ElementKind::If { .. } |
                             ElementKind::TemplateRef { .. } |
-                            ElementKind::Include { .. } |
-                            ElementKind::Import { .. } => {
+                            ElementKind::Include { .. } => {
                                 ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
                             }
                         }
@@ -846,8 +865,7 @@ impl Element {
                                 }
                             }
                             ElementKind::For { .. } |
-                            ElementKind::If { .. } |
-                            ElementKind::Import { .. } => {
+                            ElementKind::If { .. } => {
                                 ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
                             }
                         }
@@ -868,8 +886,7 @@ impl Element {
                             ElementKind::For { .. } |
                             ElementKind::If { .. } |
                             ElementKind::TemplateRef { .. } |
-                            ElementKind::Include { .. } |
-                            ElementKind::Import { .. } => {
+                            ElementKind::Include { .. } => {
                                 ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
                             }
                         }
@@ -890,8 +907,7 @@ impl Element {
                             ElementKind::For { .. } |
                             ElementKind::If { .. } |
                             ElementKind::TemplateRef { .. } |
-                            ElementKind::Include { .. } |
-                            ElementKind::Import { .. } => {
+                            ElementKind::Include { .. } => {
                                 ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
                             }
                         }
@@ -912,8 +928,7 @@ impl Element {
                             ElementKind::For { .. } |
                             ElementKind::If { .. } |
                             ElementKind::TemplateRef { .. } |
-                            ElementKind::Include { .. } |
-                            ElementKind::Import { .. } => {
+                            ElementKind::Include { .. } => {
                                 ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
                             }
                         }
@@ -930,31 +945,6 @@ impl Element {
                 }
                 ps.add_warning(ParseErrorKind::IllegalAttributeName, pos..ps.position());
                 ps.skip_whitespace();
-            }
-        }
-
-        // validate class & style attributes
-        // TODO support `class:xxx` and `style:xxx`
-
-        // check `<template name>` and validate `<template is data>`
-        if template_name.is_some() {
-            let ElementKind::TemplateRef { target, data, event_bindings, mark, slot } = &element else {
-                unreachable!();
-            };
-            if target.location().end != default_attr_position {
-                ps.add_warning(ParseErrorKind::InvalidAttribute, target.location());
-            }
-            if data.location().end != default_attr_position {
-                ps.add_warning(ParseErrorKind::InvalidAttribute, target.location());
-            }
-            for x in event_bindings {
-                ps.add_warning(ParseErrorKind::InvalidAttribute, x.name.location());
-            }
-            for (x, _) in mark {
-                ps.add_warning(ParseErrorKind::InvalidAttribute, x.location());
-            }
-            if let Some((x, _)) = slot {
-                ps.add_warning(ParseErrorKind::InvalidAttribute, x.clone());
             }
         }
 
@@ -976,13 +966,91 @@ impl Element {
             _ => unreachable!()
         };
 
-        // parse children
-        let new_children = if self_close_location.is_none() {
-            let mut new_children = vec![];
-            Node::parse_vec_node(ps, globals, &mut new_children);
-            new_children
-        } else {
+        // validate class & style attributes
+        // TODO support `class:xxx` and `style:xxx`
+
+        // check `<template name>` and validate `<template is data>`
+        if let ElementKind::TemplateRef { target, data, event_bindings, mark, slot } = &element {
+            if template_name.is_some() {
+                if target.location().end != default_attr_position {
+                    ps.add_warning(ParseErrorKind::InvalidAttribute, target.location());
+                }
+                if data.location().end != default_attr_position {
+                    ps.add_warning(ParseErrorKind::InvalidAttribute, target.location());
+                }
+                for x in event_bindings {
+                    ps.add_warning(ParseErrorKind::InvalidAttribute, x.name.location());
+                }
+                for (x, _) in mark {
+                    ps.add_warning(ParseErrorKind::InvalidAttribute, x.location());
+                }
+                if let Some((x, _)) = slot {
+                    ps.add_warning(ParseErrorKind::InvalidAttribute, x.clone());
+                }
+            } else {
+                if target.location().end == default_attr_position {
+                    ps.add_warning(ParseErrorKind::MissingModuleName, target.location());
+                }
+            }
+        };
+        let allow_for_if = template_name.is_none() && !is_script_tag && !is_import_tag;
+
+        // check script/import tag
+        if is_script_tag || is_import_tag {
+            let ElementKind::Include { path: _, event_bindings, mark, slot } = &element else {
+                unreachable!();
+            };
+            for x in event_bindings {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, x.name.location());
+            }
+            for (x, _) in mark {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, x.location());
+            }
+            if let Some((x, _)) = slot {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, x.clone());
+            }
+        }
+
+        let new_children = if is_script_tag || is_import_tag {
+            // parse script tag content
+            let ElementKind::Include { path, .. } = &element else {
+                unreachable!();
+            };
+            let pos = ps.position();
+            let cur_index = ps.cur_index();
+            loop {
+                ps.skip_until_before("</wxs");
+                match ps.peek::<5>() {
+                    None | Some('>') => break,
+                    Some(ch) if char::is_whitespace(ch) => break,
+                    _ => {}
+                }
+                ps.skip_bytes(5);
+            }
+            let content = ps.code_slice(cur_index..ps.cur_index()).to_string();
+            let content_location = pos..ps.position();
+            if let Some((_, module_name)) = script_module {
+                if path.name.is_empty() {
+                    globals.scripts.push(Script::Inline { module_name, content, content_location })
+                } else {
+                    if content.trim().len() > 0 {
+                        ps.add_warning(ParseErrorKind::ChildNodesNotAllowed, content_location);
+                    }
+                    globals.scripts.push(Script::GlobalRef { module_name, path: path.clone() })
+                }
+            } else {
+                ps.add_warning(ParseErrorKind::MissingModuleName, tag_name.location());
+            }
             vec![]
+        } else {
+            // parse children
+            if self_close_location.is_none() {
+                let mut new_children = vec![];
+                Node::parse_vec_node(ps, globals, &mut new_children);
+                new_children
+            } else {
+                vec![]
+            }
         };
 
         // parse end tag
@@ -1022,7 +1090,7 @@ impl Element {
                 Some((close_location, end_tag_location))
             });
             if close_with_end_tag_location.is_none() {
-                ps.add_warning(ParseErrorKind::MissingEndTag, tag_name.location);
+                ps.add_warning(ParseErrorKind::MissingEndTag, tag_name.location());
             }
             let close_location = close_with_end_tag_location
                 .as_ref()
@@ -1033,14 +1101,18 @@ impl Element {
         };
 
         // collect include and import sources
-        match &element {
-            ElementKind::Include { path, .. } => {
-                globals.includes.push(path.name.to_string());
+        if !is_script_tag {
+            match &element {
+                ElementKind::Include { path, .. } => {
+                    if path.name.is_empty() {
+                        ps.add_warning(ParseErrorKind::MissingSourcePath, tag_name.location());
+                    } else {
+                        let list = if is_import_tag { &mut globals.imports } else { &mut globals.includes };
+                        list.push(path.clone());
+                    }
+                }
+                _ => {}
             }
-            ElementKind::Import { path } => {
-                globals.imports.push(path.name.to_string());
-            }
-            _ => {}
         }
 
         // extract `wx:for`
@@ -1053,7 +1125,7 @@ impl Element {
                 key: (Range<Position>, Name),
             },
         }
-        let for_list = if template_name.is_some() || wx_for.is_none() {
+        let for_list = if !allow_for_if || wx_for.is_none() {
             if let Some((location, _)) = wx_for {
                 ps.add_warning(ParseErrorKind::InvalidAttribute, location);
             }
@@ -1087,7 +1159,7 @@ impl Element {
             Elif(Range<Position>, Value),
             Else(Range<Position>),
         }
-        let if_condition = if template_name.is_some() {
+        let if_condition = if !allow_for_if {
             if let Some((location, _)) = wx_if {
                 ps.add_warning(ParseErrorKind::InvalidAttribute, location);
             }
@@ -1130,9 +1202,15 @@ impl Element {
         };
 
         // write the parsed element
-        if let Some((_, name)) = template_name {
+        if is_script_tag {
+            // empty
+        } else if is_import_tag {
+            if let Some(child) = new_children.first() {
+                ps.add_warning(ParseErrorKind::ChildNodesNotAllowed, child.location());
+            }
+        } else if let Some((_, name)) = template_name {
             if globals.sub_templates.iter().find(|(x, _)| x.name_eq(&name)).is_some() {
-                ps.add_warning(ParseErrorKind::DuplicatedAttribute, name.location());
+                ps.add_warning(ParseErrorKind::DuplicatedName, name.location());
             } else {
                 globals.sub_templates.push((name, new_children));
             }
@@ -1164,8 +1242,7 @@ impl Element {
                     }
                     ElementKind::TemplateRef { .. } |
                     ElementKind::Include { .. } |
-                    ElementKind::Slot { .. } |
-                    ElementKind::Import { .. } => {
+                    ElementKind::Slot { .. } => {
                         if let Some(child) = new_children.first() {
                             ps.add_warning(ParseErrorKind::ChildNodesNotAllowed, child.location());
                         }
@@ -1294,6 +1371,14 @@ impl Name {
         Self::is_start_char(ch) || ('0'..='9').contains(&ch) || ch == '-' || ch == '.'
     }
 
+    fn is_js_start_char(ch: char) -> bool {
+        ('a'..='z').contains(&ch) || ('A'..='Z').contains(&ch) || ch == '_' || ch == '$'
+    }
+
+    fn is_js_following_char(ch: char) -> bool {
+        Self::is_start_char(ch) || ('0'..='9').contains(&ch)
+    }
+
     fn is_empty(&self) -> bool {
         self.name.is_empty()
     }
@@ -1408,17 +1493,14 @@ impl Name {
         Cow::Borrowed(ps.next_char_as_str())
     }
 
-    fn parse_identifier_like_until_before(ps: &mut ParseState, until: impl Fn(char) -> bool) -> Self {
+    fn parse_identifier_like_until_before(ps: &mut ParseState, until: impl Fn(&mut ParseState) -> bool) -> Self {
         let mut name = CompactString::new_inline("");
         let start_pos = ps.position();
         loop {
-            match ps.peek::<0>() {
-                None => break,
-                Some(ch) if until(ch) => break,
-                Some(ch) => {
-                    name.push_str(&Name::parse_next_entity(ps));
-                }
+            if ps.ended() || until(ps) {
+                break
             }
+            name.push_str(&Name::parse_next_entity(ps));
         }
         Self {
             name,
@@ -1434,6 +1516,18 @@ impl Name {
             Some(ch) if !Name::is_start_char(ch) => false,
             Some(_) => {
                 chars.find(|ch| !Name::is_following_char(*ch)).is_none()
+            }
+        }
+    }
+
+    fn is_valid_js_identifier(&self) -> bool {
+        let mut chars = self.name.chars();
+        let first = chars.next();
+        match first {
+            None => false,
+            Some(ch) if !Name::is_js_start_char(ch) => false,
+            Some(_) => {
+                chars.find(|ch| !Name::is_js_following_char(*ch)).is_none()
             }
         }
     }
@@ -1470,15 +1564,12 @@ impl Value {
     }
 
     fn parse_data_binding(ps: &mut ParseState) -> Option<Box<Expression>> {
-        if ps.consume_str("{{").is_none() {
+        let Some(start_location) = ps.consume_str("{{") else {
             return None;
-        }
-        if ps.peek::<0>() != Some('{') {
-            return None;
-        }
+        };
         let Some(expr) = Expression::parse_expression_or_object_inner(ps) else {
             ps.skip_until_after("}}");
-            return None;
+            return Some(Box::new(Expression::LitStr { value: CompactString::new_inline(""), location: start_location.start..ps.position() }));
         };
         ps.skip_whitespace();
         let end_pos = ps.position();
@@ -1495,7 +1586,7 @@ impl Value {
         Some(expr)
     }
 
-    fn parse_until_before(ps: &mut ParseState, until: char) -> Self {
+    fn parse_until_before(ps: &mut ParseState, until: impl Fn(&mut ParseState) -> bool) -> Self {
         let mut ret = Self::Static {
             value: CompactString::new_inline(""),
             location: {
@@ -1514,8 +1605,8 @@ impl Value {
             Box::new(Expression::ToStringWithoutUndefined { value: expr, location })
         }
         loop {
+            if until(ps) { break };
             let Some(peek) = ps.peek::<0>() else { break };
-            if peek == until { break };
             let start_pos = ps.position();
 
             // try parse `{{ ... }}`
@@ -1585,22 +1676,18 @@ impl Value {
         }
         ret
     }
-
-    fn append(&mut self, other: Self) {
-        // TODO
-        todo!()
-    }
 }
 
 #[derive(Debug, Clone)]
 pub enum Script {
     Inline {
-        module_name: CompactString,
+        module_name: Name,
         content: String,
+        content_location: Range<Position>,
     },
     GlobalRef {
-        module_name: CompactString,
-        rel_path: String,
+        module_name: Name,
+        path: Name,
     },
 }
 
@@ -1616,7 +1703,10 @@ mod test {
         case!(" a\t{{ b }}", r#"{{"a\t"+b}}"#);
         case!("{{ b }} a ", r#"{{b+' a '}}"#);
         case!("{{ a }}{{ b }}", r#"{{a+b}}"#);
+    }
 
+    #[test]
+    fn entities_parsing() {
         case!("&#xG;", r#"&#xG;"#, ParseErrorKind::IllegalEntity, 0..4);
         case!("&#x ", r#"&#x "#, ParseErrorKind::IllegalEntity, 0..3);
         case!("&#x41;", r#"A"#);
@@ -1629,32 +1719,135 @@ mod test {
     }
 
     #[test]
-    fn tag_parsing() {
+    fn tag_structure() {
         case!("<", r#"<"#);
         case!("<-", r#"<-"#);
         case!("<div", r#"<div></div>"#, ParseErrorKind::IncompleteTag, 4..4);
         case!("<div ", r#"<div></div>"#, ParseErrorKind::IncompleteTag, 5..5);
         case!("<div>", r#"<div></div>"#, ParseErrorKind::MissingEndTag, 5..5);
+        case!("<div><span></div>", r#"<div><span></span></div>"#, ParseErrorKind::MissingEndTag, 11..11);
+        case!("<div><span></span>", r#"<div><span></span></div>"#, ParseErrorKind::MissingEndTag, 18..18);
         case!("<div >", r#"<div></div>"#, ParseErrorKind::MissingEndTag, 6..6);
         case!("<a:div/>", r#"<wx-x></wx-x>"#, ParseErrorKind::IllegalNamePrefix, 1..2);
         case!("<div/ ></div>", r#"<div></div>"#, ParseErrorKind::UnexpectedCharacter, 4..5);
         case!("<div a:mark:c/>", r#"<div></div>"#, ParseErrorKind::IllegalNamePrefix, 5..6);
         case!("<div marks:c/>", r#"<div></div>"#, ParseErrorKind::IllegalNamePrefix, 5..10);
+        case!("<div marks:/>", r#"<div></div>"#, ParseErrorKind::InvalidAttribute, 5..10);
         case!("<div a =''/>", r#"<div a=""></div>"#, ParseErrorKind::UnexpectedWhitespace, 6..7);
         case!("<div a= ''/>", r#"<div a=""></div>"#, ParseErrorKind::UnexpectedWhitespace, 7..8);
-        case!("<div a= {{b}}/>", r#"<div a={{b}}></div>"#, ParseErrorKind::UnexpectedWhitespace, 7..8);
+        case!("<div a= {{b}}/>", r#"<div a="{{b}}"></div>"#, ParseErrorKind::UnexpectedWhitespace, 7..8);
+        case!("<div a= b/>", r#"<div a b></div>"#, ParseErrorKind::MissingAttributeValue, 7..7);
         case!("<div a=>", r#"<div></div>"#, ParseErrorKind::MissingAttributeValue, 7..7);
         case!("<div a=/>", r#"<div></div>"#, ParseErrorKind::MissingAttributeValue, 7..7);
         case!("<div a=", r#"<div></div>"#, ParseErrorKind::MissingAttributeValue, 7..7);
         case!("<div #@></div>", r#"<div></div>"#, ParseErrorKind::IllegalAttributeName, 5..7);
         case!("<div a a></div>", r#"<div></div>"#, ParseErrorKind::DuplicatedAttribute, 7..8);
-        case!("<template name='a'/><template name='a'/>", r#"<block wx:if=""></block><block wx:else></block>"#, ParseErrorKind::DuplicatedName, 36..37);
+        case!("<div></div  a=''>", r#"<div></div>"#, ParseErrorKind::UnexpectedCharacter, 12..16);
+    }
+
+    #[test]
+    fn normal_element() {
+        case!("<div a='1'></div>", r#"<div a="1"></div>"#);
+        case!("<div change:a='fn'></div>", r#"<div change:a="fn"></div>"#);
+        case!("<div worklet:a='fn'></div>", r#"<div worklet:a="fn"></div>"#);
+        case!("<div worklet:a='{{ a }}'></div>", r#"<div worklet:a="{{ a }}"></div>"#, ParseErrorKind::DataBindingNotAllowed, 16..23);
+        case!("<div mark:aB='fn'></div>", r#"<div mark:aB="fn"></div>"#);
+        case!("<div data:aB='fn'></div>", r#"<div data:aB="fn"></div>"#);
+        case!("<div data-a-bC='fn'></div>", r#"<div data:aBc="fn"></div>"#);
+        case!("<div generic:a='A'></div>", r#"<div generic:a="A"></div>"#);
+        case!("<div generic:a='{{ A }}'></div>", r#"<div generic:a="{{ A }}"></div>"#, ParseErrorKind::DataBindingNotAllowed, 16..23);
+        case!("<div extra-attr:a='A'></div>", r#"<div extra-attr:a="A"></div>"#);
+        case!("<div extra-attr:a='{{ A }}'></div>", r#"<div extra-attr:a="{{ A }}"></div>"#, ParseErrorKind::DataBindingNotAllowed, 19..26);
+        case!("<div slot='a'></div>", r#"<div slot="a"></div>"#);
+        case!("<div slot='{{ a }}'></div>", r#"<div slot="{{ a }}"></div>"#, ParseErrorKind::DataBindingNotAllowed, 11..18);
+        case!("<div slot:a></div>", r#"<div slot:a></div>"#);
+        case!("<div slot:a='A'></div>", r#"<div slot:a="A"></div>"#);
+        case!("<div slot:a='A '></div>", r#"<div slot:a="A "></div>"#, ParseErrorKind::InvalidIdentifier, 13..15);
+    }
+
+    #[test]
+    fn pure_block() {
+        case!("<block> abc </block>", " abc ");
         case!("<block a=''></block>", r#"<block></block>"#, ParseErrorKind::InvalidAttribute, 7..8);
+        case!("<div mark:aB='fn'></div>", r#"<div mark:aB="fn"></div>"#);
+        case!("<div slot='a'></div>", r#"<div slot='a'></div>"#);
+    }
+
+    #[test]
+    fn for_list() {
+        case!("<block wx:for='{{ a }}'> abc </block>", r#"<block wx:for="{{a}}"> abc </block>"#);
+        case!("<div wx:for='{{ a }}'> a </div>", r#"<block wx:for="{{a}}"><div> a </div></block>"#);
+        case!("<block wx:for='{{ a }}' wx:for-index='i' wx:for-item='j' wx:key='t'></block>", r#"<block wx:for="{{a}}" wx:for-index='i' wx:for-item="j" wx:key="t"></block>"#);
+        case!("<block wx:for='{{ a }}' wx:for-index='i '></block>", r#"<block wx:for="{{a}}" wx:for-index='i '></block>"#, ParseErrorKind::InvalidIdentifier, 38..40);
+        case!("<block wx:for='{{ a }}' wx:for-item='i '></block>", r#"<block wx:for="{{a}}" wx:for-item='i '></block>"#, ParseErrorKind::InvalidIdentifier, 37..39);
+        case!("<block wx:for='{{ a }}' wx:key='i '></block>", r#"<block wx:for="{{a}}" wx:key='i '></block>"#, ParseErrorKind::InvalidIdentifier, 32..34);
+        case!("<block wx:for='{{ a }}' wx:key='i '></block>", r#"<block wx:for="{{a}}" wx:key='i '></block>"#, ParseErrorKind::InvalidIdentifier, 32..34);
+    }
+
+    #[test]
+    fn if_group() {
+        case!("<block wx:if='{{a}}'> abc </block>", r#"<block wx:if='{{a}}'> abc </block>"#);
+        case!("<block wx:if='{{a}}'> abc </block><div wx:else/>", r#"<block wx:if='{{a}}'> abc </block><block wx:else><div></div></block>"#);
+        case!("<block wx:if='{{a}}'> abc </block><div wx:elif='{{ b }}'/>", r#"<block wx:if='{{a}}'> abc </block><block wx:elif='{{b}}'><div></div></block>"#);
+        case!("<block wx:if='{{a}}'> abc </block><div wx:elif='{{ b }}'/><block wx:else>A</block>", r#"<block wx:if='{{a}}'> abc </block><block wx:elif='{{b}}'><div></div></block><block wx:else>A</block>"#);
+        case!("<block wx:elif='{{a}}'> abc </block>", r#" abc "#, ParseErrorKind::IllegalAttributeValue, 10..14);
+        case!("<block wx:else> abc </block>", r#" abc "#, ParseErrorKind::IllegalAttributeValue, 10..14);
         case!("<block wx:if=''/><block wx:else=' '/>", r#"<block wx:if=""></block><block wx:else></block>"#, ParseErrorKind::IllegalAttributeValue, 33..34);
-        case!("<slot><div/></slot>", r#"<slot></slot>"#, ParseErrorKind::InvalidAttribute, 6..12);
-        case!("<div></div  a=''>", r#"<slot></slot>"#, ParseErrorKind::UnexpectedCharacter, 12..16);
-        case!("<template name='a' wx:for='' />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 22..25);
-        case!("<template name='a' wx:if='' />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 22..24);
-        case!("<div wx:for='' wx:else />", r#"<div wx:for=''/>"#, ParseErrorKind::InvalidAttribute, 18..22);
+        case!("<block wx:if=''/><div wx:for='' wx:else />", r#"<block wx:if=""/><div wx:for=""/>"#, ParseErrorKind::InvalidAttribute, 35..39);
+        case!("<block wx:if=''/><include src='a' wx:else />", r#"<block wx:if=""/><include src='a'/>"#, ParseErrorKind::InvalidAttribute, 37..41);
+    }
+
+    #[test]
+    fn template() {
+        case!("<template />", r#"<template is=""></template>"#, ParseErrorKind::MissingModuleName, 1..9);
+        case!("<template a='' is='a' />", r#"<template is="a"></template>"#, ParseErrorKind::InvalidAttribute, 10..11);
+        case!("<template is='a' data='{{ ...a }}' /><template name='a'> abc </template>", r#"<template name="a"> abc </template><template is="a" data="{{ ...a }}"></template>"#);
+        case!("<template name='a' is='a' />", r#"<template name="a"></template>"#, ParseErrorKind::DuplicatedName, 19..21);
+        case!("<template name='a' data='{{ ...a }}' />", r#"<template name="a"></template>"#, ParseErrorKind::DuplicatedName, 19..23);
+        case!("<template name='a'/><template name='a'/>", r#"<template name="a"></template>"#, ParseErrorKind::DuplicatedName, 36..37);
+        case!("<template name='a' wx:for='' />", r#"<template name="a"></template>"#, ParseErrorKind::InvalidAttribute, 22..25);
+        case!("<template name='a' wx:if='' />", r#"<template name="a"></template>"#, ParseErrorKind::InvalidAttribute, 22..24);
+        case!("<template is='a'><div/></template>", r#"<template is='a'></template>"#, ParseErrorKind::ChildNodesNotAllowed, 33..39);
+        case!("<template is='a' bind:a />", r#"<template is='a' bind:a></template>"#);
+        case!("<template is='a' mark:a />", r#"<template is='a' mark:a></template>"#);
+        case!("<template is='a' slot='a' />", r#"<template is='a' slot='a'></template>"#);
+        case!("<template name='a' bind:a />", r#"<template name='a'></template>"#, ParseErrorKind::InvalidAttribute, 19..23);
+        case!("<template name='a' mark:a />", r#"<template name='a'></template>"#, ParseErrorKind::InvalidAttribute, 19..23);
+        case!("<template name='a' slot='a' />", r#"<template name='a'></template>"#, ParseErrorKind::InvalidAttribute, 19..23);
+    }
+
+    #[test]
+    fn include() {
+        case!("<include src='a' />", r#"<include src="a"></include>"#);
+        case!("<include a='' src='a' />", r#"<include src="a"></include>"#, ParseErrorKind::InvalidAttribute, 9..10);
+        case!("<include src='a'><div/></include>", r#"<include></include>"#, ParseErrorKind::ChildNodesNotAllowed, 17..23);
+        case!("<include src='a' catch:a />", r#"<include src='a' catch:a></include>"#);
+        case!("<include src='a' mark:a />", r#"<include src='a' mark:a></include>"#);
+        case!("<include src='a' slot='a' />", r#"<include src='a' slot='a'></include>"#);
+    }
+
+    #[test]
+    fn slot() {
+        case!("<slot a='a'></slot>", r#"<slot a="a"></slot>"#, ParseErrorKind::ChildNodesNotAllowed, 6..12);
+        case!("<slot><div/></slot>", r#"<slot></slot>"#, ParseErrorKind::ChildNodesNotAllowed, 6..12);
+        case!("<slot mut-bind:a />", r#"<slot mut-bind:a></slot>"#);
+        case!("<slot mark:a />", r#"<slot mark:a></slot>"#);
+        case!("<slot slot='a' />", r#"<slot slot='a'></slot>"#);
+    }
+
+    #[test]
+    fn import() {
+        case!("<import src='a' />", r#"<import src="a"></import>"#);
+        case!("<import src='a' a />", r#"<import src="a"></import>"#, ParseErrorKind::InvalidAttribute, 16..17);
+        case!("<import />", r#"<import src="a"></import>"#, ParseErrorKind::MissingSourcePath, 1..7);
+        case!("<import src='a'><div/></import>", r#"<import src="a"></import>"#, ParseErrorKind::ChildNodesNotAllowed, 16..22);
+    }
+
+    #[test]
+    fn script() {
+        case!("<wxs src='a' />", r#"<wxs src="a"></wxs>"#);
+        case!("<wxs src='a' a />", r#"<wxs src="a"></wxs>"#, ParseErrorKind::InvalidAttribute, 13..14);
+        case!("<wxs />", r#"<wxs src="a"></wxs>"#, ParseErrorKind::MissingSourcePath, 1..4);
+        case!("<wxs src='a'><div/></wxs>", r#"<wxs src="a"></wxs>"#, ParseErrorKind::ChildNodesNotAllowed, 13..19);
     }
 }
