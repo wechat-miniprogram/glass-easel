@@ -16,9 +16,9 @@ pub struct Template {
 
 #[derive(Debug, Clone)]
 pub struct TemplateGlobals {
-    pub imports: Vec<Name>,
-    pub includes: Vec<Name>,
-    pub sub_templates: Vec<(Name, Vec<Node>)>,
+    pub imports: Vec<StrName>,
+    pub includes: Vec<StrName>,
+    pub sub_templates: Vec<(StrName, Vec<Node>)>,
     pub scripts: Vec<Script>,
 }
 
@@ -85,7 +85,7 @@ impl Node {
                 continue;
             }
             if let Some([peek, peek2]) = ps.peek_n() {
-                if peek == '<' && Name::is_start_char(peek2) {
+                if peek == '<' && Ident::is_start_char(peek2) {
                     Element::parse(ps, globals, ret);
                     continue;
                 }
@@ -93,7 +93,7 @@ impl Node {
             let value = Value::parse_until_before(ps, |ps| {
                 if ps.peek::<0>() != Some('<') { return false; }
                 let Some(ch) = ps.peek::<1>() else { return false };
-                if ch == '/' || ch == '!' || Name::is_start_char(ch) { return true; }
+                if ch == '/' || ch == '!' || Ident::is_start_char(ch) { return true; }
                 false
             });
             ret.push(Node::Text(value));
@@ -103,41 +103,41 @@ impl Node {
 
 #[derive(Debug, Clone)]
 pub struct Element {
-    kind: ElementKind,
-    start_tag_location: (Range<Position>, Range<Position>),
-    close_location: Range<Position>,
-    end_tag_location: Option<(Range<Position>, Range<Position>)>,
+    pub kind: ElementKind,
+    pub start_tag_location: (Range<Position>, Range<Position>),
+    pub close_location: Range<Position>,
+    pub end_tag_location: Option<(Range<Position>, Range<Position>)>,
 }
 
 #[derive(Debug, Clone)]
 pub enum ElementKind {
     Normal {
-        tag_name: Name,
+        tag_name: Ident,
         attributes: Vec<Attribute>,
         class: ClassAttribute,
         style: StyleAttribute,
         change_attributes: Vec<Attribute>,
-        worklet_attributes: Vec<(Name, Name)>,
+        worklet_attributes: Vec<StaticAttribute>,
         event_bindings: Vec<EventBinding>,
-        mark: Vec<(Name, Value)>,
-        data: Vec<(Name, Value)>,
+        marks: Vec<Attribute>,
+        data: Vec<Attribute>,
         children: Vec<Node>,
-        generics: Vec<(Name, Name)>,
-        extra_attr: Vec<(Name, Name)>,
+        generics: Vec<StaticAttribute>,
+        extra_attr: Vec<StaticAttribute>,
         slot: Option<(Range<Position>, Value)>,
-        slot_value_refs: Vec<(Name, Name)>,
+        slot_value_refs: Vec<StaticAttribute>,
     },
     Pure {
         event_bindings: Vec<EventBinding>,
-        mark: Vec<(Name, Value)>,
+        marks: Vec<Attribute>,
         children: Vec<Node>,
         slot: Option<(Range<Position>, Value)>,
     },
     For {
         list: (Range<Position>, Value),
-        item_name: (Range<Position>, Name),
-        index_name: (Range<Position>, Name),
-        key: (Range<Position>, Name),
+        item_name: (Range<Position>, StrName),
+        index_name: (Range<Position>, StrName),
+        key: (Range<Position>, StrName),
         children: Vec<Node>,
     },
     If {
@@ -145,23 +145,23 @@ pub enum ElementKind {
         else_branch: Option<(Range<Position>, Vec<Node>)>,
     },
     TemplateRef {
-        target: Value,
-        data: Value,
+        target: (Range<Position>, Value),
+        data: (Range<Position>, Value),
         event_bindings: Vec<EventBinding>,
-        mark: Vec<(Name, Value)>,
+        marks: Vec<Attribute>,
         slot: Option<(Range<Position>, Value)>,
     },
     Include {
-        path: Name,
+        path: (Range<Position>, StrName),
         event_bindings: Vec<EventBinding>,
-        mark: Vec<(Name, Value)>,
+        marks: Vec<Attribute>,
         slot: Option<(Range<Position>, Value)>,
     },
     Slot {
         event_bindings: Vec<EventBinding>,
-        mark: Vec<(Name, Value)>,
-        slot: Option<Value>,
-        name: Option<Value>,
+        marks: Vec<Attribute>,
+        slot: Option<(Range<Position>, Value)>,
+        name: (Range<Position>, Value),
         values: Vec<Attribute>,
     },
 }
@@ -176,17 +176,49 @@ impl TemplateStructure for Element {
 }
 
 impl Element {
+    pub fn children(&self) -> Option<&Vec<Node>> {
+        match &self.kind {
+            ElementKind::Normal { children, .. } |
+            ElementKind::Pure { children, .. } => {
+                Some(children)
+            }
+            ElementKind::For { .. } |
+            ElementKind::If { .. } |
+            ElementKind::TemplateRef { .. } |
+            ElementKind::Include { .. } |
+            ElementKind::Slot { .. } => {
+                None
+            }
+        }
+    }
+
+    pub fn children_mut(&mut self) -> Option<&mut Vec<Node>> {
+        match &mut self.kind {
+            ElementKind::Normal { children, .. } |
+            ElementKind::Pure { children, .. } => {
+                Some(children)
+            }
+            ElementKind::For { .. } |
+            ElementKind::If { .. } |
+            ElementKind::TemplateRef { .. } |
+            ElementKind::Include { .. } |
+            ElementKind::Slot { .. } => {
+                None
+            }
+        }
+    }
+
     fn parse(ps: &mut ParseState, globals: &mut TemplateGlobals, ret: &mut Vec<Node>) {
         // parse `<xxx`
         let start_tag_start_location = ps.consume_str("<").unwrap();
-        let mut tag_name_slices = Name::parse_colon_separated(ps);
+        let mut tag_name_slices = Ident::parse_colon_separated(ps);
         debug_assert_ne!(tag_name_slices.len(), 0);
         let tag_name = if tag_name_slices.len() > 1 {
             let end = tag_name_slices.pop().unwrap();
             for x in tag_name_slices {
                 ps.add_warning(ParseErrorKind::IllegalNamePrefix, x.location());
             }
-            Name {
+            Ident {
                 name: CompactString::new_inline("wx-x"),
                 location: end.location(),
             }
@@ -204,34 +236,34 @@ impl Element {
             "block" => {
                 ElementKind::Pure {
                     event_bindings: vec![],
-                    mark: vec![],
+                    marks: vec![],
                     children: vec![],
                     slot: None,
                 }
             }
             "template" => {
                 ElementKind::TemplateRef {
-                    target: Value::new_empty(default_attr_position),
-                    data: Value::new_empty(default_attr_position),
+                    target: (default_attr_position..default_attr_position, Value::new_empty(default_attr_position)),
+                    data: (default_attr_position..default_attr_position, Value::new_empty(default_attr_position)),
                     event_bindings: vec![],
-                    mark: vec![],
+                    marks: vec![],
                     slot: None,
                 }
             }
             "include" | "wxs" | "import" => {
                 ElementKind::Include {
-                    path: Name::new_empty(default_attr_position),
+                    path: (default_attr_position..default_attr_position, StrName::new_empty(default_attr_position)),
                     event_bindings: vec![],
-                    mark: vec![],
+                    marks: vec![],
                     slot: None,
                 }
             }
             "slot" => {
                 ElementKind::Slot {
                     event_bindings: vec![],
-                    mark: vec![],
+                    marks: vec![],
                     slot: None,
-                    name: None,
+                    name: (default_attr_position..default_attr_position, Value::new_empty(default_attr_position)),
                     values: vec![],
                 }
             }
@@ -244,7 +276,7 @@ impl Element {
                     change_attributes: vec![],
                     worklet_attributes: vec![],
                     event_bindings: vec![],
-                    mark: vec![],
+                    marks: vec![],
                     data: vec![],
                     children: vec![],
                     generics: vec![],
@@ -260,13 +292,13 @@ impl Element {
         let mut wx_elif: Option<(Range<Position>, Value)> = None;
         let mut wx_else: Option<Range<Position>> = None;
         let mut wx_for: Option<(Range<Position>, Value)> = None;
-        let mut wx_for_index: Option<(Range<Position>, Name)> = None;
-        let mut wx_for_item: Option<(Range<Position>, Name)> = None;
-        let mut wx_key: Option<(Range<Position>, Name)> = None;
-        let mut template_name: Option<(Range<Position>, Name)> = None;
-        let mut script_module: Option<(Range<Position>, Name)> = None;
-        let mut class_attrs: Vec<(Range<Position>, Name, Value)> = vec![];
-        let mut style_attrs: Vec<(Range<Position>, Name, Value)> = vec![];
+        let mut wx_for_index: Option<(Range<Position>, StrName)> = None;
+        let mut wx_for_item: Option<(Range<Position>, StrName)> = None;
+        let mut wx_key: Option<(Range<Position>, StrName)> = None;
+        let mut template_name: Option<(Range<Position>, StrName)> = None;
+        let mut script_module: Option<(Range<Position>, StrName)> = None;
+        let mut class_attrs: Vec<(Range<Position>, Ident, Value)> = vec![];
+        let mut style_attrs: Vec<(Range<Position>, Ident, Value)> = vec![];
         loop {
             let Some(peek) = ps.peek::<0>() else { break };
             if peek == '>' {
@@ -277,10 +309,11 @@ impl Element {
                 if !ps.peek_str("/>") {
                     ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
                 }
-            } else if Name::is_start_char(peek) {
+            } else if Ident::is_start_char(peek) {
                 // decide the attribute kind
                 enum AttrPrefixKind {
                     Normal,
+                    Slot,
                     WxIf,
                     WxElif,
                     WxElse,
@@ -293,6 +326,7 @@ impl Element {
                     TemplateData,
                     Src,
                     Module,
+                    SlotName,
                     Model(Range<Position>),
                     Change(Range<Position>),
                     Worklet(Range<Position>),
@@ -311,7 +345,7 @@ impl Element {
                     SlotDataRef(Range<Position>),
                     Invalid(Range<Position>),
                 }
-                let mut segs = Name::parse_colon_separated(ps);
+                let mut segs = Ident::parse_colon_separated(ps);
                 let attr_name = segs.pop().unwrap();
                 let prefix = if segs.len() <= 1 {
                     match segs.first() {
@@ -327,6 +361,8 @@ impl Element {
                                         true => AttrPrefixKind::Module,
                                     }
                                 }
+                                (ElementKind::Slot { .. }, "name") => AttrPrefixKind::SlotName,
+                                (_, "slot") => AttrPrefixKind::Slot,
                                 _ => AttrPrefixKind::Normal,
                             }
                         }
@@ -374,6 +410,7 @@ impl Element {
                 }
                 let parse_kind = match prefix {
                     AttrPrefixKind::Normal => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::Slot => AttrPrefixParseKind::Value,
                     AttrPrefixKind::WxIf => AttrPrefixParseKind::Value,
                     AttrPrefixKind::WxElif => AttrPrefixParseKind::Value,
                     AttrPrefixKind::WxElse => AttrPrefixParseKind::StaticStr,
@@ -386,6 +423,7 @@ impl Element {
                     AttrPrefixKind::TemplateData => AttrPrefixParseKind::Value,
                     AttrPrefixKind::Src => AttrPrefixParseKind::StaticStr,
                     AttrPrefixKind::Module => AttrPrefixParseKind::ScopeName,
+                    AttrPrefixKind::SlotName => AttrPrefixParseKind::Value,
                     AttrPrefixKind::Model(_) => AttrPrefixParseKind::Value,
                     AttrPrefixKind::Change(_) => AttrPrefixParseKind::Value,
                     AttrPrefixKind::Worklet(_) => AttrPrefixParseKind::StaticStr,
@@ -409,8 +447,8 @@ impl Element {
                 enum AttrPrefixParseResult {
                     Invalid,
                     Value(Value),
-                    StaticStr(Name),
-                    ScopeName(Name),
+                    StaticStr(StrName),
+                    ScopeName(StrName),
                 }
                 let ws_before_eq = ps.skip_whitespace();
                 let attr_value = if let Some(eq_range) = ps.consume_str("=") {
@@ -424,8 +462,8 @@ impl Element {
                             ps.add_warning(ParseErrorKind::MissingAttributeValue, eq_range);
                             match parse_kind {
                                 AttrPrefixParseKind::Value => AttrPrefixParseResult::Value(Value::new_empty(pos)),
-                                AttrPrefixParseKind::StaticStr => AttrPrefixParseResult::StaticStr(Name::new_empty(pos)),
-                                AttrPrefixParseKind::ScopeName => AttrPrefixParseResult::ScopeName(Name::new_empty(pos)),
+                                AttrPrefixParseKind::StaticStr => AttrPrefixParseResult::StaticStr(StrName::new_empty(pos)),
+                                AttrPrefixParseKind::ScopeName => AttrPrefixParseResult::ScopeName(StrName::new_empty(pos)),
                             }
                         }
                         Some(ch) if ch == '"' || ch == '\'' => {
@@ -438,14 +476,14 @@ impl Element {
                             let value = match parse_kind {
                                 AttrPrefixParseKind::Value => AttrPrefixParseResult::Value(Value::parse_until_before(ps, until)),
                                 AttrPrefixParseKind::StaticStr => {
-                                    let v = Name::parse_identifier_like_until_before(ps, until);
+                                    let v = StrName::parse_identifier_like_until_before(ps, until);
                                     if v.name.as_str().contains("{{") {
                                         ps.add_warning(ParseErrorKind::DataBindingNotAllowed, v.location());
                                     }
                                     AttrPrefixParseResult::StaticStr(v)
                                 },
                                 AttrPrefixParseKind::ScopeName => {
-                                    let v = Name::parse_identifier_like_until_before(ps, until);
+                                    let v = StrName::parse_identifier_like_until_before(ps, until);
                                     if !v.is_valid_js_identifier() {
                                         ps.add_warning(ParseErrorKind::InvalidIdentifier, v.location());
                                     }
@@ -476,10 +514,10 @@ impl Element {
                             }
                         }
                         Some(_) if ws_after_eq.is_none() => {
-                            let v = Name::parse_identifier_like_until_before(ps, |ps| {
+                            let v = StrName::parse_identifier_like_until_before(ps, |ps| {
                                 match ps.peek::<0>() {
                                     None => true,
-                                    Some(ch) => !Name::is_following_char(ch),
+                                    Some(ch) => !Ident::is_following_char(ch),
                                 }
                             });
                             match parse_kind {
@@ -493,8 +531,8 @@ impl Element {
                             ps.add_warning(ParseErrorKind::MissingAttributeValue, eq_range);
                             match parse_kind {
                                 AttrPrefixParseKind::Value => AttrPrefixParseResult::Value(Value::new_empty(pos)),
-                                AttrPrefixParseKind::StaticStr => AttrPrefixParseResult::StaticStr(Name::new_empty(pos)),
-                                AttrPrefixParseKind::ScopeName => AttrPrefixParseResult::ScopeName(Name::new_empty(pos)),
+                                AttrPrefixParseKind::StaticStr => AttrPrefixParseResult::StaticStr(StrName::new_empty(pos)),
+                                AttrPrefixParseKind::ScopeName => AttrPrefixParseResult::ScopeName(StrName::new_empty(pos)),
                             }
                         }
                     };
@@ -504,8 +542,8 @@ impl Element {
                     let pos = attr_name.location.end;
                     match parse_kind {
                         AttrPrefixParseKind::Value => AttrPrefixParseResult::Value(Value::new_empty(pos)),
-                        AttrPrefixParseKind::StaticStr => AttrPrefixParseResult::StaticStr(Name::new_empty(pos)),
-                        AttrPrefixParseKind::ScopeName => AttrPrefixParseResult::ScopeName(Name::new_empty(pos)),
+                        AttrPrefixParseKind::StaticStr => AttrPrefixParseResult::StaticStr(StrName::new_empty(pos)),
+                        AttrPrefixParseKind::ScopeName => AttrPrefixParseResult::ScopeName(StrName::new_empty(pos)),
                     }
                 };
 
@@ -513,11 +551,12 @@ impl Element {
                 fn add_element_event_binding(
                     ps: &mut ParseState,
                     element: &mut ElementKind,
-                    attr_name: Name,
+                    attr_name: Ident,
                     attr_value: AttrPrefixParseResult,
                     is_catch: bool,
                     is_mut: bool,
                     is_capture: bool,
+                    prefix_location: Range<Position>,
                 ) {
                     match element {
                         ElementKind::Normal { event_bindings, .. } |
@@ -535,6 +574,7 @@ impl Element {
                                         is_catch,
                                         is_mut,
                                         is_capture,
+                                        prefix_location,
                                     });
                                 }
                             }
@@ -548,23 +588,13 @@ impl Element {
                 match prefix {
                     AttrPrefixKind::Normal => {
                         match &mut element {
-                            ElementKind::Normal { attributes, .. } => {
+                            ElementKind::Normal { attributes, .. } | ElementKind::Slot { values: attributes, .. } => {
                                 if let AttrPrefixParseResult::Value(value) = attr_value {
                                     if attributes.iter().find(|x| x.name.name_eq(&attr_name)).is_some() {
                                         ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                                     } else {
-                                        let attr = Attribute { kind: AttributeKind::Normal, name: attr_name, value };
+                                        let attr = Attribute { name: attr_name, value, is_model: false, prefix_location: None };
                                         attributes.push(attr);
-                                    }
-                                }
-                            }
-                            ElementKind::Slot { values, .. } => {
-                                if let AttrPrefixParseResult::Value(value) = attr_value {
-                                    if values.iter().find(|x| x.name.name_eq(&attr_name)).is_some() {
-                                        ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
-                                    } else {
-                                        let attr = Attribute { kind: AttributeKind::Normal, name: attr_name, value };
-                                        values.push(attr);
                                     }
                                 }
                             }
@@ -573,6 +603,27 @@ impl Element {
                             ElementKind::If { .. } |
                             ElementKind::TemplateRef { .. } |
                             ElementKind::Include { .. } => {
+                                ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
+                            }
+                        }
+                    }
+                    AttrPrefixKind::Slot => {
+                        match &mut element {
+                            ElementKind::Normal { slot, .. } |
+                            ElementKind::Pure { slot, .. } |
+                            ElementKind::TemplateRef { slot, .. } |
+                            ElementKind::Include { slot, .. } |
+                            ElementKind::Slot { slot, .. } => {
+                                if let AttrPrefixParseResult::Value(value) = attr_value {
+                                    if slot.is_some() {
+                                        ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
+                                    } else {
+                                        *slot = Some((attr_name.location(), value));
+                                    }
+                                }
+                            }
+                            ElementKind::For { .. } |
+                            ElementKind::If { .. } => {
                                 ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
                             }
                         }
@@ -656,10 +707,10 @@ impl Element {
                         match &mut element {
                             ElementKind::TemplateRef { target, .. } => {
                                 if let AttrPrefixParseResult::Value(value) = attr_value {
-                                    if target.location().end != default_attr_position {
+                                    if target.1.location().end != default_attr_position {
                                         ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                                     } else {
-                                        *target = value;
+                                        *target = (attr_name.location(), value);
                                     }
                                 }
                             }
@@ -670,10 +721,10 @@ impl Element {
                         match &mut element {
                             ElementKind::TemplateRef { data, .. } => {
                                 if let AttrPrefixParseResult::Value(value) = attr_value {
-                                    if data.location().end != default_attr_position {
+                                    if data.1.location().end != default_attr_position {
                                         ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                                     } else {
-                                        *data = value;
+                                        *data = (attr_name.location(), value);
                                     }
                                 }
                             }
@@ -684,10 +735,10 @@ impl Element {
                         match &mut element {
                             ElementKind::Include { path, .. } => {
                                 if let AttrPrefixParseResult::StaticStr(s) = attr_value {
-                                    if path.location().end != default_attr_position {
+                                    if path.1.location().end != default_attr_position {
                                         ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                                     } else {
-                                        *path = s;
+                                        *path = (attr_name.location(), s);
                                     }
                                 }
                             }
@@ -703,6 +754,20 @@ impl Element {
                             }
                         }
                     }
+                    AttrPrefixKind::SlotName => {
+                        match &mut element {
+                            ElementKind::Slot { name, .. } => {
+                                if let AttrPrefixParseResult::Value(value) = attr_value {
+                                    if name.1.location().end != default_attr_position {
+                                        ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
+                                    } else {
+                                        *name = (attr_name.location(), value);
+                                    }
+                                }
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
                     AttrPrefixKind::Model(prefix_location) => {
                         match &mut element {
                             ElementKind::Normal { attributes, .. } => {
@@ -710,7 +775,7 @@ impl Element {
                                     if attributes.iter().find(|x| x.name.name_eq(&attr_name)).is_some() {
                                         ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                                     } else {
-                                        let attr = Attribute { kind: AttributeKind::Model(prefix_location), name: attr_name, value };
+                                        let attr = Attribute { name: attr_name, value, is_model: true, prefix_location: Some(prefix_location) };
                                         attributes.push(attr);
                                     }
                                 }
@@ -725,15 +790,19 @@ impl Element {
                             }
                         }
                     }
-                    AttrPrefixKind::Change(_prefix_location) => {
+                    AttrPrefixKind::Change(prefix_location) => {
                         match &mut element {
                             ElementKind::Normal { change_attributes, .. } => {
                                 if let AttrPrefixParseResult::Value(value) = attr_value {
                                     if change_attributes.iter().find(|x| x.name.name_eq(&attr_name)).is_some() {
                                         ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                                     } else {
-                                        let attr = Attribute { kind: AttributeKind::Normal, name: attr_name, value };
-                                        change_attributes.push(attr);
+                                        change_attributes.push(Attribute {
+                                            name: attr_name,
+                                            value,
+                                            is_model: false,
+                                            prefix_location: Some(prefix_location),
+                                        });
                                     }
                                 }
                             }
@@ -747,14 +816,18 @@ impl Element {
                             }
                         }
                     }
-                    AttrPrefixKind::Worklet(_prefix_location) => {
+                    AttrPrefixKind::Worklet(prefix_location) => {
                         match &mut element {
                             ElementKind::Normal { worklet_attributes, .. } => {
                                 if let AttrPrefixParseResult::StaticStr(s) = attr_value {
-                                    if worklet_attributes.iter().find(|(x, _)| x.name_eq(&attr_name)).is_some() {
+                                    if worklet_attributes.iter().find(|attr| attr.name.name_eq(&attr_name)).is_some() {
                                         ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                                     } else {
-                                        worklet_attributes.push((attr_name, s));
+                                        worklet_attributes.push(StaticAttribute {
+                                            name: attr_name,
+                                            value: s,
+                                            prefix_location,
+                                        });
                                     }
                                 }
                             }
@@ -768,14 +841,19 @@ impl Element {
                             }
                         }
                     }
-                    AttrPrefixKind::Data(_prefix_location) => {
+                    AttrPrefixKind::Data(prefix_location) => {
                         match &mut element {
                             ElementKind::Normal { data, .. } => {
                                 if let AttrPrefixParseResult::Value(value) = attr_value {
-                                    if data.iter().find(|(x, _)| x.name_eq(&attr_name)).is_some() {
+                                    if data.iter().find(|attr| attr.name.name_eq(&attr_name)).is_some() {
                                         ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                                     } else {
-                                        data.push((attr_name, value));
+                                        data.push(Attribute {
+                                            name: attr_name,
+                                            value,
+                                            is_model: false,
+                                            prefix_location: Some(prefix_location),
+                                        });
                                     }
                                 }
                             }
@@ -831,36 +909,41 @@ impl Element {
                             }
                         }
                     }
-                    AttrPrefixKind::Bind(_prefix_location) => {
-                        add_element_event_binding(ps, &mut element, attr_name, attr_value, false, false, false);
+                    AttrPrefixKind::Bind(prefix_location) => {
+                        add_element_event_binding(ps, &mut element, attr_name, attr_value, false, false, false, prefix_location);
                     }
-                    AttrPrefixKind::MutBind(_prefix_location) => {
-                        add_element_event_binding(ps, &mut element, attr_name, attr_value, false, true, false);
+                    AttrPrefixKind::MutBind(prefix_location) => {
+                        add_element_event_binding(ps, &mut element, attr_name, attr_value, false, true, false, prefix_location);
                     }
-                    AttrPrefixKind::Catch(_prefix_location) => {
-                        add_element_event_binding(ps, &mut element, attr_name, attr_value, true, false, false);
+                    AttrPrefixKind::Catch(prefix_location) => {
+                        add_element_event_binding(ps, &mut element, attr_name, attr_value, true, false, false, prefix_location);
                     }
-                    AttrPrefixKind::CaptureBind(_prefix_location) => {
-                        add_element_event_binding(ps, &mut element, attr_name, attr_value, false, false, true);
+                    AttrPrefixKind::CaptureBind(prefix_location) => {
+                        add_element_event_binding(ps, &mut element, attr_name, attr_value, false, false, true, prefix_location);
                     }
-                    AttrPrefixKind::CaptureMutBind(_prefix_location) => {
-                        add_element_event_binding(ps, &mut element, attr_name, attr_value, false, true, true);
+                    AttrPrefixKind::CaptureMutBind(prefix_location) => {
+                        add_element_event_binding(ps, &mut element, attr_name, attr_value, false, true, true, prefix_location);
                     }
-                    AttrPrefixKind::CaptureCatch(_prefix_location) => {
-                        add_element_event_binding(ps, &mut element, attr_name, attr_value, true, false, true);
+                    AttrPrefixKind::CaptureCatch(prefix_location) => {
+                        add_element_event_binding(ps, &mut element, attr_name, attr_value, true, false, true, prefix_location);
                     }
-                    AttrPrefixKind::Mark(_prefix_location) => {
+                    AttrPrefixKind::Mark(prefix_location) => {
                         match &mut element {
-                            ElementKind::Normal { mark, .. } |
-                            ElementKind::Pure { mark, .. } |
-                            ElementKind::TemplateRef { mark, .. } |
-                            ElementKind::Include { mark, .. } |
-                            ElementKind::Slot { mark, .. } => {
+                            ElementKind::Normal { marks, .. } |
+                            ElementKind::Pure { marks, .. } |
+                            ElementKind::TemplateRef { marks, .. } |
+                            ElementKind::Include { marks, .. } |
+                            ElementKind::Slot { marks, .. } => {
                                 if let AttrPrefixParseResult::Value(value) = attr_value {
-                                    if mark.iter().find(|(x, _)| x.name_eq(&attr_name)).is_some() {
+                                    if marks.iter().find(|attr| attr.name.name_eq(&attr_name)).is_some() {
                                         ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                                     } else {
-                                        mark.push((attr_name, value));
+                                        marks.push(Attribute {
+                                            name: attr_name,
+                                            value,
+                                            is_model: false,
+                                            prefix_location: Some(prefix_location),
+                                        });
                                     }
                                 }
                             }
@@ -870,14 +953,18 @@ impl Element {
                             }
                         }
                     }
-                    AttrPrefixKind::Generic(_prefix_location) => {
+                    AttrPrefixKind::Generic(prefix_location) => {
                         match &mut element {
                             ElementKind::Normal { generics, .. } => {
                                 if let AttrPrefixParseResult::StaticStr(s) = attr_value {
-                                    if generics.iter().find(|(x, _)| x.name_eq(&attr_name)).is_some() {
+                                    if generics.iter().find(|attr| attr.name.name_eq(&attr_name)).is_some() {
                                         ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                                     } else {
-                                        generics.push((attr_name, s));
+                                        generics.push(StaticAttribute {
+                                            name: attr_name,
+                                            value: s,
+                                            prefix_location,
+                                        });
                                     }
                                 }
                             }
@@ -891,14 +978,18 @@ impl Element {
                             }
                         }
                     }
-                    AttrPrefixKind::ExtraAttr(_prefix_location) => {
+                    AttrPrefixKind::ExtraAttr(prefix_location) => {
                         match &mut element {
                             ElementKind::Normal { extra_attr, .. } => {
                                 if let AttrPrefixParseResult::StaticStr(s) = attr_value {
-                                    if extra_attr.iter().find(|(x, _)| x.name_eq(&attr_name)).is_some() {
+                                    if extra_attr.iter().find(|attr| attr.name.name_eq(&attr_name)).is_some() {
                                         ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                                     } else {
-                                        extra_attr.push((attr_name, s));
+                                        extra_attr.push(StaticAttribute {
+                                            name: attr_name,
+                                            value: s,
+                                            prefix_location,
+                                        });
                                     }
                                 }
                             }
@@ -912,14 +1003,18 @@ impl Element {
                             }
                         }
                     }
-                    AttrPrefixKind::SlotDataRef(_prefix_location) => {
+                    AttrPrefixKind::SlotDataRef(prefix_location) => {
                         match &mut element {
                             ElementKind::Normal { slot_value_refs, .. } => {
                                 if let AttrPrefixParseResult::ScopeName(s) = attr_value {
-                                    if slot_value_refs.iter().find(|(x, _)| x.name_eq(&attr_name)).is_some() {
+                                    if slot_value_refs.iter().find(|attr| attr.name.name_eq(&attr_name)).is_some() {
                                         ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                                     } else {
-                                        slot_value_refs.push((attr_name, s));
+                                        slot_value_refs.push(StaticAttribute {
+                                            name: attr_name,
+                                            value: s,
+                                            prefix_location,
+                                        });
                                     }
                                 }
                             }
@@ -939,7 +1034,7 @@ impl Element {
                 let pos = ps.position();
                 loop {
                     let Some(peek) = ps.peek::<0>() else { break };
-                    if peek == '/' || peek == '>' || Name::is_start_char(peek) || char::is_whitespace(peek) {
+                    if peek == '/' || peek == '>' || Ident::is_start_char(peek) || char::is_whitespace(peek) {
                         break
                     }
                 }
@@ -970,26 +1065,26 @@ impl Element {
         // TODO support `class:xxx` and `style:xxx`
 
         // check `<template name>` and validate `<template is data>`
-        if let ElementKind::TemplateRef { target, data, event_bindings, mark, slot } = &element {
+        if let ElementKind::TemplateRef { target, data, event_bindings, marks, slot } = &element {
             if template_name.is_some() {
-                if target.location().end != default_attr_position {
-                    ps.add_warning(ParseErrorKind::InvalidAttribute, target.location());
+                if target.1.location().end != default_attr_position {
+                    ps.add_warning(ParseErrorKind::InvalidAttribute, target.0.clone());
                 }
-                if data.location().end != default_attr_position {
-                    ps.add_warning(ParseErrorKind::InvalidAttribute, target.location());
+                if data.1.location().end != default_attr_position {
+                    ps.add_warning(ParseErrorKind::InvalidAttribute, target.0.clone());
                 }
                 for x in event_bindings {
                     ps.add_warning(ParseErrorKind::InvalidAttribute, x.name.location());
                 }
-                for (x, _) in mark {
-                    ps.add_warning(ParseErrorKind::InvalidAttribute, x.location());
+                for attr in marks {
+                    ps.add_warning(ParseErrorKind::InvalidAttribute, attr.name.location());
                 }
                 if let Some((x, _)) = slot {
                     ps.add_warning(ParseErrorKind::InvalidAttribute, x.clone());
                 }
             } else {
-                if target.location().end == default_attr_position {
-                    ps.add_warning(ParseErrorKind::MissingModuleName, target.location());
+                if target.1.location().end == default_attr_position {
+                    ps.add_warning(ParseErrorKind::MissingModuleName, target.0.clone());
                 }
             }
         };
@@ -997,14 +1092,14 @@ impl Element {
 
         // check script/import tag
         if is_script_tag || is_import_tag {
-            let ElementKind::Include { path: _, event_bindings, mark, slot } = &element else {
+            let ElementKind::Include { path: _, event_bindings, marks, slot } = &element else {
                 unreachable!();
             };
             for x in event_bindings {
                 ps.add_warning(ParseErrorKind::InvalidAttribute, x.name.location());
             }
-            for (x, _) in mark {
-                ps.add_warning(ParseErrorKind::InvalidAttribute, x.location());
+            for attr in marks {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, attr.name.location());
             }
             if let Some((x, _)) = slot {
                 ps.add_warning(ParseErrorKind::InvalidAttribute, x.clone());
@@ -1021,8 +1116,8 @@ impl Element {
             loop {
                 ps.skip_until_before("</wxs");
                 match ps.peek::<5>() {
-                    None | Some('>') => break,
-                    Some(ch) if char::is_whitespace(ch) => break,
+                    None => break,
+                    Some(ch) if !Ident::is_following_char(ch) => break,
                     _ => {}
                 }
                 ps.skip_bytes(5);
@@ -1030,13 +1125,13 @@ impl Element {
             let content = ps.code_slice(cur_index..ps.cur_index()).to_string();
             let content_location = pos..ps.position();
             if let Some((_, module_name)) = script_module {
-                if path.name.is_empty() {
+                if path.1.name.is_empty() {
                     globals.scripts.push(Script::Inline { module_name, content, content_location })
                 } else {
                     if content.trim().len() > 0 {
                         ps.add_warning(ParseErrorKind::ChildNodesNotAllowed, content_location);
                     }
-                    globals.scripts.push(Script::GlobalRef { module_name, path: path.clone() })
+                    globals.scripts.push(Script::GlobalRef { module_name, path: path.1.clone() })
                 }
             } else {
                 ps.add_warning(ParseErrorKind::MissingModuleName, tag_name.location());
@@ -1065,13 +1160,13 @@ impl Element {
                 }
                 let end_tag_start_location = ps.consume_str("<").unwrap();
                 let close_location = ps.consume_str("/").unwrap();
-                let mut tag_name_slices = Name::parse_colon_separated(ps);
+                let mut tag_name_slices = Ident::parse_colon_separated(ps);
                 let end_tag_name = if tag_name_slices.len() > 1 {
                     let end = tag_name_slices.pop().unwrap();
                     for x in tag_name_slices {
                         ps.add_warning(ParseErrorKind::IllegalNamePrefix, x.location());
                     }
-                    Name {
+                    Ident {
                         name: CompactString::new_inline("wx-x"),
                         location: end.location(),
                     }
@@ -1104,11 +1199,11 @@ impl Element {
         if !is_script_tag {
             match &element {
                 ElementKind::Include { path, .. } => {
-                    if path.name.is_empty() {
+                    if path.1.name.is_empty() {
                         ps.add_warning(ParseErrorKind::MissingSourcePath, tag_name.location());
                     } else {
                         let list = if is_import_tag { &mut globals.imports } else { &mut globals.includes };
-                        list.push(path.clone());
+                        list.push(path.1.clone());
                     }
                 }
                 _ => {}
@@ -1120,9 +1215,9 @@ impl Element {
             None,
             For {
                 list: (Range<Position>, Value),
-                item_name: (Range<Position>, Name),
-                index_name: (Range<Position>, Name),
-                key: (Range<Position>, Name),
+                item_name: (Range<Position>, StrName),
+                index_name: (Range<Position>, StrName),
+                key: (Range<Position>, StrName),
             },
         }
         let for_list = if !allow_for_if || wx_for.is_none() {
@@ -1141,9 +1236,9 @@ impl Element {
             ForList::None
         } else {
             let (for_location, for_value) = wx_for.unwrap();
-            let item_name = wx_for_item.unwrap_or_else(|| (for_location.clone(), Name::new_empty(for_location.end.clone())));
-            let index_name = wx_for_index.unwrap_or_else(|| (for_location.clone(), Name::new_empty(for_location.end.clone())));
-            let key = wx_key.unwrap_or_else(|| (for_location.clone(), Name::new_empty(for_location.end.clone())));
+            let item_name = wx_for_item.unwrap_or_else(|| (for_location.clone(), StrName::new_empty(for_location.end.clone())));
+            let index_name = wx_for_index.unwrap_or_else(|| (for_location.clone(), StrName::new_empty(for_location.end.clone())));
+            let key = wx_key.unwrap_or_else(|| (for_location.clone(), StrName::new_empty(for_location.end.clone())));
             ForList::For {
                 list: (for_location, for_value),
                 item_name,
@@ -1217,8 +1312,8 @@ impl Element {
         } else {
             let wrap_children = |mut element: Element| -> Vec<Node> {
                 match &mut element.kind {
-                    ElementKind::Pure { event_bindings, mark, slot, children } => {
-                        if !event_bindings.is_empty() || !mark.is_empty() || slot.is_some() {
+                    ElementKind::Pure { event_bindings, marks, slot, children } => {
+                        if !event_bindings.is_empty() || !marks.is_empty() || slot.is_some() {
                             // empty
                         } else {
                             return std::mem::replace(children, vec![]);
@@ -1231,29 +1326,20 @@ impl Element {
 
             // generate normal element
             let wrapped_element = {
-                match &mut element {
-                    ElementKind::Normal { children, .. } |
-                    ElementKind::Pure { children, .. } => {
-                        *children = new_children;
-                    }
-                    ElementKind::For { .. } |
-                    ElementKind::If { .. } => {
-                        unreachable!()
-                    }
-                    ElementKind::TemplateRef { .. } |
-                    ElementKind::Include { .. } |
-                    ElementKind::Slot { .. } => {
-                        if let Some(child) = new_children.first() {
-                            ps.add_warning(ParseErrorKind::ChildNodesNotAllowed, child.location());
-                        }
-                    }
-                }
-                Element {
+                let mut element = Element {
                     kind: element,
                     start_tag_location: (start_tag_start_location.clone(), start_tag_end_location.clone()),
                     close_location: close_location.clone(),
                     end_tag_location: end_tag_location.clone(),
+                };
+                if let Some(v) = element.children_mut() {
+                    *v = new_children;
+                } else {
+                    if let Some(child) = new_children.first() {
+                        ps.add_warning(ParseErrorKind::ChildNodesNotAllowed, child.location());
+                    }
                 }
+                element
             };
 
             // wrap if condition
@@ -1316,53 +1402,56 @@ impl Element {
 
 #[derive(Debug, Clone)]
 pub struct Attribute {
-    pub kind: AttributeKind,
-    pub name: Name,
+    pub name: Ident,
     pub value: Value,
+    pub is_model: bool,
+    pub prefix_location: Option<Range<Position>>,
 }
 
 #[derive(Debug, Clone)]
-pub enum AttributeKind {
-    Normal,
-    Model(Range<Position>),
+pub struct StaticAttribute {
+    pub name: Ident,
+    pub value: StrName,
+    pub prefix_location: Range<Position>,
 }
 
 #[derive(Debug, Clone)]
 pub enum ClassAttribute {
     None,
-    String(Value),
-    Multiple(Vec<(Name, Value)>),
+    String(Range<Position>, Value),
+    Multiple(Vec<(Ident, Value)>),
 }
 
 #[derive(Debug, Clone)]
 pub enum StyleAttribute {
     None,
-    String(Value),
-    Multiple(Vec<(Name, Value)>),
+    String(Range<Position>, Value),
+    Multiple(Vec<(Ident, Value)>),
 }
 
 #[derive(Debug, Clone)]
 pub struct EventBinding {
-    pub name: Name,
+    pub name: Ident,
     pub value: Value,
     pub is_catch: bool,
     pub is_mut: bool,
     pub is_capture: bool,
+    pub prefix_location: Range<Position>,
 }
 
 #[derive(Debug, Clone)]
-pub struct Name {
+pub struct Ident {
     pub name: CompactString,
     pub location: Range<Position>,
 }
 
-impl TemplateStructure for Name {
+impl TemplateStructure for Ident {
     fn location(&self) -> Range<Position> {
         self.location.clone()
     }
 }
 
-impl Name {
+impl Ident {
     fn is_start_char(ch: char) -> bool {
         ('a'..='z').contains(&ch) || ('A'..='Z').contains(&ch) || ch == '_' || ch == ':'
     }
@@ -1379,19 +1468,8 @@ impl Name {
         Self::is_start_char(ch) || ('0'..='9').contains(&ch)
     }
 
-    fn is_empty(&self) -> bool {
-        self.name.is_empty()
-    }
-
     fn name_eq(&self, other: &Self) -> bool {
         self.name == other.name
-    }
-
-    fn new_empty(pos: Position) -> Self {
-        Self {
-            name: CompactString::new_inline(""),
-            location: pos..pos,
-        }
     }
 
     fn parse_colon_separated(ps: &mut ParseState) -> Vec<Self> {
@@ -1402,11 +1480,18 @@ impl Name {
             return vec![];
         }
         let mut ret = Vec::with_capacity(2);
-        let mut cur_name = Self::new_empty(ps.position());
+        let pos = ps.position();
+        let mut cur_name = Self {
+            name: CompactString::new_inline(""),
+            location: pos..pos,
+        };
         loop {
             match ps.next().unwrap() {
                 ':' => {
-                    let prev = std::mem::replace(&mut cur_name, Self::new_empty(ps.position()));
+                    let prev = std::mem::replace(&mut cur_name, Self {
+                        name: CompactString::new_inline(""),
+                        location: pos..pos,
+                    });
                     ret.push(prev);
                 }
                 ch => {
@@ -1418,6 +1503,31 @@ impl Name {
             if !Self::is_following_char(peek) { break };
         }
         ret
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct StrName {
+    pub name: CompactString,
+    pub location: Range<Position>,
+}
+
+impl TemplateStructure for StrName {
+    fn location(&self) -> Range<Position> {
+        self.location.clone()
+    }
+}
+
+impl StrName {
+    fn name_eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+
+    fn new_empty(pos: Position) -> Self {
+        Self {
+            name: CompactString::new_inline(""),
+            location: pos..pos,
+        }
     }
 
     fn parse_next_entity<'s>(ps: &mut ParseState<'s>) -> Cow<'s, str> {
@@ -1500,23 +1610,11 @@ impl Name {
             if ps.ended() || until(ps) {
                 break
             }
-            name.push_str(&Name::parse_next_entity(ps));
+            name.push_str(&StrName::parse_next_entity(ps));
         }
         Self {
             name,
             location: start_pos..ps.position(),
-        }
-    }
-
-    fn is_valid_identifier(&self) -> bool {
-        let mut chars = self.name.chars();
-        let first = chars.next();
-        match first {
-            None => false,
-            Some(ch) if !Name::is_start_char(ch) => false,
-            Some(_) => {
-                chars.find(|ch| !Name::is_following_char(*ch)).is_none()
-            }
         }
     }
 
@@ -1525,9 +1623,9 @@ impl Name {
         let first = chars.next();
         match first {
             None => false,
-            Some(ch) if !Name::is_js_start_char(ch) => false,
+            Some(ch) if !Ident::is_js_start_char(ch) => false,
             Some(_) => {
-                chars.find(|ch| !Name::is_js_following_char(*ch)).is_none()
+                chars.find(|ch| !Ident::is_js_following_char(*ch)).is_none()
             }
         }
     }
@@ -1557,6 +1655,14 @@ impl TemplateStructure for Value {
 impl Value {
     fn new_empty(pos: Position) -> Self {
         Self::Static { value: CompactString::new_inline(""), location: pos..pos }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        if let Self::Static { value, .. } = self {
+            value.is_empty()
+        } else {
+            false
+        }
     }
 
     fn from_expression(expression: Box<Expression>) -> Self {
@@ -1671,7 +1777,7 @@ impl Value {
             };
 
             // parse next char
-            ret_value.push_str(&Name::parse_next_entity(ps));
+            ret_value.push_str(&StrName::parse_next_entity(ps));
             ret_location.end = ps.position();
         }
         ret
@@ -1681,13 +1787,13 @@ impl Value {
 #[derive(Debug, Clone)]
 pub enum Script {
     Inline {
-        module_name: Name,
+        module_name: StrName,
         content: String,
         content_location: Range<Position>,
     },
     GlobalRef {
-        module_name: Name,
-        path: Name,
+        module_name: StrName,
+        path: StrName,
     },
 }
 
@@ -1845,9 +1951,9 @@ mod test {
 
     #[test]
     fn script() {
-        case!("<wxs src='a' />", r#"<wxs src="a"></wxs>"#);
-        case!("<wxs src='a' a />", r#"<wxs src="a"></wxs>"#, ParseErrorKind::InvalidAttribute, 13..14);
-        case!("<wxs />", r#"<wxs src="a"></wxs>"#, ParseErrorKind::MissingSourcePath, 1..4);
-        case!("<wxs src='a'><div/></wxs>", r#"<wxs src="a"></wxs>"#, ParseErrorKind::ChildNodesNotAllowed, 13..19);
+        case!("<wxs src='a' module='a' />", r#"<wxs module="a" src="a"/>"#);
+        case!("<wxs src='a' a module='a' />", r#"<wxs module="a" src="a"/>"#, ParseErrorKind::InvalidAttribute, 13..14);
+        case!("<wxs module='a' /><wxs module='a' src='a' />", r#"<wxs module="a"/>"#, ParseErrorKind::DuplicatedName, 31..32);
+        case!("<wxs src='a' module='a'><div/></wxs>", r#"<wxs module="a" src="a"/>"#, ParseErrorKind::ChildNodesNotAllowed, 13..19);
     }
 }

@@ -17,12 +17,13 @@ macro_rules! case {
     };
 }
 
-mod tag;
-mod expr;
+pub mod tag;
+pub mod expr;
 
 use super::binding_map;
+pub use tag::Template;
 
-pub(crate) trait TemplateStructure {
+pub trait TemplateStructure {
     fn location(&self) -> Range<Position>;
 
     fn location_start(&self) -> Position {
@@ -44,7 +45,6 @@ pub struct ParseState<'s> {
     scopes: Vec<(CompactString, Range<Position>)>,
     auto_skip_whitespace: bool,
     warnings: Vec<ParseError>,
-    errors: Vec<ParseError>,
 }
 
 impl<'s> ParseState<'s> {
@@ -65,7 +65,6 @@ impl<'s> ParseState<'s> {
             scopes: vec![],
             auto_skip_whitespace: false,
             warnings: vec![],
-            errors: vec![],
         }
     }
 

@@ -10,6 +10,7 @@ pub(crate) use tree::*;
 mod expr;
 pub(crate) use expr::*;
 pub mod parse;
+pub mod stringify;
 mod parser;
 mod binding_map;
 mod group;
