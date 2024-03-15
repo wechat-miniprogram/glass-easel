@@ -287,14 +287,21 @@ describe('component utils', () => {
   })
 
   test('#getMethodsFromDef #getMethod #callMethod (when `useMethodCallerListeners` is set)', () => {
-    const compDef = glassEasel.Component.register(
-      {
-        options: {
-          useMethodCallerListeners: true,
+    const compDef = componentSpace
+      .define()
+      .options({
+        useMethodCallerListeners: true,
+      })
+      .init(({ method }) => {
+        const def = method(() => 'def')
+        return { def }
+      })
+      .methods({
+        ghi() {
+          return 'ghi'
         },
-      },
-      componentSpace,
-    )
+      })
+      .registerComponent()
     const comp = glassEasel.Component.createWithContext('root', compDef.general(), domBackend)
     const caller = {
       abc() {
@@ -305,6 +312,12 @@ describe('component utils', () => {
     expect(glassEasel.Component.getMethodsFromDef(compDef.general()).abc).toBeUndefined()
     expect(glassEasel.Component.getMethod(comp.general(), 'abc')!()).toBe('abc')
     expect(comp.callMethod('abc')).toBe('abc')
+    expect(glassEasel.Component.getMethodsFromDef(compDef.general()).def).toBeUndefined()
+    expect(glassEasel.Component.getMethod(comp.general(), 'def')!()).toBe('def')
+    expect(comp.callMethod('def')).toBe('def')
+    expect(glassEasel.Component.getMethodsFromDef(compDef.general()).ghi).toBeTruthy()
+    expect(glassEasel.Component.getMethod(comp.general(), 'ghi')!()).toBe('ghi')
+    expect(comp.callMethod('ghi')).toBe('ghi')
   })
 
   test('#isInnerDataExcluded', () => {
