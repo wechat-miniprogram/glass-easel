@@ -7,8 +7,9 @@ use super::{ParseState, Position, TemplateStructure, ParseErrorKind};
 #[derive(Debug, Clone)]
 pub enum Expression {
     ScopeRef {
-        index: usize,
+        name: CompactString,
         location: Range<Position>,
+        index: usize,
     },
     Ident {
         name: CompactString,
@@ -214,7 +215,12 @@ pub enum ObjectFieldKind {
     Named {
         name: CompactString,
         location: Range<Position>,
+        colon_location: Range<Position>,
         value: Expression,
+    },
+    ShortcutNamed {
+        name: CompactString,
+        location: Range<Position>,
     },
     Spread {
         location: Range<Position>,
@@ -436,7 +442,8 @@ impl Expression {
                 return None;
             };
             let dup_name = fields.iter().find_map(|x| match x {
-                ObjectFieldKind::Named { name: x, location, .. } => (x == &name).then_some(location.clone()),
+                ObjectFieldKind::Named { name: x, location, .. } |
+                ObjectFieldKind::ShortcutNamed { name: x, location } => (x == &name).then_some(location.clone()),
                 ObjectFieldKind::Spread { .. } => None,
             });
             if let Some(location) = dup_name {
@@ -447,9 +454,9 @@ impl Expression {
             let peek = ps.peek::<0>();
             match peek {
                 Some(':') => {
-                    ps.next(); // ':'
+                    let colon_location = ps.consume_str(":").unwrap(); // ':'
                     let value = *Self::parse_cond(ps)?;
-                    fields.push(ObjectFieldKind::Named { name, location, value });
+                    fields.push(ObjectFieldKind::Named { name, location, colon_location, value });
                     let peek = ps.peek::<0>()?;
                     if peek == '}' { break };
                     if peek == ',' {
@@ -460,8 +467,7 @@ impl Expression {
                     }
                 }
                 None | Some('}') | Some(',') => {
-                    let value = Expression::Ident { name: name.clone(), location: location.clone() };
-                    fields.push(ObjectFieldKind::Named { name, location, value });
+                    fields.push(ObjectFieldKind::ShortcutNamed { name, location });
                     if peek == Some(',') {
                         ps.next(); // ','
                     }

@@ -498,7 +498,7 @@ impl Element {
                             if let Some(range) = ws_after_eq {
                                 ps.add_warning(ParseErrorKind::UnexpectedWhitespace, range);
                             }
-                            let value = Value::parse_data_binding(ps).map(Value::from_expression);
+                            let value = Value::parse_data_binding(ps);
                             if let Some(value) = value {
                                 match parse_kind {
                                     AttrPrefixParseKind::Value => {
@@ -1639,6 +1639,7 @@ pub enum Value {
     },
     Dynamic {
         expression: Box<Expression>,
+        double_brace_location: (Range<Position>, Range<Position>),
         binding_map_keys: Option<BindingMapKeys>,
     },
 }
@@ -1647,7 +1648,9 @@ impl TemplateStructure for Value {
     fn location(&self) -> Range<Position> {
         match self {
             Self::Static { value: _, location } => location.clone(),
-            Self::Dynamic { expression, binding_map_keys: _ } => expression.location(),
+            Self::Dynamic { expression: _, double_brace_location, binding_map_keys: _ } => {
+                double_brace_location.0.start..double_brace_location.1.end
+            },
         }
     }
 }
@@ -1665,31 +1668,35 @@ impl Value {
         }
     }
 
-    fn from_expression(expression: Box<Expression>) -> Self {
-        Self::Dynamic { expression, binding_map_keys: None }
-    }
-
-    fn parse_data_binding(ps: &mut ParseState) -> Option<Box<Expression>> {
-        let Some(start_location) = ps.consume_str("{{") else {
+    fn parse_data_binding(ps: &mut ParseState) -> Option<Self> {
+        let Some(double_brace_left) = ps.consume_str("{{") else {
             return None;
         };
-        let Some(expr) = Expression::parse_expression_or_object_inner(ps) else {
+        let Some(expression) = Expression::parse_expression_or_object_inner(ps) else {
             ps.skip_until_after("}}");
-            return Some(Box::new(Expression::LitStr { value: CompactString::new_inline(""), location: start_location.start..ps.position() }));
+            return Some(Self::Static { value: CompactString::new_inline(""), location: double_brace_left.start..ps.position() });
         };
         ps.skip_whitespace();
         let end_pos = ps.position();
-        match ps.skip_until_after("}}") {
+        match ps.skip_until_before("}}") {
             None => {
-                ps.add_warning(ParseErrorKind::MissingExpressionEnd, end_pos..ps.position());
+                ps.add_warning_at_current_position(ParseErrorKind::MissingExpressionEnd);
             }
             Some(s) => {
                 if s.len() > 0 {
                     ps.add_warning(ParseErrorKind::IllegalExpression, end_pos..ps.position());
                 }
             }
-        }
-        Some(expr)
+        };
+        let double_brace_right = ps.consume_str("}}").unwrap_or_else(|| {
+            let pos = ps.position();
+            pos..pos
+        });
+        Some(Self::Dynamic {
+            expression,
+            double_brace_location: (double_brace_left, double_brace_right),
+            binding_map_keys: None,
+        })
     }
 
     fn parse_until_before(ps: &mut ParseState, until: impl Fn(&mut ParseState) -> bool) -> Self {
@@ -1717,30 +1724,38 @@ impl Value {
 
             // try parse `{{ ... }}`
             if peek == '{' {
-                if let Some(expr) = ps.try_parse(Self::parse_data_binding) {
-                    let expression = match ret {
-                        Self::Static { value, location } => {
-                            if value.is_empty() {
-                                expr
-                            } else {
-                                let left = Box::new(Expression::LitStr { value, location });
-                                let right = wrap_to_string(expr, start_pos..start_pos);
-                                Box::new(Expression::Plus { left, right, location: start_pos..start_pos })
+                match ps.try_parse(Self::parse_data_binding) {
+                    Some(Value::Dynamic { expression, double_brace_location, binding_map_keys: _ }) => {
+                        let expression = match ret {
+                            Self::Static { value, location } => {
+                                if value.is_empty() {
+                                    expression
+                                } else {
+                                    let left = Box::new(Expression::LitStr { value, location });
+                                    let right = wrap_to_string(expression, double_brace_location.1.clone());
+                                    Box::new(Expression::Plus { left, right, location: double_brace_location.0.clone() })
+                                }
                             }
-                        }
-                        Self::Dynamic { expression: left, binding_map_keys } => {
-                            let left = wrap_to_string(left, start_pos..start_pos);
-                            let right = wrap_to_string(expr, start_pos..start_pos);
-                            Box::new(Expression::Plus { left, right, location: start_pos..start_pos })
-                        }
-                    };
-                    ret = Self::Dynamic { expression, binding_map_keys: None };
-                    continue;
+                            Self::Dynamic { expression: left, double_brace_location: left_double_brace_location, binding_map_keys: _ } => {
+                                let left = wrap_to_string(left, left_double_brace_location.1.clone());
+                                let right = wrap_to_string(expression, double_brace_location.1.clone());
+                                Box::new(Expression::Plus { left, right, location: double_brace_location.0.clone() })
+                            }
+                        };
+                        let left = expression.location_start();
+                        let right = expression.location_end();
+                        ret = Self::Dynamic { expression, double_brace_location: (left..left, right..right), binding_map_keys: None };
+                        continue;
+                    }
+                    Some(Value::Static { .. }) => {
+                        continue;
+                    }
+                    None => {}
                 }
             }
 
             // convert `Self` format if needed
-            ret = if let Self::Dynamic { expression, binding_map_keys } = ret {
+            ret = if let Self::Dynamic { expression, double_brace_location, binding_map_keys } = ret {
                 let need_convert = if let Expression::Plus { right, .. } = &*expression {
                     if let Expression::LitStr { .. } = &**right {
                         false
@@ -1751,12 +1766,12 @@ impl Value {
                     true
                 };
                 if need_convert {
-                    let left = wrap_to_string(expression, start_pos..start_pos);
+                    let left = wrap_to_string(expression, double_brace_location.1.clone());
                     let right = Box::new(Expression::LitStr { value: CompactString::new_inline(""), location: start_pos..start_pos });
-                    let expression = Box::new(Expression::Plus { left, right, location: start_pos..start_pos });
-                    Self::Dynamic { expression, binding_map_keys }
+                    let expression = Box::new(Expression::Plus { left, right, location: double_brace_location.0.clone() });
+                    Self::Dynamic { expression, double_brace_location, binding_map_keys }
                 } else {
-                    Self::Dynamic { expression, binding_map_keys }
+                    Self::Dynamic { expression, double_brace_location, binding_map_keys }
                 }
             } else {
                 ret

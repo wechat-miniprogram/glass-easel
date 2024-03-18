@@ -5,15 +5,21 @@ use compact_str::CompactString;
 #[cfg(test)]
 macro_rules! case {
     ($src:expr, $expect:expr $(, $msg:expr, $range:expr)*) => {
-        let (template, ps) = $crate::parse::parse($src, "TEST");
-        // TODO stringify template
-        let mut warnings = ps.warnings();
-        $(
-            let err = warnings.next().unwrap();
-            assert_eq!(err.kind, $msg);
-            assert_eq!(err.location.start.utf16_col..err.location.end.utf16_col, $range);
-        )*
-        assert!(warnings.next().is_none());
+        {
+            use crate::stringify::Stringify;
+            let src: &str = $src;
+            let (template, ps) = $crate::parse::parse(src, "TEST");
+            let mut warnings = ps.warnings();
+            $(
+                let err = warnings.next().unwrap();
+                assert_eq!(err.kind, $msg);
+                assert_eq!(err.location.start.utf16_col..err.location.end.utf16_col, $range);
+            )*
+            assert!(warnings.next().is_none());
+            let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src);
+            template.stringify_write(&mut stringifier).unwrap();
+            assert_eq!(stringifier.finish().as_str(), $expect);
+        }
     };
 }
 
