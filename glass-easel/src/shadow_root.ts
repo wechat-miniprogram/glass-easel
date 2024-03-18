@@ -675,7 +675,7 @@ export class ShadowRoot extends VirtualNode {
       const newSlot = this._$subtreeSlotStart?.value
       if (oldSlot === newSlot) return
 
-      this._$singleSlot = newSlot
+      this._$singleSlot = newSlot || null
       Element._$insertChildReassignSlot(this, null, oldSlot || null, newSlot || null)
       return
     }

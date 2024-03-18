@@ -125,11 +125,11 @@ const testCases = function (testBackend) {
     })
 
     it('should support slot movement', function () {
-      var elem = null
+      var elem = root.shadowRoot.createComponent('component-slot-b')
       var text = glassEasel.TextNode.create('test', root.shadowRoot)
-      var text2 = null
-      elem = root.shadowRoot.createComponent('component-slot-b')
-      text2 = elem.shadowRoot.createTextNode('test2')
+      var text2 = elem.shadowRoot.createTextNode('test2')
+      var text3 = elem.shadowRoot.createTextNode('test3')
+
       elem.appendChild(text)
       elem.$.b.childNodes[0].appendChild(text2)
       expect(elem.childNodes).toStrictEqual([text])
@@ -159,17 +159,30 @@ const testCases = function (testBackend) {
       ])
       matchElementWithDom(elem)
 
+      a.shadowRoot.removeChild(newSlot)
+      expect(a.shadowRoot.getSlotElementFromName('')).toBe(null)
+      expect(elem.shadowRoot.getSlotElementFromName('').getComposedChildren()).toStrictEqual([text])
+      expect(elem.shadowRoot.getSlotElementFromName('').getComposedParent()).toBe(null)
+      expect(a.shadowRoot.childNodes[0].getComposedChildren()).toStrictEqual([])
+      matchElementWithDom(elem)
+
+      a.insertBefore(text3, text2)
+      expect(text3.getComposedParent()).toBe(null)
+      matchElementWithDom(elem)
+
       a.shadowRoot.appendChild(newSlot)
+      expect(text3.getComposedParent()).toBe(newSlot)
       expect(a.shadowRoot.getSlotElementFromName('')).toBe(newSlot)
       expect(a.shadowRoot.getSlotElementFromName('').getComposedChildren()).toStrictEqual([
         elem.shadowRoot.getSlotElementFromName(''),
+        text3,
         text2,
       ])
       expect(elem.shadowRoot.getSlotElementFromName('').getComposedChildren()).toStrictEqual([text])
       expect(elem.shadowRoot.getSlotElementFromName('').getComposedParent()).toBe(newSlot)
       expect(
         a.shadowRoot.childNodes[a.shadowRoot.childNodes.length - 1].getComposedChildren(),
-      ).toStrictEqual([elem.shadowRoot.getSlotElementFromName(''), text2])
+      ).toStrictEqual([elem.shadowRoot.getSlotElementFromName(''), text3, text2])
       matchElementWithDom(elem)
     })
   })
