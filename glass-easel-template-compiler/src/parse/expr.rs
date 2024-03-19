@@ -434,10 +434,10 @@ impl Expression {
                 if peek == '}' { break };
                 if peek == ',' {
                     ps.next(); // ','
-                } else {
-                    ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
-                    return None;
+                    continue;
                 }
+                ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
+                return None;
             }
 
             // parse field name
@@ -642,14 +642,10 @@ impl Expression {
         let pos = ps.position();
         let start_index = ps.cur_index();
         ps.parse_off_auto_whitespace(|ps| {
-            ps.next(); // peek
-
             // parse zero-leading sequence
             if peek == '0' {
+                ps.next(); // '0'
                 match ps.peek::<0>() {
-                    None => {
-                        return Some(Box::new(Expression::LitInt { value: 0, location: pos..ps.position() }));
-                    },
                     Some(d) if ('0'..='7').contains(&d) => {
                         // parse as OCT
                         let mut num = 0i64;
@@ -705,12 +701,15 @@ impl Expression {
                         }
                         return Some(Box::new(Expression::LitInt { value: num, location: pos..ps.position() }));
                     }
-                    Some('e') => {
-                        // parse as `0eXX` , do nothing
+                    Some('e') | Some('.') | Some('8') | Some('9') => {
+                        // do nothing
                     }
-                    _ => {
+                    Some(x) if is_ident_char(x) => {
                         ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
                         return None;
+                    }
+                    _ => {
+                        return Some(Box::new(Expression::LitInt { value: 0, location: pos..ps.position() }));
                     }
                 }
             }
@@ -743,12 +742,12 @@ impl Expression {
                 } else {
                     // '0'..='9'
                     if let Some(x) = int.as_mut() {
-                        let d = ps.next().unwrap() as i64 - '0' as i64;
+                        let d = next as i64 - '0' as i64;
                         *x = *x * 10 + d;
                     }
                 }
                 let Some(peek) = ps.peek::<0>() else { break };
-                if !is_ident_char(peek) { break }
+                if !is_ident_char(peek) && peek != '.' { break }
                 if ('0'..='9').contains(&peek) || (int.is_some() && peek == '.') || peek == 'e' {
                     // empty
                 } else {
@@ -1019,7 +1018,7 @@ mod test {
 
     #[test]
     fn lit_str() {
-        case!("{{ '", "", ParseErrorKind::MissingExpressionEnd, 4..4);
+        case!("{{ '", "", ParseErrorKind::MissingExpressionEnd, 0..2);
         case!(r#"{{ 'a\n\u0041\x4f\x4E' }}"#, "a\nAON");
         case!(r#"{{ 'a\n\u0' }}"#, "a\n 0", ParseErrorKind::IllegalEscapeSequence, 9..11);
         case!(r#"{{ "" }}"#, "");
@@ -1028,7 +1027,7 @@ mod test {
     #[test]
     fn number() {
         case!(r#"{{ 0 }}"#, r#"{{0}}"#);
-        case!(r#"{{ 08 }}"#, r#""#, ParseErrorKind::UnexpectedCharacter, 4..4);
+        case!(r#"{{ 089 }}"#, r#"{{89}}"#);
         case!(r#"{{ 010 }}"#, r#"{{8}}"#);
         case!(r#"{{ 0x }}"#, r#""#, ParseErrorKind::UnexpectedCharacter, 5..5);
         case!(r#"{{ 0xaB }}"#, r#"{{171}}"#);
@@ -1038,7 +1037,7 @@ mod test {
         case!(r#"{{ 102 }}"#, r#"{{102}}"#);
         case!(r#"{{ 0.1 }}"#, r#"{{0.1}}"#);
         case!(r#"{{ .1 }}"#, r#"{{0.1}}"#);
-        case!(r#"{{ 1. }}"#, r#"{{1.0}}"#);
+        case!(r#"{{ 1. }}"#, r#"{{1}}"#);
         case!(r#"{{ 1.2e1 }}"#, r#"{{12}}"#);
         case!(r#"{{ 1.2e01 }}"#, r#"{{12}}"#);
         case!(r#"{{ 1.2e-1 }}"#, r#"{{0.12}}"#);
@@ -1046,7 +1045,7 @@ mod test {
 
     #[test]
     fn lit_obj() {
-        case!(r#"{{ a }}"#, r#"{{{a:a}}}"#);
+        case!(r#"{{{ a }}}"#, r#"{{{a}}}"#);
         case!(r#"{{ { a# } }}"#, r#""#, ParseErrorKind::UnexpectedCharacter, 6..6);
         case!(r#"{{ { a:# } }}"#, r#""#, ParseErrorKind::UnexpectedCharacter, 7..7);
         case!(r#"{{ { } }}"#, r#"{{{}}}"#);
@@ -1056,7 +1055,7 @@ mod test {
         case!(r#"{{ a: 1 }}"#, r#"{{{a:1}}}"#);
         case!(r#"{{ a: 2, }}"#, r#"{{{a:2}}}"#);
         case!(r#"{{ a: 2, b: 3 }}"#, r#"{{{a:2,b:3}}}"#);
-        case!(r#"{{ a, }}"#, r#"{{{a:a}}}"#);
+        case!(r#"{{ a, }}"#, r#"{{{a}}}"#);
         case!(r#"{{ ...a, ...b }}"#, r#"{{{...a,...b}}}"#);
         case!(r#"{{ {...} }}"#, r#""#, ParseErrorKind::UnexpectedCharacter, 7..7);
     }
@@ -1070,7 +1069,7 @@ mod test {
         case!(r#"{{ [ c, a + b ] }}"#, r#"{{[c,a+b]}}"#);
         case!(r#"{{ [ ...a, ] }}"#, r#"{{[...a]}}"#);
         case!(r#"{{ [ ...a, ...b ] }}"#, r#"{{[...a,...b]}}"#);
-        case!(r#"{{ [...] }}"#, r#"{{[...]}}"#, ParseErrorKind::UnexpectedCharacter, 7..7);
+        case!(r#"{{ [...] }}"#, r#""#, ParseErrorKind::UnexpectedCharacter, 7..7);
     }
 
     #[test]

@@ -495,7 +495,7 @@ impl Element {
                                 AttrPrefixParseKind::ScopeName => {
                                     let v = StrName::parse_identifier_like_until_before(ps, until);
                                     if !v.is_valid_js_identifier() {
-                                        ps.add_warning(ParseErrorKind::InvalidIdentifier, v.location());
+                                        ps.add_warning(ParseErrorKind::InvalidScopeName, v.location());
                                     }
                                     AttrPrefixParseResult::ScopeName(v)
                                 },
@@ -554,7 +554,7 @@ impl Element {
                         AttrPrefixParseKind::Value => AttrPrefixParseResult::Value(Value::new_empty(pos)),
                         AttrPrefixParseKind::StaticStr => AttrPrefixParseResult::StaticStr(StrName::new_empty(pos)),
                         AttrPrefixParseKind::ScopeName => {
-                            ps.add_warning(ParseErrorKind::InvalidIdentifier, pos..pos);
+                            ps.add_warning(ParseErrorKind::InvalidScopeName, pos..pos);
                             AttrPrefixParseResult::ScopeName(StrName::new_empty(pos))
                         }
                     }
@@ -1757,8 +1757,9 @@ impl Value {
             return None;
         };
         let Some(expression) = Expression::parse_expression_or_object_inner(ps) else {
-            ps.add_warning_at_current_position(ParseErrorKind::MissingExpressionEnd);
-            ps.skip_until_after("}}");
+            if ps.skip_until_after("}}").is_none() {
+                ps.add_warning(ParseErrorKind::MissingExpressionEnd, double_brace_left.clone());
+            }
             return Some(Self::Static { value: CompactString::new_inline(""), location: double_brace_left.start..ps.position() });
         };
         ps.skip_whitespace();
@@ -1980,9 +1981,9 @@ mod test {
         case!("<div extra-attr:a='A'></div>", r#"<div extra-attr:a="A"/>"#);
         case!("<div extra-attr:a='{{ A }}'></div>", r#"<div extra-attr:a="{{ A }}"/>"#, ParseErrorKind::DataBindingNotAllowed, 19..26);
         case!("<div slot='a'></div>", r#"<div slot="a"/>"#);
-        case!("<div slot:a></div>", r#"<div slot:a/>"#);
+        case!("<div slot:a></div>", r#"<div slot:a/>"#, ParseErrorKind::InvalidScopeName, 11..11);
         case!("<div slot:a='A'></div>", r#"<div slot:a="A"/>"#);
-        case!("<div slot:a='A '></div>", r#"<div slot:a="A "/>"#, ParseErrorKind::InvalidIdentifier, 13..15);
+        case!("<div slot:a='A '></div>", r#"<div slot:a="A "/>"#, ParseErrorKind::InvalidScopeName, 13..15);
     }
 
     #[test]
@@ -1995,12 +1996,12 @@ mod test {
 
     #[test]
     fn for_list() {
-        case!("<block wx:for='{{ a }}' wx:for-item />", r#"<block wx:for="{{a}}"/>"#, ParseErrorKind::InvalidIdentifier, 35..35);
+        case!("<block wx:for='{{ a }}' wx:for-item />", r#"<block wx:for="{{a}}"/>"#, ParseErrorKind::InvalidScopeName, 35..35);
         case!("<block wx:for='{{ a }}'> abc </block>", r#"<block wx:for="{{a}}"> abc </block>"#);
         case!("<div wx:for='{{ a }}'> a </div>", r#"<block wx:for="{{a}}"><div> a </div></block>"#);
         case!("<block wx:for='{{ a }}' wx:for-index='i' wx:for-item='j' wx:key='t'></block>", r#"<block wx:for="{{a}}" wx:for-item="j" wx:for-index="i" wx:key="t"/>"#);
-        case!("<block wx:for='{{ a }}' wx:for-index='i '></block>", r#"<block wx:for="{{a}}" wx:for-index="i "/>"#, ParseErrorKind::InvalidIdentifier, 38..40);
-        case!("<block wx:for='{{ a }}' wx:for-item='i '></block>", r#"<block wx:for="{{a}}" wx:for-item="i "/>"#, ParseErrorKind::InvalidIdentifier, 37..39);
+        case!("<block wx:for='{{ a }}' wx:for-index='i '></block>", r#"<block wx:for="{{a}}" wx:for-index="i "/>"#, ParseErrorKind::InvalidScopeName, 38..40);
+        case!("<block wx:for='{{ a }}' wx:for-item='i '></block>", r#"<block wx:for="{{a}}" wx:for-item="i "/>"#, ParseErrorKind::InvalidScopeName, 37..39);
         case!("<block wx:for='{{ a }}' wx:key='{{ i }}'></block>", r#"<block wx:for="{{a}}" wx:key="{{ i }}"/>"#, ParseErrorKind::DataBindingNotAllowed, 32..39);
     }
 

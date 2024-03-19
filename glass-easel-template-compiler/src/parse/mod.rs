@@ -28,11 +28,11 @@ macro_rules! case {
             template.stringify_write(&mut stringifier).unwrap();
             let (stringify_result, sourcemap) = stringifier.finish();
             let _ = sourcemap; // TODO check sourcemap
-            assert_eq!(stringify_result.as_str(), $expect);
+            assert_eq!(stringify_result.as_str(), expect);
 
             // re-parse and then stringify
             let (template, ps) = $crate::parse::parse("TEST", expect);
-            assert_eq!(ps.warnings().next(), None);
+            assert_eq!(ps.warnings().filter(|x| x.kind.level() > crate::parse::ParseErrorLevel::Note).next(), None);
             let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src);
             template.stringify_write(&mut stringifier).unwrap();
             assert_eq!(stringifier.finish().0.as_str(), expect);
@@ -395,6 +395,7 @@ pub enum ParseErrorKind {
     MissingAttributeValue,
     DataBindingNotAllowed,
     InvalidIdentifier,
+    InvalidScopeName,
     ChildNodesNotAllowed,
     IllegalEscapeSequence,
     IncompleteConditionExpression,
@@ -426,6 +427,7 @@ impl ParseErrorKind {
             Self::MissingAttributeValue => "missing attribute value",
             Self::DataBindingNotAllowed => "data bindings are not allowed for this attribute",
             Self::InvalidIdentifier => "not a valid identifier",
+            Self::InvalidScopeName => "not a valid identifier as scope name",
             Self::ChildNodesNotAllowed => "child nodes are not allowed for this element",
             Self::IllegalEscapeSequence => "illegal escape sequence",
             Self::IncompleteConditionExpression => "incomplete condition expression",
@@ -433,6 +435,38 @@ impl ParseErrorKind {
             Self::UnmatchedParenthesis => "unmatched parenthesis",
             Self::MissingModuleName => "missing module name",
             Self::MissingSourcePath => "missing source path",
+        }
+    }
+
+    pub fn level(&self) -> ParseErrorLevel {
+        match self {
+            Self::UnexpectedCharacter => ParseErrorLevel::Fatal,
+            Self::UnrecognizedTag => ParseErrorLevel::Warn,
+            Self::IllegalExpression => ParseErrorLevel::Fatal,
+            Self::MissingExpressionEnd => ParseErrorLevel::Fatal,
+            Self::IllegalEntity => ParseErrorLevel::Error,
+            Self::IncompleteTag => ParseErrorLevel::Fatal,
+            Self::MissingEndTag => ParseErrorLevel::Error,
+            Self::IllegalNamePrefix => ParseErrorLevel::Warn,
+            Self::InvalidAttributePrefix => ParseErrorLevel::Warn,
+            Self::InvalidAttributeName => ParseErrorLevel::Warn,
+            Self::InvalidAttributeValue => ParseErrorLevel::Note,
+            Self::InvalidAttribute => ParseErrorLevel::Warn,
+            Self::DuplicatedAttribute => ParseErrorLevel::Warn,
+            Self::DuplicatedName => ParseErrorLevel::Note,
+            Self::AvoidUppercaseLetters => ParseErrorLevel::Warn,
+            Self::UnexpectedWhitespace => ParseErrorLevel::Note,
+            Self::MissingAttributeValue => ParseErrorLevel::Error,
+            Self::DataBindingNotAllowed => ParseErrorLevel::Note,
+            Self::InvalidIdentifier => ParseErrorLevel::Fatal,
+            Self::InvalidScopeName => ParseErrorLevel::Note,
+            Self::ChildNodesNotAllowed => ParseErrorLevel::Error,
+            Self::IllegalEscapeSequence => ParseErrorLevel::Error,
+            Self::IncompleteConditionExpression => ParseErrorLevel::Fatal,
+            Self::UnmatchedBracket => ParseErrorLevel::Fatal,
+            Self::UnmatchedParenthesis => ParseErrorLevel::Fatal,
+            Self::MissingModuleName => ParseErrorLevel::Error,
+            Self::MissingSourcePath => ParseErrorLevel::Error,
         }
     }
 }
@@ -447,4 +481,18 @@ impl std::fmt::Display for ParseErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self.static_message())
     }
+}
+
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ParseErrorLevel {
+    /// Likely to be an mistake and should be noticed.
+    ///
+    /// The generator may generate code that contains this kind of mistakes.
+    Note = 1,
+    /// Should be a mistake but the compiler can guess a good way to generate proper code.
+    Warn,
+    /// An error that prevents a successful compilation, but can still continue to find more errors.
+    Error,
+    /// A very serious error that can cause continuous compiling issues, such as miss matched braces.
+    Fatal,
 }
