@@ -1,7 +1,7 @@
 //! The parsed node tree structure
 
 use crate::binding_map::{BindingMapCollector, BindingMapKeys};
-use crate::escape::{escape_html_text, gen_lit_str};
+use crate::escape::{escape_html_text, gen_lit_str, dash_to_camel};
 use crate::proc_gen::{
     JsExprWriter, JsFunctionScopeWriter, JsIdent, JsTopScopeWriter, ScopeVar, ScopeVarLvaluePath,
 };
@@ -10,22 +10,6 @@ use std::fmt;
 use std::fmt::Write;
 
 use super::*;
-
-fn dash_to_camel(s: &str) -> String {
-    let mut camel_name = String::new();
-    let mut next_upper = false;
-    for c in s.chars() {
-        if c == '-' {
-            next_upper = true;
-        } else if next_upper {
-            next_upper = false;
-            camel_name.push(c.to_ascii_uppercase());
-        } else {
-            camel_name.push(c);
-        }
-    }
-    camel_name
-}
 
 /// A parsed template.
 #[derive(Debug, Clone)]

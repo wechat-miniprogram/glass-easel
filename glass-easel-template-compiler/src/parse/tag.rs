@@ -2,6 +2,8 @@ use std::{borrow::Cow, ops::Range};
 
 use compact_str::CompactString;
 
+use crate::escape::dash_to_camel;
+
 use super::{
     binding_map::{BindingMapCollector, BindingMapKeys}, expr::Expression, ParseErrorKind, ParseState, Position, TemplateStructure
 };
@@ -34,7 +36,7 @@ impl Template {
         Node::parse_vec_node(ps, &mut globals, &mut content);
         let ret = Template {
             path: ps.path.to_string(),
-            content: vec![],
+            content,
             globals,
             binding_map_collector: BindingMapCollector::new(),
         };
@@ -64,7 +66,7 @@ impl TemplateStructure for Node {
 impl Node {
     fn parse_vec_node(ps: &mut ParseState, globals: &mut TemplateGlobals, ret: &mut Vec<Node>) {
         loop {
-            if ps.peek_str("</") {
+            if ps.ended() || ps.peek_str("</") {
                 // tag end, returns
                 break;
             }
@@ -179,10 +181,10 @@ impl Element {
     pub fn children(&self) -> Option<&Vec<Node>> {
         match &self.kind {
             ElementKind::Normal { children, .. } |
-            ElementKind::Pure { children, .. } => {
+            ElementKind::Pure { children, .. } |
+            ElementKind::For { children, .. } => {
                 Some(children)
             }
-            ElementKind::For { .. } |
             ElementKind::If { .. } |
             ElementKind::TemplateRef { .. } |
             ElementKind::Include { .. } |
@@ -195,10 +197,10 @@ impl Element {
     pub fn children_mut(&mut self) -> Option<&mut Vec<Node>> {
         match &mut self.kind {
             ElementKind::Normal { children, .. } |
-            ElementKind::Pure { children, .. } => {
+            ElementKind::Pure { children, .. } |
+            ElementKind::For { children, .. } => {
                 Some(children)
             }
-            ElementKind::For { .. } |
             ElementKind::If { .. } |
             ElementKind::TemplateRef { .. } |
             ElementKind::Include { .. } |
@@ -225,7 +227,6 @@ impl Element {
         } else {
             tag_name_slices.pop().unwrap()
         };
-        ps.skip_whitespace();
 
         // create an empty element
         let default_attr_position = tag_name.location.end;
@@ -300,6 +301,7 @@ impl Element {
         let mut class_attrs: Vec<(Range<Position>, Ident, Value)> = vec![];
         let mut style_attrs: Vec<(Range<Position>, Ident, Value)> = vec![];
         loop {
+            ps.skip_whitespace();
             let Some(peek) = ps.peek::<0>() else { break };
             if peek == '>' {
                 break;
@@ -307,7 +309,10 @@ impl Element {
             if peek == '/' {
                 // maybe self-close
                 if !ps.peek_str("/>") {
-                    ps.add_warning_at_current_position(ParseErrorKind::UnexpectedCharacter);
+                    let location = ps.consume_str("/").unwrap();
+                    ps.add_warning(ParseErrorKind::UnexpectedCharacter, location);
+                } else {
+                    break;
                 }
             } else if Ident::is_start_char(peek) {
                 // decide the attribute kind
@@ -331,6 +336,7 @@ impl Element {
                     Change(Range<Position>),
                     Worklet(Range<Position>),
                     Data(Range<Position>),
+                    DataHyphen,
                     Class(Range<Position>),
                     Style(Range<Position>),
                     Bind(Range<Position>),
@@ -347,7 +353,7 @@ impl Element {
                 }
                 let mut segs = Ident::parse_colon_separated(ps);
                 let attr_name = segs.pop().unwrap();
-                let prefix = if segs.len() <= 1 {
+                let prefix = if segs.len() <= 1 && attr_name.name.len() > 0 {
                     match segs.first() {
                         None => {
                             match (&element, attr_name.name.as_str()) {
@@ -363,6 +369,9 @@ impl Element {
                                 }
                                 (ElementKind::Slot { .. }, "name") => AttrPrefixKind::SlotName,
                                 (_, "slot") => AttrPrefixKind::Slot,
+                                (ElementKind::Normal { .. }, x) if x.starts_with("data-") => {
+                                    AttrPrefixKind::DataHyphen
+                                }
                                 _ => AttrPrefixKind::Normal,
                             }
                         }
@@ -400,7 +409,7 @@ impl Element {
                     AttrPrefixKind::Invalid(segs.first().unwrap().location())
                 };
                 if let AttrPrefixKind::Invalid(location) = &prefix {
-                    ps.add_warning(ParseErrorKind::IllegalAttributePrefix, location.clone());
+                    ps.add_warning(ParseErrorKind::InvalidAttributePrefix, location.clone());
                 }
                 #[derive(Debug, PartialEq)]
                 enum AttrPrefixParseKind {
@@ -428,6 +437,7 @@ impl Element {
                     AttrPrefixKind::Change(_) => AttrPrefixParseKind::Value,
                     AttrPrefixKind::Worklet(_) => AttrPrefixParseKind::StaticStr,
                     AttrPrefixKind::Data(_) => AttrPrefixParseKind::Value,
+                    AttrPrefixKind::DataHyphen => AttrPrefixParseKind::Value,
                     AttrPrefixKind::Class(_) => AttrPrefixParseKind::Value,
                     AttrPrefixKind::Style(_) => AttrPrefixParseKind::Value,
                     AttrPrefixKind::Bind(_) => AttrPrefixParseKind::Value,
@@ -543,7 +553,10 @@ impl Element {
                     match parse_kind {
                         AttrPrefixParseKind::Value => AttrPrefixParseResult::Value(Value::new_empty(pos)),
                         AttrPrefixParseKind::StaticStr => AttrPrefixParseResult::StaticStr(StrName::new_empty(pos)),
-                        AttrPrefixParseKind::ScopeName => AttrPrefixParseResult::ScopeName(StrName::new_empty(pos)),
+                        AttrPrefixParseKind::ScopeName => {
+                            ps.add_warning(ParseErrorKind::InvalidIdentifier, pos..pos);
+                            AttrPrefixParseResult::ScopeName(StrName::new_empty(pos))
+                        }
                     }
                 };
 
@@ -631,7 +644,7 @@ impl Element {
                     AttrPrefixKind::WxIf => {
                         if let AttrPrefixParseResult::Value(value) = attr_value {
                             if wx_if.is_some() {
-                                ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
+                                ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                             } else {
                                 wx_if = Some((attr_name.location(), value));
                             }
@@ -640,7 +653,7 @@ impl Element {
                     AttrPrefixKind::WxElif => {
                         if let AttrPrefixParseResult::Value(value) = attr_value {
                             if wx_elif.is_some() {
-                                ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
+                                ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                             } else {
                                 wx_elif = Some((attr_name.location(), value));
                             }
@@ -648,11 +661,11 @@ impl Element {
                     }
                     AttrPrefixKind::WxElse => {
                         if let AttrPrefixParseResult::StaticStr(value) = attr_value {
-                            if wx_elif.is_some() {
-                                ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location());
+                            if wx_else.is_some() {
+                                ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location());
                             } else {
                                 if value.name.len() > 0 {
-                                    ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location());
+                                    ps.add_warning(ParseErrorKind::InvalidAttributeValue, value.location());
                                 }
                                 wx_else = Some(attr_name.location());
                             }
@@ -661,7 +674,7 @@ impl Element {
                     AttrPrefixKind::WxFor => {
                         if let AttrPrefixParseResult::Value(value) = attr_value {
                             if wx_for.is_some() {
-                                ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
+                                ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                             } else {
                                 wx_for = Some((attr_name.location(), value));
                             }
@@ -670,7 +683,7 @@ impl Element {
                     AttrPrefixKind::WxForIndex => {
                         if let AttrPrefixParseResult::ScopeName(s) = attr_value {
                             if wx_for_index.is_some() {
-                                ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
+                                ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                             } else {
                                 wx_for_index = Some((attr_name.location(), s));
                             }
@@ -679,7 +692,7 @@ impl Element {
                     AttrPrefixKind::WxForItem => {
                         if let AttrPrefixParseResult::ScopeName(s) = attr_value {
                             if wx_for_item.is_some() {
-                                ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
+                                ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                             } else {
                                 wx_for_item = Some((attr_name.location(), s));
                             }
@@ -688,7 +701,7 @@ impl Element {
                     AttrPrefixKind::WxKey => {
                         if let AttrPrefixParseResult::StaticStr(s) = attr_value {
                             if wx_key.is_some() {
-                                ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
+                                ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                             } else {
                                 wx_key = Some((attr_name.location(), s));
                             }
@@ -697,7 +710,7 @@ impl Element {
                     AttrPrefixKind::TemplateName => {
                         if let AttrPrefixParseResult::StaticStr(s) = attr_value {
                             if template_name.is_some() {
-                                ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
+                                ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                             } else {
                                 template_name = Some((attr_name.location(), s));
                             }
@@ -848,6 +861,37 @@ impl Element {
                                     if data.iter().find(|attr| attr.name.name_eq(&attr_name)).is_some() {
                                         ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                                     } else {
+                                        data.push(Attribute {
+                                            name: attr_name,
+                                            value,
+                                            is_model: false,
+                                            prefix_location: Some(prefix_location),
+                                        });
+                                    }
+                                }
+                            }
+                            ElementKind::Slot { .. } |
+                            ElementKind::Pure { .. } |
+                            ElementKind::For { .. } |
+                            ElementKind::If { .. } |
+                            ElementKind::TemplateRef { .. } |
+                            ElementKind::Include { .. } => {
+                                ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
+                            }
+                        }
+                    }
+                    AttrPrefixKind::DataHyphen => {
+                        match &mut element {
+                            ElementKind::Normal { data, .. } => {
+                                if let AttrPrefixParseResult::Value(value) = attr_value {
+                                    let attr_name = Ident {
+                                        name: dash_to_camel(attr_name.name.strip_prefix("data-").unwrap()).into(),
+                                        location: attr_name.location.clone(),
+                                    };
+                                    if data.iter().find(|attr| attr.name.name_eq(&attr_name)).is_some() {
+                                        ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
+                                    } else {
+                                        let prefix_location = attr_name.location.start..attr_name.location.start;
                                         data.push(Attribute {
                                             name: attr_name,
                                             value,
@@ -1037,9 +1081,9 @@ impl Element {
                     if peek == '/' || peek == '>' || Ident::is_start_char(peek) || char::is_whitespace(peek) {
                         break
                     }
+                    ps.next();
                 }
-                ps.add_warning(ParseErrorKind::IllegalAttributeName, pos..ps.position());
-                ps.skip_whitespace();
+                ps.add_warning(ParseErrorKind::InvalidAttributeName, pos..ps.position());
             }
         }
 
@@ -1071,7 +1115,7 @@ impl Element {
                     ps.add_warning(ParseErrorKind::InvalidAttribute, target.0.clone());
                 }
                 if data.1.location().end != default_attr_position {
-                    ps.add_warning(ParseErrorKind::InvalidAttribute, target.0.clone());
+                    ps.add_warning(ParseErrorKind::InvalidAttribute, data.0.clone());
                 }
                 for x in event_bindings {
                     ps.add_warning(ParseErrorKind::InvalidAttribute, x.name.location());
@@ -1106,26 +1150,34 @@ impl Element {
             }
         }
 
-        let new_children = if is_script_tag || is_import_tag {
+        let new_children = if is_script_tag {
             // parse script tag content
             let ElementKind::Include { path, .. } = &element else {
                 unreachable!();
             };
-            let pos = ps.position();
-            let cur_index = ps.cur_index();
-            loop {
-                ps.skip_until_before("</wxs");
-                match ps.peek::<5>() {
-                    None => break,
-                    Some(ch) if !Ident::is_following_char(ch) => break,
-                    _ => {}
+            let (content, content_location) = if self_close_location.is_none() {
+                let pos = ps.position();
+                let cur_index = ps.cur_index();
+                loop {
+                    ps.skip_until_before("</wxs");
+                    match ps.peek::<5>() {
+                        None => break,
+                        Some(ch) if !Ident::is_following_char(ch) => break,
+                        _ => {}
+                    }
+                    ps.skip_bytes(5);
                 }
-                ps.skip_bytes(5);
-            }
-            let content = ps.code_slice(cur_index..ps.cur_index()).to_string();
-            let content_location = pos..ps.position();
+                let content = ps.code_slice(cur_index..ps.cur_index()).to_string();
+                let content_location = pos..ps.position();
+                (content, content_location)
+            } else {
+                let pos = ps.position();
+                (String::new(), pos..pos)
+            };
             if let Some((_, module_name)) = script_module {
-                if path.1.name.is_empty() {
+                if globals.scripts.iter().find(|x| x.module_name().name_eq(&module_name)).is_some() {
+                    ps.add_warning(ParseErrorKind::DuplicatedName, module_name.location());
+                } else if path.1.name.is_empty() {
                     globals.scripts.push(Script::Inline { module_name, content, content_location })
                 } else {
                     if content.trim().len() > 0 {
@@ -1155,7 +1207,6 @@ impl Element {
             let close_with_end_tag_location = ps.try_parse(|ps| {
                 ps.skip_whitespace();
                 if ps.ended() {
-                    ps.add_warning(ParseErrorKind::MissingEndTag, start_tag_start_location.clone());
                     return None;
                 }
                 let end_tag_start_location = ps.consume_str("<").unwrap();
@@ -1178,9 +1229,12 @@ impl Element {
                 }
                 ps.skip_whitespace();
                 let end_tag_end_pos = ps.position();
-                if let Some(_) = ps.skip_until_after(">") {
-                    ps.add_warning(ParseErrorKind::UnexpectedCharacter, end_tag_end_pos..ps.position());
+                if let Some(x) = ps.skip_until_before(">") {
+                    if x.len() > 0 {
+                        ps.add_warning(ParseErrorKind::UnexpectedCharacter, end_tag_end_pos..ps.position());
+                    }
                 }
+                ps.next(); // '>'
                 let end_tag_location = (end_tag_start_location, end_tag_end_pos..ps.position());
                 Some((close_location, end_tag_location))
             });
@@ -1197,16 +1251,26 @@ impl Element {
 
         // collect include and import sources
         if !is_script_tag {
-            match &element {
+            let invalid = match &element {
                 ElementKind::Include { path, .. } => {
                     if path.1.name.is_empty() {
                         ps.add_warning(ParseErrorKind::MissingSourcePath, tag_name.location());
+                        true
                     } else {
                         let list = if is_import_tag { &mut globals.imports } else { &mut globals.includes };
                         list.push(path.1.clone());
+                        false
                     }
                 }
-                _ => {}
+                _ => false,
+            };
+            if invalid {
+                element = ElementKind::Pure {
+                    event_bindings: vec![],
+                    marks: vec![],
+                    children: vec![],
+                    slot: None,
+                };
             }
         }
 
@@ -1453,7 +1517,7 @@ impl TemplateStructure for Ident {
 
 impl Ident {
     fn is_start_char(ch: char) -> bool {
-        ('a'..='z').contains(&ch) || ('A'..='Z').contains(&ch) || ch == '_' || ch == ':'
+        ('a'..='z').contains(&ch) || ('A'..='Z').contains(&ch) || ch == '_'
     }
 
     fn is_following_char(ch: char) -> bool {
@@ -1479,12 +1543,15 @@ impl Ident {
         if !Self::is_start_char(peek) {
             return vec![];
         }
+
+        // parse segments
         let mut ret = Vec::with_capacity(2);
         let pos = ps.position();
         let mut cur_name = Self {
             name: CompactString::new_inline(""),
             location: pos..pos,
         };
+        let mut has_uppercase = false;
         loop {
             match ps.next().unwrap() {
                 ':' => {
@@ -1495,13 +1562,30 @@ impl Ident {
                     ret.push(prev);
                 }
                 ch => {
+                    if ch.is_ascii_uppercase() {
+                        has_uppercase = true;
+                    }
                     cur_name.name.push(ch);
                     cur_name.location.end = ps.position();
                 }
             }
             let Some(peek) = ps.peek::<0>() else { break };
-            if !Self::is_following_char(peek) { break };
+            if peek != ':' && !Self::is_following_char(peek) { break };
         }
+        ret.push(cur_name);
+
+        // NOTE
+        // for the compatibility with legacy framework,
+        // the names without `:` are case-insensitive,
+        // otherwise it is case-sensitive.
+        let case_sensitive = ret.len() > 1;
+        if !case_sensitive && has_uppercase {
+            ps.add_warning(ParseErrorKind::AvoidUppercaseLetters, pos..ps.position());
+            for item in &mut ret {
+                item.name = item.name.to_ascii_lowercase().into();
+            }
+        }
+
         ret
     }
 }
@@ -1673,6 +1757,7 @@ impl Value {
             return None;
         };
         let Some(expression) = Expression::parse_expression_or_object_inner(ps) else {
+            ps.add_warning_at_current_position(ParseErrorKind::MissingExpressionEnd);
             ps.skip_until_after("}}");
             return Some(Self::Static { value: CompactString::new_inline(""), location: double_brace_left.start..ps.position() });
         };
@@ -1680,11 +1765,14 @@ impl Value {
         let end_pos = ps.position();
         match ps.skip_until_before("}}") {
             None => {
-                ps.add_warning_at_current_position(ParseErrorKind::MissingExpressionEnd);
+                ps.add_warning(ParseErrorKind::MissingExpressionEnd, double_brace_left.clone());
+                return Some(Self::Static { value: CompactString::new_inline(""), location: double_brace_left.start..ps.position() });
             }
             Some(s) => {
                 if s.len() > 0 {
                     ps.add_warning(ParseErrorKind::IllegalExpression, end_pos..ps.position());
+                    ps.consume_str("}}");
+                    return Some(Self::Static { value: CompactString::new_inline(""), location: double_brace_left.start..ps.position() });
                 }
             }
         };
@@ -1812,6 +1900,15 @@ pub enum Script {
     },
 }
 
+impl Script {
+    fn module_name(&self) -> &StrName {
+        match self {
+            Self::Inline { module_name, .. } |
+            Self::GlobalRef { module_name, .. } => module_name,
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -1819,156 +1916,177 @@ mod test {
     #[test]
     fn value_parsing() {
         case!("{ {", r#"{ {"#);
-        case!("{{ a } }", "", ParseErrorKind::MissingExpressionEnd, 8..8);
+        case!("{{ a } }", "", ParseErrorKind::MissingExpressionEnd, 0..2);
         case!("{{ a b }}", "", ParseErrorKind::IllegalExpression, 5..7);
-        case!(" a\t{{ b }}", r#"{{"a\t"+b}}"#);
-        case!("{{ b }} a ", r#"{{b+' a '}}"#);
-        case!("{{ a }}{{ b }}", r#"{{a+b}}"#);
+        case!(" a\t{{ b }}", " a\t{{b}}");
+        case!("{{ b }} a ", r#"{{b}} a "#);
+        case!("{{ a }}{{ b }}", r#"{{a}}{{b}}"#);
+        case!("{{ 'a' }}", r#"a"#);
     }
 
     #[test]
     fn entities_parsing() {
-        case!("&#xG;", r#"&#xG;"#, ParseErrorKind::IllegalEntity, 0..4);
-        case!("&#x ", r#"&#x "#, ParseErrorKind::IllegalEntity, 0..3);
+        case!("&#xG;", r#"&amp;#xG;"#, ParseErrorKind::IllegalEntity, 0..4);
+        case!("&#x ", r#"&amp;#x "#, ParseErrorKind::IllegalEntity, 0..4);
         case!("&#x41;", r#"A"#);
-        case!("&#A;", r#"&#a;"#, ParseErrorKind::IllegalEntity, 0..3);
-        case!("&# ", r#"&# "#, ParseErrorKind::IllegalEntity, 0..2);
+        case!("&#A;", r#"&amp;#A;"#, ParseErrorKind::IllegalEntity, 0..3);
+        case!("&# ", r#"&amp;# "#, ParseErrorKind::IllegalEntity, 0..3);
         case!("&#97;", r#"a"#);
-        case!("&lt", r#"&lt"#);
-        case!("&lt ", r#"&lt "#);
-        case!("&lt;", r#"<"#);
+        case!("&lt", r#"&amp;lt"#);
+        case!("&lt ", r#"&amp;lt "#);
+        case!("&lt;", r#"&lt;"#);
+        case!("&gt;", r#">"#);
+        case!("&", r#"&amp;"#);
     }
 
     #[test]
     fn tag_structure() {
-        case!("<", r#"<"#);
-        case!("<-", r#"<-"#);
-        case!("<div", r#"<div></div>"#, ParseErrorKind::IncompleteTag, 4..4);
-        case!("<div ", r#"<div></div>"#, ParseErrorKind::IncompleteTag, 5..5);
-        case!("<div>", r#"<div></div>"#, ParseErrorKind::MissingEndTag, 5..5);
-        case!("<div><span></div>", r#"<div><span></span></div>"#, ParseErrorKind::MissingEndTag, 11..11);
-        case!("<div><span></span>", r#"<div><span></span></div>"#, ParseErrorKind::MissingEndTag, 18..18);
-        case!("<div >", r#"<div></div>"#, ParseErrorKind::MissingEndTag, 6..6);
-        case!("<a:div/>", r#"<wx-x></wx-x>"#, ParseErrorKind::IllegalNamePrefix, 1..2);
-        case!("<div/ ></div>", r#"<div></div>"#, ParseErrorKind::UnexpectedCharacter, 4..5);
-        case!("<div a:mark:c/>", r#"<div></div>"#, ParseErrorKind::IllegalNamePrefix, 5..6);
-        case!("<div marks:c/>", r#"<div></div>"#, ParseErrorKind::IllegalNamePrefix, 5..10);
-        case!("<div marks:/>", r#"<div></div>"#, ParseErrorKind::InvalidAttribute, 5..10);
-        case!("<div a =''/>", r#"<div a=""></div>"#, ParseErrorKind::UnexpectedWhitespace, 6..7);
-        case!("<div a= ''/>", r#"<div a=""></div>"#, ParseErrorKind::UnexpectedWhitespace, 7..8);
-        case!("<div a= {{b}}/>", r#"<div a="{{b}}"></div>"#, ParseErrorKind::UnexpectedWhitespace, 7..8);
-        case!("<div a= b/>", r#"<div a b></div>"#, ParseErrorKind::MissingAttributeValue, 7..7);
-        case!("<div a=>", r#"<div></div>"#, ParseErrorKind::MissingAttributeValue, 7..7);
-        case!("<div a=/>", r#"<div></div>"#, ParseErrorKind::MissingAttributeValue, 7..7);
-        case!("<div a=", r#"<div></div>"#, ParseErrorKind::MissingAttributeValue, 7..7);
-        case!("<div #@></div>", r#"<div></div>"#, ParseErrorKind::IllegalAttributeName, 5..7);
-        case!("<div a a></div>", r#"<div></div>"#, ParseErrorKind::DuplicatedAttribute, 7..8);
-        case!("<div></div  a=''>", r#"<div></div>"#, ParseErrorKind::UnexpectedCharacter, 12..16);
+        case!("<", r#"&lt;"#);
+        case!("<-", r#"&lt;-"#);
+        case!("<div", r#"<div/>"#, ParseErrorKind::IncompleteTag, 0..1);
+        case!("<div ", r#"<div/>"#, ParseErrorKind::IncompleteTag, 0..1);
+        case!("<div>", r#"<div/>"#, ParseErrorKind::MissingEndTag, 1..4);
+        case!("<div><span></div>", r#"<div><span/></div>"#, ParseErrorKind::MissingEndTag, 6..10);
+        case!("<div><span></span>", r#"<div><span/></div>"#, ParseErrorKind::MissingEndTag, 1..4);
+        case!("<div >", r#"<div/>"#, ParseErrorKind::MissingEndTag, 1..4);
+        case!("<a:div/>", r#"<wx-x/>"#, ParseErrorKind::IllegalNamePrefix, 1..2);
+        case!("<div/ ></div>", r#"<div/>"#, ParseErrorKind::UnexpectedCharacter, 4..5);
+        case!("<div a:mark:c/>", r#"<div/>"#, ParseErrorKind::InvalidAttributePrefix, 5..6);
+        case!("<div marks:c/>", r#"<div/>"#, ParseErrorKind::InvalidAttributePrefix, 5..10);
+        case!("<div mark:/>", r#"<div/>"#, ParseErrorKind::InvalidAttributePrefix, 5..9);
+        case!("<div a =''/>", r#"<div a/>"#, ParseErrorKind::UnexpectedWhitespace, 6..7);
+        case!("<div a= ''/>", r#"<div a/>"#, ParseErrorKind::UnexpectedWhitespace, 7..8);
+        case!("<div a= {{b}}/>", r#"<div a="{{b}}"/>"#, ParseErrorKind::UnexpectedWhitespace, 7..8);
+        case!("<div a= b/>", r#"<div a b/>"#, ParseErrorKind::MissingAttributeValue, 6..7);
+        case!("<div a=></div>", r#"<div a/>"#, ParseErrorKind::MissingAttributeValue, 6..7);
+        case!("<div a=/>", r#"<div a/>"#, ParseErrorKind::MissingAttributeValue, 6..7);
+        case!("<div a=", r#"<div a/>"#, ParseErrorKind::MissingAttributeValue, 6..7, ParseErrorKind::IncompleteTag, 0..1);
+        case!("<div #@></div>", r#"<div/>"#, ParseErrorKind::InvalidAttributeName, 5..7);
+        case!("<div a a></div>", r#"<div a/>"#, ParseErrorKind::DuplicatedAttribute, 7..8);
+        case!("<div></div  a=''>", r#"<div/>"#, ParseErrorKind::UnexpectedCharacter, 12..16);
     }
 
     #[test]
     fn normal_element() {
-        case!("<div a='1'></div>", r#"<div a="1"></div>"#);
-        case!("<div change:a='fn'></div>", r#"<div change:a="fn"></div>"#);
-        case!("<div worklet:a='fn'></div>", r#"<div worklet:a="fn"></div>"#);
-        case!("<div worklet:a='{{ a }}'></div>", r#"<div worklet:a="{{ a }}"></div>"#, ParseErrorKind::DataBindingNotAllowed, 16..23);
-        case!("<div mark:aB='fn'></div>", r#"<div mark:aB="fn"></div>"#);
-        case!("<div data:aB='fn'></div>", r#"<div data:aB="fn"></div>"#);
-        case!("<div data-a-bC='fn'></div>", r#"<div data:aBc="fn"></div>"#);
-        case!("<div generic:a='A'></div>", r#"<div generic:a="A"></div>"#);
-        case!("<div generic:a='{{ A }}'></div>", r#"<div generic:a="{{ A }}"></div>"#, ParseErrorKind::DataBindingNotAllowed, 16..23);
-        case!("<div extra-attr:a='A'></div>", r#"<div extra-attr:a="A"></div>"#);
-        case!("<div extra-attr:a='{{ A }}'></div>", r#"<div extra-attr:a="{{ A }}"></div>"#, ParseErrorKind::DataBindingNotAllowed, 19..26);
-        case!("<div slot='a'></div>", r#"<div slot="a"></div>"#);
-        case!("<div slot='{{ a }}'></div>", r#"<div slot="{{ a }}"></div>"#, ParseErrorKind::DataBindingNotAllowed, 11..18);
-        case!("<div slot:a></div>", r#"<div slot:a></div>"#);
-        case!("<div slot:a='A'></div>", r#"<div slot:a="A"></div>"#);
-        case!("<div slot:a='A '></div>", r#"<div slot:a="A "></div>"#, ParseErrorKind::InvalidIdentifier, 13..15);
+        case!("<div a='1'></div>", r#"<div a="1"/>"#);
+        case!("<div change:a='fn'></div>", r#"<div change:a="fn"/>"#);
+        case!("<div worklet:a='fn'></div>", r#"<div worklet:a="fn"/>"#);
+        case!("<div worklet:a='{{ a }}'></div>", r#"<div worklet:a="{{ a }}"/>"#, ParseErrorKind::DataBindingNotAllowed, 16..23);
+        case!("<div mark:aB='fn'></div>", r#"<div mark:aB="fn"/>"#);
+        case!("<div data:aB='fn'></div>", r#"<div data:aB="fn"/>"#);
+        case!("<div data-a-bC='fn'></div>", r#"<div data:aBc="fn"/>"#, ParseErrorKind::AvoidUppercaseLetters, 5..14);
+        case!("<div generic:a='A'></div>", r#"<div generic:a="A"/>"#);
+        case!("<div generic:a='{{ A }}'></div>", r#"<div generic:a="{{ A }}"/>"#, ParseErrorKind::DataBindingNotAllowed, 16..23);
+        case!("<div extra-attr:a='A'></div>", r#"<div extra-attr:a="A"/>"#);
+        case!("<div extra-attr:a='{{ A }}'></div>", r#"<div extra-attr:a="{{ A }}"/>"#, ParseErrorKind::DataBindingNotAllowed, 19..26);
+        case!("<div slot='a'></div>", r#"<div slot="a"/>"#);
+        case!("<div slot:a></div>", r#"<div slot:a/>"#);
+        case!("<div slot:a='A'></div>", r#"<div slot:a="A"/>"#);
+        case!("<div slot:a='A '></div>", r#"<div slot:a="A "/>"#, ParseErrorKind::InvalidIdentifier, 13..15);
     }
 
     #[test]
     fn pure_block() {
-        case!("<block> abc </block>", " abc ");
-        case!("<block a=''></block>", r#"<block></block>"#, ParseErrorKind::InvalidAttribute, 7..8);
-        case!("<div mark:aB='fn'></div>", r#"<div mark:aB="fn"></div>"#);
-        case!("<div slot='a'></div>", r#"<div slot='a'></div>"#);
+        case!("<block> abc </block>", "<block> abc </block>");
+        case!("<block a=''></block>", r#"<block/>"#, ParseErrorKind::InvalidAttribute, 7..8);
+        case!("<block mark:aB='fn'></block>", r#"<block mark:aB="fn"/>"#);
+        case!("<block slot='a'></block>", r#"<block slot="a"/>"#);
     }
 
     #[test]
     fn for_list() {
+        case!("<block wx:for='{{ a }}' wx:for-item />", r#"<block wx:for="{{a}}"/>"#, ParseErrorKind::InvalidIdentifier, 35..35);
         case!("<block wx:for='{{ a }}'> abc </block>", r#"<block wx:for="{{a}}"> abc </block>"#);
         case!("<div wx:for='{{ a }}'> a </div>", r#"<block wx:for="{{a}}"><div> a </div></block>"#);
-        case!("<block wx:for='{{ a }}' wx:for-index='i' wx:for-item='j' wx:key='t'></block>", r#"<block wx:for="{{a}}" wx:for-index='i' wx:for-item="j" wx:key="t"></block>"#);
-        case!("<block wx:for='{{ a }}' wx:for-index='i '></block>", r#"<block wx:for="{{a}}" wx:for-index='i '></block>"#, ParseErrorKind::InvalidIdentifier, 38..40);
-        case!("<block wx:for='{{ a }}' wx:for-item='i '></block>", r#"<block wx:for="{{a}}" wx:for-item='i '></block>"#, ParseErrorKind::InvalidIdentifier, 37..39);
-        case!("<block wx:for='{{ a }}' wx:key='i '></block>", r#"<block wx:for="{{a}}" wx:key='i '></block>"#, ParseErrorKind::InvalidIdentifier, 32..34);
-        case!("<block wx:for='{{ a }}' wx:key='i '></block>", r#"<block wx:for="{{a}}" wx:key='i '></block>"#, ParseErrorKind::InvalidIdentifier, 32..34);
+        case!("<block wx:for='{{ a }}' wx:for-index='i' wx:for-item='j' wx:key='t'></block>", r#"<block wx:for="{{a}}" wx:for-item="j" wx:for-index="i" wx:key="t"/>"#);
+        case!("<block wx:for='{{ a }}' wx:for-index='i '></block>", r#"<block wx:for="{{a}}" wx:for-index="i "/>"#, ParseErrorKind::InvalidIdentifier, 38..40);
+        case!("<block wx:for='{{ a }}' wx:for-item='i '></block>", r#"<block wx:for="{{a}}" wx:for-item="i "/>"#, ParseErrorKind::InvalidIdentifier, 37..39);
+        case!("<block wx:for='{{ a }}' wx:key='{{ i }}'></block>", r#"<block wx:for="{{a}}" wx:key="{{ i }}"/>"#, ParseErrorKind::DataBindingNotAllowed, 32..39);
     }
 
     #[test]
     fn if_group() {
-        case!("<block wx:if='{{a}}'> abc </block>", r#"<block wx:if='{{a}}'> abc </block>"#);
-        case!("<block wx:if='{{a}}'> abc </block><div wx:else/>", r#"<block wx:if='{{a}}'> abc </block><block wx:else><div></div></block>"#);
-        case!("<block wx:if='{{a}}'> abc </block><div wx:elif='{{ b }}'/>", r#"<block wx:if='{{a}}'> abc </block><block wx:elif='{{b}}'><div></div></block>"#);
-        case!("<block wx:if='{{a}}'> abc </block><div wx:elif='{{ b }}'/><block wx:else>A</block>", r#"<block wx:if='{{a}}'> abc </block><block wx:elif='{{b}}'><div></div></block><block wx:else>A</block>"#);
-        case!("<block wx:elif='{{a}}'> abc </block>", r#" abc "#, ParseErrorKind::IllegalAttributeValue, 10..14);
-        case!("<block wx:else> abc </block>", r#" abc "#, ParseErrorKind::IllegalAttributeValue, 10..14);
-        case!("<block wx:if=''/><block wx:else=' '/>", r#"<block wx:if=""></block><block wx:else></block>"#, ParseErrorKind::IllegalAttributeValue, 33..34);
-        case!("<block wx:if=''/><div wx:for='' wx:else />", r#"<block wx:if=""/><div wx:for=""/>"#, ParseErrorKind::InvalidAttribute, 35..39);
-        case!("<block wx:if=''/><include src='a' wx:else />", r#"<block wx:if=""/><include src='a'/>"#, ParseErrorKind::InvalidAttribute, 37..41);
+        case!("<block wx:if='{{a}}'> abc </block>", r#"<block wx:if="{{a}}"> abc </block>"#);
+        case!("<block wx:if='{{a}}'> abc </block><div wx:else/>", r#"<block wx:if="{{a}}"> abc </block><block wx:else><div/></block>"#);
+        case!("<block wx:if='{{a}}'> abc </block><div wx:elif='{{ b }}'/>", r#"<block wx:if="{{a}}"> abc </block><block wx:elif="{{b}}"><div/></block>"#);
+        case!("<block wx:if='{{a}}'> abc </block><div wx:elif='{{ b }}'/><block wx:else>A</block>", r#"<block wx:if="{{a}}"> abc </block><block wx:elif="{{b}}"><div/></block><block wx:else>A</block>"#);
+        case!("<block wx:elif='{{a}}'> abc </block>", r#"<block> abc </block>"#, ParseErrorKind::InvalidAttribute, 7..14);
+        case!("<block wx:else> abc </block>", r#"<block> abc </block>"#, ParseErrorKind::InvalidAttribute, 7..14);
+        case!("<block wx:if=''/><block wx:else=' '/>", r#"<block wx:if/><block wx:else/>"#, ParseErrorKind::InvalidAttributeValue, 33..34);
+        case!("<block wx:if=''/><div wx:for='' wx:else />", r#"<block wx:if/><block wx:for><div/></block>"#, ParseErrorKind::InvalidAttribute, 32..39);
+        case!("<block wx:if=''/><include src='a' wx:else />", r#"<block wx:if/><block wx:else><include src="a"/></block>"#);
     }
 
     #[test]
     fn template() {
-        case!("<template />", r#"<template is=""></template>"#, ParseErrorKind::MissingModuleName, 1..9);
-        case!("<template a='' is='a' />", r#"<template is="a"></template>"#, ParseErrorKind::InvalidAttribute, 10..11);
-        case!("<template is='a' data='{{ ...a }}' /><template name='a'> abc </template>", r#"<template name="a"> abc </template><template is="a" data="{{ ...a }}"></template>"#);
-        case!("<template name='a' is='a' />", r#"<template name="a"></template>"#, ParseErrorKind::DuplicatedName, 19..21);
-        case!("<template name='a' data='{{ ...a }}' />", r#"<template name="a"></template>"#, ParseErrorKind::DuplicatedName, 19..23);
-        case!("<template name='a'/><template name='a'/>", r#"<template name="a"></template>"#, ParseErrorKind::DuplicatedName, 36..37);
-        case!("<template name='a' wx:for='' />", r#"<template name="a"></template>"#, ParseErrorKind::InvalidAttribute, 22..25);
-        case!("<template name='a' wx:if='' />", r#"<template name="a"></template>"#, ParseErrorKind::InvalidAttribute, 22..24);
-        case!("<template is='a'><div/></template>", r#"<template is='a'></template>"#, ParseErrorKind::ChildNodesNotAllowed, 33..39);
-        case!("<template is='a' bind:a />", r#"<template is='a' bind:a></template>"#);
-        case!("<template is='a' mark:a />", r#"<template is='a' mark:a></template>"#);
-        case!("<template is='a' slot='a' />", r#"<template is='a' slot='a'></template>"#);
-        case!("<template name='a' bind:a />", r#"<template name='a'></template>"#, ParseErrorKind::InvalidAttribute, 19..23);
-        case!("<template name='a' mark:a />", r#"<template name='a'></template>"#, ParseErrorKind::InvalidAttribute, 19..23);
-        case!("<template name='a' slot='a' />", r#"<template name='a'></template>"#, ParseErrorKind::InvalidAttribute, 19..23);
+        case!("<template />", r#"<template is/>"#, ParseErrorKind::MissingModuleName, 9..9);
+        case!("<template a='' is='a' />", r#"<template is="a"/>"#, ParseErrorKind::InvalidAttribute, 10..11);
+        case!("<template is='a' data='{{ ...a }}' /><template name='a'> abc </template>", r#"<template name="a"> abc </template><template is="a" data="{{{...a}}}"/>"#);
+        case!("<template name='a' is='a' />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 19..21);
+        case!("<template name='a' data='{{ ...a }}' />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 19..23);
+        case!("<template name='a'/><template name='a'/>", r#"<template name="a"/>"#, ParseErrorKind::DuplicatedName, 36..37);
+        case!("<template name='a' wx:for='' />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 19..25);
+        case!("<template name='a' wx:if='' />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 19..24);
+        case!("<template is='a'><div/></template>", r#"<template is="a"/>"#, ParseErrorKind::ChildNodesNotAllowed, 17..23);
+        case!("<template is='a' bind:a />", r#"<template is="a" bind:a/>"#);
+        case!("<template is='a' mark:a />", r#"<template is="a" mark:a/>"#);
+        case!("<template is='a' slot='a' />", r#"<template is="a" slot="a"/>"#);
+        case!("<template name='a' bind:a />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 19..25);
+        case!("<template name='a' mark:a />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 19..25);
+        case!("<template name='a' slot='a' />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 19..23);
     }
 
     #[test]
     fn include() {
-        case!("<include src='a' />", r#"<include src="a"></include>"#);
-        case!("<include a='' src='a' />", r#"<include src="a"></include>"#, ParseErrorKind::InvalidAttribute, 9..10);
-        case!("<include src='a'><div/></include>", r#"<include></include>"#, ParseErrorKind::ChildNodesNotAllowed, 17..23);
-        case!("<include src='a' catch:a />", r#"<include src='a' catch:a></include>"#);
-        case!("<include src='a' mark:a />", r#"<include src='a' mark:a></include>"#);
-        case!("<include src='a' slot='a' />", r#"<include src='a' slot='a'></include>"#);
+        case!("<include/>", r#"<block/>"#, ParseErrorKind::MissingSourcePath, 1..8);
+        case!("<include src='a' />", r#"<include src="a"/>"#);
+        case!("<include src='a' src />", r#"<include src="a"/>"#, ParseErrorKind::DuplicatedAttribute, 17..20);
+        case!("<include a='' src='a' />", r#"<include src="a"/>"#, ParseErrorKind::InvalidAttribute, 9..10);
+        case!("<include src='a'><div/></include>", r#"<include src="a"/>"#, ParseErrorKind::ChildNodesNotAllowed, 17..23);
+        case!("<include src='a' catch:a />", r#"<include src="a" catch:a/>"#);
+        case!("<include src='a' mark:a />", r#"<include src="a" mark:a/>"#);
+        case!("<include src='a' slot='a' />", r#"<include src="a" slot="a"/>"#);
     }
 
     #[test]
     fn slot() {
-        case!("<slot a='a'></slot>", r#"<slot a="a"></slot>"#, ParseErrorKind::ChildNodesNotAllowed, 6..12);
-        case!("<slot><div/></slot>", r#"<slot></slot>"#, ParseErrorKind::ChildNodesNotAllowed, 6..12);
-        case!("<slot mut-bind:a />", r#"<slot mut-bind:a></slot>"#);
-        case!("<slot mark:a />", r#"<slot mark:a></slot>"#);
-        case!("<slot slot='a' />", r#"<slot slot='a'></slot>"#);
+        case!("<slot a='a'></slot>", r#"<slot a="a"/>"#);
+        case!("<slot><div/></slot>", r#"<slot/>"#, ParseErrorKind::ChildNodesNotAllowed, 6..12);
+        case!("<slot mut-bind:a />", r#"<slot mut-bind:a/>"#);
+        case!("<slot mark:a />", r#"<slot mark:a/>"#);
+        case!("<slot slot='a' />", r#"<slot slot="a"/>"#);
     }
 
     #[test]
     fn import() {
-        case!("<import src='a' />", r#"<import src="a"></import>"#);
-        case!("<import src='a' a />", r#"<import src="a"></import>"#, ParseErrorKind::InvalidAttribute, 16..17);
-        case!("<import />", r#"<import src="a"></import>"#, ParseErrorKind::MissingSourcePath, 1..7);
-        case!("<import src='a'><div/></import>", r#"<import src="a"></import>"#, ParseErrorKind::ChildNodesNotAllowed, 16..22);
+        case!("<import src='a' />", r#"<import src="a"/>"#);
+        case!("<import src='a' a />", r#"<import src="a"/>"#, ParseErrorKind::InvalidAttribute, 16..17);
+        case!("<import src='a' src='b' />", r#"<import src="a"/>"#, ParseErrorKind::DuplicatedAttribute, 16..19);
+        case!("<import />", r#""#, ParseErrorKind::MissingSourcePath, 1..7);
+        case!("<import src='a'><div/></import>", r#"<import src="a"/>"#, ParseErrorKind::ChildNodesNotAllowed, 16..22);
     }
 
     #[test]
     fn script() {
+        case!("<wxs />", r#""#, ParseErrorKind::MissingModuleName, 1..4);
+        case!("<wxs module='a'> <wxs></wxsa </wxs>", r#"<wxs module="a"> <wxs>< /wxsa </wxs>"#);
         case!("<wxs src='a' module='a' />", r#"<wxs module="a" src="a"/>"#);
         case!("<wxs src='a' a module='a' />", r#"<wxs module="a" src="a"/>"#, ParseErrorKind::InvalidAttribute, 13..14);
         case!("<wxs module='a' /><wxs module='a' src='a' />", r#"<wxs module="a"/>"#, ParseErrorKind::DuplicatedName, 31..32);
-        case!("<wxs src='a' module='a'><div/></wxs>", r#"<wxs module="a" src="a"/>"#, ParseErrorKind::ChildNodesNotAllowed, 13..19);
+        case!("<wxs src='a' module='a'><div/></wxs>", r#"<wxs module="a" src="a"/>"#, ParseErrorKind::ChildNodesNotAllowed, 24..30);
+    }
+
+    #[test]
+    fn parsing_line_col() {
+        let (_, ps) = crate::parse::parse("TEST", "<wxs module='a'>\n\n'字'</wxs><div");
+        assert_eq!(
+            ps.warnings().next().unwrap().location,
+            Position { line: 3, utf16_col: 9 } .. Position { line: 3, utf16_col: 10 },
+        );
+        let (_, ps) = crate::parse::parse("TEST", "{{ \n '' + \n'字'}}<div");
+        assert_eq!(
+            ps.warnings().next().unwrap().location,
+            Position { line: 3, utf16_col: 5 } .. Position { line: 3, utf16_col: 6 },
+        );
     }
 }

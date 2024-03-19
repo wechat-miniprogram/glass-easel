@@ -42,3 +42,19 @@ pub(crate) fn escape_html_quote(s: &str) -> Cow<'_, str> {
 pub(crate) fn gen_lit_str(s: &str) -> String {
     format!("{:?}", s)
 }
+
+pub(crate) fn dash_to_camel(s: &str) -> String {
+    let mut camel_name = String::new();
+    let mut next_upper = false;
+    for c in s.chars() {
+        if c == '-' {
+            next_upper = true;
+        } else if next_upper {
+            next_upper = false;
+            camel_name.push(c.to_ascii_uppercase());
+        } else {
+            camel_name.push(c);
+        }
+    }
+    camel_name
+}

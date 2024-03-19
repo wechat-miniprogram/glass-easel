@@ -11,16 +11,20 @@ impl Stringify for Template {
         for import in globals.imports.iter() {
             stringifier.write_str(r#"<import src="#)?;
             stringifier.write_str_name_quoted(import)?;
-            stringifier.write_str(r#">"#)?;
+            stringifier.write_str(r#"/>"#)?;
         }
         for script in globals.scripts.iter() {
             match script {
                 Script::Inline { module_name, content, content_location } => {
                     stringifier.write_str(r#"<wxs module="#)?;
                     stringifier.write_str_name_quoted(module_name)?;
-                    stringifier.write_str(r#">"#)?;
-                    stringifier.write_token(&content.replace("</wxs", "< /wxs"), content, content_location)?;
-                    stringifier.write_str(r#"</wxs>"#)?;
+                    if content.len() > 0 {
+                        stringifier.write_str(r#">"#)?;
+                        stringifier.write_token(&content.replace("</wxs", "< /wxs"), content, content_location)?;
+                        stringifier.write_str(r#"</wxs>"#)?;
+                    } else {
+                        stringifier.write_str(r#"/>"#)?;
+                    }
                 }
                 Script::GlobalRef { module_name, path } => {
                     stringifier.write_str(r#"<wxs module="#)?;
@@ -34,11 +38,18 @@ impl Stringify for Template {
         for (template_name, nodes) in globals.sub_templates.iter() {
             stringifier.write_str(r#"<template name="#)?;
             stringifier.write_str_name_quoted(template_name)?;
-            stringifier.write_str(r#">"#)?;
-            for node in nodes {
-                node.stringify_write(stringifier)?;
+            if nodes.len() > 0 {
+                stringifier.write_str(r#">"#)?;
+                for node in nodes {
+                    node.stringify_write(stringifier)?;
+                }
+                stringifier.write_str(r#"</template>"#)?;
+            } else {
+                stringifier.write_str(r#"/>"#)?;
             }
-            stringifier.write_str(r#"</template>"#)?;
+        }
+        for node in self.content.iter() {
+            node.stringify_write(stringifier)?;
         }
         Ok(())
     }
@@ -63,6 +74,12 @@ impl Stringify for Node {
 impl Stringify for Element {
     fn stringify_write<'s, W: FmtWrite>(&self, stringifier: &mut Stringifier<'s, W>) -> FmtResult {
         // attribute writers
+        fn is_empty_value(value: &Value) -> bool {
+            match value {
+                Value::Static { value, .. } => value.is_empty(),
+                Value::Dynamic { .. } => false,
+            }
+        }
         let write_attr = |
             stringifier: &mut Stringifier<'s, W>,
             prefix: Option<(&str, &Range<Position>)>,
@@ -73,7 +90,9 @@ impl Stringify for Element {
             if let Some((p, loc)) = prefix {
                 stringifier.write_token(p, p, loc)?;
                 stringifier.write_str(":")?;
-                stringifier.write_ident(name)?;
+            }
+            stringifier.write_ident(name)?;
+            if !is_empty_value(value) {
                 stringifier.write_str(r#"=""#)?;
                 value.stringify_write(stringifier)?;
                 stringifier.write_str(r#"""#)?;
@@ -90,7 +109,9 @@ impl Stringify for Element {
             if let Some((p, loc)) = prefix {
                 stringifier.write_token(p, p, loc)?;
                 stringifier.write_str(":")?;
-                stringifier.write_ident(name)?;
+            }
+            stringifier.write_ident(name)?;
+            if value.name.len() > 0 {
                 stringifier.write_str(r#"="#)?;
                 stringifier.write_str_name_quoted(value)?;
             }
@@ -102,10 +123,13 @@ impl Stringify for Element {
             location: &Range<Position>,
             value: &Value,
         | -> FmtResult {
+            stringifier.write_str(" ")?;
             stringifier.write_token(name, name, location)?;
-            stringifier.write_str(r#"=""#)?;
-            value.stringify_write(stringifier)?;
-            stringifier.write_str(r#"""#)?;
+            if !is_empty_value(value) {
+                stringifier.write_str(r#"=""#)?;
+                value.stringify_write(stringifier)?;
+                stringifier.write_str(r#"""#)?;
+            }
             Ok(())
         };
         let write_named_static_attr = |
@@ -114,9 +138,12 @@ impl Stringify for Element {
             location: &Range<Position>,
             value: &StrName,
         | -> FmtResult {
+            stringifier.write_str(" ")?;
             stringifier.write_token(name, name, location)?;
-            stringifier.write_str(r#"="#)?;
-            stringifier.write_str_name_quoted(value)?;
+            if value.name.len() > 0 {
+                stringifier.write_str(r#"="#)?;
+                stringifier.write_str_name_quoted(value)?;
+            }
             Ok(())
         };
         let write_event_bindings = |
@@ -175,6 +202,7 @@ impl Stringify for Element {
             if let Some((loc, children)) = else_branch.as_ref() {
                 stringifier.write_token("<", "<", &self.start_tag_location.0)?;
                 stringifier.write_str("block")?;
+                stringifier.write_str(" ")?;
                 stringifier.write_token("wx:else", "wx:else", loc)?;
                 if children.len() > 0 {
                     stringifier.write_token(">", ">", &self.start_tag_location.1)?;
@@ -231,9 +259,6 @@ impl Stringify for Element {
                         todo!()
                     }
                 }
-                if let Some((loc, value)) = slot.as_ref() {
-                    write_named_attr(stringifier, "slot", loc, value)?;
-                }
                 for attr in attributes.iter() {
                     let prefix = attr.is_model.then_some(("model", attr.prefix_location.as_ref().unwrap_or(&attr.name.location)));
                     write_attr(stringifier, prefix, &attr.name, &attr.value)?;
@@ -254,7 +279,7 @@ impl Stringify for Element {
                     write_static_attr(stringifier, Some(("generic", &attr.prefix_location)), &attr.name, &attr.value)?;
                 }
                 for attr in extra_attr.iter() {
-                    write_static_attr(stringifier, Some(("extra_attr", &attr.prefix_location)), &attr.name, &attr.value)?;
+                    write_static_attr(stringifier, Some(("extra-attr", &attr.prefix_location)), &attr.name, &attr.value)?;
                 }
                 for attr in slot_value_refs.iter() {
                     write_static_attr(stringifier, Some(("slot", &attr.prefix_location)), &attr.name, &attr.value)?;
@@ -278,9 +303,15 @@ impl Stringify for Element {
             } => {
                 stringifier.write_str("block")?;
                 write_named_attr(stringifier, "wx:for", &list.0, &list.1)?;
-                write_named_static_attr(stringifier, "wx:for-item", &item_name.0, &item_name.1)?;
-                write_named_static_attr(stringifier, "wx:for-index", &index_name.0, &index_name.1)?;
-                write_named_static_attr(stringifier, "wx:key", &key.0, &key.1)?;
+                if !item_name.1.name.is_empty() {
+                    write_named_static_attr(stringifier, "wx:for-item", &item_name.0, &item_name.1)?;
+                }
+                if !index_name.1.name.is_empty() {
+                    write_named_static_attr(stringifier, "wx:for-index", &index_name.0, &index_name.1)?;
+                }
+                if !key.1.name.is_empty() {
+                    write_named_static_attr(stringifier, "wx:key", &key.0, &key.1)?;
+                }
             }
             ElementKind::If { .. } => unreachable!(),
             ElementKind::TemplateRef {
@@ -292,8 +323,9 @@ impl Stringify for Element {
             } => {
                 stringifier.write_str("template")?;
                 write_named_attr(stringifier, "is", &target.0, &target.1)?;
-                write_named_attr(stringifier, "data", &data.0, &data.1)?;
-                stringifier.write_str("block")?;
+                if !data.1.is_empty() {
+                    write_named_attr(stringifier, "data", &data.0, &data.1)?;
+                }
                 write_event_bindings(stringifier, event_bindings, marks, slot)?;
             }
             ElementKind::Include { path, event_bindings, marks, slot } => {
@@ -356,7 +388,7 @@ impl Stringify for Value {
         match self {
             Self::Static { value, location } => {
                 let quoted = escape_html_body(&value);
-                stringifier.write_token(&format!(r#""{}""#, quoted), &value, &location)?;
+                stringifier.write_token(&format!("{}", quoted), &value, &location)?;
             }
             Self::Dynamic { expression, double_brace_location, binding_map_keys: _ } => {
                 fn split_expression<'s, W: FmtWrite>(

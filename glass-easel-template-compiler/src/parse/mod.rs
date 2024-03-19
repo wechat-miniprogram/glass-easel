@@ -8,17 +8,34 @@ macro_rules! case {
         {
             use crate::stringify::Stringify;
             let src: &str = $src;
-            let (template, ps) = $crate::parse::parse(src, "TEST");
+            let expect: &str = $expect;
+
+            // parse and check warnings
+            let (template, ps) = $crate::parse::parse("TEST", src);
+            dbg!(&template); // !!!
             let mut warnings = ps.warnings();
             $(
-                let err = warnings.next().unwrap();
+                let next = warnings.next();
+                assert!(next.is_some());
+                let err = next.unwrap();
                 assert_eq!(err.kind, $msg);
                 assert_eq!(err.location.start.utf16_col..err.location.end.utf16_col, $range);
             )*
-            assert!(warnings.next().is_none());
+            assert_eq!(warnings.next(), None);
+
+            // check stringify result
             let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src);
             template.stringify_write(&mut stringifier).unwrap();
-            assert_eq!(stringifier.finish().as_str(), $expect);
+            let (stringify_result, sourcemap) = stringifier.finish();
+            let _ = sourcemap; // TODO check sourcemap
+            assert_eq!(stringify_result.as_str(), $expect);
+
+            // re-parse and then stringify
+            let (template, ps) = $crate::parse::parse("TEST", expect);
+            assert_eq!(ps.warnings().next(), None);
+            let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src);
+            template.stringify_write(&mut stringifier).unwrap();
+            assert_eq!(stringifier.finish().0.as_str(), expect);
         }
     };
 }
@@ -259,7 +276,10 @@ impl<'s> ParseState<'s> {
         if self.auto_skip_whitespace { self.skip_whitespace(); }
         let mut i = self.cur_str().char_indices();
         let (_, ret) = i.next()?;
-        self.cur_index += i.next().map(|(p, _)| p).unwrap_or(0);
+        self.cur_index += match i.next() {
+            Some((p, _)) => p,
+            None => self.cur_str().len(),
+        };
         if ret == '\n' {
             self.line += 1;
             self.utf16_col = 0;
@@ -330,7 +350,7 @@ impl Position {
 }
 
 /// Template parsing error object.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ParseError {
     pub path: String,
     pub kind: ParseErrorKind,
@@ -364,12 +384,13 @@ pub enum ParseErrorKind {
     IncompleteTag,
     MissingEndTag,
     IllegalNamePrefix,
-    IllegalAttributePrefix,
-    IllegalAttributeName,
-    IllegalAttributeValue,
+    InvalidAttributePrefix,
+    InvalidAttributeName,
+    InvalidAttributeValue,
     InvalidAttribute,
     DuplicatedAttribute,
     DuplicatedName,
+    AvoidUppercaseLetters,
     UnexpectedWhitespace,
     MissingAttributeValue,
     DataBindingNotAllowed,
@@ -394,12 +415,13 @@ impl ParseErrorKind {
             Self::IncompleteTag => "incomplete tag",
             Self::MissingEndTag => "missing end tag",
             Self::IllegalNamePrefix => "illegal name prefix",
-            Self::IllegalAttributePrefix => "illegal attribute prefix",
-            Self::IllegalAttributeName => "illegal attribute name",
-            Self::IllegalAttributeValue => "illegal attribute value",
+            Self::InvalidAttributePrefix => "invalid attribute prefix",
+            Self::InvalidAttributeName => "invalid attribute name",
+            Self::InvalidAttributeValue => "invalid attribute value",
             Self::InvalidAttribute => "invalid attribute",
             Self::DuplicatedAttribute => "duplicated attribute",
             Self::DuplicatedName => "duplicated name",
+            Self::AvoidUppercaseLetters => "avoid uppercase letters",
             Self::UnexpectedWhitespace => "unexpected whitespace",
             Self::MissingAttributeValue => "missing attribute value",
             Self::DataBindingNotAllowed => "data bindings are not allowed for this attribute",

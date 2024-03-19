@@ -346,15 +346,19 @@ impl Expression {
             let mut is_object_inner = false;
             ps.try_parse(|ps| -> Option<()> {
                 // try parse as an object
-                Self::try_parse_field_name(ps)?;
-                let peek = ps.peek::<0>()?;
-                if peek == ':' || peek == ',' {
-                    is_object_inner = true
-                } else if peek == '.' {
-                    if ps.peek_str("...") {
-                        is_object_inner = true
+                match Self::try_parse_field_name(ps) {
+                    Some(_) => {
+                        let peek = ps.peek::<0>()?;
+                        if peek == ':' || peek == ',' {
+                            is_object_inner = true;
+                        }
                     }
-                };
+                    None => {
+                        if ps.peek_str("...") {
+                            is_object_inner = true;
+                        }
+                    }
+                }
                 None
             });
             if is_object_inner {
@@ -1016,9 +1020,9 @@ mod test {
     #[test]
     fn lit_str() {
         case!("{{ '", "", ParseErrorKind::MissingExpressionEnd, 4..4);
-        case!(r#"{{ 'a\n\u0041\x4f\x4E' }}"#, "{{\"a\nAON\"}}");
-        case!(r#"{{ 'a\n\u0' }}"#, "{{\"a\nAON\"}}");
-        case!(r#"{{ "" }}"#, "{{\"\"}}");
+        case!(r#"{{ 'a\n\u0041\x4f\x4E' }}"#, "a\nAON");
+        case!(r#"{{ 'a\n\u0' }}"#, "a\n 0", ParseErrorKind::IllegalEscapeSequence, 9..11);
+        case!(r#"{{ "" }}"#, "");
     }
 
     #[test]
@@ -1114,15 +1118,15 @@ mod test {
 
     #[test]
     fn positive() {
-        case!("{{ + a.b }}", "{{+a.b}}");
-        case!("{{ + + a }}", "{{++a}}");
+        case!("{{ + a.b }}", "{{ +a.b}}");
+        case!("{{ + + a }}", "{{+ +a}}");
         case!("{{ ++ a }}", "", ParseErrorKind::UnexpectedCharacter, 3..3);
     }
 
     #[test]
     fn negative() {
-        case!("{{ - a.b }}", "{{-a.b}}");
-        case!("{{ - - a }}", "{{--a}}");
+        case!("{{ - a.b }}", "{{ -a.b}}");
+        case!("{{ - - a }}", "{{- -a}}");
         case!("{{ -- a }}", "", ParseErrorKind::UnexpectedCharacter, 3..3);
     }
 

@@ -1,5 +1,6 @@
 use std::{fmt::{Result as FmtResult, Write as FmtWrite}, ops::Range};
 
+pub use sourcemap::SourceMap;
 use sourcemap::SourceMapBuilder;
 
 use crate::{escape::escape_html_quote, parse::{
@@ -31,8 +32,9 @@ impl<'s, W: FmtWrite> Stringifier<'s, W> {
         }
     }
 
-    pub fn finish(self) -> W {
-        self.w
+    pub fn finish(self) -> (W, SourceMap) {
+        let sourcemap = self.smb.into_sourcemap();
+        (self.w, sourcemap)
     }
 
     fn write_str(&mut self, s: &str) -> FmtResult {
