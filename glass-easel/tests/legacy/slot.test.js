@@ -378,11 +378,18 @@ const testCases = function (testBackend) {
       expect(elem3.getComposedParent()).toBe(slot0)
       matchElementWithDom(elem)
 
+      var elem4 = root.shadowRoot.createNativeNode('elem4')
+      elem4.slot = '1'
+      elem.appendChild(elem4)
+      expect(elem4.getComposedParent()).toBe(null)
+      matchElementWithDom(elem)
+
       elem.shadowRoot.appendChild(slot1)
       expect(slot1.getComposedParent()).toBe(elem.shadowRoot)
-      expect(slot1.getComposedChildren()).toStrictEqual([elem2])
+      expect(slot1.getComposedChildren()).toStrictEqual([elem2, elem4])
       expect(elem2.getComposedParent()).toBe(slot1)
       expect(elem3.getComposedParent()).toBe(slot0)
+      expect(elem4.getComposedParent()).toBe(slot1)
       matchElementWithDom(elem)
     })
 
