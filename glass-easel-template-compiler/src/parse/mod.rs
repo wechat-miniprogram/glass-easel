@@ -25,8 +25,7 @@ macro_rules! case {
             // check stringify result
             let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src);
             template.stringify_write(&mut stringifier).unwrap();
-            let (stringify_result, sourcemap) = stringifier.finish();
-            let _ = sourcemap; // TODO check sourcemap
+            let (stringify_result, _sourcemap) = stringifier.finish();
             assert_eq!(stringify_result.as_str(), expect);
 
             // re-parse and then stringify

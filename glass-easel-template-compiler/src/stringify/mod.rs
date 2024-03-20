@@ -25,7 +25,7 @@ impl<'s, W: FmtWrite> Stringifier<'s, W> {
         smb.set_source_contents(source_id, Some(source));
         Self {
             w,
-            line: 0,
+            line: 1,
             utf16_col: 0,
             smb,
             source_path,
@@ -51,14 +51,18 @@ impl<'s, W: FmtWrite> Stringifier<'s, W> {
     }
 
     fn write_token(&mut self, dest_text: &str, source_text: &str, location: &Range<Position>) -> FmtResult {
-        self.smb.add(self.line + 1, self.utf16_col, location.start.line + 1, location.start.utf16_col, Some(self.source_path), Some(source_text));
+        dbg!(self.line, self.utf16_col, location.start.line, location.start.utf16_col);
+        self.smb.add(self.line, self.utf16_col, location.start.line, location.start.utf16_col, Some(self.source_path), Some(source_text));
         self.write_str(dest_text)?;
         Ok(())
     }
 
     fn write_str_name_quoted(&mut self, n: &StrName) -> FmtResult {
         let quoted = escape_html_quote(&n.name);
-        self.write_token(&format!(r#""{}""#, quoted), &n.name, &n.location())
+        self.write_str("\"")?;
+        self.write_token(&quoted, &n.name, &n.location())?;
+        self.write_str("\"")?;
+        Ok(())
     }
 
     fn write_ident(&mut self, n: &Ident) -> FmtResult {

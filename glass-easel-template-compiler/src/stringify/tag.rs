@@ -435,3 +435,52 @@ impl Stringify for Value {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::stringify::Stringify;
+
+    #[test]
+    fn sourcemap_location() {
+        let src = r#"
+            <template is="a" />
+            <template name="a">
+                <a href="/"> A </a>
+            </template>
+        "#;
+        let (template, _) = crate::parse::parse("TEST", src);
+        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src);
+        template.stringify_write(&mut stringifier).unwrap();
+        let (output, sourcemap) = stringifier.finish();
+        assert_eq!(output.as_str(), r#"<template name="a"><a href="/"> A </a></template><template is="a"/>"#);
+        let mut expects = vec![
+            (3, 28, 1, 16, "a"),
+            (4, 16, 1, 19, "<"),
+            (4, 17, 1, 20, "a"),
+            (4, 19, 1, 22, "href"),
+            (4, 25, 1, 28, "/"),
+            (4, 27, 1, 30, ">"),
+            (4, 28, 1, 31, " A "),
+            (4, 31, 1, 34, "<"),
+            (4, 32, 1, 35, "/"),
+            (4, 17, 1, 36, "a"),
+            (4, 34, 1, 37, ">"),
+            (2, 12, 1, 49, "<"),
+            (2, 22, 1, 59, "is"),
+            (2, 26, 1, 63, "a"),
+            (2, 29, 1, 65, "/"),
+            (2, 30, 1, 66, ">"),
+        ].into_iter();
+        for token in sourcemap.tokens() {
+            let token = (
+                token.get_src_line(),
+                token.get_src_col(),
+                token.get_dst_line(),
+                token.get_dst_col(),
+                token.get_name().unwrap(),
+            );
+            assert_eq!(Some(token), expects.next());
+        }
+        assert!(expects.next().is_none());
+    }
+}

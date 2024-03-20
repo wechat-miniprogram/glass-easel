@@ -98,7 +98,15 @@ impl Node {
                 if ch == '/' || ch == '!' || Ident::is_start_char(ch) { return true; }
                 false
             });
-            ret.push(Node::Text(value));
+            let is_whitespace = match &value {
+                Value::Static { value, .. } => {
+                    value.trim().is_empty()
+                }
+                Value::Dynamic { .. } => false,
+            };
+            if !is_whitespace {
+                ret.push(Node::Text(value));
+            }
         }
     }
 }
