@@ -1771,7 +1771,7 @@ impl Value {
             }
             Some(s) => {
                 if s.len() > 0 {
-                    ps.add_warning(ParseErrorKind::IllegalExpression, end_pos..ps.position());
+                    ps.add_warning(ParseErrorKind::UnexpectedExpressionCharacter, end_pos..end_pos);
                     ps.consume_str("}}");
                     return Some(Self::Static { value: CompactString::new_inline(""), location: double_brace_left.start..ps.position() });
                 }
@@ -1918,7 +1918,7 @@ mod test {
     fn value_parsing() {
         case!("{ {", r#"{ {"#);
         case!("{{ a } }", "", ParseErrorKind::MissingExpressionEnd, 0..2);
-        case!("{{ a b }}", "", ParseErrorKind::IllegalExpression, 5..7);
+        case!("{{ a b }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 5..5);
         case!(" a\t{{ b }}", " a\t{{b}}");
         case!("{{ b }} a ", r#"{{b}} a "#);
         case!("{{ a }}{{ b }}", r#"{{a}}{{b}}"#);

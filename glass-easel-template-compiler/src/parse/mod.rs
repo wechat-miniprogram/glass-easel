@@ -12,7 +12,6 @@ macro_rules! case {
 
             // parse and check warnings
             let (template, ps) = $crate::parse::parse("TEST", src);
-            dbg!(&template); // !!!
             let mut warnings = ps.warnings();
             $(
                 let next = warnings.next();
@@ -236,7 +235,8 @@ impl<'s> ParseState<'s> {
         if !self.peek_str(s) {
             return None;
         }
-        match self.peek::<0>() {
+        let s_followed = &self.cur_str()[s.len()..];
+        match s_followed.chars().next() {
             None => {}
             Some(ch) => {
                 if reject_followed(ch) {
@@ -377,8 +377,8 @@ impl std::error::Error for ParseError {}
 #[derive(Clone, PartialEq, Eq)]
 pub enum ParseErrorKind {
     UnexpectedCharacter = 0x10001,
+    UnexpectedExpressionCharacter,
     UnrecognizedTag,
-    IllegalExpression,
     MissingExpressionEnd,
     IllegalEntity,
     IncompleteTag,
@@ -409,8 +409,8 @@ impl ParseErrorKind {
     fn static_message(&self) -> &'static str {
         match self {
             Self::UnexpectedCharacter => "unexpected character",
+            Self::UnexpectedExpressionCharacter => "unexpected character inside expression",
             Self::UnrecognizedTag => "unrecognized tag",
-            Self::IllegalExpression => "illegal expression",
             Self::MissingExpressionEnd => "missing expression end",
             Self::IllegalEntity => "illegal entity",
             Self::IncompleteTag => "incomplete tag",
@@ -441,8 +441,8 @@ impl ParseErrorKind {
     pub fn level(&self) -> ParseErrorLevel {
         match self {
             Self::UnexpectedCharacter => ParseErrorLevel::Fatal,
+            Self::UnexpectedExpressionCharacter => ParseErrorLevel::Fatal,
             Self::UnrecognizedTag => ParseErrorLevel::Warn,
-            Self::IllegalExpression => ParseErrorLevel::Fatal,
             Self::MissingExpressionEnd => ParseErrorLevel::Fatal,
             Self::IllegalEntity => ParseErrorLevel::Error,
             Self::IncompleteTag => ParseErrorLevel::Fatal,
