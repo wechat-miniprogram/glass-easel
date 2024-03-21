@@ -50,6 +50,7 @@ jobs:
         run: |
           pnpm run lint
           pnpm run test
+          pnpm run test:types
       - name: Test glass-easel-miniprogram-adapter
         working-directory: glass-easel-miniprogram-adapter
         run: |

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
+
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { expectType } from 'tsd-lite'
+import { expect } from 'tstyche'
 import * as glassEasel from '../../src'
 
 /**
@@ -53,34 +54,33 @@ glassEasel.registerElement({
     propNull: null,
   },
   created() {
-    expectType<string>(this.data.propStr)
-    expectType<string>(this.data.propStrSf)
-    expectType<number>(this.data.propNum)
-    expectType<number>(this.data.propNumSf)
-    expectType<boolean>(this.data.propBool)
-    expectType<boolean>(this.data.propBoolSf)
-    expectType<Record<string, any> | null>(this.data.propObj)
-    expectType<Record<string, any> | null>(this.data.propObjSf)
-    expectType<{ foo: string }>(this.data.propObjFoo)
-    expectType<string>(this.data.propObjFoo.foo)
-    expectType<{ bar: string }>(this.data.propObjBar)
-    expectType<string>(this.data.propObjBar.bar)
-    expectType<(...args: any[]) => any>(this.data.propFunc)
-    expectType<(...args: any[]) => any>(this.data.propFuncSf)
-    expectType<() => 'foo'>(this.data.propFuncFoo)
-    expectType<any[]>(this.data.propArr)
-    expectType<any[]>(this.data.propArrSf)
-    expectType<{ name: string }[]>(this.data.propArrBooks)
-    expectType<any>(this.data.propAnySf)
-    expectType<any>(this.data.propNull)
+    expect(this.data.propStr).type.toBeString()
+    expect(this.data.propStrSf).type.toBeString()
+    expect(this.data.propNum).type.toBeNumber()
+    expect(this.data.propNumSf).type.toBeNumber()
+    expect(this.data.propBool).type.toBeBoolean()
+    expect(this.data.propBoolSf).type.toBeBoolean()
+    expect(this.data.propObj).type.toEqual<Record<string, any> | null>()
+    expect(this.data.propObjSf).type.toEqual<Record<string, any> | null>()
+    expect(this.data.propObjFoo).type.toEqual<{ foo: string }>()
+    expect(this.data.propObjFoo.foo).type.toBeString()
+    expect(this.data.propObjBar).type.toEqual<{ bar: string }>()
+    expect(this.data.propObjBar.bar).type.toBeString()
+    expect(this.data.propFunc).type.toEqual<(...args: any[]) => any>()
+    expect(this.data.propFuncSf).type.toEqual<(...args: any[]) => any>()
+    expect(this.data.propFuncFoo).type.toEqual<() => 'foo'>()
+    expect(this.data.propArr).type.toEqual<any[]>()
+    expect(this.data.propArrSf).type.toEqual<any[]>()
+    expect(this.data.propArrBooks).type.toEqual<{ name: string }[]>()
+    expect(this.data.propAnySf).type.toBeAny()
+    expect(this.data.propNull).type.toBeAny()
 
-    expectType<string | number | boolean>(this.data.propOptional)
-    expectType<string | number | boolean>(this.data.propOptionalFoo)
+    expect(this.data.propOptional).type.toEqual<string | number | boolean>()
+    expect(this.data.propOptionalFoo).type.toEqual<string | number | boolean>()
 
-    expectType<never>(this.data.invalid)
+    expect(this.data.invalid).type.toBeNever()
 
-    // @ts-expect-error
-    expectType<any>(this.data.nonExists)
+    expect(this.data).type.not.toHaveProperty('nonExists')
 
     this.data.propStr = '123'
     this.data.propObjFoo.foo = '123'
@@ -102,8 +102,7 @@ glassEasel.registerElement({
 
 glassEasel.registerElement({
   created() {
-    // @ts-expect-error
-    expectType<any>(this.data.non_exists)
+    expect(this.data).type.not.toHaveProperty('nonExists')
   },
 })
 
@@ -123,16 +122,15 @@ glassEasel.registerElement({
     books: [{ name: 'book' }],
   },
   created() {
-    expectType<string>(this.data.str)
-    expectType<number>(this.data.num)
-    expectType<boolean>(this.data.bool)
-    expectType<{ foo: string }>(this.data.foo)
-    expectType<() => 'foo'>(this.data.func)
-    expectType<number[]>(this.data.arr)
-    expectType<{ name: string }[]>(this.data.books)
+    expect(this.data.str).type.toBeString()
+    expect(this.data.num).type.toBeNumber()
+    expect(this.data.bool).type.toBeBoolean()
+    expect(this.data.foo).type.toEqual<{ foo: string }>()
+    expect(this.data.func).type.toEqual<() => 'foo'>()
+    expect(this.data.arr).type.toEqual<number[]>()
+    expect(this.data.books).type.toEqual<{ name: string }[]>()
 
-    // @ts-expect-error
-    expectType<any>(this.data.nonExists)
+    expect(this.data).type.not.toHaveProperty('nonExists')
 
     this.data.str = '123'
     this.data.foo.foo = '123'
@@ -433,9 +431,9 @@ glassEasel.registerElement({
       //
     },
     bar() {
-      expectType<void>(this.bar())
-      expectType<void>(this.foo())
-      expectType<number>(this.sum(1, 2))
+      expect(this.bar()).type.toBeVoid()
+      expect(this.foo()).type.toBeVoid()
+      expect(this.sum(1, 2)).type.toBeNumber()
 
       // @ts-expect-error
       this.bar(1)
@@ -445,9 +443,8 @@ glassEasel.registerElement({
       this.sum()
       // @ts-expect-error
       this.sum('1', '2')
-      // @ts-expect-error
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-      this.nonExists()
+
+      expect(this).type.not.toHaveProperty('nonExists')
     },
   },
 })
