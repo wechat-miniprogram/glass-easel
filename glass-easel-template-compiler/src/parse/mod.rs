@@ -127,20 +127,6 @@ impl<'s> ParseState<'s> {
         ret
     }
 
-    fn parse_with_scope<T>(&mut self, ident: CompactString, location: Range<Position>, f: impl FnOnce(&mut Self) -> T) -> T {
-        self.scopes.push((ident, location));
-        let ret = f(self);
-        self.scopes.pop();
-        ret
-    }
-
-    fn parse_with_no_scopes<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
-        let old_scopes = std::mem::replace(&mut self.scopes, vec![]);
-        let ret = f(self);
-        self.scopes = old_scopes;
-        ret
-    }
-
     fn try_parse<T>(&mut self, f: impl FnOnce(&mut Self) -> Option<T>) -> Option<T> {
         let prev = self.cur_index;
         let prev_line = self.line;

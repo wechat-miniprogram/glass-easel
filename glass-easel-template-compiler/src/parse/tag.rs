@@ -8,6 +8,9 @@ use super::{
     binding_map::{BindingMapCollector, BindingMapKeys}, expr::Expression, ParseErrorKind, ParseState, Position, TemplateStructure
 };
 
+pub const DEFAULT_FOR_ITEM_SCOPE_NAME: &'static str = "item";
+pub const DEFAULT_FOR_INDEX_SCOPE_NAME: &'static str = "index";
+
 #[derive(Debug, Clone)]
 pub struct Template {
     pub path: String,
@@ -32,15 +35,31 @@ impl Template {
             sub_templates: vec![],
             scripts: vec![],
         };
+
+        // first round - parse the original string
         let mut content = vec![];
         Node::parse_vec_node(ps, &mut globals, &mut content);
-        let ret = Template {
+
+        // second round - traverse the tree to find more information
+        fn rec(
+            nodes: &mut Vec<Node>,
+            binding_map_collector: &mut BindingMapCollector,
+        ) {
+            for node in nodes {
+            }
+        }
+        let mut binding_map_collector = BindingMapCollector::new();
+        for (_, nodes) in globals.sub_templates.iter_mut() {
+            rec(nodes, &mut binding_map_collector);
+        }
+        rec(&mut content, &mut binding_map_collector);
+
+        Template {
             path: ps.path.to_string(),
             content,
             globals,
-            binding_map_collector: BindingMapCollector::new(),
-        };
-        ret
+            binding_map_collector,
+        }
     }
 }
 
@@ -105,6 +124,13 @@ impl Node {
                 Value::Dynamic { .. } => false,
             };
             if !is_whitespace {
+                let mut value = value;
+                match &mut value {
+                    Value::Static { .. } => {}
+                    Value::Dynamic { expression, .. } => {
+                        expression.convert_scopes(&ps.scopes);
+                    }
+                }
                 ret.push(Node::Text(value));
             }
         }
@@ -186,7 +212,7 @@ impl TemplateStructure for Element {
 }
 
 impl Element {
-    pub fn children(&self) -> Option<&Vec<Node>> {
+    pub(crate) fn children(&self) -> Option<&Vec<Node>> {
         match &self.kind {
             ElementKind::Normal { children, .. } |
             ElementKind::Pure { children, .. } |
@@ -202,7 +228,7 @@ impl Element {
         }
     }
 
-    pub fn children_mut(&mut self) -> Option<&mut Vec<Node>> {
+    pub(crate) fn children_mut(&mut self) -> Option<&mut Vec<Node>> {
         match &mut self.kind {
             ElementKind::Normal { children, .. } |
             ElementKind::Pure { children, .. } |
@@ -216,6 +242,137 @@ impl Element {
                 None
             }
         }
+    }
+
+    fn for_each_value_mut(&mut self, mut f: impl FnMut(&mut Value)) {
+        match &mut self.kind {
+            ElementKind::Normal {
+                tag_name: _,
+                attributes,
+                class,
+                style,
+                change_attributes,
+                worklet_attributes: _,
+                event_bindings,
+                marks,
+                data,
+                children: _,
+                generics: _,
+                extra_attr: _,
+                slot,
+                slot_value_refs: _,
+            } => {
+                for attr in attributes {
+                    f(&mut attr.value);
+                }
+                match class {
+                    ClassAttribute::None => {}
+                    ClassAttribute::String(_, value) => {
+                        f(value);
+                    }
+                    ClassAttribute::Multiple(v) => {
+                        for (_, value) in v {
+                            f(value);
+                        }
+                    }
+                }
+                match style {
+                    StyleAttribute::None => {}
+                    StyleAttribute::String(_, value) => {
+                        f(value);
+                    }
+                    StyleAttribute::Multiple(v) => {
+                        for (_, value) in v {
+                            f(value);
+                        }
+                    }
+                }
+                for attr in change_attributes {
+                    f(&mut attr.value);
+                }
+                for ev in event_bindings {
+                    f(&mut ev.value);
+                }
+                for attr in marks {
+                    f(&mut attr.value);
+                }
+                for attr in data {
+                    f(&mut attr.value);
+                }
+                if let Some(slot) = slot {
+                    f(&mut slot.1);
+                }
+            }
+            ElementKind::Pure { event_bindings, marks, children: _, slot } => {
+                for ev in event_bindings {
+                    f(&mut ev.value);
+                }
+                for attr in marks {
+                    f(&mut attr.value);
+                }
+                if let Some(slot) = slot {
+                    f(&mut slot.1);
+                }
+            }
+            ElementKind::For { list, item_name: _, index_name: _, key: _, children: _ } => {
+                f(&mut list.1);
+            }
+            ElementKind::If { branches, else_branch: _ } => {
+                for (_, value, _) in branches {
+                    f(value);
+                }
+            }
+            ElementKind::TemplateRef { target, data, event_bindings, marks, slot } => {
+                f(&mut target.1);
+                f(&mut data.1);
+                for ev in event_bindings {
+                    f(&mut ev.value);
+                }
+                for attr in marks {
+                    f(&mut attr.value);
+                }
+                if let Some(slot) = slot {
+                    f(&mut slot.1);
+                }
+            }
+            ElementKind::Include { path: _, event_bindings, marks, slot } => {
+                for ev in event_bindings {
+                    f(&mut ev.value);
+                }
+                for attr in marks {
+                    f(&mut attr.value);
+                }
+                if let Some(slot) = slot {
+                    f(&mut slot.1);
+                }
+            }
+            ElementKind::Slot { event_bindings, marks, slot, name, values } => {
+                for ev in event_bindings {
+                    f(&mut ev.value);
+                }
+                for attr in marks {
+                    f(&mut attr.value);
+                }
+                if let Some(slot) = slot {
+                    f(&mut slot.1);
+                }
+                f(&mut name.1);
+                for attr in values {
+                    f(&mut attr.value);
+                }
+            }
+        }
+    }
+
+    pub(super) fn for_each_expression_mut(&mut self, mut f: impl FnMut(&mut Expression)) {
+        self.for_each_value_mut(|value| {
+            match value {
+                Value::Static { .. } => {}
+                Value::Dynamic { expression, .. } => {
+                    f(expression);
+                }
+            }
+        });
     }
 
     fn parse(ps: &mut ParseState, globals: &mut TemplateGlobals, ret: &mut Vec<Node>) {
@@ -502,9 +659,6 @@ impl Element {
                                 },
                                 AttrPrefixParseKind::ScopeName => {
                                     let v = StrName::parse_identifier_like_until_before(ps, until);
-                                    if !v.is_valid_js_identifier() {
-                                        ps.add_warning(ParseErrorKind::InvalidScopeName, v.location());
-                                    }
                                     AttrPrefixParseResult::ScopeName(v)
                                 },
                             };
@@ -561,10 +715,7 @@ impl Element {
                     match parse_kind {
                         AttrPrefixParseKind::Value => AttrPrefixParseResult::Value(Value::new_empty(pos)),
                         AttrPrefixParseKind::StaticStr => AttrPrefixParseResult::StaticStr(StrName::new_empty(pos)),
-                        AttrPrefixParseKind::ScopeName => {
-                            ps.add_warning(ParseErrorKind::InvalidScopeName, pos..pos);
-                            AttrPrefixParseResult::ScopeName(StrName::new_empty(pos))
-                        }
+                        AttrPrefixParseKind::ScopeName => AttrPrefixParseResult::ScopeName(StrName::new_empty(pos)),
                     }
                 };
 
@@ -693,6 +844,9 @@ impl Element {
                             if wx_for_index.is_some() {
                                 ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                             } else {
+                                if !s.is_valid_js_identifier() {
+                                    ps.add_warning(ParseErrorKind::InvalidScopeName, s.location());
+                                }
                                 wx_for_index = Some((attr_name.location(), s));
                             }
                         }
@@ -702,6 +856,9 @@ impl Element {
                             if wx_for_item.is_some() {
                                 ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                             } else {
+                                if !s.is_valid_js_identifier() {
+                                    ps.add_warning(ParseErrorKind::InvalidScopeName, s.location());
+                                }
                                 wx_for_item = Some((attr_name.location(), s));
                             }
                         }
@@ -771,6 +928,9 @@ impl Element {
                             if wx_for_item.is_some() {
                                 ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
                             } else {
+                                if !s.is_valid_js_identifier() {
+                                    ps.add_warning(ParseErrorKind::InvalidScopeName, s.location());
+                                }
                                 script_module = Some((attr_name.location(), s));
                             }
                         }
@@ -1062,6 +1222,13 @@ impl Element {
                                     if slot_value_refs.iter().find(|attr| attr.name.name_eq(&attr_name)).is_some() {
                                         ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                                     } else {
+                                        let s = match s.name.is_empty() {
+                                            true => StrName { name: attr_name.name.clone(), location: attr_name.location() },
+                                            false => s,
+                                        };
+                                        if !s.is_valid_js_identifier() {
+                                            ps.add_warning(ParseErrorKind::InvalidScopeName, s.location());
+                                        }
                                         slot_value_refs.push(StaticAttribute {
                                             name: attr_name,
                                             value: s,
@@ -1157,6 +1324,151 @@ impl Element {
                 ps.add_warning(ParseErrorKind::InvalidAttribute, x.clone());
             }
         }
+
+        // collect include and import sources
+        if !is_script_tag {
+            let invalid = match &element {
+                ElementKind::Include { path, .. } => {
+                    if path.1.name.is_empty() {
+                        ps.add_warning(ParseErrorKind::MissingSourcePath, tag_name.location());
+                        true
+                    } else {
+                        let list = if is_import_tag { &mut globals.imports } else { &mut globals.includes };
+                        list.push(path.1.clone());
+                        false
+                    }
+                }
+                _ => false,
+            };
+            if invalid {
+                element = ElementKind::Pure {
+                    event_bindings: vec![],
+                    marks: vec![],
+                    children: vec![],
+                    slot: None,
+                };
+            }
+        }
+
+        // extract `wx:for`
+        enum ForList {
+            None,
+            For {
+                list: (Range<Position>, Value),
+                item_name: (Range<Position>, StrName),
+                index_name: (Range<Position>, StrName),
+                key: (Range<Position>, StrName),
+            },
+        }
+        let for_list = if !allow_for_if || wx_for.is_none() {
+            if let Some((location, _)) = wx_for {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            if let Some((location, _)) = wx_for_item {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            if let Some((location, _)) = wx_for_index {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            if let Some((location, _)) = wx_key {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            ForList::None
+        } else {
+            let (for_location, for_value) = wx_for.unwrap();
+            let item_name = wx_for_item.unwrap_or_else(|| {
+                let name = StrName {
+                    name: CompactString::new_inline(DEFAULT_FOR_ITEM_SCOPE_NAME),
+                    location: for_location.clone()
+                };
+                (for_location.clone(), name)
+            });
+            let index_name = wx_for_index.unwrap_or_else(|| {
+                let name = StrName {
+                    name: CompactString::new_inline(DEFAULT_FOR_INDEX_SCOPE_NAME),
+                    location: for_location.clone()
+                };
+                (for_location.clone(), name)
+            });
+            let key = wx_key.unwrap_or_else(|| (for_location.clone(), StrName::new_empty(for_location.end.clone())));
+            ForList::For {
+                list: (for_location, for_value),
+                item_name,
+                index_name,
+                key,
+            }
+        };
+
+        // extract if conditions
+        enum IfCondition {
+            None,
+            If(Range<Position>, Value),
+            Elif(Range<Position>, Value),
+            Else(Range<Position>),
+        }
+        let if_condition = if !allow_for_if {
+            if let Some((location, _)) = wx_if {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            if let Some((location, _)) = wx_elif {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            if let Some(location) = wx_else {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            IfCondition::None
+        } else if let ForList::For { .. } = &for_list {
+            if let Some((location, _)) = wx_elif {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            if let Some(location) = wx_else {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            if let Some((location, value)) = wx_if {
+                IfCondition::If(location, value)
+            } else {
+                IfCondition::None
+            }
+        } else if let Some((location, value)) = wx_if {
+            if let Some((location, _)) = wx_elif {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            if let Some(location) = wx_else {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            IfCondition::If(location, value)
+        } else if let Some((location, value)) = wx_elif {
+            if let Some(location) = wx_else {
+                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
+            }
+            IfCondition::Elif(location, value)
+        } else if let Some(location) = wx_else {
+            IfCondition::Else(location)
+        } else {
+            IfCondition::None
+        };
+
+        // handling scopes
+        enum ScopeState {
+            PrevCount(usize),
+            Prev(Vec<(CompactString, Range<Position>)>),
+        }
+        let scope_state = if template_name.is_some() {
+            let prev_scopes = std::mem::replace(&mut ps.scopes, vec![]);
+            ScopeState::Prev(prev_scopes)
+        } else {
+            let prev_scope_count = ps.scopes.len();
+            if let ForList::For { list: _, item_name, index_name, key: _ } = &for_list {
+                ps.scopes.push((item_name.1.name.clone(), item_name.1.location.clone()));
+                ps.scopes.push((index_name.1.name.clone(), index_name.1.location.clone()));
+            }
+            if let ElementKind::Normal { slot_value_refs, .. } = &element {
+                for attr in slot_value_refs {
+                    ps.scopes.push((attr.value.name.clone(), attr.value.location.clone()));
+                }
+            }
+            ScopeState::PrevCount(prev_scope_count)
+        };
 
         let new_children = if is_script_tag {
             // parse script tag content
@@ -1257,116 +1569,15 @@ impl Element {
             (close_location, end_tag_location)
         };
 
-        // collect include and import sources
-        if !is_script_tag {
-            let invalid = match &element {
-                ElementKind::Include { path, .. } => {
-                    if path.1.name.is_empty() {
-                        ps.add_warning(ParseErrorKind::MissingSourcePath, tag_name.location());
-                        true
-                    } else {
-                        let list = if is_import_tag { &mut globals.imports } else { &mut globals.includes };
-                        list.push(path.1.clone());
-                        false
-                    }
-                }
-                _ => false,
-            };
-            if invalid {
-                element = ElementKind::Pure {
-                    event_bindings: vec![],
-                    marks: vec![],
-                    children: vec![],
-                    slot: None,
-                };
+        // reset scope states
+        match scope_state {
+            ScopeState::PrevCount(x) => {
+                ps.scopes.truncate(x);
+            }
+            ScopeState::Prev(x) => {
+                ps.scopes = x;
             }
         }
-
-        // extract `wx:for`
-        enum ForList {
-            None,
-            For {
-                list: (Range<Position>, Value),
-                item_name: (Range<Position>, StrName),
-                index_name: (Range<Position>, StrName),
-                key: (Range<Position>, StrName),
-            },
-        }
-        let for_list = if !allow_for_if || wx_for.is_none() {
-            if let Some((location, _)) = wx_for {
-                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
-            }
-            if let Some((location, _)) = wx_for_item {
-                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
-            }
-            if let Some((location, _)) = wx_for_index {
-                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
-            }
-            if let Some((location, _)) = wx_key {
-                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
-            }
-            ForList::None
-        } else {
-            let (for_location, for_value) = wx_for.unwrap();
-            let item_name = wx_for_item.unwrap_or_else(|| (for_location.clone(), StrName::new_empty(for_location.end.clone())));
-            let index_name = wx_for_index.unwrap_or_else(|| (for_location.clone(), StrName::new_empty(for_location.end.clone())));
-            let key = wx_key.unwrap_or_else(|| (for_location.clone(), StrName::new_empty(for_location.end.clone())));
-            ForList::For {
-                list: (for_location, for_value),
-                item_name,
-                index_name,
-                key,
-            }
-        };
-
-        // extract if conditions
-        enum IfCondition {
-            None,
-            If(Range<Position>, Value),
-            Elif(Range<Position>, Value),
-            Else(Range<Position>),
-        }
-        let if_condition = if !allow_for_if {
-            if let Some((location, _)) = wx_if {
-                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
-            }
-            if let Some((location, _)) = wx_elif {
-                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
-            }
-            if let Some(location) = wx_else {
-                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
-            }
-            IfCondition::None
-        } else if let ForList::For { .. } = &for_list {
-            if let Some((location, _)) = wx_elif {
-                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
-            }
-            if let Some(location) = wx_else {
-                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
-            }
-            if let Some((location, value)) = wx_if {
-                IfCondition::If(location, value)
-            } else {
-                IfCondition::None
-            }
-        } else if let Some((location, value)) = wx_if {
-            if let Some((location, _)) = wx_elif {
-                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
-            }
-            if let Some(location) = wx_else {
-                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
-            }
-            IfCondition::If(location, value)
-        } else if let Some((location, value)) = wx_elif {
-            if let Some(location) = wx_else {
-                ps.add_warning(ParseErrorKind::InvalidAttribute, location);
-            }
-            IfCondition::Elif(location, value)
-        } else if let Some(location) = wx_else {
-            IfCondition::Else(location)
-        } else {
-            IfCondition::None
-        };
 
         // write the parsed element
         if is_script_tag {
@@ -1397,7 +1608,7 @@ impl Element {
             };
 
             // generate normal element
-            let wrapped_element = {
+            let mut wrapped_element = {
                 let mut element = Element {
                     kind: element,
                     start_tag_location: (start_tag_start_location.clone(), start_tag_end_location.clone()),
@@ -1413,6 +1624,39 @@ impl Element {
                 }
                 element
             };
+
+            // analyze scopes
+            // this should be done here because sometimes scope ref comes before scope definition,
+            // e.g. `<div data:a="{{index}}" wx:for="{{list}}" />`
+            let mut if_condition = if_condition;
+            let mut for_list = for_list;
+            if let ForList::For { list, item_name, index_name, key: _ } = &mut for_list {
+                match &mut list.1 {
+                    Value::Static { .. } => {}
+                    Value::Dynamic { expression, .. } => {
+                        expression.convert_scopes(&ps.scopes);
+                    }
+                }
+                ps.scopes.push((item_name.1.name.clone(), item_name.1.location.clone()));
+                ps.scopes.push((index_name.1.name.clone(), index_name.1.location.clone()));
+            }
+            wrapped_element.for_each_expression_mut(|x| x.convert_scopes(&ps.scopes));
+            match &mut if_condition {
+                IfCondition::If(_, value) |
+                IfCondition::Elif(_, value) => {
+                    match value {
+                        Value::Static { .. } => {}
+                        Value::Dynamic { expression, .. } => {
+                            expression.convert_scopes(&ps.scopes);
+                        }
+                    }
+                }
+                IfCondition::Else(_) | IfCondition::None => {}
+            }
+            if let ForList::For { .. } = &for_list {
+                ps.scopes.pop();
+                ps.scopes.pop();
+            }
 
             // wrap if condition
             let wrapped_element = match if_condition {
@@ -1563,6 +1807,7 @@ impl Ident {
         loop {
             match ps.next().unwrap() {
                 ':' => {
+                    let pos = ps.position();
                     let prev = std::mem::replace(&mut cur_name, Self {
                         name: CompactString::new_inline(""),
                         location: pos..pos,
@@ -1615,7 +1860,7 @@ impl StrName {
         self.name == other.name
     }
 
-    fn new_empty(pos: Position) -> Self {
+    pub fn new_empty(pos: Position) -> Self {
         Self {
             name: CompactString::new_inline(""),
             location: pos..pos,
@@ -1989,7 +2234,8 @@ mod test {
         case!("<div extra-attr:a='A'></div>", r#"<div extra-attr:a="A"/>"#);
         case!("<div extra-attr:a='{{ A }}'></div>", r#"<div extra-attr:a="{{ A }}"/>"#, ParseErrorKind::DataBindingNotAllowed, 19..26);
         case!("<div slot='a'></div>", r#"<div slot="a"/>"#);
-        case!("<div slot:a></div>", r#"<div slot:a/>"#, ParseErrorKind::InvalidScopeName, 11..11);
+        case!("<div slot:a></div>", r#"<div slot:a/>"#);
+        case!("<div slot:a-b></div>", r#"<div slot:a-b/>"#, ParseErrorKind::InvalidScopeName, 10..13);
         case!("<div slot:a='A'></div>", r#"<div slot:a="A"/>"#);
         case!("<div slot:a='A '></div>", r#"<div slot:a="A "/>"#, ParseErrorKind::InvalidScopeName, 13..15);
     }
@@ -2004,7 +2250,7 @@ mod test {
 
     #[test]
     fn for_list() {
-        case!("<block wx:for='{{ a }}' wx:for-item />", r#"<block wx:for="{{a}}"/>"#, ParseErrorKind::InvalidScopeName, 35..35);
+        case!("<block wx:for='{{ a }}' wx:for-item />", r#"<block wx:for="{{a}}" wx:for-item/>"#, ParseErrorKind::InvalidScopeName, 35..35);
         case!("<block wx:for='{{ a }}'> abc </block>", r#"<block wx:for="{{a}}"> abc </block>"#);
         case!("<div wx:for='{{ a }}'> a </div>", r#"<block wx:for="{{a}}"><div> a </div></block>"#);
         case!("<block wx:for='{{ a }}' wx:for-index='i' wx:for-item='j' wx:key='t'></block>", r#"<block wx:for="{{a}}" wx:for-item="j" wx:for-index="i" wx:key="t"/>"#);
@@ -2019,10 +2265,10 @@ mod test {
         case!("<block wx:if='{{a}}'> abc </block><div wx:else/>", r#"<block wx:if="{{a}}"> abc </block><block wx:else><div/></block>"#);
         case!("<block wx:if='{{a}}'> abc </block><div wx:elif='{{ b }}'/>", r#"<block wx:if="{{a}}"> abc </block><block wx:elif="{{b}}"><div/></block>"#);
         case!("<block wx:if='{{a}}'> abc </block><div wx:elif='{{ b }}'/><block wx:else>A</block>", r#"<block wx:if="{{a}}"> abc </block><block wx:elif="{{b}}"><div/></block><block wx:else>A</block>"#);
-        case!("<block wx:elif='{{a}}'> abc </block>", r#"<block> abc </block>"#, ParseErrorKind::InvalidAttribute, 7..14);
-        case!("<block wx:else> abc </block>", r#"<block> abc </block>"#, ParseErrorKind::InvalidAttribute, 7..14);
+        case!("<block wx:elif='{{a}}'> abc </block>", r#"<block> abc </block>"#, ParseErrorKind::InvalidAttribute, 10..14);
+        case!("<block wx:else> abc </block>", r#"<block> abc </block>"#, ParseErrorKind::InvalidAttribute, 10..14);
         case!("<block wx:if=''/><block wx:else=' '/>", r#"<block wx:if/><block wx:else/>"#, ParseErrorKind::InvalidAttributeValue, 33..34);
-        case!("<block wx:if=''/><div wx:for='' wx:else />", r#"<block wx:if/><block wx:for><div/></block>"#, ParseErrorKind::InvalidAttribute, 32..39);
+        case!("<block wx:if=''/><div wx:for='' wx:else />", r#"<block wx:if/><block wx:for><div/></block>"#, ParseErrorKind::InvalidAttribute, 35..39);
         case!("<block wx:if=''/><include src='a' wx:else />", r#"<block wx:if/><block wx:else><include src="a"/></block>"#);
     }
 
@@ -2034,14 +2280,14 @@ mod test {
         case!("<template name='a' is='a' />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 19..21);
         case!("<template name='a' data='{{ ...a }}' />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 19..23);
         case!("<template name='a'/><template name='a'/>", r#"<template name="a"/>"#, ParseErrorKind::DuplicatedName, 36..37);
-        case!("<template name='a' wx:for='' />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 19..25);
-        case!("<template name='a' wx:if='' />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 19..24);
+        case!("<template name='a' wx:for='' />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 22..25);
+        case!("<template name='a' wx:if='' />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 22..24);
         case!("<template is='a'><div/></template>", r#"<template is="a"/>"#, ParseErrorKind::ChildNodesNotAllowed, 17..23);
         case!("<template is='a' bind:a />", r#"<template is="a" bind:a/>"#);
         case!("<template is='a' mark:a />", r#"<template is="a" mark:a/>"#);
         case!("<template is='a' slot='a' />", r#"<template is="a" slot="a"/>"#);
-        case!("<template name='a' bind:a />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 19..25);
-        case!("<template name='a' mark:a />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 19..25);
+        case!("<template name='a' bind:a />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 24..25);
+        case!("<template name='a' mark:a />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 24..25);
         case!("<template name='a' slot='a' />", r#"<template name="a"/>"#, ParseErrorKind::InvalidAttribute, 19..23);
     }
 
@@ -2097,5 +2343,68 @@ mod test {
             ps.warnings().next().unwrap().location,
             Position { line: 3, utf16_col: 5 } .. Position { line: 3, utf16_col: 6 },
         );
+    }
+
+    fn check_with_mangling(src: &str, expect: &str) {
+        use crate::stringify::Stringify;
+        let (template, ps) = crate::parse::parse("TEST", src);
+        assert_eq!(ps.warnings().next(), None);
+        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src);
+        stringifier.set_mangling(true);
+        template.stringify_write(&mut stringifier).unwrap();
+        let (stringify_result, _sourcemap) = stringifier.finish();
+        assert_eq!(stringify_result.as_str(), expect);
+    }
+
+    #[test]
+    fn for_if_scope() {
+        let src = r#"<block wx:if="{{ item }}" wx:for="{{ item }}">{{ index }}</block>"#;
+        let expect = r#"<block wx:for="{{item}}"><block wx:if="{{_$0}}">{{_$1}}</block></block>"#;
+        check_with_mangling(src, expect);
+    }
+
+    #[test]
+    fn for_scope() {
+        let src = r#"
+            <div wx:for="{{list}}" hidden="{{item}}" change:hidden="{{item}}" data:a="{{index}}"/>
+        "#;
+        let expect = r#"<block wx:for="{{list}}"><div hidden="{{_$0}}" change:hidden="{{_$0}}" data:a="{{_$1}}"/></block>"#;
+        check_with_mangling(src, expect);
+        let src = r#"
+            <block wx:for="{{list}}">
+                <div wx:for="{{item}}" />
+            </block>
+        "#;
+        let expect = r#"<block wx:for="{{list}}"><block wx:for="{{_$0}}"><div/></block></block>"#;
+        check_with_mangling(src, expect);
+        let src = r#"
+            <block wx:for="{{list}}">
+                <block wx:if="{{item}}" />
+            </block>
+        "#;
+        let expect = r#"<block wx:for="{{list}}"><block wx:if="{{_$0}}"/></block>"#;
+        check_with_mangling(src, expect);
+        let src = r#"
+            <template wx:for="{{list}}" is="{{index}}" data="{{item}}" />
+        "#;
+        let expect = r#"<block wx:for="{{list}}"><template is="{{_$1}}" data="{{_$0}}"/></block>"#;
+        check_with_mangling(src, expect);
+        let src = r#"
+            <include wx:for="{{list}}" src="a" bind:a="{{index}}" mark:a="{{item}}" slot="{{index}}{{item}}" />
+        "#;
+        let expect = r#"<block wx:for="{{list}}"><include src="a" slot="{{_$1}}{{_$0}}" mark:a="{{_$0}}" bind:a="{{_$1}}"/></block>"#;
+        check_with_mangling(src, expect);
+        let src = r#"
+            <slot wx:for="{{list}}" name="{{index}}" />
+        "#;
+        let expect = r#"<block wx:for="{{list}}"><slot name="{{_$1}}"/></block>"#;
+        check_with_mangling(src, expect);
+    }
+
+    #[test]
+    fn slot_value_ref_scope() {
+        let src = r#"<div slot:a slot:b="c" data:a="{{ a + b + c }}">{{ a + b + c }}</div>"#;
+        let expect = r#"<div data:a="{{a+b+c}}" slot:a="_$0" slot:b="_$1">{{_$0+b+_$1}}</div>"#;
+        check_with_mangling(src, expect);
     }
 }

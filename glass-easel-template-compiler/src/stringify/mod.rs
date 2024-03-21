@@ -1,5 +1,6 @@
 use std::{fmt::{Result as FmtResult, Write as FmtWrite}, ops::Range};
 
+use compact_str::CompactString;
 pub use sourcemap::SourceMap;
 use sourcemap::SourceMapBuilder;
 
@@ -16,6 +17,8 @@ pub struct Stringifier<'s, W: FmtWrite> {
     utf16_col: u32,
     smb: SourceMapBuilder,
     source_path: &'s str,
+    scope_names: Vec<CompactString>,
+    mangling: bool,
 }
 
 impl<'s, W: FmtWrite> Stringifier<'s, W> {
@@ -29,12 +32,37 @@ impl<'s, W: FmtWrite> Stringifier<'s, W> {
             utf16_col: 0,
             smb,
             source_path,
+            scope_names: vec![],
+            mangling: false,
         }
     }
 
     pub fn finish(self) -> (W, SourceMap) {
         let sourcemap = self.smb.into_sourcemap();
         (self.w, sourcemap)
+    }
+
+    pub fn set_mangling(&mut self, v: bool) {
+        self.mangling = v;
+    }
+
+    fn add_scope(&mut self, name: &CompactString) -> &CompactString {
+        let i = self.scope_names.len();
+        if self.mangling {
+            self.scope_names.push(format!("_${}", i).into());
+        } else {
+            self.scope_names.push(name.clone());
+        }
+        &self.scope_names[i]
+    }
+
+    fn get_scope_name(&mut self, index: usize) -> &str {
+        self.scope_names.get(index).map(|x| x.as_str()).unwrap_or("__INVALID_SCOPE_NAME__")
+    }
+
+    fn write_scope_name(&mut self, index: usize, location: &Range<Position>) -> FmtResult {
+        let name = self.get_scope_name(index).to_string();
+        self.write_token(&name, &name, location)
     }
 
     fn write_str(&mut self, s: &str) -> FmtResult {
@@ -51,7 +79,6 @@ impl<'s, W: FmtWrite> Stringifier<'s, W> {
     }
 
     fn write_token(&mut self, dest_text: &str, source_text: &str, location: &Range<Position>) -> FmtResult {
-        dbg!(self.line, self.utf16_col, location.start.line, location.start.utf16_col);
         self.smb.add(self.line, self.utf16_col, location.start.line, location.start.utf16_col, Some(self.source_path), Some(source_text));
         self.write_str(dest_text)?;
         Ok(())

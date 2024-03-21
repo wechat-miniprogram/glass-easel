@@ -1,7 +1,7 @@
 use std::{fmt::{Result as FmtResult, Write as FmtWrite}, ops::Range};
 
-use crate::{escape::{escape_html_text, escape_html_body}, parse::{
-    expr::Expression, tag::{Attribute, ClassAttribute, Element, ElementKind, EventBinding, Ident, Node, Script, StrName, StyleAttribute, Value}, Position, Template
+use crate::{escape::{escape_html_body, escape_html_text}, parse::{
+    expr::Expression, tag::{Attribute, ClassAttribute, Element, ElementKind, EventBinding, Ident, Node, Script, StrName, StyleAttribute, Value, DEFAULT_FOR_INDEX_SCOPE_NAME, DEFAULT_FOR_ITEM_SCOPE_NAME}, Position, Template
 }};
 use super::{Stringifier, Stringify};
 
@@ -222,6 +222,7 @@ impl Stringify for Element {
         }
 
         // write tag start
+        let prev_scopes_count = stringifier.scope_names.len();
         stringifier.write_token("<", "<", &self.start_tag_location.0)?;
         match &self.kind {
             ElementKind::Normal {
@@ -282,7 +283,15 @@ impl Stringify for Element {
                     write_static_attr(stringifier, Some(("extra-attr", &attr.prefix_location)), &attr.name, &attr.value)?;
                 }
                 for attr in slot_value_refs.iter() {
-                    write_static_attr(stringifier, Some(("slot", &attr.prefix_location)), &attr.name, &attr.value)?;
+                    let value = stringifier.add_scope(&attr.value.name).clone();
+                    stringifier.write_str(" ")?;
+                    stringifier.write_token("slot", "slot", &attr.prefix_location)?;
+                    stringifier.write_str(":")?;
+                    stringifier.write_token(&attr.name.name, &attr.name.name, &attr.name.location)?;
+                    if value != &attr.name.name {
+                        stringifier.write_str(r#"="#)?;
+                        stringifier.write_str_name_quoted(&StrName { name: value, location: attr.value.location.clone() })?;
+                    }
                 }
             }
             ElementKind::Pure {
@@ -303,15 +312,17 @@ impl Stringify for Element {
             } => {
                 stringifier.write_str("block")?;
                 write_named_attr(stringifier, "wx:for", &list.0, &list.1)?;
-                if !item_name.1.name.is_empty() {
+                if item_name.1.name.as_str() != DEFAULT_FOR_ITEM_SCOPE_NAME {
                     write_named_static_attr(stringifier, "wx:for-item", &item_name.0, &item_name.1)?;
                 }
-                if !index_name.1.name.is_empty() {
+                if index_name.1.name.as_str() != DEFAULT_FOR_INDEX_SCOPE_NAME {
                     write_named_static_attr(stringifier, "wx:for-index", &index_name.0, &index_name.1)?;
                 }
                 if !key.1.name.is_empty() {
                     write_named_static_attr(stringifier, "wx:key", &key.0, &key.1)?;
                 }
+                stringifier.add_scope(&item_name.1.name);
+                stringifier.add_scope(&index_name.1.name);
             }
             ElementKind::If { .. } => unreachable!(),
             ElementKind::TemplateRef {
@@ -379,6 +390,10 @@ impl Stringify for Element {
             stringifier.write_token("/", "/", &self.close_location)?;
             stringifier.write_token(">", ">", &self.start_tag_location.1)?;
         }
+
+        // reset scopes
+        stringifier.scope_names.truncate(prev_scopes_count);
+
         Ok(())
     }
 }

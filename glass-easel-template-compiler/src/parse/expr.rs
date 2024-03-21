@@ -7,13 +7,8 @@ use super::{ParseState, Position, TemplateStructure, ParseErrorKind};
 #[derive(Debug, Clone)]
 pub enum Expression {
     ScopeRef {
-        name: CompactString,
         location: Range<Position>,
         index: usize,
-    },
-    Ident {
-        name: CompactString,
-        location: Range<Position>,
     },
     DataField {
         name: CompactString,
@@ -215,12 +210,8 @@ pub enum ObjectFieldKind {
     Named {
         name: CompactString,
         location: Range<Position>,
-        colon_location: Range<Position>,
+        colon_location: Option<Range<Position>>,
         value: Expression,
-    },
-    ShortcutNamed {
-        name: CompactString,
-        location: Range<Position>,
     },
     Spread {
         location: Range<Position>,
@@ -248,7 +239,6 @@ impl TemplateStructure for Expression {
     fn location_start(&self) -> Position {
         match self {
             Self::ScopeRef { location, .. } => location.start,
-            Self::Ident { location, .. } => location.start,
             Self::DataField { location, .. } => location.start,
             Self::ToStringWithoutUndefined { location, .. } => location.start,
             Self::LitUndefined { location, .. } => location.start,
@@ -295,7 +285,6 @@ impl TemplateStructure for Expression {
     fn location_end(&self) -> Position {
         match self {
             Self::ScopeRef { location, .. } => location.end,
-            Self::Ident { location, .. } => location.end,
             Self::DataField { location, .. } => location.end,
             Self::ToStringWithoutUndefined { location, .. } => location.end,
             Self::LitUndefined { location, .. } => location.end,
@@ -409,7 +398,7 @@ impl Expression {
             "null" => Expression::LitNull { location },
             "true" => Expression::LitBool { value: true, location },
             "false" => Expression::LitBool { value: false, location },
-            _ => Expression::Ident { name, location },
+            _ => Expression::DataField { name, location },
         };
         Some(Box::new(ret))
     }
@@ -446,8 +435,7 @@ impl Expression {
                 return None;
             };
             let dup_name = fields.iter().find_map(|x| match x {
-                ObjectFieldKind::Named { name: x, location, .. } |
-                ObjectFieldKind::ShortcutNamed { name: x, location } => (x == &name).then_some(location.clone()),
+                ObjectFieldKind::Named { name: x, location, .. } => (x == &name).then_some(location.clone()),
                 ObjectFieldKind::Spread { .. } => None,
             });
             if let Some(location) = dup_name {
@@ -458,7 +446,7 @@ impl Expression {
             let peek = ps.peek::<0>();
             match peek {
                 Some(':') => {
-                    let colon_location = ps.consume_str(":").unwrap(); // ':'
+                    let colon_location = ps.consume_str(":");
                     let value = *Self::parse_cond(ps)?;
                     fields.push(ObjectFieldKind::Named { name, location, colon_location, value });
                     let peek = ps.peek::<0>()?;
@@ -471,7 +459,8 @@ impl Expression {
                     }
                 }
                 None | Some('}') | Some(',') => {
-                    fields.push(ObjectFieldKind::ShortcutNamed { name, location });
+                    let value = Expression::DataField { name: name.clone(), location: location.clone() };
+                    fields.push(ObjectFieldKind::Named { name, location, colon_location: None, value });
                     if peek == Some(',') {
                         ps.next(); // ','
                     }
@@ -1003,6 +992,179 @@ fn is_ident_char(ch: char) -> bool {
 
 fn is_ident_start_char(ch: char) -> bool {
     ch == '_' || ch == '$' || ('a'..='z').contains(&ch) || ('A'..='Z').contains(&ch)
+}
+
+impl Expression {
+    pub fn sub_expressions_mut(&mut self) -> SubExpressionMut {
+        SubExpressionMut {
+            inner: self,
+            index: 0,
+        }
+    }
+
+    pub(super) fn convert_scopes(&mut self, scopes: &[(CompactString, Range<Position>)]) {
+        let index = if let Self::DataField { name, location } = self {
+            scopes
+                .iter()
+                .enumerate()
+                .rev()
+                .find_map(|(i, x)| {
+                    (x.0 == name).then_some((i, location.clone()))
+                })
+        } else {
+            None
+        };
+        if let Some((index, location)) = index {
+            *self = Self::ScopeRef { location, index };
+            return;
+        }
+        for sub in self.sub_expressions_mut() {
+            sub.convert_scopes(scopes);
+        }
+    }
+}
+
+pub struct SubExpressionMut<'a> {
+    inner: &'a mut Expression,
+    index: usize,
+}
+
+impl<'a> Iterator for SubExpressionMut<'a> {
+    type Item = &'a mut Expression;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let value = match &mut self.inner {
+            Expression::ScopeRef { .. } |
+            Expression::DataField { .. } => {
+                return None;
+            }
+            Expression::ToStringWithoutUndefined { value, .. } => {
+                if self.index == 0 {
+                    self.index = 1;
+                    value
+                } else {
+                    return None;
+                }
+            }
+            Expression::LitUndefined { .. } |
+            Expression::LitNull { .. } |
+            Expression::LitStr { .. } |
+            Expression::LitInt { .. } |
+            Expression::LitFloat { .. } |
+            Expression::LitBool { .. } => {
+                return None;
+            }
+            Expression::LitObj { fields, .. } => {
+                let x = fields.get_mut(self.index)?;
+                self.index += 1;
+                match x {
+                    ObjectFieldKind::Named { value, .. } => value,
+                    ObjectFieldKind::Spread { value, .. } => value,
+                }
+            }
+            Expression::LitArr { fields, .. } => {
+                let x = fields.get_mut(self.index)?;
+                self.index += 1;
+                match x {
+                    ArrayFieldKind::Normal { value, .. } => value,
+                    ArrayFieldKind::Spread { value, .. } => value,
+                    ArrayFieldKind::EmptySlot => {
+                        return None;
+                    }
+                }
+            }
+            Expression::StaticMember { obj, .. } => {
+                if self.index == 0 {
+                    self.index = 1;
+                    obj
+                } else {
+                    return None;
+                }
+            }
+            Expression::DynamicMember { obj, field_name, .. } => {
+                if self.index == 0 {
+                    self.index = 1;
+                    obj
+                } else if self.index == 1 {
+                    self.index = 2;
+                    field_name
+                } else {
+                    return None;
+                }
+            }
+            Expression::FuncCall { func, args, .. } => {
+                if self.index == 0 {
+                    self.index = 1;
+                    func
+                } else {
+                    let value = args.get_mut(self.index - 1)?;
+                    self.index += 1;
+                    value
+                }
+            }
+            Expression::Reverse { value, .. } |
+            Expression::BitReverse { value, .. } |
+            Expression::Positive { value, .. } |
+            Expression::Negative { value, .. } |
+            Expression::TypeOf { value, .. } |
+            Expression::Void { value, .. } => {
+                if self.index == 0 {
+                    self.index = 1;
+                    value
+                } else {
+                    return None;
+                }
+            }
+            Expression::Multiply { left, right, .. } |
+            Expression::Divide { left, right, .. } |
+            Expression::Remainer { left, right, .. } |
+            Expression::Plus { left, right, .. } |
+            Expression::Minus { left, right, .. } |
+            Expression::Lt { left, right, .. } |
+            Expression::Gt { left, right, .. } |
+            Expression::Lte { left, right, .. } |
+            Expression::Gte { left, right, .. } |
+            Expression::InstanceOf { left, right, .. } |
+            Expression::Eq { left, right, .. } |
+            Expression::Ne { left, right, .. } |
+            Expression::EqFull { left, right, .. } |
+            Expression::NeFull { left, right, .. } |
+            Expression::BitAnd { left, right, .. } |
+            Expression::BitXor { left, right, .. } |
+            Expression::BitOr { left, right, .. } |
+            Expression::LogicAnd { left, right, .. } |
+            Expression::LogicOr { left, right, .. } |
+            Expression::NullishCoalescing { left, right, .. } => {
+                if self.index == 0 {
+                    self.index = 1;
+                    left
+                } else if self.index == 1 {
+                    self.index = 2;
+                    right
+                } else {
+                    return None;
+                }
+            }
+            Expression::Cond { cond, true_br, false_br, .. } => {
+                if self.index == 0 {
+                    self.index = 1;
+                    cond
+                } else if self.index == 1 {
+                    self.index = 2;
+                    true_br
+                } else if self.index == 2 {
+                    self.index = 3;
+                    false_br
+                } else {
+                    return None;
+                }
+            }
+        };
+
+        // SAFETY: it is safe because `Self::Item` is limited to `'a`
+        let value = unsafe { &mut *(value as *mut _)};
+        Some(value)
+    }
 }
 
 #[cfg(test)]

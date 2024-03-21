@@ -24,7 +24,6 @@ impl ExpressionLevel {
     fn from_expression(expr: &Expression) -> Self {
         match expr {
             Expression::ScopeRef { .. } => ExpressionLevel::Lit,
-            Expression::Ident { .. } => ExpressionLevel::Lit,
             Expression::DataField { .. } => ExpressionLevel::Lit,
             Expression::ToStringWithoutUndefined { .. } => ExpressionLevel::Member,
             Expression::LitUndefined { .. } => ExpressionLevel::Lit,
@@ -82,8 +81,9 @@ fn expression_strigify_write<'s, W: FmtWrite>(
         return Ok(());
     }
     match expression {
-        Expression::ScopeRef { name, location, index: _ } |
-        Expression::Ident { name, location } |
+        Expression::ScopeRef { location, index } => {
+            stringifier.write_scope_name(*index, location)?;
+        }
         Expression::DataField { name, location } => {
             stringifier.write_token(name, name, location)?;
         }
@@ -121,12 +121,16 @@ fn expression_strigify_write<'s, W: FmtWrite>(
                 }
                 match field {
                     ObjectFieldKind::Named { name, location, colon_location, value } => {
+                        let is_shortcut = match value {
+                            Expression::ScopeRef { index, .. } => stringifier.get_scope_name(*index) == name.as_str(),
+                            Expression::DataField { name: x, .. } => x == name,
+                            _ => false,
+                        };
                         stringifier.write_token(name, name, location)?;
-                        stringifier.write_token(":", ":", colon_location)?;
-                        expression_strigify_write(value, stringifier, ExpressionLevel::Cond)?;
-                    }
-                    ObjectFieldKind::ShortcutNamed { name, location } => {
-                        stringifier.write_token(name, name, location)?;
+                        if !is_shortcut {
+                            stringifier.write_token(":", ":", colon_location.as_ref().unwrap_or(location))?;
+                            expression_strigify_write(value, stringifier, ExpressionLevel::Cond)?;
+                        }
                     }
                     ObjectFieldKind::Spread { location, value } => {
                         stringifier.write_token("...", "...", location)?;
