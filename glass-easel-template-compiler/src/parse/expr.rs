@@ -2,6 +2,8 @@ use std::ops::Range;
 
 use compact_str::CompactString;
 
+use crate::binding_map::{BindingMapCollector, BindingMapKeys};
+
 use super::{ParseState, Position, TemplateStructure, ParseErrorKind};
 
 #[derive(Debug, Clone)]
@@ -995,6 +997,13 @@ fn is_ident_start_char(ch: char) -> bool {
 }
 
 impl Expression {
+    pub fn sub_expressions(&self) -> SubExpression {
+        SubExpression {
+            inner: self,
+            index: 0,
+        }
+    }
+
     pub fn sub_expressions_mut(&mut self) -> SubExpressionMut {
         SubExpressionMut {
             inner: self,
@@ -1022,6 +1031,39 @@ impl Expression {
             sub.convert_scopes(scopes);
         }
     }
+
+    pub(super) fn collect_binding_map_keys(&self, bmc: &mut BindingMapCollector, bmk: &mut BindingMapKeys) {
+        if let Self::DataField { name, location: _ } = self {
+            if let Some(index) = bmc.add_field(name) {
+                bmk.add(name, index);
+            }
+        }
+        for sub in self.sub_expressions() {
+            sub.collect_binding_map_keys(bmc, bmk);
+        }
+    }
+
+    pub(super) fn disable_binding_map_keys(&self, bmc: &mut BindingMapCollector) {
+        if let Self::DataField { name, location: _ } = self {
+            bmc.disable_field(name);
+        }
+        for sub in self.sub_expressions() {
+            sub.disable_binding_map_keys(bmc);
+        }
+    }
+}
+
+pub struct SubExpression<'a> {
+    inner: &'a Expression,
+    index: usize,
+}
+
+impl<'a> Iterator for SubExpression<'a> {
+    type Item = &'a Expression;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next_item()
+    }
 }
 
 pub struct SubExpressionMut<'a> {
@@ -1033,142 +1075,157 @@ impl<'a> Iterator for SubExpressionMut<'a> {
     type Item = &'a mut Expression;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let value = match &mut self.inner {
-            Expression::ScopeRef { .. } |
-            Expression::DataField { .. } => {
-                return None;
-            }
-            Expression::ToStringWithoutUndefined { value, .. } => {
-                if self.index == 0 {
-                    self.index = 1;
-                    value
-                } else {
-                    return None;
-                }
-            }
-            Expression::LitUndefined { .. } |
-            Expression::LitNull { .. } |
-            Expression::LitStr { .. } |
-            Expression::LitInt { .. } |
-            Expression::LitFloat { .. } |
-            Expression::LitBool { .. } => {
-                return None;
-            }
-            Expression::LitObj { fields, .. } => {
-                let x = fields.get_mut(self.index)?;
-                self.index += 1;
-                match x {
-                    ObjectFieldKind::Named { value, .. } => value,
-                    ObjectFieldKind::Spread { value, .. } => value,
-                }
-            }
-            Expression::LitArr { fields, .. } => {
-                let x = fields.get_mut(self.index)?;
-                self.index += 1;
-                match x {
-                    ArrayFieldKind::Normal { value, .. } => value,
-                    ArrayFieldKind::Spread { value, .. } => value,
-                    ArrayFieldKind::EmptySlot => {
-                        return None;
-                    }
-                }
-            }
-            Expression::StaticMember { obj, .. } => {
-                if self.index == 0 {
-                    self.index = 1;
-                    obj
-                } else {
-                    return None;
-                }
-            }
-            Expression::DynamicMember { obj, field_name, .. } => {
-                if self.index == 0 {
-                    self.index = 1;
-                    obj
-                } else if self.index == 1 {
-                    self.index = 2;
-                    field_name
-                } else {
-                    return None;
-                }
-            }
-            Expression::FuncCall { func, args, .. } => {
-                if self.index == 0 {
-                    self.index = 1;
-                    func
-                } else {
-                    let value = args.get_mut(self.index - 1)?;
-                    self.index += 1;
-                    value
-                }
-            }
-            Expression::Reverse { value, .. } |
-            Expression::BitReverse { value, .. } |
-            Expression::Positive { value, .. } |
-            Expression::Negative { value, .. } |
-            Expression::TypeOf { value, .. } |
-            Expression::Void { value, .. } => {
-                if self.index == 0 {
-                    self.index = 1;
-                    value
-                } else {
-                    return None;
-                }
-            }
-            Expression::Multiply { left, right, .. } |
-            Expression::Divide { left, right, .. } |
-            Expression::Remainer { left, right, .. } |
-            Expression::Plus { left, right, .. } |
-            Expression::Minus { left, right, .. } |
-            Expression::Lt { left, right, .. } |
-            Expression::Gt { left, right, .. } |
-            Expression::Lte { left, right, .. } |
-            Expression::Gte { left, right, .. } |
-            Expression::InstanceOf { left, right, .. } |
-            Expression::Eq { left, right, .. } |
-            Expression::Ne { left, right, .. } |
-            Expression::EqFull { left, right, .. } |
-            Expression::NeFull { left, right, .. } |
-            Expression::BitAnd { left, right, .. } |
-            Expression::BitXor { left, right, .. } |
-            Expression::BitOr { left, right, .. } |
-            Expression::LogicAnd { left, right, .. } |
-            Expression::LogicOr { left, right, .. } |
-            Expression::NullishCoalescing { left, right, .. } => {
-                if self.index == 0 {
-                    self.index = 1;
-                    left
-                } else if self.index == 1 {
-                    self.index = 2;
-                    right
-                } else {
-                    return None;
-                }
-            }
-            Expression::Cond { cond, true_br, false_br, .. } => {
-                if self.index == 0 {
-                    self.index = 1;
-                    cond
-                } else if self.index == 1 {
-                    self.index = 2;
-                    true_br
-                } else if self.index == 2 {
-                    self.index = 3;
-                    false_br
-                } else {
-                    return None;
-                }
-            }
-        };
-
-        // SAFETY: it is safe because `Self::Item` is limited to `'a`
-        let value = unsafe { &mut *(value as *mut _)};
-        Some(value)
+        self.next_item()
     }
 }
 
+macro_rules! iter_sub_expr {
+    ($s:ident, $get:ident, $f:expr) => {
+        impl<'a> $s<'a> {
+            fn next_item(&mut self) -> Option<<Self as Iterator>::Item> {
+                let value = match &mut self.inner {
+                    Expression::ScopeRef { .. } |
+                    Expression::DataField { .. } => {
+                        return None;
+                    }
+                    Expression::ToStringWithoutUndefined { value, .. } => {
+                        if self.index == 0 {
+                            self.index = 1;
+                            value
+                        } else {
+                            return None;
+                        }
+                    }
+                    Expression::LitUndefined { .. } |
+                    Expression::LitNull { .. } |
+                    Expression::LitStr { .. } |
+                    Expression::LitInt { .. } |
+                    Expression::LitFloat { .. } |
+                    Expression::LitBool { .. } => {
+                        return None;
+                    }
+                    Expression::LitObj { fields, .. } => {
+                        let x = fields.$get(self.index)?;
+                        self.index += 1;
+                        match x {
+                            ObjectFieldKind::Named { value, .. } => value,
+                            ObjectFieldKind::Spread { value, .. } => value,
+                        }
+                    }
+                    Expression::LitArr { fields, .. } => {
+                        let x = fields.$get(self.index)?;
+                        self.index += 1;
+                        match x {
+                            ArrayFieldKind::Normal { value, .. } => value,
+                            ArrayFieldKind::Spread { value, .. } => value,
+                            ArrayFieldKind::EmptySlot => {
+                                return None;
+                            }
+                        }
+                    }
+                    Expression::StaticMember { obj, .. } => {
+                        if self.index == 0 {
+                            self.index = 1;
+                            obj
+                        } else {
+                            return None;
+                        }
+                    }
+                    Expression::DynamicMember { obj, field_name, .. } => {
+                        if self.index == 0 {
+                            self.index = 1;
+                            obj
+                        } else if self.index == 1 {
+                            self.index = 2;
+                            field_name
+                        } else {
+                            return None;
+                        }
+                    }
+                    Expression::FuncCall { func, args, .. } => {
+                        if self.index == 0 {
+                            self.index = 1;
+                            func
+                        } else {
+                            let value = args.$get(self.index - 1)?;
+                            self.index += 1;
+                            value
+                        }
+                    }
+                    Expression::Reverse { value, .. } |
+                    Expression::BitReverse { value, .. } |
+                    Expression::Positive { value, .. } |
+                    Expression::Negative { value, .. } |
+                    Expression::TypeOf { value, .. } |
+                    Expression::Void { value, .. } => {
+                        if self.index == 0 {
+                            self.index = 1;
+                            value
+                        } else {
+                            return None;
+                        }
+                    }
+                    Expression::Multiply { left, right, .. } |
+                    Expression::Divide { left, right, .. } |
+                    Expression::Remainer { left, right, .. } |
+                    Expression::Plus { left, right, .. } |
+                    Expression::Minus { left, right, .. } |
+                    Expression::Lt { left, right, .. } |
+                    Expression::Gt { left, right, .. } |
+                    Expression::Lte { left, right, .. } |
+                    Expression::Gte { left, right, .. } |
+                    Expression::InstanceOf { left, right, .. } |
+                    Expression::Eq { left, right, .. } |
+                    Expression::Ne { left, right, .. } |
+                    Expression::EqFull { left, right, .. } |
+                    Expression::NeFull { left, right, .. } |
+                    Expression::BitAnd { left, right, .. } |
+                    Expression::BitXor { left, right, .. } |
+                    Expression::BitOr { left, right, .. } |
+                    Expression::LogicAnd { left, right, .. } |
+                    Expression::LogicOr { left, right, .. } |
+                    Expression::NullishCoalescing { left, right, .. } => {
+                        if self.index == 0 {
+                            self.index = 1;
+                            left
+                        } else if self.index == 1 {
+                            self.index = 2;
+                            right
+                        } else {
+                            return None;
+                        }
+                    }
+                    Expression::Cond { cond, true_br, false_br, .. } => {
+                        if self.index == 0 {
+                            self.index = 1;
+                            cond
+                        } else if self.index == 1 {
+                            self.index = 2;
+                            true_br
+                        } else if self.index == 2 {
+                            self.index = 3;
+                            false_br
+                        } else {
+                            return None;
+                        }
+                    }
+                };
+        
+                // SAFETY: it is safe because `Self::Item` is limited to `'a`
+                let value = ($f)(value);
+                Some(value)
+            }
+        }                
+    };
+}
+
+iter_sub_expr!(SubExpression, get, |value| value);
+iter_sub_expr!(SubExpressionMut, get_mut, |value| unsafe { &mut *(value as *mut _)});
+
 #[cfg(test)]
 mod test {
+    use crate::stringify::Stringify;
+
     use super::*;
 
     #[test]
@@ -1452,5 +1509,60 @@ mod test {
         case!("{{ a + c : b }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 9..9);
         case!("{{ a ?. b }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 5..5);
         case!("{{ a ? b : c }}", "{{a?b:c}}");
+    }
+
+    #[test]
+    fn sub_expressions() {
+        fn check_sub_expr(src: &str, expect: &[&str]) {
+            let mut state = ParseState::new("TEST", src);
+            let parsed = Expression::parse_expression_or_object_inner(&mut state).unwrap();
+            let r: Vec<_> = parsed.sub_expressions().map(|x| {
+                let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src);
+                x.stringify_write(&mut stringifier).unwrap();
+                let (s, _) = stringifier.finish();
+                s
+            }).collect();
+            let r: Vec<_> = r.iter().map(|x| x.as_str()).collect();
+            assert_eq!(&r, expect);
+        }
+        check_sub_expr("a", &[]);
+        check_sub_expr("undefined", &[]);
+        check_sub_expr("null", &[]);
+        check_sub_expr("'a'", &[]);
+        check_sub_expr("1", &[]);
+        check_sub_expr("1.0", &[]);
+        check_sub_expr("true", &[]);
+        check_sub_expr("{ a, b: 1, ...c }", &["a", "1", "c"]);
+        check_sub_expr("[a, ...b]", &["a", "b"]);
+        check_sub_expr("a.b", &["a"]);
+        check_sub_expr("a[b]", &["a", "b"]);
+        check_sub_expr("a(b, c,)", &["a", "b", "c"]);
+        check_sub_expr("!a", &["a"]);
+        check_sub_expr("~a", &["a"]);
+        check_sub_expr("+a", &["a"]);
+        check_sub_expr("-a", &["a"]);
+        check_sub_expr("typeof a", &["a"]);
+        check_sub_expr("void a", &["a"]);
+        check_sub_expr("a * b", &["a", "b"]);
+        check_sub_expr("a / b", &["a", "b"]);
+        check_sub_expr("a % b", &["a", "b"]);
+        check_sub_expr("a + b * c", &["a", "b*c"]);
+        check_sub_expr("a * b - c", &["a*b", "c"]);
+        check_sub_expr("a < b", &["a", "b"]);
+        check_sub_expr("a <= b", &["a", "b"]);
+        check_sub_expr("a > b", &["a", "b"]);
+        check_sub_expr("a >= b", &["a", "b"]);
+        check_sub_expr("a instanceof b", &["a", "b"]);
+        check_sub_expr("a == b", &["a", "b"]);
+        check_sub_expr("a != b", &["a", "b"]);
+        check_sub_expr("a === b", &["a", "b"]);
+        check_sub_expr("a !== b", &["a", "b"]);
+        check_sub_expr("a & b", &["a", "b"]);
+        check_sub_expr("a | b", &["a", "b"]);
+        check_sub_expr("a ^ b", &["a", "b"]);
+        check_sub_expr("a && b", &["a", "b"]);
+        check_sub_expr("a || b", &["a", "b"]);
+        check_sub_expr("a ?? b", &["a", "b"]);
+        check_sub_expr("a ? b : c", &["a", "b", "c"]);
     }
 }

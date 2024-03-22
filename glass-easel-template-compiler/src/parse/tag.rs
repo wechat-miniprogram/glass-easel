@@ -16,7 +16,6 @@ pub struct Template {
     pub path: String,
     pub content: Vec<Node>,
     pub globals: TemplateGlobals,
-    pub binding_map_collector: BindingMapCollector,
 }
 
 #[derive(Debug, Clone)]
@@ -25,6 +24,7 @@ pub struct TemplateGlobals {
     pub includes: Vec<StrName>,
     pub sub_templates: Vec<(StrName, Vec<Node>)>,
     pub scripts: Vec<Script>,
+    pub(crate) binding_map_collector: BindingMapCollector,
 }
 
 impl Template {
@@ -34,31 +34,14 @@ impl Template {
             includes: vec![],
             sub_templates: vec![],
             scripts: vec![],
+            binding_map_collector: BindingMapCollector::new(),
         };
-
-        // first round - parse the original string
         let mut content = vec![];
         Node::parse_vec_node(ps, &mut globals, &mut content);
-
-        // second round - traverse the tree to find more information
-        fn rec(
-            nodes: &mut Vec<Node>,
-            binding_map_collector: &mut BindingMapCollector,
-        ) {
-            for node in nodes {
-            }
-        }
-        let mut binding_map_collector = BindingMapCollector::new();
-        for (_, nodes) in globals.sub_templates.iter_mut() {
-            rec(nodes, &mut binding_map_collector);
-        }
-        rec(&mut content, &mut binding_map_collector);
-
         Template {
             path: ps.path.to_string(),
             content,
             globals,
-            binding_map_collector,
         }
     }
 }
@@ -125,12 +108,7 @@ impl Node {
             };
             if !is_whitespace {
                 let mut value = value;
-                match &mut value {
-                    Value::Static { .. } => {}
-                    Value::Dynamic { expression, .. } => {
-                        expression.convert_scopes(&ps.scopes);
-                    }
-                }
+                value.init_scopes_and_binding_map_keys(ps, globals);
                 ret.push(Node::Text(value));
             }
         }
@@ -1631,25 +1609,17 @@ impl Element {
             let mut if_condition = if_condition;
             let mut for_list = for_list;
             if let ForList::For { list, item_name, index_name, key: _ } = &mut for_list {
-                match &mut list.1 {
-                    Value::Static { .. } => {}
-                    Value::Dynamic { expression, .. } => {
-                        expression.convert_scopes(&ps.scopes);
-                    }
-                }
+                list.1.init_scopes_and_binding_map_keys(ps, globals);
                 ps.scopes.push((item_name.1.name.clone(), item_name.1.location.clone()));
                 ps.scopes.push((index_name.1.name.clone(), index_name.1.location.clone()));
             }
-            wrapped_element.for_each_expression_mut(|x| x.convert_scopes(&ps.scopes));
+            wrapped_element.for_each_value_mut(|x| {
+                x.init_scopes_and_binding_map_keys(ps, globals);
+            });
             match &mut if_condition {
                 IfCondition::If(_, value) |
                 IfCondition::Elif(_, value) => {
-                    match value {
-                        Value::Static { .. } => {}
-                        Value::Dynamic { expression, .. } => {
-                            expression.convert_scopes(&ps.scopes);
-                        }
-                    }
+                    value.init_scopes_and_binding_map_keys(ps, globals);
                 }
                 IfCondition::Else(_) | IfCondition::None => {}
             }
@@ -2138,6 +2108,27 @@ impl Value {
             ret_location.end = ps.position();
         }
         ret
+    }
+
+    fn init_scopes_and_binding_map_keys(&mut self, ps: &mut ParseState, globals: &mut TemplateGlobals) {
+        match self {
+            Self::Static { .. } => {}
+            Self::Dynamic { expression, binding_map_keys, .. } => {
+                expression.convert_scopes(&ps.scopes);
+                if ps.inside_dynamic_tree > 0 {
+                    expression.disable_binding_map_keys(
+                        &mut globals.binding_map_collector,
+                    );
+                } else {
+                    let mut bmk = BindingMapKeys::new();
+                    expression.collect_binding_map_keys(
+                        &mut globals.binding_map_collector,
+                        &mut bmk,
+                    );
+                    *binding_map_keys = Some(bmk);
+                }
+            }
+        }
     }
 }
 

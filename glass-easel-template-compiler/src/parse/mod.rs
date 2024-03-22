@@ -2,6 +2,9 @@ use std::ops::Range;
 
 use compact_str::CompactString;
 
+use super::binding_map;
+pub use tag::Template;
+
 #[cfg(test)]
 macro_rules! case {
     ($src:expr, $expect:expr $(, $msg:expr, $range:expr)*) => {
@@ -41,9 +44,6 @@ macro_rules! case {
 pub mod tag;
 pub mod expr;
 
-use super::binding_map;
-pub use tag::Template;
-
 pub trait TemplateStructure {
     fn location(&self) -> Range<Position>;
 
@@ -64,6 +64,7 @@ pub struct ParseState<'s> {
     line: u32,
     utf16_col: u32,
     scopes: Vec<(CompactString, Range<Position>)>,
+    inside_dynamic_tree: usize,
     auto_skip_whitespace: bool,
     warnings: Vec<ParseError>,
 }
@@ -84,6 +85,7 @@ impl<'s> ParseState<'s> {
             line: 1,
             utf16_col: 0,
             scopes: vec![],
+            inside_dynamic_tree: 0,
             auto_skip_whitespace: false,
             warnings: vec![],
         }
