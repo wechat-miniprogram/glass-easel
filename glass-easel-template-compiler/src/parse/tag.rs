@@ -1426,6 +1426,26 @@ impl Element {
             IfCondition::None
         };
 
+        // update dynamic tree state
+        let self_dynamic_tree = match element {
+            ElementKind::Normal { .. } |
+            ElementKind::Pure { .. } => {
+                if let (IfCondition::None, ForList::None) = (&if_condition, &for_list) {
+                    false
+                } else {
+                    true
+                }
+            }
+            ElementKind::For { .. } |
+            ElementKind::If { .. } |
+            ElementKind::TemplateRef { .. } |
+            ElementKind::Include { .. } |
+            ElementKind::Slot { .. } => true,
+        };
+        if self_dynamic_tree {
+            ps.inside_dynamic_tree += 1;
+        }
+
         // handling scopes
         enum ScopeState {
             PrevCount(usize),
@@ -1556,6 +1576,9 @@ impl Element {
                 ps.scopes = x;
             }
         }
+        if self_dynamic_tree {
+            ps.inside_dynamic_tree -= 1;
+        }
 
         // write the parsed element
         if is_script_tag {
@@ -1608,6 +1631,9 @@ impl Element {
             // e.g. `<div data:a="{{index}}" wx:for="{{list}}" />`
             let mut if_condition = if_condition;
             let mut for_list = for_list;
+            if self_dynamic_tree {
+                ps.inside_dynamic_tree += 1;
+            }
             if let ForList::For { list, item_name, index_name, key: _ } = &mut for_list {
                 list.1.init_scopes_and_binding_map_keys(ps, globals);
                 ps.scopes.push((item_name.1.name.clone(), item_name.1.location.clone()));
@@ -1627,7 +1653,10 @@ impl Element {
                 ps.scopes.pop();
                 ps.scopes.pop();
             }
-
+            if self_dynamic_tree {
+                ps.inside_dynamic_tree -= 1;
+            }
+    
             // wrap if condition
             let wrapped_element = match if_condition {
                 IfCondition::None => Some(wrapped_element),
