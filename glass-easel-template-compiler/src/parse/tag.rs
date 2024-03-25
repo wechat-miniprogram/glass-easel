@@ -44,6 +44,70 @@ impl Template {
             globals,
         }
     }
+
+    pub fn direct_dependencies<'a>(&'a self) -> impl Iterator<Item = String> + 'a {
+        self.globals.imports.iter().chain(self.globals.includes.iter()).map(move |p| {
+            crate::path::resolve(&self.path, &p.name)
+        })
+    }
+
+    pub fn script_dependencies<'a>(&'a self) -> impl Iterator<Item = String> + 'a {
+        self.globals.scripts.iter().filter_map(move |script| {
+            match script {
+                Script::GlobalRef { path, .. } => {
+                    let abs_path = crate::path::resolve(&self.path, &path.name);
+                    Some(abs_path)
+                }
+                Script::Inline { .. } => None,
+            }
+        })
+    }
+
+    pub fn inline_script_module_names<'a>(&'a self) -> impl Iterator<Item = &'a str> {
+        self.globals.scripts.iter().filter_map(move |script| {
+            match script {
+                Script::GlobalRef { .. } => None,
+                Script::Inline { module_name, .. } => {
+                    Some(module_name.name.as_str())
+                }
+            }
+        })
+    }
+
+    pub fn inline_script_content(&self, module_name: &str) -> Option<&str> {
+        for script in self.globals.scripts.iter() {
+            match script {
+                Script::GlobalRef { .. } => {}
+                Script::Inline { module_name: m, content, content_location: _ } => {
+                    if module_name == m.name.as_str() {
+                        return Some(&content);
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    pub fn set_inline_script_content(&mut self, module_name: &str, new_content: &str) {
+        let content_location = Position { line: 0, utf16_col: 0 }..Position { line: 0, utf16_col: 0 };
+        match self.globals.scripts.iter_mut().find(|script| match script {
+            Script::GlobalRef { .. } => false,
+            Script::Inline { module_name: m, .. } => module_name == m.name.as_str(),
+        }) {
+            Some(script) => {
+                *script = Script::Inline {
+                    module_name: script.module_name().clone(),
+                    content: new_content.to_string(),
+                    content_location,
+                };
+            }
+            None => self.globals.scripts.push(Script::Inline {
+                module_name: StrName { name: CompactString::new(module_name), location: content_location.clone() },
+                content: String::from(new_content),
+                content_location,
+            }),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -139,7 +203,7 @@ pub enum ElementKind {
         generics: Vec<StaticAttribute>,
         extra_attr: Vec<StaticAttribute>,
         slot: Option<(Range<Position>, Value)>,
-        slot_value_refs: Vec<StaticAttribute>,
+        slot_value_refs: Vec<StaticAttribute>, // TODO !!!
     },
     Pure {
         event_bindings: Vec<EventBinding>,
@@ -219,6 +283,13 @@ impl Element {
             ElementKind::Slot { .. } => {
                 None
             }
+        }
+    }
+
+    pub(crate) fn slot_value_refs(&self) -> Option<impl Iterator<Item = &StaticAttribute>> {
+        match &self.kind {
+            ElementKind::Normal { slot_value_refs, .. } => Some(slot_value_refs.iter()),
+            _ => None,
         }
     }
 
@@ -594,6 +665,26 @@ impl Element {
                     AttrPrefixKind::ExtraAttr(_) => AttrPrefixParseKind::StaticStr,
                     AttrPrefixKind::SlotDataRef(_) => AttrPrefixParseKind::ScopeName,
                     AttrPrefixKind::Invalid(_) => AttrPrefixParseKind::Value,
+                };
+
+                // dash to camel case conversion for attribute name
+                let attr_name = match &prefix {
+                    AttrPrefixKind::Model(_) |
+                    AttrPrefixKind::Change(_) |
+                    AttrPrefixKind::Worklet(_) |
+                    AttrPrefixKind::SlotDataRef(_) => {
+                        Ident {
+                            name: dash_to_camel(&attr_name.name),
+                            location: attr_name.location,
+                        }
+                    }
+                    AttrPrefixKind::DataHyphen => {
+                        Ident {
+                            name: dash_to_camel(attr_name.name.strip_prefix("data-").unwrap()),
+                            location: attr_name.location,
+                        }
+                    }
+                    _ => attr_name,
                 };
 
                 // actually parse the value
@@ -1030,10 +1121,6 @@ impl Element {
                         match &mut element {
                             ElementKind::Normal { data, .. } => {
                                 if let AttrPrefixParseResult::Value(value) = attr_value {
-                                    let attr_name = Ident {
-                                        name: dash_to_camel(attr_name.name.strip_prefix("data-").unwrap()).into(),
-                                        location: attr_name.location.clone(),
-                                    };
                                     if data.iter().find(|attr| attr.name.name_eq(&attr_name)).is_some() {
                                         ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
                                     } else {
@@ -2175,7 +2262,7 @@ pub enum Script {
 }
 
 impl Script {
-    fn module_name(&self) -> &StrName {
+    pub fn module_name(&self) -> &StrName {
         match self {
             Self::Inline { module_name, .. } |
             Self::GlobalRef { module_name, .. } => module_name,

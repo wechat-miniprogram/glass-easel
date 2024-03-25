@@ -6,9 +6,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Write;
 
-use self::parser::{parse_tmpl, TmplParseError};
-
-use super::*;
+use crate::parse::{ParseError, Template};
 
 // PRESERVED one-letter vars
 // A: the binding map object
@@ -113,7 +111,7 @@ fn runtime_var_list() -> Vec<&'static str> {
     RUNTIME_ITEMS.iter().map(|(k, _)| *k).collect()
 }
 
-/// Template parsing error object.
+/// A general template error.
 pub struct TmplError {
     pub message: String,
 }
@@ -140,73 +138,13 @@ impl From<fmt::Error> for TmplError {
 
 impl std::error::Error for TmplError {}
 
-pub(crate) mod path {
-    pub(crate) fn normalize(path: &str) -> String {
-        let mut slices = vec![];
-        for slice in path.split('/') {
-            match slice {
-                "." => {}
-                ".." => {
-                    slices.pop();
-                }
-                _ => {
-                    slices.push(slice);
-                }
-            }
-        }
-        slices.join("/")
-    }
-
-    pub(crate) fn resolve(base: &str, rel: &str) -> String {
-        let mut slices = vec![];
-        let main = if rel.starts_with('/') {
-            &rel[1..]
-        } else {
-            for slice in base.split('/') {
-                match slice {
-                    "." => {}
-                    ".." => {
-                        slices.pop();
-                    }
-                    _ => {
-                        slices.push(slice);
-                    }
-                }
-            }
-            rel
-        };
-        slices.pop();
-        for slice in main.split('/') {
-            match slice {
-                "." => {}
-                ".." => {
-                    slices.pop();
-                }
-                _ => {
-                    slices.push(slice);
-                }
-            }
-        }
-        slices.join("/")
-    }
-}
-
 /// A template group in which the templates can ref each other.
+#[derive(Debug)]
 pub struct TmplGroup {
-    trees: HashMap<String, TmplTree>,
+    trees: HashMap<String, Template>,
     scripts: HashMap<String, String>,
     has_scripts: bool,
     extra_runtime_string: String,
-}
-
-impl fmt::Debug for TmplGroup {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (name, tree) in self.trees.iter() {
-            writeln!(f, "{}", name)?;
-            writeln!(f, "{}", tree)?;
-        }
-        Ok(())
-    }
 }
 
 impl TmplGroup {
@@ -229,7 +167,7 @@ impl TmplGroup {
     }
 
     /// Add a ref of a parsed tree in the group.
-    pub fn get_tree(&self, path: &str) -> Result<&TmplTree, TmplError> {
+    pub fn get_tree(&self, path: &str) -> Result<&Template, TmplError> {
         match self.trees.get(path) {
             Some(x) => Ok(x),
             None => Err(TmplError {
@@ -239,7 +177,7 @@ impl TmplGroup {
     }
 
     /// Get a mutable ref of a parsed tree in the group.
-    pub fn get_tree_mut(&mut self, path: &str) -> Result<&mut TmplTree, TmplError> {
+    pub fn get_tree_mut(&mut self, path: &str) -> Result<&mut Template, TmplError> {
         match self.trees.get_mut(path) {
             Some(x) => Ok(x),
             None => Err(TmplError {
@@ -249,14 +187,17 @@ impl TmplGroup {
     }
 
     /// Add a template into the group.
-    pub fn add_tmpl(&mut self, path: &str, tmpl_str: &str) -> Result<(), TmplParseError> {
-        let mut tmpl = parse_tmpl(tmpl_str, path)?;
-        tmpl.path = path.to_string();
-        if tmpl.get_inline_script_module_names().len() > 0 {
+    pub fn add_tmpl(&mut self, path: &str, tmpl_str: &str) -> Vec<ParseError> {
+        let (template, parse_state) = crate::parse::parse(path, tmpl_str);
+        if template.inline_script_module_names().next().is_some() {
             self.has_scripts = true;
         }
-        self.trees.insert(tmpl.path.clone(), tmpl);
-        Ok(())
+        let ret = parse_state.take_warnings();
+        let success = ret.iter().find(|x| x.prevent_success()).is_none();
+        if success {
+            self.trees.insert(template.path.clone(), template);
+        }
+        ret
     }
 
     /// Get a script segment in the group.
@@ -273,10 +214,9 @@ impl TmplGroup {
     ///
     /// The `content` must be valid JavaScript file content.
     /// `require` and `exports` can be visited in this JavaScript segment, similar to Node.js.
-    pub fn add_script(&mut self, path: &str, content: &str) -> Result<(), TmplParseError> {
+    pub fn add_script(&mut self, path: &str, content: &str) {
         self.scripts.insert(path.to_string(), content.to_string());
         self.has_scripts = true;
-        Ok(())
     }
 
     /// Set extra runtime JavaScript code as a string.
@@ -303,23 +243,23 @@ impl TmplGroup {
     }
 
     /// Get direct dependency template files.
-    pub fn get_direct_dependencies(&self, path: &str) -> Result<Vec<String>, TmplError> {
-        Ok(self.get_tree(path)?.get_direct_dependencies())
+    pub fn direct_dependencies<'a>(&'a self, path: &str) -> Result<impl Iterator<Item = String> + 'a, TmplError> {
+        Ok(self.get_tree(path)?.direct_dependencies())
     }
 
     /// Get dependency script files.
-    pub fn get_script_dependencies(&self, path: &str) -> Result<Vec<String>, TmplError> {
-        Ok(self.get_tree(path)?.get_script_dependencies())
+    pub fn script_dependencies<'a>(&'a self, path: &str) -> Result<impl Iterator<Item = String> + 'a, TmplError> {
+        Ok(self.get_tree(path)?.script_dependencies())
     }
 
     /// Get inline script module names.
-    pub fn get_inline_script_module_names(&self, path: &str) -> Result<Vec<String>, TmplError> {
-        Ok(self.get_tree(path)?.get_inline_script_module_names())
+    pub fn inline_script_module_names<'a>(&'a self, path: &str) -> Result<impl Iterator<Item = &'a str>, TmplError> {
+        Ok(self.get_tree(path)?.inline_script_module_names())
     }
 
     /// Get inline script content.
-    pub fn get_inline_script(&self, path: &str, module_name: &str) -> Result<&str, TmplError> {
-        match self.get_tree(path)?.get_inline_script(module_name) {
+    pub fn inline_script_content(&self, path: &str, module_name: &str) -> Result<&str, TmplError> {
+        match self.get_tree(path)?.inline_script_content(module_name) {
             Some(x) => Ok(x),
             None => Err(TmplError {
                 message: format!(r#"no inline script "{}" found in "{}""#, path, module_name),
@@ -328,7 +268,7 @@ impl TmplGroup {
     }
 
     /// Set inline script content.
-    pub fn set_inline_script(
+    pub fn set_inline_script_content(
         &mut self,
         path: &str,
         module_name: &str,
@@ -336,7 +276,7 @@ impl TmplGroup {
     ) -> Result<(), TmplError> {
         Ok(self
             .get_tree_mut(path)?
-            .set_inline_script(module_name, new_content))
+            .set_inline_script_content(module_name, new_content))
     }
 
     /// Convert to WXML GenObject js string.

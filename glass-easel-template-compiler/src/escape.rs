@@ -1,5 +1,6 @@
 //! Helpers for escaping
 
+use compact_str::CompactString;
 use regex::{Captures, Regex};
 use std::borrow::Cow;
 
@@ -43,8 +44,8 @@ pub(crate) fn gen_lit_str(s: &str) -> String {
     format!("{:?}", s)
 }
 
-pub(crate) fn dash_to_camel(s: &str) -> String {
-    let mut camel_name = String::new();
+pub(crate) fn dash_to_camel(s: &str) -> CompactString {
+    let mut camel_name = CompactString::new("");
     let mut next_upper = false;
     for c in s.chars() {
         if c == '-' {

@@ -4,7 +4,7 @@ use crate::{escape::gen_lit_str, parse::expr::{ArrayFieldKind, Expression, Objec
 use super::{Stringifier, Stringify};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
-enum ExpressionLevel {
+pub(crate) enum ExpressionLevel {
     Lit = 0,
     Member = 1,
     Unary = 2,
@@ -21,7 +21,7 @@ enum ExpressionLevel {
 }
 
 impl ExpressionLevel {
-    fn from_expression(expr: &Expression) -> Self {
+    pub(crate) fn from_expression(expr: &Expression) -> Self {
         match expr {
             Expression::ScopeRef { .. } => ExpressionLevel::Lit,
             Expression::DataField { .. } => ExpressionLevel::Lit,

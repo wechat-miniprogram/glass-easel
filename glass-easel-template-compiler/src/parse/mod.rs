@@ -105,6 +105,11 @@ impl<'s> ParseState<'s> {
         self.warnings.iter()
     }
 
+    /// Extract and then clear all warnings.
+    pub fn take_warnings(&self) -> Vec<ParseError> {
+        std::mem::replace(&mut self.warnings, vec![])
+    }
+
     fn cur_str(&self) -> &'s str {
         &self.whole_str[self.cur_index..]
     }
@@ -360,6 +365,18 @@ impl std::fmt::Display for ParseError {
 }
 
 impl std::error::Error for ParseError {}
+
+impl ParseError {
+    /// The level of the error.
+    pub fn level(&self) -> ParseErrorLevel {
+        self.kind.level()
+    }
+
+    /// Whether the error prevent a success compilation.
+    pub fn prevent_success(&self) -> bool {
+        self.level() >= ParseErrorLevel::Error
+    }
+}
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum ParseErrorKind {

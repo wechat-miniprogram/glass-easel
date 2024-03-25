@@ -9,7 +9,7 @@ use crate::{escape::escape_html_quote, parse::{
 }};
 
 mod tag;
-mod expr;
+pub(crate) mod expr;
 
 pub struct Stringifier<'s, W: FmtWrite> {
     w: W,
