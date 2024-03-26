@@ -111,7 +111,13 @@ fn load_wxml_files(group: &mut TmplGroup, dir: &Path, wxml_path: &mut Vec<String
                                             .unwrap()
                                             .to_string(),
                                     );
-                                    group.add_tmpl(&wxml_path.join("/"), &content).unwrap();
+                                    for err in group.add_tmpl(&wxml_path.join("/"), &content) {
+                                        if err.prevent_success() {
+                                            error!("{}", err);
+                                        } else {
+                                            warn!("{}", err);
+                                        }
+                                    }
                                     wxml_path.pop();
                                     size += fsize;
                                 }
@@ -133,7 +139,13 @@ fn main() {
         use std::io::Read;
         let mut s = String::new();
         std::io::stdin().read_to_string(&mut s).unwrap();
-        group.add_tmpl("".into(), &s).unwrap();
+        for err in group.add_tmpl("".into(), &s) {
+            if err.prevent_success() {
+                error!("{}", err);
+            } else {
+                warn!("{}", err);
+            }
+        }
         s.len() as u64
     } else {
         load_wxml_files(

@@ -1,7 +1,7 @@
 use std::{fmt::{Result as FmtResult, Write as FmtWrite}, ops::Range};
 
 use crate::{escape::{escape_html_body, escape_html_text}, parse::{
-    expr::Expression, tag::{Attribute, ClassAttribute, Element, ElementKind, EventBinding, Ident, Node, Script, StrName, StyleAttribute, Value, DEFAULT_FOR_INDEX_SCOPE_NAME, DEFAULT_FOR_ITEM_SCOPE_NAME}, Position, Template
+    expr::Expression, tag::{ClassAttribute, CommonElementAttributes, Element, ElementKind, Ident, Node, Script, StrName, StyleAttribute, Value, DEFAULT_FOR_INDEX_SCOPE_NAME, DEFAULT_FOR_ITEM_SCOPE_NAME}, Position, Template
 }};
 use super::{Stringifier, Stringify};
 
@@ -146,18 +146,37 @@ impl Stringify for Element {
             }
             Ok(())
         };
-        let write_event_bindings = |
+        let write_common_attributes = |
             stringifier: &mut Stringifier<'s, W>,
-            event_bindings: &Vec<EventBinding>,
-            marks: &Vec<Attribute>,
-            slot: &Option<(Range<Position>, Value)>,
+            common: &CommonElementAttributes,
         | -> FmtResult {
+            let CommonElementAttributes {
+                id,
+                slot,
+                slot_value_refs,
+                event_bindings,
+                marks,
+            } = common;
+            if let Some((loc, value)) = id.as_ref() {
+                write_named_attr(stringifier, "id", loc, value)?;
+            }
             if let Some((loc, value)) = slot.as_ref() {
                 write_named_attr(stringifier, "slot", loc, value)?;
             }
             for attr in marks.iter() {
                 let prefix = ("mark", attr.prefix_location.as_ref().unwrap_or(&attr.name.location));
                 write_attr(stringifier, Some(prefix), &attr.name, &attr.value)?;
+            }
+            for attr in slot_value_refs.iter() {
+                let value = stringifier.add_scope(&attr.value.name).clone();
+                stringifier.write_str(" ")?;
+                stringifier.write_token("slot", "slot", &attr.prefix_location)?;
+                stringifier.write_str(":")?;
+                stringifier.write_token(&attr.name.name, &attr.name.name, &attr.name.location)?;
+                if value != &attr.name.name {
+                    stringifier.write_str(r#"="#)?;
+                    stringifier.write_str_name_quoted(&StrName { name: value, location: attr.value.location.clone() })?;
+                }
             }
             for ev in event_bindings.iter() {
                 let prefix = if ev.is_catch {
@@ -232,20 +251,17 @@ impl Stringify for Element {
                 style,
                 change_attributes,
                 worklet_attributes,
-                event_bindings,
-                marks,
                 data,
                 children: _,
                 generics,
                 extra_attr,
-                slot,
-                slot_value_refs,
+                common,
             } => {
                 stringifier.write_ident(&tag_name)?;
                 match class {
                     ClassAttribute::None => {}
-                    ClassAttribute::String(..) => {
-                        todo!()
+                    ClassAttribute::String(location, value) => {
+                        write_attr(stringifier, None, &Ident { name: "class".into(), location: location.clone() }, &value)?;
                     }
                     ClassAttribute::Multiple(..) => {
                         todo!()
@@ -253,8 +269,8 @@ impl Stringify for Element {
                 }
                 match style {
                     StyleAttribute::None => {}
-                    StyleAttribute::String(..) => {
-                        todo!()
+                    StyleAttribute::String(location, value) => {
+                        write_attr(stringifier, None, &Ident { name: "style".into(), location: location.clone() }, &value)?;
                     }
                     StyleAttribute::Multiple(..) => {
                         todo!()
@@ -271,7 +287,6 @@ impl Stringify for Element {
                 for attr in worklet_attributes.iter() {
                     write_static_attr(stringifier, Some(("worklet", &attr.prefix_location)), &attr.name, &attr.value)?;
                 }
-                write_event_bindings(stringifier, event_bindings, marks, slot)?;
                 for attr in data.iter() {
                     let prefix = ("data", attr.prefix_location.as_ref().unwrap_or(&attr.name.location));
                     write_attr(stringifier, Some(prefix), &attr.name, &attr.value)?;
@@ -282,26 +297,14 @@ impl Stringify for Element {
                 for attr in extra_attr.iter() {
                     write_static_attr(stringifier, Some(("extra-attr", &attr.prefix_location)), &attr.name, &attr.value)?;
                 }
-                for attr in slot_value_refs.iter() {
-                    let value = stringifier.add_scope(&attr.value.name).clone();
-                    stringifier.write_str(" ")?;
-                    stringifier.write_token("slot", "slot", &attr.prefix_location)?;
-                    stringifier.write_str(":")?;
-                    stringifier.write_token(&attr.name.name, &attr.name.name, &attr.name.location)?;
-                    if value != &attr.name.name {
-                        stringifier.write_str(r#"="#)?;
-                        stringifier.write_str_name_quoted(&StrName { name: value, location: attr.value.location.clone() })?;
-                    }
-                }
+                write_common_attributes(stringifier, common)?;
             }
             ElementKind::Pure {
-                event_bindings,
-                marks,
                 children: _,
-                slot,
+                common,
             } => {
                 stringifier.write_str("block")?;
-                write_event_bindings(stringifier, event_bindings, marks, slot)?;
+                write_common_attributes(stringifier, common)?;
             }
             ElementKind::For {
                 list,
@@ -328,31 +331,26 @@ impl Stringify for Element {
             ElementKind::TemplateRef {
                 target,
                 data,
-                event_bindings,
-                marks,
-                slot,
             } => {
                 stringifier.write_str("template")?;
                 write_named_attr(stringifier, "is", &target.0, &target.1)?;
                 if !data.1.is_empty() {
                     write_named_attr(stringifier, "data", &data.0, &data.1)?;
                 }
-                write_event_bindings(stringifier, event_bindings, marks, slot)?;
             }
-            ElementKind::Include { path, event_bindings, marks, slot } => {
+            ElementKind::Include { path } => {
                 stringifier.write_str("include")?;
                 write_named_static_attr(stringifier, "src", &path.0, &path.1)?;
-                write_event_bindings(stringifier, event_bindings, marks, slot)?;
             }
-            ElementKind::Slot { event_bindings, marks, slot, name, values } => {
+            ElementKind::Slot { name, values, common } => {
                 stringifier.write_str("slot")?;
                 if !name.1.is_empty() {
                     write_named_attr(stringifier, "name", &name.0, &name.1)?;
                 }
-                write_event_bindings(stringifier, event_bindings, marks, slot)?;
                 for attr in values.iter() {
                     write_attr(stringifier, None, &attr.name, &attr.value)?;
                 }
+                write_common_attributes(stringifier, common)?;
             }
         }
 

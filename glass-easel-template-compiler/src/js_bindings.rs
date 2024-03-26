@@ -25,7 +25,7 @@ impl From<ParseError> for TemplateParseError {
     fn from(value: ParseError) -> Self {
         Self {
             is_error: value.kind.level() >= ParseErrorLevel::Error,
-            code: value.kind as u32,
+            code: value.code() as u32,
             message: value.kind.to_string(),
             path: value.path.to_string(),
             start_line: value.location.start.line,
@@ -39,10 +39,9 @@ impl From<ParseError> for TemplateParseError {
 #[wasm_bindgen]
 pub struct TmplGroup {
     group: crate::TmplGroup,
-    names: Vec<String>,
 }
 
-fn convert_str_arr<T: ToString>(arr: &impl Iterator<Item = T>) -> js_sys::Array {
+fn convert_str_arr<T: ToString>(arr: impl Iterator<Item = T>) -> js_sys::Array {
     let ret = js_sys::Array::new();
     for (index, item) in arr.enumerate() {
         ret.set(index as u32, JsValue::from(item.to_string()));
@@ -56,7 +55,6 @@ impl TmplGroup {
     pub fn new() -> Self {
         Self {
             group: crate::TmplGroup::new(),
-            names: vec![],
         }
     }
 
@@ -82,19 +80,19 @@ impl TmplGroup {
     #[wasm_bindgen(js_name = "getDirectDependencies")]
     pub fn get_direct_dependencies(&self, path: &str) -> Result<js_sys::Array, JsError> {
         let dependencies = self.group.direct_dependencies(&path)?;
-        Ok(convert_str_arr(&dependencies))
+        Ok(convert_str_arr(dependencies))
     }
 
     #[wasm_bindgen(js_name = "getScriptDependencies")]
     pub fn get_script_dependencies(&self, path: &str) -> Result<js_sys::Array, JsError> {
         let dependencies = self.group.script_dependencies(&path)?;
-        Ok(convert_str_arr(&dependencies))
+        Ok(convert_str_arr(dependencies))
     }
 
     #[wasm_bindgen(js_name = "getInlineScriptModuleNames")]
     pub fn get_inline_script_module_names(&self, path: &str) -> Result<js_sys::Array, JsError> {
         let names = self.group.inline_script_module_names(path)?;
-        Ok(convert_str_arr(&names))
+        Ok(convert_str_arr(names))
     }
 
     #[wasm_bindgen(js_name = "getInlineScript")]

@@ -2,7 +2,7 @@ use std::fmt::Write;
 
 use compact_str::CompactString;
 
-use crate::{escape::gen_lit_str, parse::expr::Expression, stringify::expr::ExpressionLevel, TmplError};
+use crate::{escape::gen_lit_str, parse::expr::{ArrayFieldKind, Expression, ObjectFieldKind}, stringify::expr::ExpressionLevel, TmplError};
 use super::{JsExprWriter, JsFunctionScopeWriter, JsIdent, ScopeVar, ScopeVarLvaluePath};
 
 
@@ -14,7 +14,7 @@ pub(crate) enum PathSlice {
     StaticMember(CompactString),
     IndirectValue(JsIdent),
     CombineObj(Vec<(Option<CompactString>, PathAnalysisState, Vec<PathSliceList>)>),
-    CombineArr(Vec<(PathAnalysisState, Vec<PathSliceList>)>),
+    CombineArr(Vec<(PathAnalysisState, Vec<PathSliceList>)>, Vec<(PathAnalysisState, Vec<PathSliceList>)>),
     Condition(JsIdent, (PathAnalysisState, Vec<PathSliceList>), (PathAnalysisState, Vec<PathSliceList>)),
 }
 
@@ -232,16 +232,24 @@ impl PathSliceList {
                         write!(ret, "{}{{{}}}", prepend, s)?;
                     }
                 }
-                PathSlice::CombineArr(v) => {
+                PathSlice::CombineArr(v, spread) => {
+                    for (sub_pas, sub_p) in spread.iter() {
+                        let mut sub_s = String::new();
+                        let sub_pas_str =
+                            sub_pas.to_path_analysis_str(sub_p, &mut sub_s, scopes)?;
+                        if let Some(_) = sub_pas_str {
+                            write!(ret, "({})===true||", sub_s)?;
+                        }
+                    }
                     write!(ret, "[")?;
                     let mut next_need_comma_sep = false;
                     for (sub_pas, sub_p) in v.iter() {
+                        if next_need_comma_sep {
+                            write!(ret, ",")?;
+                        }
                         let mut s = String::new();
                         let sub_pas_str = sub_pas.to_path_analysis_str(sub_p, &mut s, scopes)?;
                         if let Some(_) = sub_pas_str {
-                            if next_need_comma_sep {
-                                write!(ret, ",")?;
-                            }
                             write!(ret, "{}", s)?;
                             next_need_comma_sep = true;
                         }
@@ -355,9 +363,9 @@ impl Expression {
         path_calc: &mut Vec<PathSliceList>,
         value: &mut String,
     ) -> Result<PathAnalysisState, TmplError> {
-        if ExpressionLevel::from_expression(self) > allow_level {
+        if proc_gen_expression_level(self) > allow_level {
             write!(value, "(")?;
-            let ret = self.to_proc_gen_rec(w, scopes, ExpressionLevel::Comma, path_calc, value)?;
+            let ret = self.to_proc_gen_rec(w, scopes, ExpressionLevel::Cond, path_calc, value)?;
             write!(value, ")")?;
             return Ok(ret);
         }
@@ -419,24 +427,24 @@ impl Expression {
                 let mut next_need_comma_sep = false;
                 let mut sub_pas_list = Vec::with_capacity(x.len());
                 for x in x.iter() {
-                    match &x.0 {
-                        Some(k) => {
+                    match x {
+                        ObjectFieldKind::Named { name, value, .. } => {
                             if next_need_comma_sep {
                                 write!(s, ",")?;
                             }
-                            write!(s, "{}:", &k)?;
-                            let (pas, sub_p) = x.1.to_proc_gen_rec_and_combine_paths(
+                            write!(s, "{}:", &name)?;
+                            let (pas, sub_p) = value.to_proc_gen_rec_and_combine_paths(
                                 w,
                                 scopes,
                                 ExpressionLevel::Cond,
                                 &mut s,
                             )?;
                             next_need_comma_sep = true;
-                            sub_pas_list.push((x.0.clone(), pas, sub_p));
+                            sub_pas_list.push((Some(name.clone()), pas, sub_p));
                         }
-                        None => {
+                        ObjectFieldKind::Spread { value, .. } => {
                             write!(s, "}},X(")?;
-                            let (pas, sub_p) = x.1.to_proc_gen_rec_and_combine_paths(
+                            let (pas, sub_p) = value.to_proc_gen_rec_and_combine_paths(
                                 w,
                                 scopes,
                                 ExpressionLevel::Cond,
@@ -457,18 +465,57 @@ impl Expression {
                 PathAnalysisState::InPath(PathSliceList(vec![PathSlice::CombineObj(sub_pas_list)]))
             }
             Expression::LitArr { fields: x, .. } => {
-                write!(value, "[")?;
+                let mut s = String::new();
+                let mut need_array_concat = false;
+                let mut next_need_comma_sep = false;
                 let mut sub_pas_list = Vec::with_capacity(x.len());
-                for (i, x) in x.iter().enumerate() {
-                    if i > 0 {
-                        write!(value, ",")?;
+                let mut spread_sub_pas_list = Vec::with_capacity(x.len());
+                for x in x.iter() {
+                    match x {
+                        ArrayFieldKind::Normal { value } => {
+                            if next_need_comma_sep {
+                                write!(s, ",")?;
+                            }
+                            let (pas, sub_p) = value.to_proc_gen_rec_and_combine_paths(
+                                w,
+                                scopes,
+                                ExpressionLevel::Cond,
+                                &mut s,
+                            )?;
+                            next_need_comma_sep = true;
+                            let list = if spread_sub_pas_list.len() > 0 { &mut spread_sub_pas_list } else { &mut sub_pas_list };
+                            list.push((pas, sub_p));
+                        }
+                        ArrayFieldKind::Spread { value, .. } => {
+                            write!(s, "],")?;
+                            let (pas, sub_p) = value.to_proc_gen_rec_and_combine_paths(
+                                w,
+                                scopes,
+                                ExpressionLevel::Cond,
+                                &mut s,
+                            )?;
+                            write!(s, ",[")?;
+                            need_array_concat = true;
+                            next_need_comma_sep = false;
+                            spread_sub_pas_list.push((pas, sub_p));
+                        }
+                        ArrayFieldKind::EmptySlot => {
+                            if next_need_comma_sep {
+                                write!(s, ",")?;
+                            }
+                            write!(s, ",")?;
+                            next_need_comma_sep = false;
+                            let list = if spread_sub_pas_list.len() > 0 { &mut spread_sub_pas_list } else { &mut sub_pas_list };
+                            list.push((PathAnalysisState::NotInPath, vec![]));
+                        }
                     }
-                    let (pas, sub_p) =
-                        x.to_proc_gen_rec_and_combine_paths(w, scopes, ExpressionLevel::Cond, value)?;
-                    sub_pas_list.push((pas, sub_p));
                 }
-                write!(value, "]")?;
-                PathAnalysisState::InPath(PathSliceList(vec![PathSlice::CombineArr(sub_pas_list)]))
+                if need_array_concat {
+                    write!(value, "[].concat([{}])", s)?;
+                } else {
+                    write!(value, "[{}]", s)?;
+                }
+                PathAnalysisState::InPath(PathSliceList(vec![PathSlice::CombineArr(sub_pas_list, spread_sub_pas_list)]))
             }
 
             Expression::StaticMember { obj, field_name, .. } => {
@@ -787,18 +834,27 @@ impl Expression {
                 PathAnalysisState::NotInPath
             }
             Expression::NullishCoalescing { left: x, right: y, .. } => {
-                x.to_proc_gen_rec_and_end_path(
-                    w,
-                    scopes,
-                    ExpressionLevel::LogicOr,
-                    path_calc,
-                    value,
-                )?;
-                write!(value, "??")?;
+                let ident = {
+                    let ident = w.gen_private_ident();
+                    let mut s = String::new();
+                    x.to_proc_gen_rec_and_end_path(
+                        w,
+                        scopes,
+                        ExpressionLevel::Cond,
+                        path_calc,
+                        &mut s,
+                    )?;
+                    w.expr_stmt(|w| {
+                        write!(w, "var {}={}", ident, s)?;
+                        Ok(())
+                    })?;
+                    ident
+                };
+                write!(value, "{ident}?{ident}:", ident = ident)?;
                 y.to_proc_gen_rec_and_end_path(
                     w,
                     scopes,
-                    ExpressionLevel::LogicAnd,
+                    ExpressionLevel::Cond,
                     path_calc,
                     value,
                 )?;
@@ -913,5 +969,51 @@ impl ExpressionProcGen {
 
     pub(crate) fn above_cond_expr(&self) -> bool {
         self.level >= ExpressionLevel::Cond
+    }
+}
+
+fn proc_gen_expression_level(expr: &Expression) -> ExpressionLevel {
+    match expr {
+        Expression::ScopeRef { .. } => ExpressionLevel::Lit,
+        Expression::DataField { .. } => ExpressionLevel::Member,
+        Expression::ToStringWithoutUndefined { .. } => ExpressionLevel::Member,
+        Expression::LitUndefined { .. } => ExpressionLevel::Lit,
+        Expression::LitNull { .. } => ExpressionLevel::Lit,
+        Expression::LitStr { .. } => ExpressionLevel::Lit,
+        Expression::LitInt { .. } => ExpressionLevel::Lit,
+        Expression::LitFloat { .. } => ExpressionLevel::Lit,
+        Expression::LitBool { .. } => ExpressionLevel::Lit,
+        Expression::LitObj { .. } => ExpressionLevel::Member,
+        Expression::LitArr { .. } => ExpressionLevel::Member,
+        Expression::StaticMember { .. } => ExpressionLevel::Member,
+        Expression::DynamicMember { .. } => ExpressionLevel::Member,
+        Expression::FuncCall { .. } => ExpressionLevel::Member,
+        Expression::Reverse { .. } => ExpressionLevel::Unary,
+        Expression::BitReverse { .. } => ExpressionLevel::Unary,
+        Expression::Positive { .. } => ExpressionLevel::Unary,
+        Expression::Negative { .. } => ExpressionLevel::Unary,
+        Expression::TypeOf { .. } => ExpressionLevel::Unary,
+        Expression::Void { .. } => ExpressionLevel::Unary,
+        Expression::Multiply { .. } => ExpressionLevel::Multiply,
+        Expression::Divide { .. } => ExpressionLevel::Multiply,
+        Expression::Remainer { .. } => ExpressionLevel::Multiply,
+        Expression::Plus { .. } => ExpressionLevel::Plus,
+        Expression::Minus { .. } => ExpressionLevel::Plus,
+        Expression::Lt { .. } => ExpressionLevel::Comparison,
+        Expression::Gt { .. } => ExpressionLevel::Comparison,
+        Expression::Lte { .. } => ExpressionLevel::Comparison,
+        Expression::Gte { .. } => ExpressionLevel::Comparison,
+        Expression::InstanceOf { .. } => ExpressionLevel::Comparison,
+        Expression::Eq { .. } => ExpressionLevel::Eq,
+        Expression::Ne { .. } => ExpressionLevel::Eq,
+        Expression::EqFull { .. } => ExpressionLevel::Eq,
+        Expression::NeFull { .. } => ExpressionLevel::Eq,
+        Expression::BitAnd { .. } => ExpressionLevel::BitAnd,
+        Expression::BitXor { .. } => ExpressionLevel::BitXor,
+        Expression::BitOr { .. } => ExpressionLevel::BitOr,
+        Expression::LogicAnd { .. } => ExpressionLevel::LogicAnd,
+        Expression::LogicOr { .. } => ExpressionLevel::LogicOr,
+        Expression::NullishCoalescing { .. } => ExpressionLevel::Cond,
+        Expression::Cond { .. } => ExpressionLevel::Cond,
     }
 }

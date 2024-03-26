@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt::Write, ops::Range};
 
-use crate::{binding_map::BindingMapCollector, escape::gen_lit_str, parse::{tag::{Attribute, Element, ElementKind, Node, Script, Value}, Position, Template}, proc_gen::expr::ExpressionProcGen, TmplError, TmplGroup};
+use crate::{binding_map::BindingMapCollector, escape::gen_lit_str, parse::{tag::{Attribute, ClassAttribute, CommonElementAttributes, Element, ElementKind, EventBinding, Node, Script, StaticAttribute, StyleAttribute, Value}, Position, Template}, proc_gen::expr::ExpressionProcGen, TmplError, TmplGroup};
 use super::{JsExprWriter, JsFunctionScopeWriter, JsIdent, JsTopScopeWriter, ScopeVar, ScopeVarLvaluePath};
 
 impl Template {
@@ -211,7 +211,7 @@ impl Node {
                     Node::Text(_) => ArgLevel::TextNode,
                     Node::Element(n) => match &n.kind {
                         ElementKind::Normal { .. } => ArgLevel::Element,
-                        ElementKind::If { branches, .. } => ArgLevel::IfGroup,
+                        ElementKind::If { .. } => ArgLevel::IfGroup,
                         ElementKind::For { .. } => ArgLevel::ForLoop,
                         ElementKind::Slot { .. } => ArgLevel::Slot,
                         ElementKind::Pure { .. } |
@@ -395,16 +395,13 @@ impl Element {
                 style,
                 change_attributes,
                 worklet_attributes,
-                event_bindings,
-                marks,
                 data,
                 children,
                 generics,
                 extra_attr,
-                slot,
-                slot_value_refs,
+                common,
             } => {
-                let slot_kind = SlotKind::new(slot, w, scopes)?;
+                let slot_kind = SlotKind::new(&common.slot, w, scopes)?;
                 let (child_ident, var_slot_map) =
                     w.declare_var_on_top_scope_init(|w, ident| {
                         let var_slot_map = Node::to_proc_gen_define_children(
@@ -452,11 +449,35 @@ impl Element {
                                 })?;
                             }
                         }
-                        for attr in attributes.iter() {
-                            attr.to_proc_gen(w, scopes, bmc)?;
+                        match class {
+                            ClassAttribute::None => {}
+                            ClassAttribute::String(_, value) => {
+                                write_attribute_value(w, "L", value, scopes, bmc)?;
+                            }
+                            ClassAttribute::Multiple(..) => unimplemented!()
                         }
+                        match style {
+                            StyleAttribute::None => {}
+                            StyleAttribute::String(_, value) => {
+                                write_attribute_value(w, "R.y", value, scopes, bmc)?;
+                            }
+                            StyleAttribute::Multiple(..) => unimplemented!()
+                        }
+                        for attr in attributes.iter() {
+                            attr.to_proc_gen_as_normal(w, scopes, bmc)?;
+                        }
+                        for attr in change_attributes.iter() {
+                            attr.to_proc_gen_as_change_property(w, scopes, bmc)?;
+                        }
+                        for attr in worklet_attributes.iter() {
+                            attr.to_proc_gen_as_worklet_property(w, scopes, bmc)?;
+                        }
+                        for attr in data.iter() {
+                            attr.to_proc_gen_with_method(w, "R.d", scopes, bmc)?;
+                        }
+                        common.to_proc_gen_without_slot(w, scopes, bmc)?;
                         if let SlotKind::Dynamic(p) = &slot_kind {
-                            if let Some((_, Value::Dynamic { binding_map_keys, .. })) = slot.as_ref() {
+                            if let Some((_, Value::Dynamic { binding_map_keys, .. })) = common.slot.as_ref() {
                                 if let Some(binding_map_keys) = binding_map_keys {
                                     if !binding_map_keys.is_empty(bmc) {
                                         binding_map_keys.to_proc_gen_write_map(w, bmc, |w| {
@@ -474,7 +495,7 @@ impl Element {
                         Ok(())
                     })?;
                     write!(w, ",{}", child_ident)?;
-                    if slot.is_some() || var_slot_map.is_some() {
+                    if common.slot.is_some() || var_slot_map.is_some() {
                         write!(w, ",")?;
                         match slot_kind {
                             SlotKind::None => write!(w, "undefined")?,
@@ -498,8 +519,8 @@ impl Element {
                     Ok(())
                 })
             }
-            ElementKind::Pure { event_bindings, marks, children, slot } => {
-                let slot_kind = SlotKind::new(&slot, w, scopes)?;
+            ElementKind::Pure { children, common } => {
+                let slot_kind = SlotKind::new(&common.slot, w, scopes)?;
                 let child_ident = w.declare_var_on_top_scope_init(|w, ident| {
                     Node::to_proc_gen_define_children(
                         &mut children.iter(),
@@ -507,6 +528,7 @@ impl Element {
                         scopes,
                         |args, w, var_slot_map, scopes| {
                             w.function_args(args, |w| {
+                                common.to_proc_gen_without_slot(w, scopes, bmc)?;
                                 Node::to_proc_gen_define_children_content(
                                     &children,
                                     &var_slot_map,
@@ -535,7 +557,7 @@ impl Element {
                     Dynamic(ExpressionProcGen),
                 }
                 let mut cond_list = Vec::with_capacity(branches.len() + if else_branch.is_some() { 1 } else { 0 });
-                for (cond, children) in branches.iter().map(|(_, x, y)| (Some(x), y)).chain(else_branch.as_ref().map(|(_, y)| (None, y))) {
+                for (cond, _children) in branches.iter().map(|(_, x, y)| (Some(x), y)).chain(else_branch.as_ref().map(|(_, y)| (None, y))) {
                     let item = match cond {
                         None => CondItem::None,
                         Some(Value::Static { value, .. }) => CondItem::Static(value.as_str()),
@@ -583,7 +605,7 @@ impl Element {
                         |args, w, var_slot_map, scopes| {
                             w.function_args(&args, |w| {
                                 w.expr_stmt(|w| {
-                                    for (index, (_, cond, children)) in branches.iter().enumerate() {
+                                    for (index, (_, _, children)) in branches.iter().enumerate() {
                                         if index > 0 {
                                             write!(w, "else ")?;
                                         }
@@ -775,7 +797,7 @@ impl Element {
                     Ok(())
                 })
             }
-            ElementKind::TemplateRef { target, data, event_bindings, marks, slot } => {
+            ElementKind::TemplateRef { target, data } => {
                 let var_key = w.declare_var_on_top_scope()?;
                 match &target.1 {
                     Value::Static { value, .. } => {
@@ -837,7 +859,7 @@ impl Element {
                     Ok(())
                 })
             }
-            ElementKind::Include { path: (_, rel_path), event_bindings, marks, slot } => {
+            ElementKind::Include { path: (_, rel_path) } => {
                 let var_key = w.gen_private_ident();
                 let normalized_path = crate::path::resolve(cur_path, &rel_path.name);
                 let child_ident = w.declare_var_on_top_scope_init(|w, ident| {
@@ -862,8 +884,8 @@ impl Element {
                     Ok(())
                 })
             }
-            ElementKind::Slot { name, values, event_bindings, marks, slot } => {
-                let slot_kind = SlotKind::new(&slot, w, scopes)?;
+            ElementKind::Slot { name, values, common } => {
+                let slot_kind = SlotKind::new(&common.slot, w, scopes)?;
                 let name = StaticStrOrProcGen::new(name, w, scopes)?;
                 w.expr_stmt(|w| {
                     write!(w, "S(")?;
@@ -882,6 +904,7 @@ impl Element {
                     if values.len() > 0 {
                         write!(w, r#","#)?;
                         w.function_args("N", |w| {
+                            common.to_proc_gen_without_slot(w, scopes, bmc)?;
                             for attr in values {
                                 let name = attr.name.name.as_str();
                                 match &attr.value {
@@ -925,14 +948,347 @@ impl Element {
     }
 }
 
-impl Attribute {
-    pub(crate) fn to_proc_gen<W: std::fmt::Write>(
+fn write_attribute_value<W: Write>(
+    w: &mut JsFunctionScopeWriter<W>,
+    method_name: &'static str,
+    value: &Value,
+    scopes: &Vec<ScopeVar>,
+    bmc: &BindingMapCollector,
+) -> Result<(), TmplError> {
+    match &value {
+        Value::Static { value, location: _ } => {
+            w.expr_stmt(|w| {
+                write!(w, "if(C){}(N,{})", method_name, gen_lit_str(value))?;
+                Ok(())
+            })?;
+        }
+        Value::Dynamic {
+            expression,
+            double_brace_location: _,
+            binding_map_keys,
+        } => {
+            let p = expression.to_proc_gen_prepare(w, scopes)?;
+            w.expr_stmt(|w| {
+                write!(w, "if(C||K||")?;
+                p.lvalue_state_expr(w, scopes)?;
+                write!(w, "){}(N,", method_name)?;
+                p.value_expr(w)?;
+                write!(w, ")")?;
+                Ok(())
+            })?;
+            if let Some(binding_map_keys) = binding_map_keys {
+                if !binding_map_keys.is_empty(bmc) {
+                    binding_map_keys.to_proc_gen_write_map(w, bmc, |w| {
+                        let p = expression.to_proc_gen_prepare(w, scopes)?;
+                        w.expr_stmt(|w| {
+                            write!(w, "{}(N,", method_name)?;
+                            p.value_expr(w)?;
+                            write!(w, ")")?;
+                            Ok(())
+                        })
+                    })?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+impl CommonElementAttributes {
+    fn to_proc_gen_without_slot<W: std::fmt::Write>(
         &self,
         w: &mut JsFunctionScopeWriter<W>,
         scopes: &Vec<ScopeVar>,
         bmc: &BindingMapCollector,
     ) -> Result<(), TmplError> {
-        // TODO !!!
+        let CommonElementAttributes {
+            id,
+            slot: _,
+            slot_value_refs: _,
+            event_bindings,
+            marks,
+        } = self;
+        for mark in marks {
+            mark.to_proc_gen_with_method(w, "M", scopes, bmc)?;
+        }
+        for ev in event_bindings {
+            ev.to_proc_gen(w, scopes, bmc)?;
+        }
+        if let Some((_, value)) = id.as_ref() {
+            write_attribute_value(w, "R.i", value, scopes, bmc)?;
+        }
+        Ok(())
+    }
+}
+
+impl Attribute {
+    fn to_proc_gen_with_method<W: std::fmt::Write>(
+        &self,
+        w: &mut JsFunctionScopeWriter<W>,
+        method_name: &str,
+        scopes: &Vec<ScopeVar>,
+        bmc: &BindingMapCollector,
+    ) -> Result<(), TmplError> {
+        match &self.value {
+            Value::Static { value, location: _ } => {
+                w.expr_stmt(|w| {
+                    write!(w, "if(C){}(N,{},{})", method_name, gen_lit_str(&self.name.name), gen_lit_str(value))?;
+                    Ok(())
+                })?;
+            }
+            Value::Dynamic {
+                expression,
+                double_brace_location: _,
+                binding_map_keys,
+            } => {
+                let p = expression.to_proc_gen_prepare(w, scopes)?;
+                w.expr_stmt(|w| {
+                    write!(w, "if(C||K||")?;
+                    p.lvalue_state_expr(w, scopes)?;
+                    write!(w, "){}(N,{},", method_name, gen_lit_str(&self.name.name))?;
+                    p.value_expr(w)?;
+                    write!(w, ")")?;
+                    Ok(())
+                })?;
+                if let Some(binding_map_keys) = binding_map_keys {
+                    if !binding_map_keys.is_empty(bmc) {
+                        binding_map_keys.to_proc_gen_write_map(w, bmc, |w| {
+                            let p = expression.to_proc_gen_prepare(w, scopes)?;
+                            w.expr_stmt(|w| {
+                                write!(w, "{}(N,{},", method_name, gen_lit_str(&self.name.name))?;
+                                p.value_expr(w)?;
+                                write!(w, ")")?;
+                                Ok(())
+                            })?;
+                            w.expr_stmt(|w| {
+                                write!(w, "E(N)")?;
+                                Ok(())
+                            })
+                        })?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn to_proc_gen_as_normal<W: std::fmt::Write>(
+        &self,
+        w: &mut JsFunctionScopeWriter<W>,
+        scopes: &Vec<ScopeVar>,
+        bmc: &BindingMapCollector,
+    ) -> Result<(), TmplError> {
+        let attr_name = gen_lit_str(&self.name.name);
+        match &self.value {
+            Value::Static { value, location: _ } => {
+                w.expr_stmt(|w| {
+                    write!(w, "if(C)O(N,{},{})", attr_name, gen_lit_str(value))?;
+                    Ok(())
+                })?;
+            }
+            Value::Dynamic {
+                expression,
+                double_brace_location: _,
+                binding_map_keys,
+            } => {
+                let maybe_event_binding = !self.is_model && {
+                    attr_name.starts_with("bind")
+                        || attr_name.starts_with("capture-bind")
+                        || attr_name.starts_with("catch")
+                        || attr_name.starts_with("capture-catch")
+                        || attr_name.starts_with("on")
+                };
+                let p = expression.to_proc_gen_prepare(w, scopes)?;
+                w.expr_stmt(|w| {
+                    write!(w, "if(C||K||")?;
+                    p.lvalue_state_expr(w, scopes)?;
+                    write!(w, ")O(N,{},", attr_name)?;
+                    p.value_expr(w)?;
+                    if self.is_model {
+                        if p.has_model_lvalue_path(scopes) {
+                            write!(w, ",")?;
+                            p.lvalue_path(w, scopes, Some(true))?;
+                        }
+                    } else if maybe_event_binding {
+                        if p.has_script_lvalue_path(scopes) {
+                            write!(w, ",undefined,")?;
+                            p.lvalue_path(w, scopes, Some(false))?;
+                        }
+                    }
+                    write!(w, ")")?;
+                    Ok(())
+                })?;
+                if let Some(binding_map_keys) = binding_map_keys {
+                    if !binding_map_keys.is_empty(bmc) {
+                        binding_map_keys.to_proc_gen_write_map(w, bmc, |w| {
+                            let p = expression.to_proc_gen_prepare(w, scopes)?;
+                            w.expr_stmt(|w| {
+                                write!(w, "O(N,{},", attr_name)?;
+                                p.value_expr(w)?;
+                                if self.is_model {
+                                    if p.has_model_lvalue_path(scopes) {
+                                        write!(w, ",")?;
+                                        p.lvalue_path(w, scopes, Some(true))?;
+                                    }
+                                } else if maybe_event_binding {
+                                    if p.has_script_lvalue_path(scopes) {
+                                        write!(w, ",undefined,")?;
+                                        p.lvalue_path(w, scopes, Some(false))?;
+                                    }
+                                }
+                                write!(w, ")")?;
+                                Ok(())
+                            })?;
+                            w.expr_stmt(|w| {
+                                write!(w, "E(N)")?;
+                                Ok(())
+                            })
+                        })?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn to_proc_gen_as_change_property<W: std::fmt::Write>(
+        &self,
+        w: &mut JsFunctionScopeWriter<W>,
+        scopes: &Vec<ScopeVar>,
+        bmc: &BindingMapCollector,
+    ) -> Result<(), TmplError> {
+        let attr_name = gen_lit_str(&self.name.name);
+        match &self.value {
+            Value::Static { .. } => {}
+            Value::Dynamic {
+                expression,
+                double_brace_location: _,
+                binding_map_keys,
+            } => {
+                let p = expression.to_proc_gen_prepare(w, scopes)?;
+                w.expr_stmt(|w| {
+                    write!(w, "if(C||K||")?;
+                    p.lvalue_state_expr(w, scopes)?;
+                    write!(w, ")R.p(N,{},", attr_name)?;
+                    p.value_expr(w)?;
+                    if p.has_script_lvalue_path(scopes) {
+                        write!(w, ",")?;
+                        p.lvalue_path(w, scopes, Some(false))?;
+                    }
+                    write!(w, ")")?;
+                    Ok(())
+                })?;
+                if let Some(binding_map_keys) = binding_map_keys {
+                    if !binding_map_keys.is_empty(bmc) {
+                        binding_map_keys.to_proc_gen_write_map(w, bmc, |w| {
+                            let p = expression.to_proc_gen_prepare(w, scopes)?;
+                            w.expr_stmt(|w| {
+                                write!(w, "R.p(N,{},", attr_name)?;
+                                p.value_expr(w)?;
+                                if p.has_script_lvalue_path(scopes) {
+                                    write!(w, ",")?;
+                                    p.lvalue_path(w, scopes, Some(false))?;
+                                }
+                                write!(w, ")")?;
+                                Ok(())
+                            })
+                        })?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl EventBinding {
+    fn to_proc_gen<W: std::fmt::Write>(
+        &self,
+        w: &mut JsFunctionScopeWriter<W>,
+        scopes: &Vec<ScopeVar>,
+        bmc: &BindingMapCollector,
+    ) -> Result<(), TmplError> {
+        match &self.value {
+            Value::Static { value, location: _ } => {
+                w.expr_stmt(|w| {
+                    write!(
+                        w,
+                        "if(C)R.v(N,{},{},{},{},{},!1)",
+                        gen_lit_str(&self.name.name),
+                        gen_lit_str(value),
+                        if self.is_catch { "!0" } else { "!1" },
+                        if self.is_mut { "!0" } else { "!1" },
+                        if self.is_capture { "!0" } else { "!1" },
+                    )?;
+                    Ok(())
+                })?;
+            }
+            Value::Dynamic {
+                expression,
+                double_brace_location: _,
+                binding_map_keys,
+            } => {
+                let p = expression.to_proc_gen_prepare(w, scopes)?;
+                w.expr_stmt(|w| {
+                    write!(w, "if(C||K||")?;
+                    p.lvalue_state_expr(w, scopes)?;
+                    write!(w, ")R.v(N,{},", gen_lit_str(&self.name.name),)?;
+                    p.value_expr(w)?;
+                    write!(
+                        w,
+                        ",{},{},{},!0",
+                        if self.is_catch { "!0" } else { "!1" },
+                        if self.is_mut { "!0" } else { "!1" },
+                        if self.is_capture { "!0" } else { "!1" },
+                    )?;
+                    if p.has_script_lvalue_path(scopes) {
+                        write!(w, ",")?;
+                        p.lvalue_path(w, scopes, Some(false))?;
+                    }
+                    write!(w, ")")?;
+                    Ok(())
+                })?;
+                if let Some(binding_map_keys) = binding_map_keys {
+                    if !binding_map_keys.is_empty(bmc) {
+                        binding_map_keys.to_proc_gen_write_map(w, bmc, |w| {
+                            let p = expression.to_proc_gen_prepare(w, scopes)?;
+                            w.expr_stmt(|w| {
+                                write!(w, "R.v(N,{},", gen_lit_str(&self.name.name))?;
+                                p.value_expr(w)?;
+                                write!(
+                                    w,
+                                    ",{},{},{},!0)",
+                                    if self.is_catch { "!0" } else { "!1" },
+                                    if self.is_mut { "!0" } else { "!1" },
+                                    if self.is_capture { "!0" } else { "!1" },
+                                )?;
+                                if p.has_script_lvalue_path(scopes) {
+                                    write!(w, ",")?;
+                                    p.lvalue_path(w, scopes, Some(false))?;
+                                }
+                                Ok(())
+                            })
+                        })?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl StaticAttribute {
+    fn to_proc_gen_as_worklet_property<W: std::fmt::Write>(
+        &self,
+        w: &mut JsFunctionScopeWriter<W>,
+        _scopes: &Vec<ScopeVar>,
+        _bmc: &BindingMapCollector,
+    ) -> Result<(), TmplError> {
+        let attr_name = gen_lit_str(&self.name.name);
+        w.expr_stmt(|w| {
+            write!(w, "if(C)R.wl(N,{},{})", attr_name, gen_lit_str(&self.value.name))?;
+            Ok(())
+        })?;
         Ok(())
     }
 }

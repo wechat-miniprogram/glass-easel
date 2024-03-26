@@ -106,7 +106,7 @@ impl<'s> ParseState<'s> {
     }
 
     /// Extract and then clear all warnings.
-    pub fn take_warnings(&self) -> Vec<ParseError> {
+    pub fn take_warnings(&mut self) -> Vec<ParseError> {
         std::mem::replace(&mut self.warnings, vec![])
     }
 
@@ -372,6 +372,11 @@ impl ParseError {
         self.kind.level()
     }
 
+    /// An error code.
+    pub fn code(&self) -> u32 {
+        self.kind.clone() as u32
+    }
+
     /// Whether the error prevent a success compilation.
     pub fn prevent_success(&self) -> bool {
         self.level() >= ParseErrorLevel::Error
@@ -407,6 +412,7 @@ pub enum ParseErrorKind {
     UnmatchedParenthesis,
     MissingModuleName,
     MissingSourcePath,
+    UnsupportedSyntax,
 }
 
 impl ParseErrorKind {
@@ -439,6 +445,7 @@ impl ParseErrorKind {
             Self::UnmatchedParenthesis => "unmatched parenthesis",
             Self::MissingModuleName => "missing module name",
             Self::MissingSourcePath => "missing source path",
+            Self::UnsupportedSyntax => "this syntax has not been supported yet",
         }
     }
 
@@ -471,6 +478,7 @@ impl ParseErrorKind {
             Self::UnmatchedParenthesis => ParseErrorLevel::Fatal,
             Self::MissingModuleName => ParseErrorLevel::Error,
             Self::MissingSourcePath => ParseErrorLevel::Error,
+            Self::UnsupportedSyntax => ParseErrorLevel::Error,
         }
     }
 }

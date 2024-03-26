@@ -54,7 +54,7 @@ impl BindingMapCollector {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct BindingMapKeys {
+pub struct BindingMapKeys {
     keys: Vec<(String, usize)>,
 }
 

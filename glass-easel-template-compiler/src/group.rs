@@ -188,7 +188,7 @@ impl TmplGroup {
 
     /// Add a template into the group.
     pub fn add_tmpl(&mut self, path: &str, tmpl_str: &str) -> Vec<ParseError> {
-        let (template, parse_state) = crate::parse::parse(path, tmpl_str);
+        let (template, mut parse_state) = crate::parse::parse(path, tmpl_str);
         if template.inline_script_module_names().next().is_some() {
             self.has_scripts = true;
         }
