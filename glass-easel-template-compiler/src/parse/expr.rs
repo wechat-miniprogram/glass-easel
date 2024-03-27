@@ -332,7 +332,7 @@ impl TemplateStructure for Expression {
 }
 
 impl Expression {
-    pub(super) fn parse_expression_or_object_inner(ps: &mut ParseState) -> Option<Box<Self>> {
+    pub(super) fn parse_expression_or_object_inner(ps: &mut ParseState, prefer_object_inner: bool) -> Option<Box<Self>> {
         ps.parse_on_auto_whitespace(|ps| {
             let mut is_object_inner = false;
             ps.try_parse(|ps| -> Option<()> {
@@ -341,6 +341,8 @@ impl Expression {
                     Some(_) => {
                         let peek = ps.peek::<0>()?;
                         if peek == ':' || peek == ',' {
+                            is_object_inner = true;
+                        } else if prefer_object_inner && ps.peek_str("}}") {
                             is_object_inner = true;
                         }
                     }
@@ -1515,7 +1517,7 @@ mod test {
     fn sub_expressions() {
         fn check_sub_expr(src: &str, expect: &[&str]) {
             let mut state = ParseState::new("TEST", src);
-            let parsed = Expression::parse_expression_or_object_inner(&mut state).unwrap();
+            let parsed = Expression::parse_expression_or_object_inner(&mut state, false).unwrap();
             let r: Vec<_> = parsed.sub_expressions().map(|x| {
                 let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src);
                 x.stringify_write(&mut stringifier).unwrap();

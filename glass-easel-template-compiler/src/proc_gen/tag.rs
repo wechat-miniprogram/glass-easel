@@ -519,8 +519,8 @@ impl Element {
                     Ok(())
                 })
             }
-            ElementKind::Pure { children, common } => {
-                let slot_kind = SlotKind::new(&common.slot, w, scopes)?;
+            ElementKind::Pure { children, slot, slot_value_refs: _ } => {
+                let slot_kind = SlotKind::new(&slot, w, scopes)?;
                 let child_ident = w.declare_var_on_top_scope_init(|w, ident| {
                     Node::to_proc_gen_define_children(
                         &mut children.iter(),
@@ -528,7 +528,6 @@ impl Element {
                         scopes,
                         |args, w, var_slot_map, scopes| {
                             w.function_args(args, |w| {
-                                common.to_proc_gen_without_slot(w, scopes, bmc)?;
                                 Node::to_proc_gen_define_children_content(
                                     &children,
                                     &var_slot_map,

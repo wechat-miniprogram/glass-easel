@@ -301,10 +301,18 @@ impl Stringify for Element {
             }
             ElementKind::Pure {
                 children: _,
-                common,
+                slot,
+                slot_value_refs,
             } => {
                 stringifier.write_str("block")?;
-                write_common_attributes(stringifier, common)?;
+                let common = CommonElementAttributes {
+                    id: None,
+                    slot: slot.clone(),
+                    slot_value_refs: slot_value_refs.clone(),
+                    event_bindings: vec![],
+                    marks: vec![],
+                };
+                write_common_attributes(stringifier, &common)?;
             }
             ElementKind::For {
                 list,
