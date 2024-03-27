@@ -1,7 +1,5 @@
 use std::ops::Range;
 
-use compact_str::CompactString;
-
 use super::binding_map;
 pub use tag::Template;
 
@@ -63,8 +61,6 @@ pub struct ParseState<'s> {
     cur_index: usize,
     line: u32,
     utf16_col: u32,
-    scopes: Vec<(CompactString, Range<Position>)>,
-    inside_dynamic_tree: usize,
     auto_skip_whitespace: bool,
     warnings: Vec<ParseError>,
 }
@@ -84,8 +80,6 @@ impl<'s> ParseState<'s> {
             cur_index: 0,
             line: 1,
             utf16_col: 0,
-            scopes: vec![],
-            inside_dynamic_tree: 0,
             auto_skip_whitespace: false,
             warnings: vec![],
         }
@@ -457,7 +451,7 @@ impl ParseErrorKind {
             Self::MissingExpressionEnd => ParseErrorLevel::Fatal,
             Self::IllegalEntity => ParseErrorLevel::Error,
             Self::IncompleteTag => ParseErrorLevel::Fatal,
-            Self::MissingEndTag => ParseErrorLevel::Error,
+            Self::MissingEndTag => ParseErrorLevel::Warn,
             Self::IllegalNamePrefix => ParseErrorLevel::Warn,
             Self::InvalidAttributePrefix => ParseErrorLevel::Warn,
             Self::InvalidAttributeName => ParseErrorLevel::Warn,
@@ -467,7 +461,7 @@ impl ParseErrorKind {
             Self::DuplicatedName => ParseErrorLevel::Note,
             Self::AvoidUppercaseLetters => ParseErrorLevel::Warn,
             Self::UnexpectedWhitespace => ParseErrorLevel::Note,
-            Self::MissingAttributeValue => ParseErrorLevel::Error,
+            Self::MissingAttributeValue => ParseErrorLevel::Warn,
             Self::DataBindingNotAllowed => ParseErrorLevel::Note,
             Self::InvalidIdentifier => ParseErrorLevel::Fatal,
             Self::InvalidScopeName => ParseErrorLevel::Note,

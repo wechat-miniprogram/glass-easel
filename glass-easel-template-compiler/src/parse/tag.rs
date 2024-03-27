@@ -27,6 +27,12 @@ pub struct TemplateGlobals {
     pub(crate) binding_map_collector: BindingMapCollector,
 }
 
+struct ScopeAnalyzeState {
+    scopes: Vec<(CompactString, Range<Position>)>,
+    inside_dynamic_tree: usize,
+    binding_map_collector: BindingMapCollector,
+}
+
 impl Template {
     pub(super) fn parse(ps: &mut ParseState) -> Self {
         let mut globals = TemplateGlobals {
@@ -36,8 +42,38 @@ impl Template {
             scripts: vec![],
             binding_map_collector: BindingMapCollector::new(),
         };
+
+        // 1st round: parse the string into AST
         let mut content = vec![];
         Node::parse_vec_node(ps, &mut globals, &mut content);
+
+        // 2nd round: traverse tree to alternate some details
+        for sub in globals.sub_templates.iter_mut() {
+            let mut sas = ScopeAnalyzeState {
+                scopes: globals.scripts.iter().map(|x| {
+                    let name = x.module_name();
+                    (name.name.clone(), name.location())
+                }).collect(),
+                inside_dynamic_tree: 1,
+                binding_map_collector: BindingMapCollector::new(),
+            };
+            for node in &mut sub.1 {
+                node.init_scopes_and_binding_map_keys(&mut sas);
+            }
+        }
+        let mut sas = ScopeAnalyzeState {
+            scopes: globals.scripts.iter().map(|x| {
+                let name = x.module_name();
+                (name.name.clone(), name.location())
+            }).collect(),
+            inside_dynamic_tree: 0,
+            binding_map_collector: BindingMapCollector::new(),
+        };
+        for node in &mut content {
+            node.init_scopes_and_binding_map_keys(&mut sas);
+        }
+        globals.binding_map_collector = sas.binding_map_collector;
+
         Template {
             path: ps.path.to_string(),
             content,
@@ -171,10 +207,20 @@ impl Node {
                 Value::Dynamic { .. } => false,
             };
             if !is_whitespace {
-                let mut value = value;
-                value.init_scopes_and_binding_map_keys(ps, globals, false);
                 ret.push(Node::Text(value));
             }
+        }
+    }
+
+    fn init_scopes_and_binding_map_keys(&mut self, sas: &mut ScopeAnalyzeState) {
+        match self {
+            Self::Text(value) => {
+                value.init_scopes_and_binding_map_keys(sas, false);
+            }
+            Self::Element(x) => {
+                x.init_scopes_and_binding_map_keys(sas);
+            }
+            Self::Comment(..) | Self::UnknownMetaTag(..) => {}
         }
     }
 }
@@ -623,6 +669,16 @@ impl Element {
                             location: attr_name.location,
                         }
                     }
+                    AttrPrefixKind::Normal => {
+                        if let ElementKind::Slot { .. } = element {
+                            Ident {
+                                name: dash_to_camel(&attr_name.name),
+                                location: attr_name.location,
+                            }
+                        } else {
+                            attr_name
+                        }
+                    }
                     AttrPrefixKind::DataHyphen => {
                         Ident {
                             name: dash_to_camel(attr_name.name.strip_prefix("data-").unwrap()),
@@ -770,18 +826,14 @@ impl Element {
                         ElementKind::Normal { common, .. } |
                         ElementKind::Slot { common, .. } => {
                             if let AttrPrefixParseResult::Value(value) = attr_value {
-                                if common.event_bindings.iter().find(|eb| eb.name.name_eq(&attr_name)).is_some() {
-                                    ps.add_warning(ParseErrorKind::DuplicatedAttribute, attr_name.location);
-                                } else {
-                                    common.event_bindings.push(EventBinding {
-                                        name: attr_name,
-                                        value,
-                                        is_catch,
-                                        is_mut,
-                                        is_capture,
-                                        prefix_location,
-                                    });
-                                }
+                                common.event_bindings.push(EventBinding {
+                                    name: attr_name,
+                                    value,
+                                    is_catch,
+                                    is_mut,
+                                    is_capture,
+                                    prefix_location,
+                                });
                             }
                         }
                         ElementKind::Pure { .. } |
@@ -1552,56 +1604,6 @@ impl Element {
             }
         }
 
-        // update dynamic tree state
-        let self_dynamic_tree = match element {
-            ElementKind::Normal { .. } |
-            ElementKind::Pure { .. } => {
-                if let (IfCondition::None, ForList::None) = (&if_condition, &for_list) {
-                    false
-                } else {
-                    true
-                }
-            }
-            ElementKind::For { .. } |
-            ElementKind::If { .. } |
-            ElementKind::TemplateRef { .. } |
-            ElementKind::Include { .. } |
-            ElementKind::Slot { .. } => true,
-        };
-        if self_dynamic_tree {
-            ps.inside_dynamic_tree += 1;
-        }
-
-        // handling scopes
-        enum ScopeState {
-            PrevCount(usize),
-            Prev(Vec<(CompactString, Range<Position>)>),
-        }
-        let scope_state = if template_name.is_some() {
-            let prev_scopes = std::mem::replace(&mut ps.scopes, vec![]);
-            ScopeState::Prev(prev_scopes)
-        } else {
-            let prev_scope_count = ps.scopes.len();
-            if let ForList::For { list: _, item_name, index_name, key: _ } = &for_list {
-                ps.scopes.push((item_name.1.name.clone(), item_name.1.location.clone()));
-                ps.scopes.push((index_name.1.name.clone(), index_name.1.location.clone()));
-            }
-            match &element {
-                ElementKind::Normal { common: CommonElementAttributes { slot_value_refs, .. }, .. } |
-                ElementKind::Pure { slot_value_refs, .. } |
-                ElementKind::Slot { common: CommonElementAttributes { slot_value_refs, .. }, .. } => {
-                    for attr in slot_value_refs {
-                        ps.scopes.push((attr.value.name.clone(), attr.value.location.clone()));
-                    }
-                }
-                ElementKind::For { .. } |
-                ElementKind::If { .. } |
-                ElementKind::TemplateRef { .. } |
-                ElementKind::Include { .. } => {}
-            }
-            ScopeState::PrevCount(prev_scope_count)
-        };
-
         let new_children = if is_script_tag {
             // parse script tag content
             let ElementKind::Include { path, .. } = &element else {
@@ -1701,19 +1703,6 @@ impl Element {
             (close_location, end_tag_location)
         };
 
-        // reset scope states
-        match scope_state {
-            ScopeState::PrevCount(x) => {
-                ps.scopes.truncate(x);
-            }
-            ScopeState::Prev(x) => {
-                ps.scopes = x;
-            }
-        }
-        if self_dynamic_tree {
-            ps.inside_dynamic_tree -= 1;
-        }
-
         // write the parsed element
         if is_script_tag {
             // empty
@@ -1743,7 +1732,7 @@ impl Element {
             };
 
             // generate normal element
-            let mut wrapped_element = {
+            let wrapped_element = {
                 let mut element = Element {
                     kind: element,
                     start_tag_location: (start_tag_start_location.clone(), start_tag_end_location.clone()),
@@ -1760,37 +1749,6 @@ impl Element {
                 element
             };
 
-            // analyze scopes
-            // this should be done here because sometimes scope ref comes before scope definition,
-            // e.g. `<div data:a="{{index}}" wx:for="{{list}}" />`
-            let mut if_condition = if_condition;
-            let mut for_list = for_list;
-            if self_dynamic_tree {
-                ps.inside_dynamic_tree += 1;
-            }
-            if let ForList::For { list, item_name, index_name, key: _ } = &mut for_list {
-                list.1.init_scopes_and_binding_map_keys(ps, globals, true);
-                ps.scopes.push((item_name.1.name.clone(), item_name.1.location.clone()));
-                ps.scopes.push((index_name.1.name.clone(), index_name.1.location.clone()));
-            }
-            wrapped_element.for_each_value_mut(|x, disable_binding_map| {
-                x.init_scopes_and_binding_map_keys(ps, globals, disable_binding_map);
-            });
-            match &mut if_condition {
-                IfCondition::If(_, value) |
-                IfCondition::Elif(_, value) => {
-                    value.init_scopes_and_binding_map_keys(ps, globals, true);
-                }
-                IfCondition::Else(_) | IfCondition::None => {}
-            }
-            if let ForList::For { .. } = &for_list {
-                ps.scopes.pop();
-                ps.scopes.pop();
-            }
-            if self_dynamic_tree {
-                ps.inside_dynamic_tree -= 1;
-            }
-    
             // wrap if condition
             let wrapped_element = match if_condition {
                 IfCondition::None => Some(wrapped_element),
@@ -1847,6 +1805,81 @@ impl Element {
             }
         }
     }
+
+    fn init_scopes_and_binding_map_keys(&mut self, sas: &mut ScopeAnalyzeState) {
+        // update dynamic tree state
+        let self_dynamic_tree = match &self.kind {
+            ElementKind::Normal { .. } |
+            ElementKind::Pure { .. } => false,
+            ElementKind::For { .. } |
+            ElementKind::If { .. } |
+            ElementKind::TemplateRef { .. } |
+            ElementKind::Include { .. } |
+            ElementKind::Slot { .. } => true,
+        };
+        if self_dynamic_tree {
+            sas.inside_dynamic_tree += 1;
+        }
+        let prev_count = sas.scopes.len();
+
+        // scopes introduced by slot value
+        if let Some(slot_value_refs) = self.slot_value_refs() {
+            for attr in slot_value_refs {
+                sas.scopes.push((attr.value.name.clone(), attr.value.location.clone()));
+            }
+        }
+
+        // handling self node values
+        self.for_each_value_mut(|x, disable_binding_map| {
+            x.init_scopes_and_binding_map_keys(sas, disable_binding_map);
+        });
+
+        // scopes introduced by for loop
+        match &self.kind {
+            ElementKind::For { item_name, index_name, .. } => {
+                sas.scopes.push((item_name.1.name.clone(), item_name.1.location.clone()));
+                sas.scopes.push((index_name.1.name.clone(), index_name.1.location.clone()));
+            }
+            ElementKind::Normal { .. } |
+            ElementKind::Pure { .. } |
+            ElementKind::If { .. } |
+            ElementKind::TemplateRef { .. } |
+            ElementKind::Include { .. } |
+            ElementKind::Slot { .. } => {}
+        }
+
+        // recurse into children
+        match &mut self.kind {
+            ElementKind::Normal { children, .. } |
+            ElementKind::Pure { children, .. } |
+            ElementKind::For { children, .. } => {
+                for child in children {
+                    child.init_scopes_and_binding_map_keys(sas);
+                }
+            }
+            ElementKind::If { branches, else_branch } => {
+                for (_, _, children) in branches {
+                    for child in children {
+                        child.init_scopes_and_binding_map_keys(sas);
+                    }
+                }
+                if let Some((_, children)) = else_branch {
+                    for child in children {
+                        child.init_scopes_and_binding_map_keys(sas);
+                    }
+                }
+            }
+            ElementKind::TemplateRef { .. } |
+            ElementKind::Include { .. } |
+            ElementKind::Slot { .. } => {}
+        }
+
+        // reset scope states
+        sas.scopes.truncate(prev_count);
+        if self_dynamic_tree {
+            sas.inside_dynamic_tree -= 1;
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -1859,6 +1892,15 @@ pub struct CommonElementAttributes {
 }
 
 impl CommonElementAttributes {
+    pub(crate) fn is_empty(&self) -> bool {
+        if self.id.is_some() { return false }
+        if self.slot.is_some() { return false }
+        if self.slot_value_refs.len() > 0 { return false }
+        if self.event_bindings.len() > 0 { return false }
+        if self.marks.len() > 0 { return false }
+        true
+    }
+
     fn for_each_value_mut(&mut self, mut f: impl FnMut(&mut Value, bool)) {
         let CommonElementAttributes {
             id,
@@ -2309,19 +2351,19 @@ impl Value {
         ret
     }
 
-    fn init_scopes_and_binding_map_keys(&mut self, ps: &mut ParseState, globals: &mut TemplateGlobals, disable_binding_map: bool) {
+    fn init_scopes_and_binding_map_keys(&mut self, sas: &mut ScopeAnalyzeState, disable_binding_map: bool) {
         match self {
             Self::Static { .. } => {}
             Self::Dynamic { expression, binding_map_keys, .. } => {
-                expression.convert_scopes(&ps.scopes);
-                if ps.inside_dynamic_tree > 0 || disable_binding_map {
+                expression.convert_scopes(&sas.scopes);
+                if sas.inside_dynamic_tree > 0 || disable_binding_map {
                     expression.disable_binding_map_keys(
-                        &mut globals.binding_map_collector,
+                        &mut sas.binding_map_collector,
                     );
                 } else {
                     let mut bmk = BindingMapKeys::new();
                     expression.collect_binding_map_keys(
-                        &mut globals.binding_map_collector,
+                        &mut sas.binding_map_collector,
                         &mut bmk,
                     );
                     *binding_map_keys = Some(bmk);
@@ -2433,11 +2475,22 @@ mod test {
     }
 
     #[test]
+    fn event_listener() {
+        case!("<slot bind:a='f1' bind:a='f2'></slot>", r#"<slot bind:a="f1" bind:a="f2"/>"#);
+        case!("<slot catch:a='f1'></slot>", r#"<slot catch:a="f1"/>"#);
+        case!("<slot mut-bind:a='f1'></slot>", r#"<slot mut-bind:a="f1"/>"#);
+        case!("<slot capture-bind:a='f1'></slot>", r#"<slot capture-bind:a="f1"/>"#);
+        case!("<slot capture-catch:a='f1'></slot>", r#"<slot capture-catch:a="f1"/>"#);
+        case!("<slot capture-mut-bind:a='f1'></slot>", r#"<slot capture-mut-bind:a="f1"/>"#);
+    }
+
+    #[test]
     fn pure_block() {
         case!("<block> abc </block>", "<block> abc </block>");
         case!("<block a=''></block>", r#"<block/>"#, ParseErrorKind::InvalidAttribute, 7..8);
-        case!("<block mark:aB='fn'></block>", r#"<block mark:aB="fn"/>"#);
+        case!("<block mark:aB='fn'></block>", r#"<block/>"#, ParseErrorKind::InvalidAttribute, 12..14);
         case!("<block slot='a'></block>", r#"<block slot="a"/>"#);
+        case!("<block slot:a-b></block>", r#"<block slot:aB/>"#);
     }
 
     #[test]
@@ -2500,7 +2553,7 @@ mod test {
 
     #[test]
     fn slot() {
-        case!("<slot a='a'></slot>", r#"<slot a="a"/>"#);
+        case!("<slot a-b='a'></slot>", r#"<slot aB="a"/>"#);
         case!("<slot><div/></slot>", r#"<slot/>"#, ParseErrorKind::ChildNodesNotAllowed, 6..12);
         case!("<slot mut-bind:a />", r#"<slot mut-bind:a/>"#);
         case!("<slot mark:a />", r#"<slot mark:a/>"#);

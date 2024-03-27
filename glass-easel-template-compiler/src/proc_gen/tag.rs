@@ -900,7 +900,7 @@ impl Element {
                             write!(w, "):undefined")?;
                         }
                     }
-                    if values.len() > 0 {
+                    if values.len() > 0 || !common.is_empty() {
                         write!(w, r#","#)?;
                         w.function_args("N", |w| {
                             common.to_proc_gen_without_slot(w, scopes, bmc)?;
