@@ -459,7 +459,7 @@ impl ParseErrorKind {
             Self::InvalidAttribute => ParseErrorLevel::Warn,
             Self::DuplicatedAttribute => ParseErrorLevel::Warn,
             Self::DuplicatedName => ParseErrorLevel::Note,
-            Self::AvoidUppercaseLetters => ParseErrorLevel::Warn,
+            Self::AvoidUppercaseLetters => ParseErrorLevel::Note,
             Self::UnexpectedWhitespace => ParseErrorLevel::Note,
             Self::MissingAttributeValue => ParseErrorLevel::Warn,
             Self::DataBindingNotAllowed => ParseErrorLevel::Note,

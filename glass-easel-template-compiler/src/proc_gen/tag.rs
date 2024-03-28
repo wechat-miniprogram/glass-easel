@@ -311,7 +311,7 @@ impl Node {
                         for attr in refs {
                             if let Some(var_slot_map) = var_slot_map {
                                 if let Some((var_scope, var_update_path_tree)) =
-                                    var_slot_map.get(attr.value.name.as_str())
+                                    var_slot_map.get(attr.name.name.as_str())
                                 {
                                     slot_value_count += 1;
                                     scopes.push(ScopeVar {
@@ -356,11 +356,11 @@ impl Node {
                                 var_slot_map = Some(HashMap::new());
                             }
                             let var_slot_map = var_slot_map.as_mut().unwrap();
-                            if !var_slot_map.contains_key(attr.value.name.as_str()) {
+                            if !var_slot_map.contains_key(attr.name.name.as_str()) {
                                 let var_scope = w.declare_var_on_top_scope()?;
                                 let var_update_path_tree = w.declare_var_on_top_scope()?;
                                 var_slot_map.insert(
-                                    attr.value.name.to_string(),
+                                    attr.name.name.to_string(),
                                     (var_scope, var_update_path_tree),
                                 );
                             }
@@ -463,14 +463,14 @@ impl Element {
                             }
                             StyleAttribute::Multiple(..) => unimplemented!()
                         }
-                        for attr in attributes.iter() {
-                            attr.to_proc_gen_as_normal(w, scopes, bmc)?;
+                        for attr in worklet_attributes.iter() {
+                            attr.to_proc_gen_as_worklet_property(w, scopes, bmc)?;
                         }
                         for attr in change_attributes.iter() {
                             attr.to_proc_gen_as_change_property(w, scopes, bmc)?;
                         }
-                        for attr in worklet_attributes.iter() {
-                            attr.to_proc_gen_as_worklet_property(w, scopes, bmc)?;
+                        for attr in attributes.iter() {
+                            attr.to_proc_gen_as_normal(w, scopes, bmc)?;
                         }
                         for attr in data.iter() {
                             attr.to_proc_gen_with_method(w, "R.d", scopes, bmc)?;

@@ -425,6 +425,9 @@ impl Element {
         } else {
             tag_name_slices.pop().unwrap()
         };
+        if tag_name.has_uppercase() {
+            ps.add_warning(ParseErrorKind::AvoidUppercaseLetters, tag_name.location());
+        }
 
         // create an empty element
         let default_attr_position = tag_name.location.end;
@@ -680,8 +683,18 @@ impl Element {
                         }
                     }
                     AttrPrefixKind::DataHyphen => {
+                        let n = Ident {
+                            name: attr_name.name.strip_prefix("data-").unwrap().into(),
+                            location: attr_name.location(),
+                        };
+                        let n = if n.has_uppercase() {
+                            ps.add_warning(ParseErrorKind::AvoidUppercaseLetters, n.location());
+                            n.name.to_ascii_lowercase().into()
+                        } else {
+                            n.name
+                        };
                         Ident {
-                            name: dash_to_camel(attr_name.name.strip_prefix("data-").unwrap()),
+                            name: dash_to_camel(&n.to_ascii_lowercase()),
                             location: attr_name.location,
                         }
                     }
@@ -1992,6 +2005,13 @@ impl Ident {
         Self::is_start_char(ch) || ('0'..='9').contains(&ch)
     }
 
+    fn has_uppercase(&self) -> bool {
+        for c in self.name.chars() {
+            if c.is_uppercase() { return true; }
+        }
+        false
+    }
+
     fn name_eq(&self, other: &Self) -> bool {
         self.name == other.name
     }
@@ -2011,7 +2031,6 @@ impl Ident {
             name: CompactString::new_inline(""),
             location: pos..pos,
         };
-        let mut has_uppercase = false;
         loop {
             match ps.next().unwrap() {
                 ':' => {
@@ -2023,9 +2042,6 @@ impl Ident {
                     ret.push(prev);
                 }
                 ch => {
-                    if ch.is_ascii_uppercase() {
-                        has_uppercase = true;
-                    }
                     cur_name.name.push(ch);
                     cur_name.location.end = ps.position();
                 }
@@ -2034,18 +2050,6 @@ impl Ident {
             if peek != ':' && !Self::is_following_char(peek) { break };
         }
         ret.push(cur_name);
-
-        // NOTE
-        // for the compatibility with legacy framework,
-        // the names without `:` are case-insensitive,
-        // otherwise it is case-sensitive.
-        let case_sensitive = ret.len() > 1;
-        if !case_sensitive && has_uppercase {
-            ps.add_warning(ParseErrorKind::AvoidUppercaseLetters, pos..ps.position());
-            for item in &mut ret {
-                item.name = item.name.to_ascii_lowercase().into();
-            }
-        }
 
         ret
     }
@@ -2454,6 +2458,8 @@ mod test {
 
     #[test]
     fn normal_element() {
+        case!("<Div></div>", r#"<Div/>"#, ParseErrorKind::AvoidUppercaseLetters, 1..4, ParseErrorKind::MissingEndTag, 1..4);
+        case!("<diV></diV>", r#"<diV/>"#, ParseErrorKind::AvoidUppercaseLetters, 1..4);
         case!("<div a='1'></div>", r#"<div a="1"/>"#);
         case!("<div class='a b'></div>", r#"<div class="a b"/>"#);
         case!("<div style='a:b'></div>", r#"<div style="a:b"/>"#);
@@ -2654,7 +2660,7 @@ mod test {
     #[test]
     fn slot_value_ref_scope() {
         let src = r#"<div slot:a slot:b="c" data:a="{{ a + b + c }}">{{ a + b + c }}</div>"#;
-        let expect = r#"<div data:a="{{a+b+c}}" slot:a="_$0" slot:b="_$1">{{_$0+b+_$1}}</div>"#;
+        let expect = r#"<div slot:a="_$0" slot:b="_$1" data:a="{{_$0+b+_$1}}">{{_$0+b+_$1}}</div>"#;
         check_with_mangling(src, expect);
     }
 }
