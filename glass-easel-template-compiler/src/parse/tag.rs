@@ -2412,6 +2412,7 @@ mod test {
         case!("{{ b }} a ", r#"{{b}} a "#);
         case!("{{ a }}{{ b }}", r#"{{a}}{{b}}"#);
         case!("{{ 'a' }}", r#"a"#);
+        case!("{{propB}}:{{propA}}", r#"{{propB}}:{{propA}}"#);
     }
 
     #[test]

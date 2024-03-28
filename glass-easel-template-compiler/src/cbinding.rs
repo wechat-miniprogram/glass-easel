@@ -1,7 +1,6 @@
 use std::slice;
 
-use crate::group;
-use crate::parser;
+use crate::{group, parse::ParseError};
 
 #[repr(C)]
 struct StrRef {
@@ -80,8 +79,8 @@ impl TmplParseWarning {
     }
 }
 
-impl From<parser::ParseError> for TmplParseWarning {
-    fn from(e: parser::ParseError) -> Self {
+impl From<ParseError> for TmplParseWarning {
+    fn from(e: ParseError) -> Self {
         Self {
             message: e.kind.to_string().into(),
             start_line: e.location.start.line,
@@ -99,6 +98,13 @@ struct TmplParseWarningArray {
 }
 
 impl TmplParseWarningArray {
+    fn new(arr: impl Iterator<Item = TmplParseWarning>) -> Self {
+        let v: Box<_> = arr.collect();
+        let len = v.len();
+        let buf = Box::into_raw(v) as *mut _;
+        Self { buf, len }
+    }
+
     #[no_mangle]
     pub extern "C" fn tmpl_parse_warning_array_free(self) {
         // empty
@@ -146,13 +152,10 @@ impl TmplGroup {
         path_len: usize,
         content_buf: &u8,
         content_len: usize,
-    ) -> TmplParseResult {
+    ) -> TmplParseWarningArray {
         let path = String::from_utf8_lossy(slice::from_raw_parts(path_buf, path_len));
         let content = String::from_utf8_lossy(slice::from_raw_parts(content_buf, content_len));
-        match self.inner_mut().add_tmpl(&path, &content) {
-            Ok(_) => TmplParseResult::ok(),
-            Err(e) => TmplParseResult::from(e),
-        }
+        TmplParseWarningArray::new(self.inner_mut().add_tmpl(&path, &content).into_iter().map(|x| x.into()))
     }
 
     #[no_mangle]
@@ -162,13 +165,10 @@ impl TmplGroup {
         path_len: usize,
         content_buf: &u8,
         content_len: usize,
-    ) -> TmplParseResult {
+    ) {
         let path = String::from_utf8_lossy(slice::from_raw_parts(path_buf, path_len));
         let content = String::from_utf8_lossy(slice::from_raw_parts(content_buf, content_len));
-        match self.inner_mut().add_script(&path, &content) {
-            Ok(_) => TmplParseResult::ok(),
-            Err(e) => TmplParseResult::from(e),
-        }
+        self.inner_mut().add_script(&path, &content);
     }
 
     #[no_mangle]
@@ -179,11 +179,11 @@ impl TmplGroup {
     ) -> StrRefArray {
         let path = String::from_utf8_lossy(slice::from_raw_parts(path_buf, path_len)).to_string();
         self.inner()
-            .get_direct_dependencies(&path)
+            .direct_dependencies(&path)
+            .map(|x| {
+                x.map(|x| x.into()).collect::<Box<_>>()
+            })
             .unwrap_or_default()
-            .into_iter()
-            .map(|x| x.into())
-            .collect::<Box<_>>()
             .into()
     }
 
@@ -195,11 +195,11 @@ impl TmplGroup {
     ) -> StrRefArray {
         let path = String::from_utf8_lossy(slice::from_raw_parts(path_buf, path_len)).to_string();
         self.inner()
-            .get_script_dependencies(&path)
+            .script_dependencies(&path)
+            .map(|x| {
+                x.map(|x| x.into()).collect::<Box<_>>()
+            })
             .unwrap_or_default()
-            .into_iter()
-            .map(|x| x.into())
-            .collect::<Box<_>>()
             .into()
     }
 
@@ -211,11 +211,11 @@ impl TmplGroup {
     ) -> StrRefArray {
         let path = String::from_utf8_lossy(slice::from_raw_parts(path_buf, path_len)).to_string();
         self.inner()
-            .get_inline_script_module_names(&path)
+            .inline_script_module_names(&path)
+            .map(|x| {
+                x.map(|x| x.into()).collect::<Box<_>>()
+            })
             .unwrap_or_default()
-            .into_iter()
-            .map(|x| x.into())
-            .collect::<Box<_>>()
             .into()
     }
 
@@ -232,7 +232,7 @@ impl TmplGroup {
             String::from_utf8_lossy(slice::from_raw_parts(module_name_buf, module_name_len))
                 .to_string();
         self.inner()
-            .get_inline_script(&path, &module_name)
+            .inline_script_content(&path, &module_name)
             .unwrap_or_default()
             .into()
     }
@@ -246,19 +246,19 @@ impl TmplGroup {
         module_name_len: usize,
         content_buf: &u8,
         content_len: usize,
-    ) -> TmplResult {
+    ) -> i32 {
         let path = String::from_utf8_lossy(slice::from_raw_parts(path_buf, path_len));
         let module_name =
             String::from_utf8_lossy(slice::from_raw_parts(module_name_buf, module_name_len))
                 .to_string();
         let content = String::from_utf8_lossy(slice::from_raw_parts(content_buf, content_len));
-        match self
+        let ret = self
             .inner_mut()
-            .set_inline_script(&path, &module_name, &content)
-        {
-            Ok(_) => TmplResult::ok(),
-            Err(e) => TmplResult::from(e),
+            .set_inline_script_content(&path, &module_name, &content);
+        if ret.is_err() {
+            return -1;
         }
+        0
     }
 
     #[no_mangle]

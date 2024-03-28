@@ -71,6 +71,13 @@ impl TmplGroup {
         serde_wasm_bindgen::to_value(&ret).unwrap()
     }
 
+    /// Regenerate a template content string for the specified template.
+    #[wasm_bindgen(js_name = stringifyTmpl)]
+    pub fn stringify_tmpl(&mut self, path: &str) -> Option<String> {
+        let path = crate::path::normalize(path);
+        self.group.stringify_tmpl(&path)
+    }
+
     #[wasm_bindgen(js_name = addScript)]
     pub fn add_script(&mut self, path: &str, tmpl_str: &str) {
         let path = crate::path::normalize(path);

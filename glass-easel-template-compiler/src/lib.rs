@@ -14,5 +14,5 @@ mod entities;
 mod escape;
 mod js_bindings;
 #[cfg(feature = "c_bindings")]
-// pub mod cbinding; // TODO !!!
+pub mod cbinding;
 mod proc_gen;
