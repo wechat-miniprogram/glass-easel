@@ -1,22 +1,15 @@
 #[allow(unused_imports)]
 #[macro_use]
 extern crate log;
-extern crate pest;
-#[macro_use]
-extern crate pest_derive;
 #[macro_use]
 extern crate lazy_static;
 
-mod tree;
-pub use tree::TmplTree;
-pub(crate) use tree::*;
-mod expr;
-pub(crate) use expr::*;
-mod parser;
-pub use parser::*;
+pub mod parse;
+pub mod stringify;
+mod binding_map;
 mod group;
 pub use group::*;
-mod binding_map;
+mod path;
 mod entities;
 mod escape;
 mod js_bindings;

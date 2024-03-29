@@ -2,20 +2,49 @@
 
 #![cfg(feature = "js_bindings")]
 
+use serde::{Serialize, Deserialize};
 use wasm_bindgen::prelude::*;
 
+use self::parse::{ParseError, ParseErrorLevel};
+
 use super::*;
+
+#[derive(Serialize, Deserialize)]
+pub struct TemplateParseError {
+    is_error: bool,
+    code: u32,
+    message: String,
+    path: String,
+    start_line: u32,
+    start_column: u32,
+    end_line: u32,
+    end_column: u32,
+}
+
+impl From<ParseError> for TemplateParseError {
+    fn from(value: ParseError) -> Self {
+        Self {
+            is_error: value.kind.level() >= ParseErrorLevel::Error,
+            code: value.code() as u32,
+            message: value.kind.to_string(),
+            path: value.path.to_string(),
+            start_line: value.location.start.line,
+            start_column: value.location.start.utf16_col,
+            end_line: value.location.end.line,
+            end_column: value.location.end.utf16_col,
+        }
+    }
+}
 
 #[wasm_bindgen]
 pub struct TmplGroup {
     group: crate::TmplGroup,
-    names: Vec<String>,
 }
 
-fn convert_str_arr(arr: &Vec<String>) -> js_sys::Array {
-    let ret = js_sys::Array::new_with_length(arr.len() as u32);
-    for (index, item) in arr.iter().enumerate() {
-        ret.set(index as u32, JsValue::from(item));
+fn convert_str_arr<T: ToString>(arr: impl Iterator<Item = T>) -> js_sys::Array {
+    let ret = js_sys::Array::new();
+    for (index, item) in arr.enumerate() {
+        ret.set(index as u32, JsValue::from(item.to_string()));
     }
     ret
 }
@@ -26,50 +55,56 @@ impl TmplGroup {
     pub fn new() -> Self {
         Self {
             group: crate::TmplGroup::new(),
-            names: vec![],
         }
     }
 
+    /// Compile a template and add it to the group.
+    ///
+    /// Returns an JavaScript array containing all warnings and errors discovered during the compilation.
+    /// Each array item is an `TemplateParseError` .
+    ///
     #[wasm_bindgen(js_name = addTmpl)]
-    pub fn add_tmpl(&mut self, path: &str, tmpl_str: &str) -> Result<usize, JsError> {
-        let path = group::path::normalize(path);
-        self.group.add_tmpl(&path, tmpl_str)?;
-        if let Some(x) = self.names.iter().position(|x| x.as_str() == path.as_str()) {
-            Ok(x)
-        } else {
-            self.names.push(path);
-            Ok(self.names.len() - 1)
-        }
+    pub fn add_tmpl(&mut self, path: &str, tmpl_str: &str) -> JsValue {
+        let path = crate::path::normalize(path);
+        let errors = self.group.add_tmpl(&path, tmpl_str);
+        let ret: Vec<_> = errors.into_iter().map(|x| TemplateParseError::from(x)).collect();
+        serde_wasm_bindgen::to_value(&ret).unwrap()
+    }
+
+    /// Regenerate a template content string for the specified template.
+    #[wasm_bindgen(js_name = stringifyTmpl)]
+    pub fn stringify_tmpl(&mut self, path: &str) -> Option<String> {
+        let path = crate::path::normalize(path);
+        self.group.stringify_tmpl(&path)
     }
 
     #[wasm_bindgen(js_name = addScript)]
-    pub fn add_script(&mut self, path: &str, tmpl_str: &str) -> Result<(), JsError> {
-        let path = group::path::normalize(path);
-        self.group.add_script(&path, tmpl_str)?;
-        Ok(())
+    pub fn add_script(&mut self, path: &str, tmpl_str: &str) {
+        let path = crate::path::normalize(path);
+        self.group.add_script(&path, tmpl_str);
     }
 
     #[wasm_bindgen(js_name = "getDirectDependencies")]
     pub fn get_direct_dependencies(&self, path: &str) -> Result<js_sys::Array, JsError> {
-        let dependencies = self.group.get_direct_dependencies(&path)?;
-        Ok(convert_str_arr(&dependencies))
+        let dependencies = self.group.direct_dependencies(&path)?;
+        Ok(convert_str_arr(dependencies))
     }
 
     #[wasm_bindgen(js_name = "getScriptDependencies")]
     pub fn get_script_dependencies(&self, path: &str) -> Result<js_sys::Array, JsError> {
-        let dependencies = self.group.get_script_dependencies(&path)?;
-        Ok(convert_str_arr(&dependencies))
+        let dependencies = self.group.script_dependencies(&path)?;
+        Ok(convert_str_arr(dependencies))
     }
 
     #[wasm_bindgen(js_name = "getInlineScriptModuleNames")]
     pub fn get_inline_script_module_names(&self, path: &str) -> Result<js_sys::Array, JsError> {
-        let names = self.group.get_inline_script_module_names(path)?;
-        Ok(convert_str_arr(&names))
+        let names = self.group.inline_script_module_names(path)?;
+        Ok(convert_str_arr(names))
     }
 
     #[wasm_bindgen(js_name = "getInlineScript")]
     pub fn get_inline_script(&self, path: &str, module_name: &str) -> Result<String, JsError> {
-        let script = self.group.get_inline_script(&path, &module_name)?;
+        let script = self.group.inline_script_content(&path, &module_name)?;
         Ok(script.to_string())
     }
 
@@ -81,7 +116,7 @@ impl TmplGroup {
         new_content: &str,
     ) -> Result<(), JsError> {
         self.group
-            .set_inline_script(&path, &module_name, &new_content)?;
+            .set_inline_script_content(&path, &module_name, &new_content)?;
         Ok(())
     }
 

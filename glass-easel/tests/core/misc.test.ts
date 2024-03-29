@@ -400,7 +400,7 @@ describe('component utils', () => {
       },
       template: tmpl(
         `
-        <child id="child" bind:tap="onTap1" bindtap="onTap2" />
+        <child id="child" bind:tap="onTap1" bindtap="onTap2" bind:tap="onTap3" />
       `,
       ),
       methods: {
@@ -410,13 +410,16 @@ describe('component utils', () => {
         onTap2() {
           events.push(2)
         },
+        onTap3() {
+          events.push(3)
+        },
       },
     })
     const elem = glassEasel.createElement('root', compDef.general())
     expect(elem.$.child as glassEasel.Element).toBeInstanceOf(glassEasel.Element)
     expect(elem.$.child as glassEasel.Element).toBeInstanceOf(glassEasel.Component)
     glassEasel.triggerEvent(elem.$.child as glassEasel.Element, 'tap', {})
-    expect(events).toStrictEqual([1, 2])
+    expect(events).toStrictEqual([2, 1, 3])
   })
 
   test('fallback event on NativeNode', () => {
@@ -424,7 +427,7 @@ describe('component utils', () => {
     const compDef = componentSpace.defineComponent({
       template: tmpl(
         `
-        <div id="div" bind:tap="onTap1" bindtap="onTap2" />
+        <div id="div" bind:tap="onTap1" bindtap="onTap2" bind:tap="onTap3" />
       `,
         { fallbackListenerOnNativeNode: true },
       ),
@@ -435,13 +438,16 @@ describe('component utils', () => {
         onTap2() {
           events.push(2)
         },
+        onTap3() {
+          events.push(3)
+        },
       },
     })
     const elem = glassEasel.createElement('root', compDef.general())
     expect(elem.$.div as glassEasel.Element).toBeInstanceOf(glassEasel.Element)
     expect(elem.$.div as glassEasel.Element).not.toBeInstanceOf(glassEasel.Component)
     glassEasel.triggerEvent(elem.$.div as glassEasel.Element, 'tap', {})
-    expect(events).toStrictEqual([1, 2])
+    expect(events).toStrictEqual([2, 1, 3])
   })
 
   test('template content update', () => {
