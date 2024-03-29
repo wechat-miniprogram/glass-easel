@@ -2261,16 +2261,10 @@ impl Value {
                 start_pos..start_pos
             },
         };
-        fn has_wrapped_to_string(expr: &Expression) -> bool {
-            match expr {
-                Expression::ToStringWithoutUndefined { .. } => true,
-                _ => false,
-            }
-        }
         fn wrap_to_string(expr: Box<Expression>, location: Range<Position>) -> Box<Expression> {
-            if has_wrapped_to_string(&expr) { return expr; }
             Box::new(Expression::ToStringWithoutUndefined { value: expr, location })
         }
+        let mut has_wrap_to_string = false;
         loop {
             if until(ps) || ps.ended() { break };
             let start_pos = ps.position();
@@ -2286,12 +2280,18 @@ impl Value {
                                 } else {
                                     let left = Box::new(Expression::LitStr { value, location });
                                     let right = wrap_to_string(expression, double_brace_location.1.clone());
+                                    has_wrap_to_string = true;
                                     Box::new(Expression::Plus { left, right, location: double_brace_location.0.clone() })
                                 }
                             }
                             Self::Dynamic { expression: left, double_brace_location: left_double_brace_location, binding_map_keys: _ } => {
-                                let left = wrap_to_string(left, left_double_brace_location.1.clone());
+                                let left = if has_wrap_to_string {
+                                    left
+                                } else {
+                                    wrap_to_string(left, left_double_brace_location.1.clone())
+                                };
                                 let right = wrap_to_string(expression, double_brace_location.1.clone());
+                                has_wrap_to_string = true;
                                 Box::new(Expression::Plus { left, right, location: double_brace_location.0.clone() })
                             }
                         };
@@ -2317,8 +2317,13 @@ impl Value {
                     true
                 };
                 if need_convert {
-                    let left = wrap_to_string(expression, double_brace_location.1.clone());
+                    let left = if has_wrap_to_string {
+                        expression
+                    } else {
+                        wrap_to_string(expression, double_brace_location.1.clone())
+                    };
                     let right = Box::new(Expression::LitStr { value: CompactString::new_inline(""), location: start_pos..start_pos });
+                    has_wrap_to_string = true;
                     let expression = Box::new(Expression::Plus { left, right, location: double_brace_location.0.clone() });
                     Self::Dynamic { expression, double_brace_location, binding_map_keys }
                 } else {
@@ -2586,6 +2591,10 @@ mod test {
         case!("<wxs module='a' /><wxs module='a' src='a' />", r#"<wxs module="a"/>"#, ParseErrorKind::DuplicatedName, 31..32);
         case!("<wxs src='a' module='a'><div/></wxs>", r#"<wxs module="a" src="a"/>"#, ParseErrorKind::ChildNodesNotAllowed, 24..30);
         case!("<wxs src='a.wxs' module='a'></wxs>", r#"<wxs module="a" src="a"/>"#);
+        case!(
+            r#"<b change:abc="{{ modA.fA }}" /><wxs module="a">exports.a = () => {}</wxs>"#,
+            r#"<wxs module="a">exports.a = () => {}</wxs><b change:abc="{{modA.fA}}"/>"#
+        );
     }
 
     #[test]

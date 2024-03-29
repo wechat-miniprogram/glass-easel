@@ -13,7 +13,9 @@ impl Stringify for Template {
             stringifier.write_str_name_quoted(import)?;
             stringifier.write_str(r#"/>"#)?;
         }
+        stringifier.scope_names.clear();
         for script in globals.scripts.iter() {
+            stringifier.scope_names.push(script.module_name().name.clone());
             match script {
                 Script::Inline { module_name, content, content_location } => {
                     stringifier.write_str(r#"<wxs module="#)?;
@@ -51,6 +53,7 @@ impl Stringify for Template {
         for node in self.content.iter() {
             node.stringify_write(stringifier)?;
         }
+        stringifier.scope_names.clear();
         Ok(())
     }
 }
