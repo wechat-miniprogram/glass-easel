@@ -183,7 +183,7 @@ impl Node {
                 } else {
                     let s = ps.skip_until_after(">").unwrap_or("");
                     let location = range.start..ps.position();
-                    ps.add_warning(ParseErrorKind::UnrecognizedTag, location.clone());
+                    ps.add_warning(ParseErrorKind::UnknownMetaTag, location.clone());
                     ret.push(Node::UnknownMetaTag(s.to_string(), location));
                 }
                 continue;

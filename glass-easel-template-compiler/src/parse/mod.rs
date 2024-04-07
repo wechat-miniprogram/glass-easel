@@ -397,7 +397,7 @@ impl ParseError {
 pub enum ParseErrorKind {
     UnexpectedCharacter = 0x10001,
     UnexpectedExpressionCharacter,
-    UnrecognizedTag,
+    UnknownMetaTag,
     MissingExpressionEnd,
     IllegalEntity,
     IncompleteTag,
@@ -431,7 +431,7 @@ impl ParseErrorKind {
         match self {
             Self::UnexpectedCharacter => "unexpected character",
             Self::UnexpectedExpressionCharacter => "unexpected character inside expression",
-            Self::UnrecognizedTag => "unrecognized tag",
+            Self::UnknownMetaTag => "unknown meta tag",
             Self::MissingExpressionEnd => "missing expression end",
             Self::IllegalEntity => "illegal entity",
             Self::IncompleteTag => "incomplete tag",
@@ -465,7 +465,7 @@ impl ParseErrorKind {
         match self {
             Self::UnexpectedCharacter => ParseErrorLevel::Fatal,
             Self::UnexpectedExpressionCharacter => ParseErrorLevel::Fatal,
-            Self::UnrecognizedTag => ParseErrorLevel::Warn,
+            Self::UnknownMetaTag => ParseErrorLevel::Note,
             Self::MissingExpressionEnd => ParseErrorLevel::Fatal,
             Self::IllegalEntity => ParseErrorLevel::Error,
             Self::IncompleteTag => ParseErrorLevel::Fatal,
