@@ -1516,7 +1516,7 @@ mod test {
     #[test]
     fn sub_expressions() {
         fn check_sub_expr(src: &str, expect: &[&str]) {
-            let mut state = ParseState::new("TEST", src);
+            let mut state = ParseState::new("TEST", src, Default::default());
             let parsed = Expression::parse_expression_or_object_inner(&mut state, false).unwrap();
             let r: Vec<_> = parsed.sub_expressions().map(|x| {
                 let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src);

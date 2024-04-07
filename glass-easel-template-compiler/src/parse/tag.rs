@@ -753,14 +753,14 @@ impl Element {
                                     }
                                 }
                                 AttrPrefixParseKind::StaticStr => {
-                                    let v = StrName::parse_identifier_like_until_before(ps, until);
+                                    let v = StrName::parse_until_before(ps, until);
                                     if v.name.as_str().contains("{{") {
                                         ps.add_warning(ParseErrorKind::DataBindingNotAllowed, v.location());
                                     }
                                     AttrPrefixParseResult::StaticStr(v)
                                 },
                                 AttrPrefixParseKind::ScopeName => {
-                                    let v = StrName::parse_identifier_like_until_before(ps, until);
+                                    let v = StrName::parse_until_before(ps, until);
                                     AttrPrefixParseResult::ScopeName(v)
                                 },
                             };
@@ -788,7 +788,7 @@ impl Element {
                             }
                         }
                         Some(_) if ws_after_eq.is_none() => {
-                            let v = StrName::parse_identifier_like_until_before(ps, |ps| {
+                            let v = StrName::parse_until_before(ps, |ps| {
                                 match ps.peek::<0>() {
                                     None => true,
                                     Some(ch) => !Ident::is_following_char(ch),
@@ -1945,6 +1945,7 @@ pub struct Attribute {
     pub prefix_location: Option<Range<Position>>,
 }
 
+/// 
 #[derive(Debug, Clone)]
 pub struct StaticAttribute {
     pub name: Ident,
@@ -1976,6 +1977,11 @@ pub struct EventBinding {
     pub prefix_location: Range<Position>,
 }
 
+/// An identifier.
+/// 
+/// It can be used as tag name and attribute name.
+/// Unlike JavaScript identifier, it can contain `-` .
+/// 
 #[derive(Debug, Clone)]
 pub struct Ident {
     pub name: CompactString,
@@ -2016,7 +2022,11 @@ impl Ident {
         self.name == other.name
     }
 
-    fn parse_colon_separated(ps: &mut ParseState) -> Vec<Self> {
+    /// Parse colon-seperated identifiers.
+    /// 
+    /// For example, `wx:for-item` will be parsed as two identifiers `wx` and `for-item` .
+    /// 
+    pub fn parse_colon_separated(ps: &mut ParseState) -> Vec<Self> {
         let Some(peek) = ps.peek::<0>() else {
             return vec![];
         };
@@ -2055,6 +2065,7 @@ impl Ident {
     }
 }
 
+/// A static string with location information.
 #[derive(Debug, Clone)]
 pub struct StrName {
     pub name: CompactString,
@@ -2068,7 +2079,7 @@ impl TemplateStructure for StrName {
 }
 
 impl StrName {
-    fn name_eq(&self, other: &Self) -> bool {
+    pub fn name_eq(&self, other: &Self) -> bool {
         self.name == other.name
     }
 
@@ -2152,7 +2163,11 @@ impl StrName {
         Cow::Borrowed(ps.next_char_as_str())
     }
 
-    fn parse_identifier_like_until_before(ps: &mut ParseState, until: impl Fn(&mut ParseState) -> bool) -> Self {
+    /// Parse until the `until` returns `true` .
+    /// 
+    /// HTML Entities will be parsed.
+    /// 
+    pub fn parse_until_before(ps: &mut ParseState, until: impl Fn(&mut ParseState) -> bool) -> Self {
         let mut name = CompactString::new_inline("");
         let start_pos = ps.position();
         loop {
@@ -2167,7 +2182,8 @@ impl StrName {
         }
     }
 
-    fn is_valid_js_identifier(&self) -> bool {
+    /// Check whether the name is a valid JavaScript identifier.
+    pub fn is_valid_js_identifier(&self) -> bool {
         let mut chars = self.name.chars();
         let first = chars.next();
         match first {
@@ -2180,6 +2196,7 @@ impl StrName {
     }
 }
 
+/// A static string or an expression.
 #[derive(Debug, Clone)]
 pub enum Value {
     Static {
