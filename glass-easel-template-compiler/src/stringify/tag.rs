@@ -157,7 +157,7 @@ impl Stringify for Element {
             for attr in slot_value_refs {
                 let value = stringifier.add_scope(&attr.value.name).clone();
                 stringifier.write_str(" ")?;
-                stringifier.write_token("slot", "slot", &attr.prefix_location)?;
+                stringifier.write_token("slot", "slot", attr.prefix_location.as_ref().unwrap_or(&attr.name.location))?;
                 stringifier.write_str(":")?;
                 stringifier.write_token(&attr.name.name, &attr.name.name, &attr.name.location)?;
                 if value != &attr.name.name {
@@ -296,17 +296,17 @@ impl Stringify for Element {
                     write_attr(stringifier, Some(prefix), &attr.name, &attr.value)?;
                 }
                 for attr in worklet_attributes.iter() {
-                    write_static_attr(stringifier, Some(("worklet", &attr.prefix_location)), &attr.name, &attr.value)?;
+                    write_static_attr(stringifier, Some(("worklet", attr.prefix_location.as_ref().unwrap_or(&attr.name.location))), &attr.name, &attr.value)?;
                 }
                 for attr in data.iter() {
                     let prefix = ("data", attr.prefix_location.as_ref().unwrap_or(&attr.name.location));
                     write_attr(stringifier, Some(prefix), &attr.name, &attr.value)?;
                 }
                 for attr in generics.iter() {
-                    write_static_attr(stringifier, Some(("generic", &attr.prefix_location)), &attr.name, &attr.value)?;
+                    write_static_attr(stringifier, Some(("generic", attr.prefix_location.as_ref().unwrap_or(&attr.name.location))), &attr.name, &attr.value)?;
                 }
                 for attr in extra_attr.iter() {
-                    write_static_attr(stringifier, Some(("extra-attr", &attr.prefix_location)), &attr.name, &attr.value)?;
+                    write_static_attr(stringifier, Some(("extra-attr", attr.prefix_location.as_ref().unwrap_or(&attr.name.location))), &attr.name, &attr.value)?;
                 }
                 write_common_attributes_without_slot(stringifier, common)?;
             }

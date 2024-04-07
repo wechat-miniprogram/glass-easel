@@ -708,119 +708,37 @@ impl Element {
                     StaticStr(StrName),
                     ScopeName(StrName),
                 }
-                let ws_before_eq = ps.skip_whitespace();
-                let attr_value = if let Some(eq_range) = ps.consume_str("=") {
-                    if let Some(range) = ws_before_eq {
-                        ps.add_warning(ParseErrorKind::UnexpectedWhitespace, range);
+                let attr_value = match parse_kind {
+                    AttrPrefixParseKind::Value => {
+                        if let Some(attr) = Attribute::parse_optional_value(ps, attr_name.clone()) {
+                            AttrPrefixParseResult::Value(attr.value)
+                        } else {
+                            AttrPrefixParseResult::Invalid
+                        }
                     }
-                    let ws_after_eq = ps.skip_whitespace();
-                    let attr_value = match ps.peek::<0>() {
-                        None | Some('>') | Some('/') => {
-                            let pos = eq_range.end;
-                            ps.add_warning(ParseErrorKind::MissingAttributeValue, eq_range);
-                            match parse_kind {
-                                AttrPrefixParseKind::Value |
-                                AttrPrefixParseKind::TemplateData => AttrPrefixParseResult::Value(Value::new_empty(pos)),
-                                AttrPrefixParseKind::StaticStr |
-                                AttrPrefixParseKind::ScopeName => AttrPrefixParseResult::ScopeName(StrName::new_empty(pos)),
-                            }
+                    AttrPrefixParseKind::TemplateData => {
+                        if let Some(attr) = Attribute::parse_optional_value_as_object(ps, attr_name.clone()) {
+                            AttrPrefixParseResult::Value(attr.value)
+                        } else {
+                            AttrPrefixParseResult::Invalid
                         }
-                        Some(ch) if ch == '"' || ch == '\'' => {
-                            // parse as `"..."`
-                            if let Some(range) = ws_after_eq {
-                                ps.add_warning(ParseErrorKind::UnexpectedWhitespace, range);
+                    }
+                    AttrPrefixParseKind::StaticStr => {
+                        if let Some(attr) = StaticAttribute::parse_optional_value(ps, attr_name.clone()) {
+                            if attr.value.name.as_str().contains("{{") {
+                                ps.add_warning(ParseErrorKind::DataBindingNotAllowed, attr.value.location());
                             }
-                            ps.next(); // ch
-                            let until = |ps: &mut ParseState| ps.peek::<0>() == Some(ch);
-                            let value = match parse_kind {
-                                AttrPrefixParseKind::Value => AttrPrefixParseResult::Value(Value::parse_until_before(ps, until)),
-                                AttrPrefixParseKind::TemplateData => {
-                                    let v = ps.try_parse(|ps| {
-                                        let v = Value::parse_data_binding(ps, true)?;
-                                        match ps.peek::<0>() {
-                                            Some(x) => {
-                                                (x == ch).then_some(v)
-                                            }
-                                            None => Some(v),
-                                        }
-                                    });
-                                    if let Some(v) = v {
-                                        AttrPrefixParseResult::Value(v)
-                                    } else {
-                                        let value = Value::parse_until_before(ps, until);
-                                        ps.add_warning(ParseErrorKind::InvalidAttributeValue, value.location());
-                                        AttrPrefixParseResult::Value(Value::new_empty(value.location().start))
-                                    }
-                                }
-                                AttrPrefixParseKind::StaticStr => {
-                                    let v = StrName::parse_until_before(ps, until);
-                                    if v.name.as_str().contains("{{") {
-                                        ps.add_warning(ParseErrorKind::DataBindingNotAllowed, v.location());
-                                    }
-                                    AttrPrefixParseResult::StaticStr(v)
-                                },
-                                AttrPrefixParseKind::ScopeName => {
-                                    let v = StrName::parse_until_before(ps, until);
-                                    AttrPrefixParseResult::ScopeName(v)
-                                },
-                            };
-                            ps.next(); // ch
-                            value
+                            AttrPrefixParseResult::StaticStr(attr.value)
+                        } else {
+                            AttrPrefixParseResult::Invalid
                         }
-                        Some('{') if ps.peek_str("{{") => {
-                            // parse `{{...}}`
-                            if let Some(range) = ws_after_eq {
-                                ps.add_warning(ParseErrorKind::UnexpectedWhitespace, range);
-                            }
-                            let value = Value::parse_data_binding(ps, parse_kind == AttrPrefixParseKind::TemplateData);
-                            if let Some(value) = value {
-                                match parse_kind {
-                                    AttrPrefixParseKind::Value | AttrPrefixParseKind::TemplateData => {
-                                        AttrPrefixParseResult::Value(value)
-                                    }
-                                    AttrPrefixParseKind::StaticStr | AttrPrefixParseKind::ScopeName => {
-                                        ps.add_warning(ParseErrorKind::DataBindingNotAllowed, value.location());
-                                        AttrPrefixParseResult::Invalid
-                                    }
-                                }
-                            } else {
-                                AttrPrefixParseResult::Invalid
-                            }
+                    }
+                    AttrPrefixParseKind::ScopeName => {
+                        if let Some(attr) = StaticAttribute::parse_optional_value(ps, attr_name.clone()) {
+                            AttrPrefixParseResult::ScopeName(attr.value)
+                        } else {
+                            AttrPrefixParseResult::Invalid
                         }
-                        Some(_) if ws_after_eq.is_none() => {
-                            let v = StrName::parse_until_before(ps, |ps| {
-                                match ps.peek::<0>() {
-                                    None => true,
-                                    Some(ch) => !Ident::is_following_char(ch),
-                                }
-                            });
-                            match parse_kind {
-                                AttrPrefixParseKind::Value |
-                                AttrPrefixParseKind::TemplateData => AttrPrefixParseResult::Value(Value::Static { value: v.name, location: v.location }),
-                                AttrPrefixParseKind::StaticStr => AttrPrefixParseResult::StaticStr(v),
-                                AttrPrefixParseKind::ScopeName => AttrPrefixParseResult::ScopeName(v),
-                            }
-                        }
-                        _ => {
-                            let pos = eq_range.end;
-                            ps.add_warning(ParseErrorKind::MissingAttributeValue, eq_range);
-                            match parse_kind {
-                                AttrPrefixParseKind::Value |
-                                AttrPrefixParseKind::TemplateData => AttrPrefixParseResult::Value(Value::new_empty(pos)),
-                                AttrPrefixParseKind::StaticStr => AttrPrefixParseResult::StaticStr(StrName::new_empty(pos)),
-                                AttrPrefixParseKind::ScopeName => AttrPrefixParseResult::ScopeName(StrName::new_empty(pos)),
-                            }
-                        }
-                    };
-                    ps.skip_whitespace();
-                    attr_value
-                } else {
-                    let pos = attr_name.location.end;
-                    match parse_kind {
-                        AttrPrefixParseKind::Value |
-                        AttrPrefixParseKind::TemplateData => AttrPrefixParseResult::Value(Value::new_empty(pos)),
-                        AttrPrefixParseKind::StaticStr => AttrPrefixParseResult::StaticStr(StrName::new_empty(pos)),
-                        AttrPrefixParseKind::ScopeName => AttrPrefixParseResult::ScopeName(StrName::new_empty(pos)),
                     }
                 };
 
@@ -1173,7 +1091,7 @@ impl Element {
                                         worklet_attributes.push(StaticAttribute {
                                             name: attr_name,
                                             value: s,
-                                            prefix_location,
+                                            prefix_location: Some(prefix_location),
                                         });
                                     }
                                 }
@@ -1337,7 +1255,7 @@ impl Element {
                                         generics.push(StaticAttribute {
                                             name: attr_name,
                                             value: s,
-                                            prefix_location,
+                                            prefix_location: Some(prefix_location),
                                         });
                                     }
                                 }
@@ -1362,7 +1280,7 @@ impl Element {
                                         extra_attr.push(StaticAttribute {
                                             name: attr_name,
                                             value: s,
-                                            prefix_location,
+                                            prefix_location: Some(prefix_location),
                                         });
                                     }
                                 }
@@ -1396,7 +1314,7 @@ impl Element {
                                         slot_value_refs.push(StaticAttribute {
                                             name: attr_name,
                                             value: s,
-                                            prefix_location,
+                                            prefix_location: Some(prefix_location),
                                         });
                                     }
                                 }
@@ -1612,7 +1530,7 @@ impl Element {
             };
             if !valid {
                 for attr in slot_value_refs.drain(..) {
-                    ps.add_warning(ParseErrorKind::InvalidAttribute, attr.prefix_location);
+                    ps.add_warning(ParseErrorKind::InvalidAttribute, attr.prefix_location.unwrap());
                 }
             }
         }
@@ -1945,12 +1863,148 @@ pub struct Attribute {
     pub prefix_location: Option<Range<Position>>,
 }
 
-/// 
+impl Attribute {
+    #[inline(always)]
+    fn parse_optional_value_part<R>(
+        ps: &mut ParseState,
+        quoted_parser: impl FnOnce(&mut ParseState, char) -> R,
+        expression_parser: impl FnOnce(&mut ParseState) -> Option<R>,
+        str_name: impl FnOnce(StrName) -> R,
+        default: impl FnOnce() -> R,
+    ) -> Option<R> {
+        let ws_before_eq = ps.skip_whitespace();
+        let ret = if let Some(eq_range) = ps.consume_str("=") {
+            if let Some(range) = ws_before_eq {
+                ps.add_warning(ParseErrorKind::UnexpectedWhitespace, range);
+            }
+            let ws_after_eq = ps.skip_whitespace();
+            let attr_value = match ps.peek::<0>() {
+                Some(ch) if ch == '"' || ch == '\'' => {
+                    // parse as `"..."`
+                    if let Some(range) = ws_after_eq {
+                        ps.add_warning(ParseErrorKind::UnexpectedWhitespace, range);
+                    }
+                    ps.next(); // ch
+                    let value = quoted_parser(ps, ch);
+                    ps.next(); // ch
+                    value
+                }
+                Some('{') if ps.peek_str("{{") => {
+                    // parse `{{...}}`
+                    if let Some(range) = ws_after_eq {
+                        ps.add_warning(ParseErrorKind::UnexpectedWhitespace, range);
+                    }
+                    expression_parser(ps)?
+                }
+                Some(ch) if ws_after_eq.is_none() && Ident::is_following_char(ch) => {
+                    let v = StrName::parse_until_before(ps, |ps| {
+                        match ps.peek::<0>() {
+                            None => true,
+                            Some(ch) => !Ident::is_following_char(ch),
+                        }
+                    });
+                    ps.add_warning(ParseErrorKind::ShouldQuoted, v.location());
+                    str_name(v)
+                }
+                _ => {
+                    ps.add_warning(ParseErrorKind::MissingAttributeValue, eq_range);
+                    default()
+                }
+            };
+            ps.skip_whitespace();
+            attr_value
+        } else {
+            default()
+        };
+        Some(ret)
+    }
+
+    /// Parse the value part of the attribute, including the leading `=` .
+    pub fn parse_optional_value(ps: &mut ParseState, name: Ident) -> Option<Self> {
+        let value = Attribute::parse_optional_value_part(
+            ps,
+            |ps, ch| Value::parse_until_before(ps, |ps: &mut ParseState| ps.peek::<0>() == Some(ch)),
+            |ps| Value::parse_data_binding(ps, false),
+            |v| Value::Static { value: v.name, location: v.location },
+            || Value::new_empty(name.location.end),
+        );
+        value.map(|value| Self {
+            name,
+            value,
+            is_model: false,
+            prefix_location: None,
+        })
+    }
+
+    /// Parse the (object) value part of the attribute, including the leading `=` .
+    /// 
+    /// Unlike `parse_optional_value` ,
+    /// this function expect the value to be an object value binding.
+    /// It is useful when compiling the `data` field in `<template />` .
+    /// 
+    pub fn parse_optional_value_as_object(ps: &mut ParseState, name: Ident) -> Option<Self> {
+        let value = Attribute::parse_optional_value_part(
+            ps,
+            |ps, ch| {
+                let v = ps.try_parse(|ps| {
+                    let v = Value::parse_data_binding(ps, true)?;
+                    match ps.peek::<0>() {
+                        Some(x) => {
+                            (x == ch).then_some(v)
+                        }
+                        None => Some(v),
+                    }
+                });
+                if let Some(v) = v {
+                    v
+                } else {
+                    let value = Value::parse_until_before(ps, |ps: &mut ParseState| ps.peek::<0>() == Some(ch));
+                    ps.add_warning(ParseErrorKind::InvalidAttributeValue, value.location());
+                    Value::new_empty(value.location().start)
+                }
+            },
+            |ps| Value::parse_data_binding(ps, true),
+            |v| Value::Static { value: v.name, location: v.location },
+            || Value::new_empty(name.location.end),
+        );
+        value.map(|value| Self {
+            name,
+            value,
+            is_model: false,
+            prefix_location: None,
+        })
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct StaticAttribute {
     pub name: Ident,
     pub value: StrName,
-    pub prefix_location: Range<Position>,
+    pub prefix_location: Option<Range<Position>>,
+}
+
+impl StaticAttribute {
+    /// Parse the value part of the attribute, including the leading `=` .
+    pub fn parse_optional_value(ps: &mut ParseState, name: Ident) -> Option<Self> {
+        let value = Attribute::parse_optional_value_part(
+            ps,
+            |ps, ch| {
+                StrName::parse_until_before(ps, |ps: &mut ParseState| ps.peek::<0>() == Some(ch))
+            },
+            |ps| {
+                let value = Value::parse_data_binding(ps, false)?;
+                ps.add_warning(ParseErrorKind::DataBindingNotAllowed, value.location());
+                None
+            },
+            |v| v,
+            || StrName::new_empty(name.location.end),
+        );
+        value.map(|value| Self {
+            name,
+            value,
+            prefix_location: None,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -2484,6 +2538,7 @@ mod test {
         case!("<Div></div>", r#"<Div/>"#, ParseErrorKind::AvoidUppercaseLetters, 1..4, ParseErrorKind::MissingEndTag, 1..4);
         case!("<diV></diV>", r#"<diV/>"#, ParseErrorKind::AvoidUppercaseLetters, 1..4);
         case!("<div a='1'></div>", r#"<div a="1"/>"#);
+        case!("<div a=1></div>", r#"<div a="1"/>"#, ParseErrorKind::ShouldQuoted, 7..8);
         case!("<div class='a b'></div>", r#"<div class="a b"/>"#);
         case!("<div style='a:b'></div>", r#"<div style="a:b"/>"#);
         case!("<div change:a='fn'></div>", r#"<div change:a="fn"/>"#);

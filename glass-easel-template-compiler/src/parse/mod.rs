@@ -423,6 +423,7 @@ pub enum ParseErrorKind {
     MissingModuleName,
     MissingSourcePath,
     UnsupportedSyntax,
+    ShouldQuoted,
 }
 
 impl ParseErrorKind {
@@ -456,6 +457,7 @@ impl ParseErrorKind {
             Self::MissingModuleName => "missing module name",
             Self::MissingSourcePath => "missing source path",
             Self::UnsupportedSyntax => "this syntax has not been supported yet",
+            Self::ShouldQuoted => "should be quoted",
         }
     }
 
@@ -489,6 +491,7 @@ impl ParseErrorKind {
             Self::MissingModuleName => ParseErrorLevel::Error,
             Self::MissingSourcePath => ParseErrorLevel::Error,
             Self::UnsupportedSyntax => ParseErrorLevel::Error,
+            Self::ShouldQuoted => ParseErrorLevel::Warn,
         }
     }
 }
