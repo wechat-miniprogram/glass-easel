@@ -267,6 +267,16 @@ impl TmplGroup {
         Ok(self.get_tree(path)?.inline_script_module_names())
     }
 
+    /// Get the start line of the inline script.
+    pub fn inline_script_start_line(&self, path: &str, module_name: &str) -> Result<u32, TmplError> {
+        match self.get_tree(path)?.inline_script_start_line(module_name) {
+            Some(x) => Ok(x),
+            None => Err(TmplError {
+                message: format!(r#"no inline script "{}" found in "{}""#, path, module_name),
+            }),
+        }
+    }
+
     /// Get inline script content.
     pub fn inline_script_content(&self, path: &str, module_name: &str) -> Result<&str, TmplError> {
         match self.get_tree(path)?.inline_script_content(module_name) {

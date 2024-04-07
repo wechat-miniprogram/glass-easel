@@ -124,6 +124,20 @@ impl Template {
         None
     }
 
+    pub fn inline_script_start_line(&self, module_name: &str) -> Option<u32> {
+        for script in self.globals.scripts.iter() {
+            match script {
+                Script::GlobalRef { .. } => {}
+                Script::Inline { module_name: m, content: _, content_location } => {
+                    if module_name == m.name.as_str() {
+                        return Some(content_location.start.line);
+                    }
+                }
+            }
+        }
+        None
+    }
+
     pub fn set_inline_script_content(&mut self, module_name: &str, new_content: &str) {
         let content_location = Position { line: 0, utf16_col: 0 }..Position { line: 0, utf16_col: 0 };
         match self.globals.scripts.iter_mut().find(|script| match script {
