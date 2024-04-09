@@ -2,7 +2,6 @@
 
 import {
   ComponentDefinition,
-  type GeneralComponent,
   type GeneralComponentDefinition,
   type LifetimeFuncs,
   type Lifetimes,
