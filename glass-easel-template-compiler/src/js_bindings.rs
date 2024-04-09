@@ -2,7 +2,7 @@
 
 #![cfg(feature = "js_bindings")]
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 use self::parse::{ParseError, ParseErrorLevel};
@@ -67,7 +67,10 @@ impl TmplGroup {
     pub fn add_tmpl(&mut self, path: &str, tmpl_str: &str) -> JsValue {
         let path = crate::path::normalize(path);
         let errors = self.group.add_tmpl(&path, tmpl_str);
-        let ret: Vec<_> = errors.into_iter().map(|x| TemplateParseError::from(x)).collect();
+        let ret: Vec<_> = errors
+            .into_iter()
+            .map(|x| TemplateParseError::from(x))
+            .collect();
         serde_wasm_bindgen::to_value(&ret).unwrap()
     }
 

@@ -1,15 +1,22 @@
-use std::{fmt::{Result as FmtResult, Write as FmtWrite}, ops::Range};
+use std::{
+    fmt::{Result as FmtResult, Write as FmtWrite},
+    ops::Range,
+};
 
 use compact_str::CompactString;
 pub use sourcemap::SourceMap;
 use sourcemap::SourceMapBuilder;
 
-use crate::{escape::escape_html_quote, parse::{
-    tag::{Ident, StrName}, Position, TemplateStructure
-}};
+use crate::{
+    escape::escape_html_quote,
+    parse::{
+        tag::{Ident, StrName},
+        Position, TemplateStructure,
+    },
+};
 
-mod tag;
 pub(crate) mod expr;
+mod tag;
 
 pub struct Stringifier<'s, W: FmtWrite> {
     w: W,
@@ -57,7 +64,10 @@ impl<'s, W: FmtWrite> Stringifier<'s, W> {
     }
 
     fn get_scope_name(&mut self, index: usize) -> &str {
-        self.scope_names.get(index).map(|x| x.as_str()).unwrap_or("__INVALID_SCOPE_NAME__")
+        self.scope_names
+            .get(index)
+            .map(|x| x.as_str())
+            .unwrap_or("__INVALID_SCOPE_NAME__")
     }
 
     fn write_scope_name(&mut self, index: usize, location: &Range<Position>) -> FmtResult {
@@ -78,8 +88,20 @@ impl<'s, W: FmtWrite> Stringifier<'s, W> {
         Ok(())
     }
 
-    fn write_token(&mut self, dest_text: &str, source_text: &str, location: &Range<Position>) -> FmtResult {
-        self.smb.add(self.line, self.utf16_col, location.start.line, location.start.utf16_col, Some(self.source_path), Some(source_text));
+    fn write_token(
+        &mut self,
+        dest_text: &str,
+        source_text: &str,
+        location: &Range<Position>,
+    ) -> FmtResult {
+        self.smb.add(
+            self.line,
+            self.utf16_col,
+            location.start.line,
+            location.start.utf16_col,
+            Some(self.source_path),
+            Some(source_text),
+        );
         self.write_str(dest_text)?;
         Ok(())
     }

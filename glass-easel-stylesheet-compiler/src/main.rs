@@ -68,7 +68,11 @@ fn parse_cmd() -> CmdArgs {
     let output = matches.value_of("output-single-file").map(|x| x.into());
     let sourcemap_output = matches.value_of("sourcemap-output-file").map(|x| x.into());
     let class_prefix = matches.value_of("class-prefix").map(|x| x.into());
-    let rpx_ratio = matches.value_of("rpx-ratio").unwrap().parse().expect("RPX_RATIO should be a valid number");
+    let rpx_ratio = matches
+        .value_of("rpx-ratio")
+        .unwrap()
+        .parse()
+        .expect("RPX_RATIO should be a valid number");
     let input = matches.value_of("SOURCE_FILE").unwrap().into();
 
     CmdArgs {
@@ -84,26 +88,33 @@ fn parse_cmd() -> CmdArgs {
 fn main() {
     env_logger::init();
     let args = parse_cmd();
-    let options = StyleSheetOptions { class_prefix: args.class_prefix.clone(), rpx_ratio: args.rpx_ratio };
+    let options = StyleSheetOptions {
+        class_prefix: args.class_prefix.clone(),
+        rpx_ratio: args.rpx_ratio,
+    };
     let sst = if args.interactive {
         use std::io::Read;
         let mut s = String::new();
         std::io::stdin().read_to_string(&mut s).unwrap();
         StyleSheetTransformer::from_css(
-            args.input.to_str().expect("SOURCE_FILE name should be valid unicode string"),
+            args.input
+                .to_str()
+                .expect("SOURCE_FILE name should be valid unicode string"),
             &s,
             options,
         )
     } else {
         let s = fs::read_to_string(&args.input).expect("Failed to read source file");
         StyleSheetTransformer::from_css(
-            args.input.to_str().expect("SOURCE_FILE name should be valid unicode string"),
+            args.input
+                .to_str()
+                .expect("SOURCE_FILE name should be valid unicode string"),
             &s,
             options,
         )
     };
     if let Some(output) = args.output {
-        let output = fs::File::create(&output).expect("Failed to open or create output file");
+        let output = fs::File::create(output).expect("Failed to open or create output file");
         sst.write_content(output).unwrap();
     } else {
         let mut s = Vec::new();
@@ -111,7 +122,8 @@ fn main() {
         println!("{}", String::from_utf8(s).unwrap());
     }
     if let Some(sourcemap_output) = args.sourcemap_output {
-        let output = fs::File::create(&sourcemap_output).expect("Failed to open or create sourcemap output file");
+        let output = fs::File::create(sourcemap_output)
+            .expect("Failed to open or create sourcemap output file");
         sst.write_source_map(output).unwrap();
     }
 }

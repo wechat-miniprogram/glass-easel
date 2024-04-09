@@ -5,9 +5,9 @@ use std::fmt;
 use std::fmt::Write;
 
 use crate::escape::gen_lit_str;
+use crate::parse::{ParseError, Template};
 use crate::proc_gen::{JsFunctionScopeWriter, JsTopScopeWriter};
 use crate::stringify::Stringify;
-use crate::parse::{ParseError, Template};
 
 // PRESERVED one-letter vars
 // A: the binding map object
@@ -88,7 +88,10 @@ var D = (() => {
 })()
 "#;
 
-fn runtime_fns<W: std::fmt::Write>(w: &mut JsFunctionScopeWriter<W>, need_wxs_runtime: bool) -> Result<(), TmplError> {
+fn runtime_fns<W: std::fmt::Write>(
+    w: &mut JsFunctionScopeWriter<W>,
+    need_wxs_runtime: bool,
+) -> Result<(), TmplError> {
     for (k, v) in RUNTIME_ITEMS.iter() {
         w.expr_stmt(|w| {
             write!(w, "var {}={}", k, v)?;
@@ -164,7 +167,8 @@ impl TmplGroup {
         self.trees.extend(group.trees.clone());
         self.scripts.extend(group.scripts.clone());
         self.has_scripts = self.has_scripts || group.has_scripts;
-        self.extra_runtime_string.push_str(&group.extra_runtime_string);
+        self.extra_runtime_string
+            .push_str(&group.extra_runtime_string);
     }
 
     /// Add a ref of a parsed tree in the group.
@@ -253,22 +257,35 @@ impl TmplGroup {
     }
 
     /// Get direct dependency template files.
-    pub fn direct_dependencies<'a>(&'a self, path: &str) -> Result<impl Iterator<Item = String> + 'a, TmplError> {
+    pub fn direct_dependencies<'a>(
+        &'a self,
+        path: &str,
+    ) -> Result<impl Iterator<Item = String> + 'a, TmplError> {
         Ok(self.get_tree(path)?.direct_dependencies())
     }
 
     /// Get dependency script files.
-    pub fn script_dependencies<'a>(&'a self, path: &str) -> Result<impl Iterator<Item = String> + 'a, TmplError> {
+    pub fn script_dependencies<'a>(
+        &'a self,
+        path: &str,
+    ) -> Result<impl Iterator<Item = String> + 'a, TmplError> {
         Ok(self.get_tree(path)?.script_dependencies())
     }
 
     /// Get inline script module names.
-    pub fn inline_script_module_names<'a>(&'a self, path: &str) -> Result<impl Iterator<Item = &'a str>, TmplError> {
+    pub fn inline_script_module_names<'a>(
+        &'a self,
+        path: &str,
+    ) -> Result<impl Iterator<Item = &'a str>, TmplError> {
         Ok(self.get_tree(path)?.inline_script_module_names())
     }
 
     /// Get the start line of the inline script.
-    pub fn inline_script_start_line(&self, path: &str, module_name: &str) -> Result<u32, TmplError> {
+    pub fn inline_script_start_line(
+        &self,
+        path: &str,
+        module_name: &str,
+    ) -> Result<u32, TmplError> {
         match self.get_tree(path)?.inline_script_start_line(module_name) {
             Some(x) => Ok(x),
             None => Err(TmplError {
@@ -310,7 +327,10 @@ impl TmplGroup {
         Ok(w.finish())
     }
 
-    fn write_group_global_content(&self, w: &mut JsFunctionScopeWriter<String>) -> Result<(), TmplError> {
+    fn write_group_global_content(
+        &self,
+        w: &mut JsFunctionScopeWriter<String>,
+    ) -> Result<(), TmplError> {
         runtime_fns(w, self.has_scripts)?;
         if self.extra_runtime_string.len() > 0 {
             w.custom_stmt_str(&self.extra_runtime_string)?;
@@ -323,7 +343,12 @@ impl TmplGroup {
         if self.scripts.len() > 0 {
             for (p, script) in self.scripts.iter() {
                 w.expr_stmt(|w| {
-                    write!(w, r#"R[{path}]=D({path},(require,exports,module)=>{{{}}})"#, script, path = gen_lit_str(p))?;
+                    write!(
+                        w,
+                        r#"R[{path}]=D({path},(require,exports,module)=>{{{}}})"#,
+                        script,
+                        path = gen_lit_str(p)
+                    )?;
                     Ok(())
                 })?;
             }

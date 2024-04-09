@@ -1,7 +1,21 @@
 use std::{collections::HashMap, fmt::Write, ops::Range};
 
-use crate::{binding_map::BindingMapCollector, escape::gen_lit_str, parse::{tag::{Attribute, ClassAttribute, CommonElementAttributes, Element, ElementKind, EventBinding, Node, Script, StaticAttribute, StyleAttribute, Value}, Position, Template}, proc_gen::expr::ExpressionProcGen, TmplError, TmplGroup};
-use super::{JsExprWriter, JsFunctionScopeWriter, JsIdent, JsTopScopeWriter, ScopeVar, ScopeVarLvaluePath};
+use super::{
+    JsExprWriter, JsFunctionScopeWriter, JsIdent, JsTopScopeWriter, ScopeVar, ScopeVarLvaluePath,
+};
+use crate::{
+    binding_map::BindingMapCollector,
+    escape::gen_lit_str,
+    parse::{
+        tag::{
+            Attribute, ClassAttribute, CommonElementAttributes, Element, ElementKind, EventBinding,
+            Node, Script, StaticAttribute, StyleAttribute, Value,
+        },
+        Position, Template,
+    },
+    proc_gen::expr::ExpressionProcGen,
+    TmplError, TmplGroup,
+};
 
 impl Template {
     pub(crate) fn to_proc_gen<W: std::fmt::Write>(
@@ -214,9 +228,9 @@ impl Node {
                         ElementKind::If { .. } => ArgLevel::IfGroup,
                         ElementKind::For { .. } => ArgLevel::ForLoop,
                         ElementKind::Slot { .. } => ArgLevel::Slot,
-                        ElementKind::Pure { .. } |
-                        ElementKind::Include { .. } |
-                        ElementKind::TemplateRef { .. } => ArgLevel::PureVirtualNode,
+                        ElementKind::Pure { .. }
+                        | ElementKind::Include { .. }
+                        | ElementKind::TemplateRef { .. } => ArgLevel::PureVirtualNode,
                     },
                     Node::Comment(..) | Node::UnknownMetaTag(..) => ArgLevel::None,
                 };
@@ -263,48 +277,46 @@ impl Node {
         }
         for c in list.iter() {
             match c {
-                Node::Text(c) => {
-                    match c {
-                        Value::Static { value, .. } => {
-                            w.expr_stmt(|w| {
-                                write!(w, r#"C?T({}):T()"#, gen_lit_str(&value))?;
-                                Ok(())
-                            })?;
-                        },
-                        Value::Dynamic {
-                            expression,
-                            binding_map_keys,
-                            double_brace_location: _,
-                        } => {
-                            let p = expression.to_proc_gen_prepare(w, scopes)?;
-                            w.expr_stmt(|w| {
-                                write!(w, r#"C||K||"#)?;
-                                p.lvalue_state_expr(w, scopes)?;
-                                write!(w, r#"?T(Y("#)?;
-                                p.value_expr(w)?;
-                                write!(w, r#")"#)?;
-                                if let Some(binding_map_keys) = binding_map_keys {
-                                    if !binding_map_keys.is_empty(bmc) {
-                                        write!(w, r#","#)?;
-                                        w.function_args("N", |w| {
-                                            binding_map_keys.to_proc_gen_write_map(w, bmc, |w| {
-                                                let p = expression.to_proc_gen_prepare(w, scopes)?;
-                                                w.expr_stmt(|w| {
-                                                    write!(w, "T(N,Y(")?;
-                                                    p.value_expr(w)?;
-                                                    write!(w, "))")?;
-                                                    Ok(())
-                                                })
+                Node::Text(c) => match c {
+                    Value::Static { value, .. } => {
+                        w.expr_stmt(|w| {
+                            write!(w, r#"C?T({}):T()"#, gen_lit_str(&value))?;
+                            Ok(())
+                        })?;
+                    }
+                    Value::Dynamic {
+                        expression,
+                        binding_map_keys,
+                        double_brace_location: _,
+                    } => {
+                        let p = expression.to_proc_gen_prepare(w, scopes)?;
+                        w.expr_stmt(|w| {
+                            write!(w, r#"C||K||"#)?;
+                            p.lvalue_state_expr(w, scopes)?;
+                            write!(w, r#"?T(Y("#)?;
+                            p.value_expr(w)?;
+                            write!(w, r#")"#)?;
+                            if let Some(binding_map_keys) = binding_map_keys {
+                                if !binding_map_keys.is_empty(bmc) {
+                                    write!(w, r#","#)?;
+                                    w.function_args("N", |w| {
+                                        binding_map_keys.to_proc_gen_write_map(w, bmc, |w| {
+                                            let p = expression.to_proc_gen_prepare(w, scopes)?;
+                                            w.expr_stmt(|w| {
+                                                write!(w, "T(N,Y(")?;
+                                                p.value_expr(w)?;
+                                                write!(w, "))")?;
+                                                Ok(())
                                             })
-                                        })?;
-                                    }
+                                        })
+                                    })?;
                                 }
-                                write!(w, r#"):T()"#)?;
-                                Ok(())
-                            })?;
-                        }
-                    }            
-                }
+                            }
+                            write!(w, r#"):T()"#)?;
+                            Ok(())
+                        })?;
+                    }
+                },
                 Node::Element(c) => {
                     let mut slot_value_count = 0;
                     if let Some(refs) = c.slot_value_refs() {
@@ -402,28 +414,27 @@ impl Element {
                 common,
             } => {
                 let slot_kind = SlotKind::new(&common.slot, w, scopes)?;
-                let (child_ident, var_slot_map) =
-                    w.declare_var_on_top_scope_init(|w, ident| {
-                        let var_slot_map = Node::to_proc_gen_define_children(
-                            &mut children.iter(),
-                            w,
-                            scopes,
-                            |args, w, var_slot_map, scopes| {
-                                w.function_args(args, |w| {
-                                    Node::to_proc_gen_define_children_content(
-                                        &children,
-                                        &var_slot_map,
-                                        w,
-                                        scopes,
-                                        bmc,
-                                        group,
-                                        cur_path,
-                                    )
-                                })
-                            },
-                        )?;
-                        Ok((ident, var_slot_map))
-                    })?;
+                let (child_ident, var_slot_map) = w.declare_var_on_top_scope_init(|w, ident| {
+                    let var_slot_map = Node::to_proc_gen_define_children(
+                        &mut children.iter(),
+                        w,
+                        scopes,
+                        |args, w, var_slot_map, scopes| {
+                            w.function_args(args, |w| {
+                                Node::to_proc_gen_define_children_content(
+                                    &children,
+                                    &var_slot_map,
+                                    w,
+                                    scopes,
+                                    bmc,
+                                    group,
+                                    cur_path,
+                                )
+                            })
+                        },
+                    )?;
+                    Ok((ident, var_slot_map))
+                })?;
                 w.expr_stmt(|w| {
                     write!(w, "E({},{{", gen_lit_str(&tag_name.name),)?;
                     if generics.len() > 0 {
@@ -431,7 +442,12 @@ impl Element {
                             if i > 0 {
                                 write!(w, ",")?;
                             }
-                            write!(w, "{}:{}", gen_lit_str(&attr.name.name), gen_lit_str(&attr.value.name))?;
+                            write!(
+                                w,
+                                "{}:{}",
+                                gen_lit_str(&attr.name.name),
+                                gen_lit_str(&attr.value.name)
+                            )?;
                         }
                     }
                     write!(w, "}},")?;
@@ -454,14 +470,14 @@ impl Element {
                             ClassAttribute::String(_, value) => {
                                 write_attribute_value(w, "L", value, scopes, bmc)?;
                             }
-                            ClassAttribute::Multiple(..) => unimplemented!()
+                            ClassAttribute::Multiple(..) => unimplemented!(),
                         }
                         match style {
                             StyleAttribute::None => {}
                             StyleAttribute::String(_, value) => {
                                 write_attribute_value(w, "R.y", value, scopes, bmc)?;
                             }
-                            StyleAttribute::Multiple(..) => unimplemented!()
+                            StyleAttribute::Multiple(..) => unimplemented!(),
                         }
                         for attr in worklet_attributes.iter() {
                             attr.to_proc_gen_as_worklet_property(w, scopes, bmc)?;
@@ -477,7 +493,13 @@ impl Element {
                         }
                         common.to_proc_gen_without_slot(w, scopes, bmc)?;
                         if let SlotKind::Dynamic(p) = &slot_kind {
-                            if let Some((_, Value::Dynamic { binding_map_keys, .. })) = common.slot.as_ref() {
+                            if let Some((
+                                _,
+                                Value::Dynamic {
+                                    binding_map_keys, ..
+                                },
+                            )) = common.slot.as_ref()
+                            {
                                 if let Some(binding_map_keys) = binding_map_keys {
                                     if !binding_map_keys.is_empty(bmc) {
                                         binding_map_keys.to_proc_gen_write_map(w, bmc, |w| {
@@ -519,7 +541,11 @@ impl Element {
                     Ok(())
                 })
             }
-            ElementKind::Pure { children, slot, slot_value_refs: _ } => {
+            ElementKind::Pure {
+                children,
+                slot,
+                slot_value_refs: _,
+            } => {
                 let slot_kind = SlotKind::new(&slot, w, scopes)?;
                 let child_ident = w.declare_var_on_top_scope_init(|w, ident| {
                     Node::to_proc_gen_define_children(
@@ -549,14 +575,22 @@ impl Element {
                     Ok(())
                 })
             }
-            ElementKind::If { branches, else_branch } => {
+            ElementKind::If {
+                branches,
+                else_branch,
+            } => {
                 enum CondItem<'a> {
                     None,
                     Static(&'a str),
                     Dynamic(ExpressionProcGen),
                 }
-                let mut cond_list = Vec::with_capacity(branches.len() + if else_branch.is_some() { 1 } else { 0 });
-                for (cond, _children) in branches.iter().map(|(_, x, y)| (Some(x), y)).chain(else_branch.as_ref().map(|(_, y)| (None, y))) {
+                let mut cond_list =
+                    Vec::with_capacity(branches.len() + if else_branch.is_some() { 1 } else { 0 });
+                for (cond, _children) in branches
+                    .iter()
+                    .map(|(_, x, y)| (Some(x), y))
+                    .chain(else_branch.as_ref().map(|(_, y)| (None, y)))
+                {
                     let item = match cond {
                         None => CondItem::None,
                         Some(Value::Static { value, .. }) => CondItem::Static(value.as_str()),
@@ -593,7 +627,11 @@ impl Element {
                 })?;
                 let child_ident = w.declare_var_on_top_scope_init(|w, ident| {
                     let mut list_iter: Box<dyn Iterator<Item = &Node>> = Box::new([].iter());
-                    for children in branches.iter().map(|(_, _, y)| y).chain(else_branch.as_ref().map(|(_, y)| y)) {
+                    for children in branches
+                        .iter()
+                        .map(|(_, _, y)| y)
+                        .chain(else_branch.as_ref().map(|(_, y)| y))
+                    {
                         list_iter = Box::new(list_iter.chain(children.iter()));
                     }
                     let list: Vec<&Node> = list_iter.collect();
@@ -608,12 +646,7 @@ impl Element {
                                         if index > 0 {
                                             write!(w, "else ")?;
                                         }
-                                        write!(
-                                            w,
-                                            "if({}==={})",
-                                            var_branch_index,
-                                            index + 1
-                                        )?;
+                                        write!(w, "if({}==={})", var_branch_index, index + 1)?;
                                         w.brace_block(|w| {
                                             Node::to_proc_gen_define_children_content(
                                                 children,
@@ -654,7 +687,12 @@ impl Element {
                     Ok(())
                 })
             }
-            ElementKind::For { list, key, children, .. } => {
+            ElementKind::For {
+                list,
+                key,
+                children,
+                ..
+            } => {
                 enum ListExpr {
                     Static(String),
                     Dynamic(ExpressionProcGen),
@@ -858,7 +896,9 @@ impl Element {
                     Ok(())
                 })
             }
-            ElementKind::Include { path: (_, rel_path) } => {
+            ElementKind::Include {
+                path: (_, rel_path),
+            } => {
                 let var_key = w.gen_private_ident();
                 let normalized_path = crate::path::resolve(cur_path, &rel_path.name);
                 let child_ident = w.declare_var_on_top_scope_init(|w, ident| {
@@ -883,7 +923,11 @@ impl Element {
                     Ok(())
                 })
             }
-            ElementKind::Slot { name, values, common } => {
+            ElementKind::Slot {
+                name,
+                values,
+                common,
+            } => {
                 let slot_kind = SlotKind::new(&common.slot, w, scopes)?;
                 let name = StaticStrOrProcGen::new(name, w, scopes)?;
                 w.expr_stmt(|w| {
@@ -1031,7 +1075,13 @@ impl Attribute {
         match &self.value {
             Value::Static { value, location: _ } => {
                 w.expr_stmt(|w| {
-                    write!(w, "if(C){}(N,{},{})", method_name, gen_lit_str(&self.name.name), gen_lit_str(value))?;
+                    write!(
+                        w,
+                        "if(C){}(N,{},{})",
+                        method_name,
+                        gen_lit_str(&self.name.name),
+                        gen_lit_str(value)
+                    )?;
                     Ok(())
                 })?;
             }
@@ -1285,7 +1335,12 @@ impl StaticAttribute {
     ) -> Result<(), TmplError> {
         let attr_name = gen_lit_str(&self.name.name);
         w.expr_stmt(|w| {
-            write!(w, "if(C)R.wl(N,{},{})", attr_name, gen_lit_str(&self.value.name))?;
+            write!(
+                w,
+                "if(C)R.wl(N,{},{})",
+                attr_name,
+                gen_lit_str(&self.value.name)
+            )?;
             Ok(())
         })?;
         Ok(())
@@ -1306,7 +1361,7 @@ impl<'a> SlotKind<'a> {
     ) -> Result<Self, TmplError> {
         let this = match slot.as_ref().map(|x| &x.1) {
             None => SlotKind::None,
-            Some(Value::Static { value , .. }) => SlotKind::Static(value.as_str()),
+            Some(Value::Static { value, .. }) => SlotKind::Static(value.as_str()),
             Some(Value::Dynamic { expression, .. }) => {
                 let p = expression.to_proc_gen_prepare(w, scopes)?;
                 SlotKind::Dynamic(p)

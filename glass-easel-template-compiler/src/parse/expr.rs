@@ -4,7 +4,7 @@ use compact_str::CompactString;
 
 use crate::binding_map::{BindingMapCollector, BindingMapKeys};
 
-use super::{ParseState, Position, TemplateStructure, ParseErrorKind};
+use super::{ParseErrorKind, ParseState, Position, TemplateStructure};
 
 #[derive(Debug, Clone)]
 pub enum Expression {
@@ -250,7 +250,9 @@ impl TemplateStructure for Expression {
             Self::LitFloat { location, .. } => location.start,
             Self::LitBool { location, .. } => location.start,
             Self::LitObj { brace_location, .. } => brace_location.0.start,
-            Self::LitArr { bracket_location, .. } => bracket_location.0.start,
+            Self::LitArr {
+                bracket_location, ..
+            } => bracket_location.0.start,
             Self::StaticMember { obj, .. } => obj.location_start(),
             Self::DynamicMember { obj, .. } => obj.location_start(),
             Self::FuncCall { func, .. } => func.location_start(),
@@ -296,7 +298,9 @@ impl TemplateStructure for Expression {
             Self::LitFloat { location, .. } => location.end,
             Self::LitBool { location, .. } => location.end,
             Self::LitObj { brace_location, .. } => brace_location.1.end,
-            Self::LitArr { bracket_location, .. } => bracket_location.1.end,
+            Self::LitArr {
+                bracket_location, ..
+            } => bracket_location.1.end,
             Self::StaticMember { obj, .. } => obj.location_end(),
             Self::DynamicMember { obj, .. } => obj.location_end(),
             Self::FuncCall { func, .. } => func.location_end(),
@@ -332,7 +336,10 @@ impl TemplateStructure for Expression {
 }
 
 impl Expression {
-    pub(super) fn parse_expression_or_object_inner(ps: &mut ParseState, prefer_object_inner: bool) -> Option<Box<Self>> {
+    pub(super) fn parse_expression_or_object_inner(
+        ps: &mut ParseState,
+        prefer_object_inner: bool,
+    ) -> Option<Box<Self>> {
         ps.parse_on_auto_whitespace(|ps| {
             let mut is_object_inner = false;
             ps.try_parse(|ps| -> Option<()> {
@@ -359,7 +366,10 @@ impl Expression {
                 let fields = Self::parse_object_inner(ps)?;
                 let end_pos = ps.position();
                 let brace_location = (pos.clone()..pos, end_pos.clone()..end_pos);
-                Some(Box::new(Expression::LitObj { fields, brace_location }))
+                Some(Box::new(Expression::LitObj {
+                    fields,
+                    brace_location,
+                }))
             } else {
                 Self::parse_cond(ps)
             }
@@ -381,7 +391,7 @@ impl Expression {
                         break;
                     }
                 }
-                Some((name, pos..ps.position() ))
+                Some((name, pos..ps.position()))
             })
         } else {
             None
@@ -395,13 +405,19 @@ impl Expression {
     fn parse_ident_or_keyword(ps: &mut ParseState) -> Option<Box<Self>> {
         let Some((name, location)) = Self::try_parse_field_name(ps) else {
             ps.add_warning_at_current_position(ParseErrorKind::UnexpectedExpressionCharacter);
-            return None; 
+            return None;
         };
         let ret = match name.as_str() {
             "undefined" => Expression::LitUndefined { location },
             "null" => Expression::LitNull { location },
-            "true" => Expression::LitBool { value: true, location },
-            "false" => Expression::LitBool { value: false, location },
+            "true" => Expression::LitBool {
+                value: true,
+                location,
+            },
+            "false" => Expression::LitBool {
+                value: false,
+                location,
+            },
             _ => Expression::DataField { name, location },
         };
         Some(Box::new(ret))
@@ -410,21 +426,25 @@ impl Expression {
     fn parse_object_inner(ps: &mut ParseState) -> Option<Vec<ObjectFieldKind>> {
         let mut fields = vec![];
         loop {
-            let Some(peek) = ps.peek::<0>() else {
-                break
+            let Some(peek) = ps.peek::<0>() else { break };
+            if peek == '}' {
+                break;
             };
-            if peek == '}' { break };
 
             // parse `...xxx`
             if peek == '.' {
                 let Some(location) = ps.consume_str("...") else {
-                    ps.add_warning_at_current_position(ParseErrorKind::UnexpectedExpressionCharacter);
+                    ps.add_warning_at_current_position(
+                        ParseErrorKind::UnexpectedExpressionCharacter,
+                    );
                     return None;
                 };
                 let value = *Self::parse_cond(ps)?;
                 fields.push(ObjectFieldKind::Spread { location, value });
                 let peek = ps.peek::<0>()?;
-                if peek == '}' { break };
+                if peek == '}' {
+                    break;
+                };
                 if peek == ',' {
                     ps.next(); // ','
                     continue;
@@ -439,7 +459,9 @@ impl Expression {
                 return None;
             };
             let dup_name = fields.iter().find_map(|x| match x {
-                ObjectFieldKind::Named { name: x, location, .. } => (x == &name).then_some(location.clone()),
+                ObjectFieldKind::Named {
+                    name: x, location, ..
+                } => (x == &name).then_some(location.clone()),
                 ObjectFieldKind::Spread { .. } => None,
             });
             if let Some(location) = dup_name {
@@ -452,25 +474,44 @@ impl Expression {
                 Some(':') => {
                     let colon_location = ps.consume_str(":");
                     let value = *Self::parse_cond(ps)?;
-                    fields.push(ObjectFieldKind::Named { name, location, colon_location, value });
+                    fields.push(ObjectFieldKind::Named {
+                        name,
+                        location,
+                        colon_location,
+                        value,
+                    });
                     let peek = ps.peek::<0>()?;
-                    if peek == '}' { break };
+                    if peek == '}' {
+                        break;
+                    };
                     if peek == ',' {
                         ps.next(); // ','
                     } else {
-                        ps.add_warning_at_current_position(ParseErrorKind::UnexpectedExpressionCharacter);
+                        ps.add_warning_at_current_position(
+                            ParseErrorKind::UnexpectedExpressionCharacter,
+                        );
                         return None;
                     }
                 }
                 None | Some('}') | Some(',') => {
-                    let value = Expression::DataField { name: name.clone(), location: location.clone() };
-                    fields.push(ObjectFieldKind::Named { name, location, colon_location: None, value });
+                    let value = Expression::DataField {
+                        name: name.clone(),
+                        location: location.clone(),
+                    };
+                    fields.push(ObjectFieldKind::Named {
+                        name,
+                        location,
+                        colon_location: None,
+                        value,
+                    });
                     if peek == Some(',') {
                         ps.next(); // ','
                     }
                 }
                 _ => {
-                    ps.add_warning_at_current_position(ParseErrorKind::UnexpectedExpressionCharacter);
+                    ps.add_warning_at_current_position(
+                        ParseErrorKind::UnexpectedExpressionCharacter,
+                    );
                     return None;
                 }
             }
@@ -481,23 +522,26 @@ impl Expression {
     fn parse_lit_object(ps: &mut ParseState) -> Option<Box<Self>> {
         let Some(brace_start_location) = ps.consume_str("{") else {
             ps.add_warning_at_current_position(ParseErrorKind::UnexpectedExpressionCharacter);
-            return None
+            return None;
         };
         let fields = Self::parse_object_inner(ps)?;
         let Some(brace_end_location) = ps.consume_str("}") else {
             ps.add_warning_at_current_position(ParseErrorKind::UnexpectedExpressionCharacter);
             return None;
         };
-        Some(Box::new(Self::LitObj { fields, brace_location: (brace_start_location, brace_end_location) }))
+        Some(Box::new(Self::LitObj {
+            fields,
+            brace_location: (brace_start_location, brace_end_location),
+        }))
     }
 
     fn parse_array_inner(ps: &mut ParseState) -> Option<Vec<ArrayFieldKind>> {
         let mut items = vec![];
         loop {
-            let Some(peek) = ps.peek::<0>() else {
-                break
+            let Some(peek) = ps.peek::<0>() else { break };
+            if peek == ']' {
+                break;
             };
-            if peek == ']' { break };
 
             // parse empty slot
             if peek == ',' {
@@ -509,17 +553,23 @@ impl Expression {
             // parse `...xxx`
             if peek == '.' {
                 let Some(location) = ps.consume_str("...") else {
-                    ps.add_warning_at_current_position(ParseErrorKind::UnexpectedExpressionCharacter);
+                    ps.add_warning_at_current_position(
+                        ParseErrorKind::UnexpectedExpressionCharacter,
+                    );
                     return None;
                 };
                 let value = *Self::parse_cond(ps)?;
                 items.push(ArrayFieldKind::Spread { location, value });
                 let peek = ps.peek::<0>()?;
-                if peek == ']' { break };
+                if peek == ']' {
+                    break;
+                };
                 if peek == ',' {
                     ps.next(); // ','
                 } else {
-                    ps.add_warning_at_current_position(ParseErrorKind::UnexpectedExpressionCharacter);
+                    ps.add_warning_at_current_position(
+                        ParseErrorKind::UnexpectedExpressionCharacter,
+                    );
                     return None;
                 }
                 continue;
@@ -529,7 +579,9 @@ impl Expression {
             let value = *Self::parse_cond(ps)?;
             items.push(ArrayFieldKind::Normal { value });
             let peek = ps.peek::<0>()?;
-            if peek == ']' { break };
+            if peek == ']' {
+                break;
+            };
             if peek == ',' {
                 ps.next(); // ','
             } else {
@@ -550,7 +602,10 @@ impl Expression {
             ps.add_warning_at_current_position(ParseErrorKind::UnexpectedExpressionCharacter);
             return None;
         };
-        Some(Box::new(Self::LitArr { fields, bracket_location: (brace_start_location, brace_end_location) }))
+        Some(Box::new(Self::LitArr {
+            fields,
+            bracket_location: (brace_start_location, brace_end_location),
+        }))
     }
 
     fn parse_lit_str(ps: &mut ParseState) -> Option<Box<Self>> {
@@ -565,7 +620,9 @@ impl Expression {
             let mut ret = CompactString::new_inline("");
             loop {
                 let next = ps.next()?;
-                if next == peek { break };
+                if next == peek {
+                    break;
+                };
                 if next == '\\' {
                     let next = ps.next()?;
                     let ch = match next {
@@ -601,14 +658,20 @@ impl Expression {
                                         'e' | 'E' => 14,
                                         'f' | 'F' => 15,
                                         _ => {
-                                            ps.add_warning(ParseErrorKind::IllegalEscapeSequence, pos..ps.position());
+                                            ps.add_warning(
+                                                ParseErrorKind::IllegalEscapeSequence,
+                                                pos..ps.position(),
+                                            );
                                             return None;
                                         }
                                     };
                                     v = v * 16 + x;
                                 }
                                 let Some(ch) = char::from_u32(v) else {
-                                    ps.add_warning(ParseErrorKind::IllegalEscapeSequence, pos..ps.position());
+                                    ps.add_warning(
+                                        ParseErrorKind::IllegalEscapeSequence,
+                                        pos..ps.position(),
+                                    );
                                     return None;
                                 };
                                 Some(ch)
@@ -622,7 +685,10 @@ impl Expression {
                     ret.push(next);
                 }
             }
-            Some(Box::new(Expression::LitStr { value: ret, location: pos..ps.position() }))
+            Some(Box::new(Expression::LitStr {
+                value: ret,
+                location: pos..ps.position(),
+            }))
         })
     }
 
@@ -646,21 +712,33 @@ impl Expression {
                             let d = ps.next().unwrap() as i64 - '0' as i64;
                             num = num * 8 + d;
                             let Some(peek) = ps.peek::<0>() else { break };
-                            if !is_ident_char(peek) { break }
+                            if !is_ident_char(peek) {
+                                break;
+                            }
                             if !('0'..='7').contains(&peek) {
-                                ps.add_warning_at_current_position(ParseErrorKind::UnexpectedExpressionCharacter);
+                                ps.add_warning_at_current_position(
+                                    ParseErrorKind::UnexpectedExpressionCharacter,
+                                );
                                 return None;
                             }
                         }
-                        return Some(Box::new(Expression::LitInt { value: num, location: pos..ps.position() }));
+                        return Some(Box::new(Expression::LitInt {
+                            value: num,
+                            location: pos..ps.position(),
+                        }));
                     }
                     Some('x') => {
                         // parse as HEX
                         ps.next(); // 'x'
                         let mut num = 0i64;
                         let peek = ps.peek::<0>()?;
-                        if !('0'..='9').contains(&peek) && !('a'..='z').contains(&peek) && !('A'..='Z').contains(&peek) {
-                            ps.add_warning_at_current_position(ParseErrorKind::UnexpectedExpressionCharacter);
+                        if !('0'..='9').contains(&peek)
+                            && !('a'..='z').contains(&peek)
+                            && !('A'..='Z').contains(&peek)
+                        {
+                            ps.add_warning_at_current_position(
+                                ParseErrorKind::UnexpectedExpressionCharacter,
+                            );
                             return None;
                         }
                         loop {
@@ -686,23 +764,38 @@ impl Expression {
                             };
                             num = num * 16 + d;
                             let Some(peek) = ps.peek::<0>() else { break };
-                            if !is_ident_char(peek) { break }
-                            if !('0'..='9').contains(&peek) && !('a'..='z').contains(&peek) && !('A'..='Z').contains(&peek) {
-                                ps.add_warning_at_current_position(ParseErrorKind::UnexpectedExpressionCharacter);
+                            if !is_ident_char(peek) {
+                                break;
+                            }
+                            if !('0'..='9').contains(&peek)
+                                && !('a'..='z').contains(&peek)
+                                && !('A'..='Z').contains(&peek)
+                            {
+                                ps.add_warning_at_current_position(
+                                    ParseErrorKind::UnexpectedExpressionCharacter,
+                                );
                                 return None;
                             }
                         }
-                        return Some(Box::new(Expression::LitInt { value: num, location: pos..ps.position() }));
+                        return Some(Box::new(Expression::LitInt {
+                            value: num,
+                            location: pos..ps.position(),
+                        }));
                     }
                     Some('e') | Some('.') | Some('8') | Some('9') => {
                         // do nothing
                     }
                     Some(x) if is_ident_char(x) => {
-                        ps.add_warning_at_current_position(ParseErrorKind::UnexpectedExpressionCharacter);
+                        ps.add_warning_at_current_position(
+                            ParseErrorKind::UnexpectedExpressionCharacter,
+                        );
                         return None;
                     }
                     _ => {
-                        return Some(Box::new(Expression::LitInt { value: 0, location: pos..ps.position() }));
+                        return Some(Box::new(Expression::LitInt {
+                            value: 0,
+                            location: pos..ps.position(),
+                        }));
                     }
                 }
             }
@@ -716,15 +809,21 @@ impl Expression {
                     ps.consume_str("-");
                     let peek = ps.peek::<0>()?;
                     if !('0'..='9').contains(&peek) {
-                        ps.add_warning_at_current_position(ParseErrorKind::UnexpectedExpressionCharacter);
+                        ps.add_warning_at_current_position(
+                            ParseErrorKind::UnexpectedExpressionCharacter,
+                        );
                         return None;
                     }
                     loop {
                         ps.next();
                         let Some(peek) = ps.peek::<0>() else { break };
-                        if !is_ident_char(peek) { break; }
+                        if !is_ident_char(peek) {
+                            break;
+                        }
                         if !('0'..='9').contains(&peek) {
-                            ps.add_warning_at_current_position(ParseErrorKind::UnexpectedExpressionCharacter);
+                            ps.add_warning_at_current_position(
+                                ParseErrorKind::UnexpectedExpressionCharacter,
+                            );
                             return None;
                         }
                     }
@@ -740,23 +839,35 @@ impl Expression {
                     }
                 }
                 let Some(peek) = ps.peek::<0>() else { break };
-                if !is_ident_char(peek) && peek != '.' { break }
+                if !is_ident_char(peek) && peek != '.' {
+                    break;
+                }
                 if ('0'..='9').contains(&peek) || (int.is_some() && peek == '.') || peek == 'e' {
                     // empty
                 } else {
-                    ps.add_warning_at_current_position(ParseErrorKind::UnexpectedExpressionCharacter);
+                    ps.add_warning_at_current_position(
+                        ParseErrorKind::UnexpectedExpressionCharacter,
+                    );
                     return None;
                 }
             }
             let num = match int {
                 None => {
                     let Ok(num) = ps.code_slice(start_index..ps.cur_index()).parse::<f64>() else {
-                        ps.add_warning_at_current_position(ParseErrorKind::UnexpectedExpressionCharacter);
+                        ps.add_warning_at_current_position(
+                            ParseErrorKind::UnexpectedExpressionCharacter,
+                        );
                         return None;
                     };
-                    Expression::LitFloat { value: num, location: pos..ps.position() }
+                    Expression::LitFloat {
+                        value: num,
+                        location: pos..ps.position(),
+                    }
                 }
-                Some(int) => Expression::LitInt { value: int, location: pos..ps.position() },
+                Some(int) => Expression::LitInt {
+                    value: int,
+                    location: pos..ps.position(),
+                },
             };
             Some(Box::new(num))
         })
@@ -800,7 +911,12 @@ impl Expression {
                     ps.add_warning_at_current_position(ParseErrorKind::InvalidIdentifier);
                     return None;
                 };
-                obj = Box::new(Self::StaticMember { obj, field_name, dot_location, field_location});
+                obj = Box::new(Self::StaticMember {
+                    obj,
+                    field_name,
+                    dot_location,
+                    field_location,
+                });
                 continue;
             }
             if let Some(start) = ParseOperator::dynamic_member(ps) {
@@ -811,7 +927,11 @@ impl Expression {
                     }
                     return None;
                 };
-                obj = Box::new(Self::DynamicMember { obj, field_name, bracket_location: (start, end)});
+                obj = Box::new(Self::DynamicMember {
+                    obj,
+                    field_name,
+                    bracket_location: (start, end),
+                });
                 continue;
             }
             if let Some(start) = ParseOperator::func_call(ps) {
@@ -832,7 +952,11 @@ impl Expression {
                     }
                     return None;
                 };
-                obj = Box::new(Self::FuncCall { func: obj, args, paren_location: (start, end)});
+                obj = Box::new(Self::FuncCall {
+                    func: obj,
+                    args,
+                    paren_location: (start, end),
+                });
                 continue;
             }
             break;
@@ -879,7 +1003,13 @@ impl Expression {
             return None;
         };
         let false_br = Self::parse_cond(ps)?;
-        Some(Box::new(Self::Cond { cond, true_br, false_br, question_location, colon_location }))
+        Some(Box::new(Self::Cond {
+            cond,
+            true_br,
+            false_br,
+            question_location,
+            colon_location,
+        }))
     }
 }
 
@@ -991,7 +1121,11 @@ define_operator!(condition_end, ":", []);
 // `=` `+=` `-=` `**=` `*=` `/=` `%=` `<<=` `>>=` `>>>=` `&=` `^=` `|=` `&&=` `||=` `??=` are not allowed
 
 fn is_ident_char(ch: char) -> bool {
-    ch == '_' || ch == '$' || ('a'..='z').contains(&ch) || ('A'..='Z').contains(&ch) || ('0'..='9').contains(&ch)
+    ch == '_'
+        || ch == '$'
+        || ('a'..='z').contains(&ch)
+        || ('A'..='Z').contains(&ch)
+        || ('0'..='9').contains(&ch)
 }
 
 fn is_ident_start_char(ch: char) -> bool {
@@ -1019,9 +1153,7 @@ impl Expression {
                 .iter()
                 .enumerate()
                 .rev()
-                .find_map(|(i, x)| {
-                    (x.0 == name).then_some((i, location.clone()))
-                })
+                .find_map(|(i, x)| (x.0 == name).then_some((i, location.clone())))
         } else {
             None
         };
@@ -1034,7 +1166,11 @@ impl Expression {
         }
     }
 
-    pub(super) fn collect_binding_map_keys(&self, bmc: &mut BindingMapCollector, bmk: &mut BindingMapKeys) {
+    pub(super) fn collect_binding_map_keys(
+        &self,
+        bmc: &mut BindingMapCollector,
+        bmk: &mut BindingMapKeys,
+    ) {
         if let Self::DataField { name, location: _ } = self {
             if let Some(index) = bmc.add_field(name) {
                 bmk.add(name, index);
@@ -1086,8 +1222,7 @@ macro_rules! iter_sub_expr {
         impl<'a> $s<'a> {
             fn next_item(&mut self) -> Option<<Self as Iterator>::Item> {
                 let value = match &mut self.inner {
-                    Expression::ScopeRef { .. } |
-                    Expression::DataField { .. } => {
+                    Expression::ScopeRef { .. } | Expression::DataField { .. } => {
                         return None;
                     }
                     Expression::ToStringWithoutUndefined { value, .. } => {
@@ -1098,12 +1233,12 @@ macro_rules! iter_sub_expr {
                             return None;
                         }
                     }
-                    Expression::LitUndefined { .. } |
-                    Expression::LitNull { .. } |
-                    Expression::LitStr { .. } |
-                    Expression::LitInt { .. } |
-                    Expression::LitFloat { .. } |
-                    Expression::LitBool { .. } => {
+                    Expression::LitUndefined { .. }
+                    | Expression::LitNull { .. }
+                    | Expression::LitStr { .. }
+                    | Expression::LitInt { .. }
+                    | Expression::LitFloat { .. }
+                    | Expression::LitBool { .. } => {
                         return None;
                     }
                     Expression::LitObj { fields, .. } => {
@@ -1133,7 +1268,9 @@ macro_rules! iter_sub_expr {
                             return None;
                         }
                     }
-                    Expression::DynamicMember { obj, field_name, .. } => {
+                    Expression::DynamicMember {
+                        obj, field_name, ..
+                    } => {
                         if self.index == 0 {
                             self.index = 1;
                             obj
@@ -1154,12 +1291,12 @@ macro_rules! iter_sub_expr {
                             value
                         }
                     }
-                    Expression::Reverse { value, .. } |
-                    Expression::BitReverse { value, .. } |
-                    Expression::Positive { value, .. } |
-                    Expression::Negative { value, .. } |
-                    Expression::TypeOf { value, .. } |
-                    Expression::Void { value, .. } => {
+                    Expression::Reverse { value, .. }
+                    | Expression::BitReverse { value, .. }
+                    | Expression::Positive { value, .. }
+                    | Expression::Negative { value, .. }
+                    | Expression::TypeOf { value, .. }
+                    | Expression::Void { value, .. } => {
                         if self.index == 0 {
                             self.index = 1;
                             value
@@ -1167,26 +1304,26 @@ macro_rules! iter_sub_expr {
                             return None;
                         }
                     }
-                    Expression::Multiply { left, right, .. } |
-                    Expression::Divide { left, right, .. } |
-                    Expression::Remainer { left, right, .. } |
-                    Expression::Plus { left, right, .. } |
-                    Expression::Minus { left, right, .. } |
-                    Expression::Lt { left, right, .. } |
-                    Expression::Gt { left, right, .. } |
-                    Expression::Lte { left, right, .. } |
-                    Expression::Gte { left, right, .. } |
-                    Expression::InstanceOf { left, right, .. } |
-                    Expression::Eq { left, right, .. } |
-                    Expression::Ne { left, right, .. } |
-                    Expression::EqFull { left, right, .. } |
-                    Expression::NeFull { left, right, .. } |
-                    Expression::BitAnd { left, right, .. } |
-                    Expression::BitXor { left, right, .. } |
-                    Expression::BitOr { left, right, .. } |
-                    Expression::LogicAnd { left, right, .. } |
-                    Expression::LogicOr { left, right, .. } |
-                    Expression::NullishCoalescing { left, right, .. } => {
+                    Expression::Multiply { left, right, .. }
+                    | Expression::Divide { left, right, .. }
+                    | Expression::Remainer { left, right, .. }
+                    | Expression::Plus { left, right, .. }
+                    | Expression::Minus { left, right, .. }
+                    | Expression::Lt { left, right, .. }
+                    | Expression::Gt { left, right, .. }
+                    | Expression::Lte { left, right, .. }
+                    | Expression::Gte { left, right, .. }
+                    | Expression::InstanceOf { left, right, .. }
+                    | Expression::Eq { left, right, .. }
+                    | Expression::Ne { left, right, .. }
+                    | Expression::EqFull { left, right, .. }
+                    | Expression::NeFull { left, right, .. }
+                    | Expression::BitAnd { left, right, .. }
+                    | Expression::BitXor { left, right, .. }
+                    | Expression::BitOr { left, right, .. }
+                    | Expression::LogicAnd { left, right, .. }
+                    | Expression::LogicOr { left, right, .. }
+                    | Expression::NullishCoalescing { left, right, .. } => {
                         if self.index == 0 {
                             self.index = 1;
                             left
@@ -1197,7 +1334,12 @@ macro_rules! iter_sub_expr {
                             return None;
                         }
                     }
-                    Expression::Cond { cond, true_br, false_br, .. } => {
+                    Expression::Cond {
+                        cond,
+                        true_br,
+                        false_br,
+                        ..
+                    } => {
                         if self.index == 0 {
                             self.index = 1;
                             cond
@@ -1212,17 +1354,19 @@ macro_rules! iter_sub_expr {
                         }
                     }
                 };
-        
+
                 // SAFETY: it is safe because `Self::Item` is limited to `'a`
                 let value = ($f)(value);
                 Some(value)
             }
-        }                
+        }
     };
 }
 
 iter_sub_expr!(SubExpression, get, |value| value);
-iter_sub_expr!(SubExpressionMut, get_mut, |value| unsafe { &mut *(value as *mut _)});
+iter_sub_expr!(SubExpressionMut, get_mut, |value| unsafe {
+    &mut *(value as *mut _)
+});
 
 #[cfg(test)]
 mod test {
@@ -1241,7 +1385,12 @@ mod test {
     fn lit_str() {
         case!("{{ '", "", ParseErrorKind::MissingExpressionEnd, 0..2);
         case!(r#"{{ 'a\n\u0041\x4f\x4E' }}"#, "a\nAON");
-        case!(r#"{{ 'a\n\u0' }}"#, "a\n 0", ParseErrorKind::IllegalEscapeSequence, 9..11);
+        case!(
+            r#"{{ 'a\n\u0' }}"#,
+            "a\n 0",
+            ParseErrorKind::IllegalEscapeSequence,
+            9..11
+        );
         case!(r#"{{ "" }}"#, "");
     }
 
@@ -1250,10 +1399,25 @@ mod test {
         case!(r#"{{ 0 }}"#, r#"{{0}}"#);
         case!(r#"{{ 089 }}"#, r#"{{89}}"#);
         case!(r#"{{ 010 }}"#, r#"{{8}}"#);
-        case!(r#"{{ 0x }}"#, r#""#, ParseErrorKind::UnexpectedExpressionCharacter, 5..5);
+        case!(
+            r#"{{ 0x }}"#,
+            r#""#,
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            5..5
+        );
         case!(r#"{{ 0xaB }}"#, r#"{{171}}"#);
-        case!(r#"{{ 0e }}"#, r#""#, ParseErrorKind::UnexpectedExpressionCharacter, 5..5);
-        case!(r#"{{ 0e- }}"#, r#""#, ParseErrorKind::UnexpectedExpressionCharacter, 6..6);
+        case!(
+            r#"{{ 0e }}"#,
+            r#""#,
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            5..5
+        );
+        case!(
+            r#"{{ 0e- }}"#,
+            r#""#,
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            6..6
+        );
         case!(r#"{{ 0e12 }}"#, r#"{{0}}"#);
         case!(r#"{{ 102 }}"#, r#"{{102}}"#);
         case!(r#"{{ 0.1 }}"#, r#"{{0.1}}"#);
@@ -1267,36 +1431,86 @@ mod test {
     #[test]
     fn lit_obj() {
         case!(r#"{{{ a }}}"#, r#"{{{a}}}"#);
-        case!(r#"{{ { a# } }}"#, r#""#, ParseErrorKind::UnexpectedExpressionCharacter, 6..6);
-        case!(r#"{{ { a:# } }}"#, r#""#, ParseErrorKind::UnexpectedExpressionCharacter, 7..7);
+        case!(
+            r#"{{ { a# } }}"#,
+            r#""#,
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            6..6
+        );
+        case!(
+            r#"{{ { a:# } }}"#,
+            r#""#,
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            7..7
+        );
         case!(r#"{{ { } }}"#, r#"{{{}}}"#);
-        case!(r#"{{ {,} }}"#, r#""#, ParseErrorKind::UnexpectedExpressionCharacter, 4..4);
-        case!(r#"{{ a: 1, a: 2 }}"#, r#"{{{a:1,a:2}}}"#, ParseErrorKind::DuplicatedName, 3..4);
-        case!(r#"{{ a: 1, a }}"#, r#"{{{a:1,a}}}"#, ParseErrorKind::DuplicatedName, 3..4);
+        case!(
+            r#"{{ {,} }}"#,
+            r#""#,
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            4..4
+        );
+        case!(
+            r#"{{ a: 1, a: 2 }}"#,
+            r#"{{{a:1,a:2}}}"#,
+            ParseErrorKind::DuplicatedName,
+            3..4
+        );
+        case!(
+            r#"{{ a: 1, a }}"#,
+            r#"{{{a:1,a}}}"#,
+            ParseErrorKind::DuplicatedName,
+            3..4
+        );
         case!(r#"{{ a: 1 }}"#, r#"{{{a:1}}}"#);
         case!(r#"{{ a: 2, }}"#, r#"{{{a:2}}}"#);
         case!(r#"{{ a: 2, b: 3 }}"#, r#"{{{a:2,b:3}}}"#);
         case!(r#"{{ a, }}"#, r#"{{{a}}}"#);
         case!(r#"{{ ...a, ...b }}"#, r#"{{{...a,...b}}}"#);
-        case!(r#"{{ {...} }}"#, r#""#, ParseErrorKind::UnexpectedExpressionCharacter, 7..7);
+        case!(
+            r#"{{ {...} }}"#,
+            r#""#,
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            7..7
+        );
     }
 
     #[test]
     fn lit_arr() {
         case!(r#"{{ [ a, ] }}"#, r#"{{[a]}}"#);
-        case!(r#"{{ [ a# ] }}"#, r#""#, ParseErrorKind::UnexpectedExpressionCharacter, 6..6);
+        case!(
+            r#"{{ [ a# ] }}"#,
+            r#""#,
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            6..6
+        );
         case!(r#"{{ [ , ] }}"#, r#"{{[,]}}"#);
         case!(r#"{{ [ , , ] }}"#, r#"{{[,,]}}"#);
         case!(r#"{{ [ c, a + b ] }}"#, r#"{{[c,a+b]}}"#);
         case!(r#"{{ [ ...a, ] }}"#, r#"{{[...a]}}"#);
         case!(r#"{{ [ ...a, ...b ] }}"#, r#"{{[...a,...b]}}"#);
-        case!(r#"{{ [...] }}"#, r#""#, ParseErrorKind::UnexpectedExpressionCharacter, 7..7);
+        case!(
+            r#"{{ [...] }}"#,
+            r#""#,
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            7..7
+        );
     }
 
     #[test]
     fn paren() {
-        case!(r#"{{ ( ) }}"#, r#""#, ParseErrorKind::UnexpectedExpressionCharacter, 5..5);
-        case!(r#"{{ ( a }}"#, r#""#, ParseErrorKind::UnmatchedParenthesis, 7..7);
+        case!(
+            r#"{{ ( ) }}"#,
+            r#""#,
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            5..5
+        );
+        case!(
+            r#"{{ ( a }}"#,
+            r#""#,
+            ParseErrorKind::UnmatchedParenthesis,
+            7..7
+        );
         case!(r#"{{ ( a + b ) }}"#, r#"{{a+b}}"#);
         case!(r#"{{ ( a + b ) * c }}"#, r#"{{(a+b)*c}}"#);
         case!(r#"{{ ( a + b ) < c }}"#, r#"{{a+b<c}}"#);
@@ -1311,7 +1525,12 @@ mod test {
 
     #[test]
     fn dynamic_member() {
-        case!("{{ a[ ] }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 6..6);
+        case!(
+            "{{ a[ ] }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            6..6
+        );
         case!("{{ a[0 }}", "", ParseErrorKind::UnmatchedBracket, 7..7);
         case!("{{ a[a ? b : c] }}", "{{a[a?b:c]}}");
     }
@@ -1340,35 +1559,70 @@ mod test {
     fn positive() {
         case!("{{ + a.b }}", "{{ +a.b}}");
         case!("{{ + + a }}", "{{ + +a}}");
-        case!("{{ ++ a }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 3..3);
+        case!(
+            "{{ ++ a }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            3..3
+        );
     }
 
     #[test]
     fn negative() {
         case!("{{ - a.b }}", "{{ -a.b}}");
         case!("{{ - - a }}", "{{ - -a}}");
-        case!("{{ -- a }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 3..3);
+        case!(
+            "{{ -- a }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            3..3
+        );
     }
 
     #[test]
     fn type_of() {
-        case!("{{ typeof$ a.b }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 11..11);
+        case!(
+            "{{ typeof$ a.b }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            11..11
+        );
         case!("{{ typeof a.b }}", "{{ typeof a.b}}");
         case!("{{ typeof typeof a }}", "{{ typeof  typeof a}}");
     }
 
     #[test]
     fn void() {
-        case!("{{ void$0 a.b }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 10..10);
+        case!(
+            "{{ void$0 a.b }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            10..10
+        );
         case!("{{ void a.b }}", "{{ void a.b}}");
         case!("{{ void void a }}", "{{ void  void a}}");
     }
 
     #[test]
     fn multiply() {
-        case!("{{ a * }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 7..7);
-        case!("{{ a *= b }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 5..5);
-        case!("{{ a ** b }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 5..5);
+        case!(
+            "{{ a * }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            7..7
+        );
+        case!(
+            "{{ a *= b }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            5..5
+        );
+        case!(
+            "{{ a ** b }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            5..5
+        );
         case!("{{ a * !b }}", "{{a*!b}}");
         case!("{{ !a * b }}", "{{!a*b}}");
         case!("{{ a * b * c }}", "{{a*b*c}}");
@@ -1376,140 +1630,330 @@ mod test {
 
     #[test]
     fn divide() {
-        case!("{{ a / }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 7..7);
-        case!("{{ a /= b }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 5..5);
-        case!("{{ a // b }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 5..5);
+        case!(
+            "{{ a / }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            7..7
+        );
+        case!(
+            "{{ a /= b }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            5..5
+        );
+        case!(
+            "{{ a // b }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            5..5
+        );
         case!("{{ a / !b }}", "{{a/!b}}");
     }
 
     #[test]
     fn remainer() {
-        case!("{{ a % }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 7..7);
-        case!("{{ a %= b }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 5..5);
+        case!(
+            "{{ a % }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            7..7
+        );
+        case!(
+            "{{ a %= b }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            5..5
+        );
         case!("{{ a % !b }}", "{{a%!b}}");
     }
 
     #[test]
     fn plus() {
-        case!("{{ a + }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 7..7);
-        case!("{{ a += b }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 5..5);
-        case!("{{ a ++ }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 5..5);
+        case!(
+            "{{ a + }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            7..7
+        );
+        case!(
+            "{{ a += b }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            5..5
+        );
+        case!(
+            "{{ a ++ }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            5..5
+        );
         case!("{{ a + b * c }}", "{{a+b*c}}");
     }
 
     #[test]
     fn minus() {
-        case!("{{ a - }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 7..7);
-        case!("{{ a -= b }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 5..5);
-        case!("{{ a -- }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 5..5);
+        case!(
+            "{{ a - }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            7..7
+        );
+        case!(
+            "{{ a -= b }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            5..5
+        );
+        case!(
+            "{{ a -- }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            5..5
+        );
         case!("{{ a - b * c }}", "{{a-b*c}}");
     }
 
     #[test]
     fn lt() {
-        case!("{{ a < }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 7..7);
-        case!("{{ a << b }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 5..5);
+        case!(
+            "{{ a < }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            7..7
+        );
+        case!(
+            "{{ a << b }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            5..5
+        );
         case!("{{ a < b + c }}", "{{a<b+c}}");
     }
 
     #[test]
     fn lte() {
-        case!("{{ a <= }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 8..8);
+        case!(
+            "{{ a <= }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            8..8
+        );
         case!("{{ a <= b + c }}", "{{a<=b+c}}");
     }
 
     #[test]
     fn gt() {
-        case!("{{ a > }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 7..7);
-        case!("{{ a >> b }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 5..5);
+        case!(
+            "{{ a > }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            7..7
+        );
+        case!(
+            "{{ a >> b }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            5..5
+        );
         case!("{{ a > b + c }}", "{{a>b+c}}");
     }
 
     #[test]
     fn gte() {
-        case!("{{ a >= }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 8..8);
+        case!(
+            "{{ a >= }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            8..8
+        );
         case!("{{ a >= b + c }}", "{{a>=b+c}}");
     }
 
     #[test]
     fn instance_of() {
         case!("{{ instanceof }}", "{{instanceof}}");
-        case!("{{ a instanceof }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 16..16);
-        case!("{{ a instanceof0 }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 5..5);
+        case!(
+            "{{ a instanceof }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            16..16
+        );
+        case!(
+            "{{ a instanceof0 }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            5..5
+        );
         case!("{{ a instanceof b + c }}", "{{a instanceof b+c}}");
     }
 
     #[test]
     fn eq() {
-        case!("{{ a == }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 8..8);
+        case!(
+            "{{ a == }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            8..8
+        );
         case!("{{ a == b < c }}", "{{a==b<c}}");
     }
 
     #[test]
     fn ne() {
-        case!("{{ a != }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 8..8);
+        case!(
+            "{{ a != }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            8..8
+        );
         case!("{{ a != b < c }}", "{{a!=b<c}}");
     }
 
     #[test]
     fn eq_full() {
-        case!("{{ a === }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 9..9);
+        case!(
+            "{{ a === }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            9..9
+        );
         case!("{{ a === b < c }}", "{{a===b<c}}");
     }
 
     #[test]
     fn ne_full() {
-        case!("{{ a !== }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 9..9);
+        case!(
+            "{{ a !== }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            9..9
+        );
         case!("{{ a !== b < c }}", "{{a!==b<c}}");
     }
 
     #[test]
     fn bit_and() {
-        case!("{{ a & }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 7..7);
-        case!("{{ a &= b }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 5..5);
+        case!(
+            "{{ a & }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            7..7
+        );
+        case!(
+            "{{ a &= b }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            5..5
+        );
         case!("{{ a & b == c }}", "{{a&b==c}}");
     }
 
     #[test]
     fn bit_xor() {
-        case!("{{ a ^ }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 7..7);
-        case!("{{ a ^= b }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 5..5);
+        case!(
+            "{{ a ^ }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            7..7
+        );
+        case!(
+            "{{ a ^= b }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            5..5
+        );
         case!("{{ a ^ b & c }}", "{{a^b&c}}");
     }
 
     #[test]
     fn bit_or() {
-        case!("{{ a | }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 7..7);
-        case!("{{ a |= b }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 5..5);
+        case!(
+            "{{ a | }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            7..7
+        );
+        case!(
+            "{{ a |= b }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            5..5
+        );
         case!("{{ a | b ^ c }}", "{{a|b^c}}");
     }
 
     #[test]
     fn logic_and() {
-        case!("{{ a && }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 8..8);
-        case!("{{ a &&= b }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 5..5);
+        case!(
+            "{{ a && }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            8..8
+        );
+        case!(
+            "{{ a &&= b }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            5..5
+        );
         case!("{{ a && b | c }}", "{{a&&b|c}}");
     }
 
     #[test]
     fn logic_or() {
-        case!("{{ a || }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 8..8);
-        case!("{{ a ||= b }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 5..5);
+        case!(
+            "{{ a || }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            8..8
+        );
+        case!(
+            "{{ a ||= b }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            5..5
+        );
         case!("{{ a || b && c }}", "{{a||b&&c}}");
     }
 
     #[test]
     fn nullish_coalescing() {
-        case!("{{ a ?? }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 8..8);
-        case!("{{ a ??= b }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 5..5);
+        case!(
+            "{{ a ?? }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            8..8
+        );
+        case!(
+            "{{ a ??= b }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            5..5
+        );
         case!("{{ a ?? b || c }}", "{{a??b||c}}");
     }
 
     #[test]
     fn cond() {
-        case!("{{ a ? b }}", "", ParseErrorKind::IncompleteConditionExpression, 9..9);
-        case!("{{ a + c : b }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 9..9);
-        case!("{{ a ?. b }}", "", ParseErrorKind::UnexpectedExpressionCharacter, 5..5);
+        case!(
+            "{{ a ? b }}",
+            "",
+            ParseErrorKind::IncompleteConditionExpression,
+            9..9
+        );
+        case!(
+            "{{ a + c : b }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            9..9
+        );
+        case!(
+            "{{ a ?. b }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            5..5
+        );
         case!("{{ a ? b : c }}", "{{a?b:c}}");
     }
 
@@ -1518,12 +1962,16 @@ mod test {
         fn check_sub_expr(src: &str, expect: &[&str]) {
             let mut state = ParseState::new("TEST", src, Default::default());
             let parsed = Expression::parse_expression_or_object_inner(&mut state, false).unwrap();
-            let r: Vec<_> = parsed.sub_expressions().map(|x| {
-                let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src);
-                x.stringify_write(&mut stringifier).unwrap();
-                let (s, _) = stringifier.finish();
-                s
-            }).collect();
+            let r: Vec<_> = parsed
+                .sub_expressions()
+                .map(|x| {
+                    let mut stringifier =
+                        crate::stringify::Stringifier::new(String::new(), "test", src);
+                    x.stringify_write(&mut stringifier).unwrap();
+                    let (s, _) = stringifier.finish();
+                    s
+                })
+                .collect();
             let r: Vec<_> = r.iter().map(|x| x.as_str()).collect();
             assert_eq!(&r, expect);
         }

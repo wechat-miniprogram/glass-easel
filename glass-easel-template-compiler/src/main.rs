@@ -139,7 +139,7 @@ fn main() {
         use std::io::Read;
         let mut s = String::new();
         std::io::stdin().read_to_string(&mut s).unwrap();
-        for err in group.add_tmpl("".into(), &s) {
+        for err in group.add_tmpl("", &s) {
             if err.prevent_success() {
                 error!("{}", err);
             } else {

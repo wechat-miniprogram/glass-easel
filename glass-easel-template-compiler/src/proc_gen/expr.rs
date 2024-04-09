@@ -2,9 +2,13 @@ use std::fmt::Write;
 
 use compact_str::CompactString;
 
-use crate::{escape::gen_lit_str, parse::expr::{ArrayFieldKind, Expression, ObjectFieldKind}, stringify::expr::ExpressionLevel, TmplError};
 use super::{JsExprWriter, JsFunctionScopeWriter, JsIdent, ScopeVar, ScopeVarLvaluePath};
-
+use crate::{
+    escape::gen_lit_str,
+    parse::expr::{ArrayFieldKind, Expression, ObjectFieldKind},
+    stringify::expr::ExpressionLevel,
+    TmplError,
+};
 
 #[must_use]
 #[derive(Debug)]
@@ -14,8 +18,15 @@ pub(crate) enum PathSlice {
     StaticMember(CompactString),
     IndirectValue(JsIdent),
     CombineObj(Vec<(Option<CompactString>, PathAnalysisState, Vec<PathSliceList>)>),
-    CombineArr(Vec<(PathAnalysisState, Vec<PathSliceList>)>, Vec<(PathAnalysisState, Vec<PathSliceList>)>),
-    Condition(JsIdent, (PathAnalysisState, Vec<PathSliceList>), (PathAnalysisState, Vec<PathSliceList>)),
+    CombineArr(
+        Vec<(PathAnalysisState, Vec<PathSliceList>)>,
+        Vec<(PathAnalysisState, Vec<PathSliceList>)>,
+    ),
+    Condition(
+        JsIdent,
+        (PathAnalysisState, Vec<PathSliceList>),
+        (PathAnalysisState, Vec<PathSliceList>),
+    ),
 }
 
 #[derive(Debug)]
@@ -52,22 +63,30 @@ impl PathSliceList {
         match iter.next() {
             None => return false,
             Some(PathSlice::Ident(_)) => {
-                if model == Some(false) { return false }
-            }
-            Some(PathSlice::ScopeIndex(i)) => {
-                match &scopes[*i].lvalue_path {
-                    ScopeVarLvaluePath::Invalid => return false,
-                    ScopeVarLvaluePath::Var { from_data_scope, .. } => {
-                        if let Some(model) = model {
-                            if model && !*from_data_scope { return false }
-                            if !model && *from_data_scope { return false }
-                        }
-                    }
-                    ScopeVarLvaluePath::Script {..} | ScopeVarLvaluePath::InlineScript {..} => {
-                        if model == Some(true) { return false }
-                    }
+                if model == Some(false) {
+                    return false;
                 }
             }
+            Some(PathSlice::ScopeIndex(i)) => match &scopes[*i].lvalue_path {
+                ScopeVarLvaluePath::Invalid => return false,
+                ScopeVarLvaluePath::Var {
+                    from_data_scope, ..
+                } => {
+                    if let Some(model) = model {
+                        if model && !*from_data_scope {
+                            return false;
+                        }
+                        if !model && *from_data_scope {
+                            return false;
+                        }
+                    }
+                }
+                ScopeVarLvaluePath::Script { .. } | ScopeVarLvaluePath::InlineScript { .. } => {
+                    if model == Some(true) {
+                        return false;
+                    }
+                }
+            },
             Some(PathSlice::Condition(_, (true_pas, _), (false_pas, _))) => {
                 let true_br_res = if let PathAnalysisState::InPath(x) = true_pas {
                     x.is_legal_lvalue_path(scopes, model)
@@ -80,7 +99,7 @@ impl PathSliceList {
                     false
                 };
                 if !true_br_res && !false_br_res {
-                    return false
+                    return false;
                 }
             }
             _ => return false,
@@ -111,7 +130,10 @@ impl PathSliceList {
                     match iter.next() {
                         Some(PathSlice::Ident(s)) => write!(w, r#"{}"#, gen_lit_str(s))?,
                         Some(PathSlice::ScopeIndex(i)) => match &scopes[*i].lvalue_path {
-                            ScopeVarLvaluePath::Var { var_name, from_data_scope } if *from_data_scope => {
+                            ScopeVarLvaluePath::Var {
+                                var_name,
+                                from_data_scope,
+                            } if *from_data_scope => {
                                 write!(w, r#"...{}"#, var_name)?;
                                 need_slice_1 = true;
                             }
@@ -127,9 +149,15 @@ impl PathSliceList {
                         Some(PathSlice::Ident(s)) => write!(w, r#"0,{}"#, gen_lit_str(s))?,
                         Some(PathSlice::ScopeIndex(i)) => match &scopes[*i].lvalue_path {
                             ScopeVarLvaluePath::Invalid => return Ok(false),
-                            ScopeVarLvaluePath::Var { var_name, .. } => write!(w, r#"...{}"#, var_name)?,
-                            ScopeVarLvaluePath::Script { abs_path } => write!(w, r#"1,{}"#, gen_lit_str(abs_path))?,
-                            ScopeVarLvaluePath::InlineScript { path, mod_name } => write!(w, r#"2,{},{}"#, gen_lit_str(path), gen_lit_str(mod_name))?,
+                            ScopeVarLvaluePath::Var { var_name, .. } => {
+                                write!(w, r#"...{}"#, var_name)?
+                            }
+                            ScopeVarLvaluePath::Script { abs_path } => {
+                                write!(w, r#"1,{}"#, gen_lit_str(abs_path))?
+                            }
+                            ScopeVarLvaluePath::InlineScript { path, mod_name } => {
+                                write!(w, r#"2,{},{}"#, gen_lit_str(path), gen_lit_str(mod_name))?
+                            }
                         },
                         _ => return Ok(false),
                     }
@@ -192,7 +220,7 @@ impl PathSliceList {
                     } else {
                         write!(&mut ret, "undefined")?
                     }
-                },
+                }
                 PathSlice::StaticMember(s) => {
                     ret = format!("Z({},{})", ret, gen_lit_str(s));
                 }
@@ -258,11 +286,17 @@ impl PathSliceList {
                 }
                 PathSlice::Condition(cond, (true_pas, true_p), (false_pas, false_p)) => {
                     write!(ret, "({}?", cond)?;
-                    if true_pas.to_path_analysis_str(true_p, &mut ret, scopes)?.is_none() {
+                    if true_pas
+                        .to_path_analysis_str(true_p, &mut ret, scopes)?
+                        .is_none()
+                    {
                         write!(ret, "undefined")?;
                     }
                     write!(ret, ":")?;
-                    if false_pas.to_path_analysis_str(false_p, &mut ret, scopes)?.is_none() {
+                    if false_pas
+                        .to_path_analysis_str(false_p, &mut ret, scopes)?
+                        .is_none()
+                    {
                         write!(ret, "undefined")?;
                     }
                     write!(ret, ")")?;
@@ -375,11 +409,15 @@ impl Expression {
                 write!(value, "{}", scope.var)?;
                 match scope.lvalue_path {
                     ScopeVarLvaluePath::Script { .. } | ScopeVarLvaluePath::InlineScript { .. } => {
-                        PathAnalysisState::InPath(PathSliceList(vec![PathSlice::ScopeIndex(*index)]))
+                        PathAnalysisState::InPath(PathSliceList(vec![PathSlice::ScopeIndex(
+                            *index,
+                        )]))
                     }
                     ScopeVarLvaluePath::Invalid | ScopeVarLvaluePath::Var { .. } => {
                         if scope.update_path_tree.is_some() {
-                            PathAnalysisState::InPath(PathSliceList(vec![PathSlice::ScopeIndex(*index)]))
+                            PathAnalysisState::InPath(PathSliceList(vec![PathSlice::ScopeIndex(
+                                *index,
+                            )]))
                         } else {
                             PathAnalysisState::NotInPath
                         }
@@ -483,7 +521,11 @@ impl Expression {
                                 &mut s,
                             )?;
                             next_need_comma_sep = true;
-                            let list = if spread_sub_pas_list.len() > 0 { &mut spread_sub_pas_list } else { &mut sub_pas_list };
+                            let list = if spread_sub_pas_list.len() > 0 {
+                                &mut spread_sub_pas_list
+                            } else {
+                                &mut sub_pas_list
+                            };
                             list.push((pas, sub_p));
                         }
                         ArrayFieldKind::Spread { value, .. } => {
@@ -505,7 +547,11 @@ impl Expression {
                             }
                             write!(s, ",")?;
                             next_need_comma_sep = false;
-                            let list = if spread_sub_pas_list.len() > 0 { &mut spread_sub_pas_list } else { &mut sub_pas_list };
+                            let list = if spread_sub_pas_list.len() > 0 {
+                                &mut spread_sub_pas_list
+                            } else {
+                                &mut sub_pas_list
+                            };
                             list.push((PathAnalysisState::NotInPath, vec![]));
                         }
                     }
@@ -515,17 +561,24 @@ impl Expression {
                 } else {
                     write!(value, "[{}]", s)?;
                 }
-                PathAnalysisState::InPath(PathSliceList(vec![PathSlice::CombineArr(sub_pas_list, spread_sub_pas_list)]))
+                PathAnalysisState::InPath(PathSliceList(vec![PathSlice::CombineArr(
+                    sub_pas_list,
+                    spread_sub_pas_list,
+                )]))
             }
 
-            Expression::StaticMember { obj, field_name, .. } => {
+            Expression::StaticMember {
+                obj, field_name, ..
+            } => {
                 write!(value, "X(")?;
                 let mut pas =
                     obj.to_proc_gen_rec(w, scopes, ExpressionLevel::Cond, path_calc, value)?;
                 write!(value, ").{}", field_name)?;
                 match &mut pas {
                     PathAnalysisState::InPath(path_slices) => {
-                        path_slices.0.push(PathSlice::StaticMember(field_name.clone()));
+                        path_slices
+                            .0
+                            .push(PathSlice::StaticMember(field_name.clone()));
                     }
                     PathAnalysisState::NotInPath => {
                         // do nothing
@@ -533,7 +586,9 @@ impl Expression {
                 }
                 pas
             }
-            Expression::DynamicMember { obj, field_name, .. } => {
+            Expression::DynamicMember {
+                obj, field_name, ..
+            } => {
                 let ident = {
                     let ident = w.gen_private_ident();
                     let mut s = String::new();
@@ -566,7 +621,13 @@ impl Expression {
             }
             Expression::FuncCall { func, args, .. } => {
                 write!(value, "P(")?;
-                func.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Cond, path_calc, value)?;
+                func.to_proc_gen_rec_and_end_path(
+                    w,
+                    scopes,
+                    ExpressionLevel::Cond,
+                    path_calc,
+                    value,
+                )?;
                 write!(value, ")(")?;
                 for (i, y) in args.iter().enumerate() {
                     if i > 0 {
@@ -586,36 +647,74 @@ impl Expression {
 
             Expression::Reverse { value: x, .. } => {
                 write!(value, "!")?;
-                x.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Unary, path_calc, value)?;
+                x.to_proc_gen_rec_and_end_path(
+                    w,
+                    scopes,
+                    ExpressionLevel::Unary,
+                    path_calc,
+                    value,
+                )?;
                 PathAnalysisState::NotInPath
             }
             Expression::BitReverse { value: x, .. } => {
                 write!(value, "~")?;
-                x.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Unary, path_calc, value)?;
+                x.to_proc_gen_rec_and_end_path(
+                    w,
+                    scopes,
+                    ExpressionLevel::Unary,
+                    path_calc,
+                    value,
+                )?;
                 PathAnalysisState::NotInPath
             }
             Expression::Positive { value: x, .. } => {
                 write!(value, " +")?;
-                x.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Unary, path_calc, value)?;
+                x.to_proc_gen_rec_and_end_path(
+                    w,
+                    scopes,
+                    ExpressionLevel::Unary,
+                    path_calc,
+                    value,
+                )?;
                 PathAnalysisState::NotInPath
             }
             Expression::Negative { value: x, .. } => {
                 write!(value, " -")?;
-                x.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Unary, path_calc, value)?;
+                x.to_proc_gen_rec_and_end_path(
+                    w,
+                    scopes,
+                    ExpressionLevel::Unary,
+                    path_calc,
+                    value,
+                )?;
                 PathAnalysisState::NotInPath
             }
             Expression::TypeOf { value: x, .. } => {
                 write!(value, " typeof ")?;
-                x.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Unary, path_calc, value)?;
+                x.to_proc_gen_rec_and_end_path(
+                    w,
+                    scopes,
+                    ExpressionLevel::Unary,
+                    path_calc,
+                    value,
+                )?;
                 PathAnalysisState::NotInPath
             }
             Expression::Void { value: x, .. } => {
                 write!(value, " void ")?;
-                x.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Unary, path_calc, value)?;
+                x.to_proc_gen_rec_and_end_path(
+                    w,
+                    scopes,
+                    ExpressionLevel::Unary,
+                    path_calc,
+                    value,
+                )?;
                 PathAnalysisState::NotInPath
             }
 
-            Expression::Multiply { left: x, right: y, .. } => {
+            Expression::Multiply {
+                left: x, right: y, ..
+            } => {
                 x.to_proc_gen_rec_and_end_path(
                     w,
                     scopes,
@@ -624,10 +723,18 @@ impl Expression {
                     value,
                 )?;
                 write!(value, "*")?;
-                y.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Unary, path_calc, value)?;
+                y.to_proc_gen_rec_and_end_path(
+                    w,
+                    scopes,
+                    ExpressionLevel::Unary,
+                    path_calc,
+                    value,
+                )?;
                 PathAnalysisState::NotInPath
             }
-            Expression::Divide { left: x, right: y, .. } => {
+            Expression::Divide {
+                left: x, right: y, ..
+            } => {
                 x.to_proc_gen_rec_and_end_path(
                     w,
                     scopes,
@@ -636,10 +743,18 @@ impl Expression {
                     value,
                 )?;
                 write!(value, "/")?;
-                y.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Unary, path_calc, value)?;
+                y.to_proc_gen_rec_and_end_path(
+                    w,
+                    scopes,
+                    ExpressionLevel::Unary,
+                    path_calc,
+                    value,
+                )?;
                 PathAnalysisState::NotInPath
             }
-            Expression::Remainer { left: x, right: y, .. } => {
+            Expression::Remainer {
+                left: x, right: y, ..
+            } => {
                 x.to_proc_gen_rec_and_end_path(
                     w,
                     scopes,
@@ -648,10 +763,18 @@ impl Expression {
                     value,
                 )?;
                 write!(value, "%")?;
-                y.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Unary, path_calc, value)?;
+                y.to_proc_gen_rec_and_end_path(
+                    w,
+                    scopes,
+                    ExpressionLevel::Unary,
+                    path_calc,
+                    value,
+                )?;
                 PathAnalysisState::NotInPath
             }
-            Expression::Plus { left: x, right: y, .. } => {
+            Expression::Plus {
+                left: x, right: y, ..
+            } => {
                 x.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Plus, path_calc, value)?;
                 write!(value, "+")?;
                 y.to_proc_gen_rec_and_end_path(
@@ -663,7 +786,9 @@ impl Expression {
                 )?;
                 PathAnalysisState::NotInPath
             }
-            Expression::Minus { left: x, right: y, .. } => {
+            Expression::Minus {
+                left: x, right: y, ..
+            } => {
                 x.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Plus, path_calc, value)?;
                 write!(value, "-")?;
                 y.to_proc_gen_rec_and_end_path(
@@ -676,7 +801,9 @@ impl Expression {
                 PathAnalysisState::NotInPath
             }
 
-            Expression::Lt { left: x, right: y, .. } => {
+            Expression::Lt {
+                left: x, right: y, ..
+            } => {
                 x.to_proc_gen_rec_and_end_path(
                     w,
                     scopes,
@@ -688,7 +815,9 @@ impl Expression {
                 y.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Plus, path_calc, value)?;
                 PathAnalysisState::NotInPath
             }
-            Expression::Gt { left: x, right: y, .. } => {
+            Expression::Gt {
+                left: x, right: y, ..
+            } => {
                 x.to_proc_gen_rec_and_end_path(
                     w,
                     scopes,
@@ -700,7 +829,9 @@ impl Expression {
                 y.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Plus, path_calc, value)?;
                 PathAnalysisState::NotInPath
             }
-            Expression::Lte { left: x, right: y, .. } => {
+            Expression::Lte {
+                left: x, right: y, ..
+            } => {
                 x.to_proc_gen_rec_and_end_path(
                     w,
                     scopes,
@@ -712,7 +843,9 @@ impl Expression {
                 y.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Plus, path_calc, value)?;
                 PathAnalysisState::NotInPath
             }
-            Expression::Gte { left: x, right: y, .. } => {
+            Expression::Gte {
+                left: x, right: y, ..
+            } => {
                 x.to_proc_gen_rec_and_end_path(
                     w,
                     scopes,
@@ -724,7 +857,9 @@ impl Expression {
                 y.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Plus, path_calc, value)?;
                 PathAnalysisState::NotInPath
             }
-            Expression::InstanceOf { left: x, right: y, .. } => {
+            Expression::InstanceOf {
+                left: x, right: y, ..
+            } => {
                 x.to_proc_gen_rec_and_end_path(
                     w,
                     scopes,
@@ -736,7 +871,9 @@ impl Expression {
                 y.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Plus, path_calc, value)?;
                 PathAnalysisState::NotInPath
             }
-            Expression::Eq { left: x, right: y, .. } => {
+            Expression::Eq {
+                left: x, right: y, ..
+            } => {
                 x.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Eq, path_calc, value)?;
                 write!(value, "==")?;
                 y.to_proc_gen_rec_and_end_path(
@@ -748,7 +885,9 @@ impl Expression {
                 )?;
                 PathAnalysisState::NotInPath
             }
-            Expression::Ne { left: x, right: y, .. } => {
+            Expression::Ne {
+                left: x, right: y, ..
+            } => {
                 x.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Eq, path_calc, value)?;
                 write!(value, "!=")?;
                 y.to_proc_gen_rec_and_end_path(
@@ -760,7 +899,9 @@ impl Expression {
                 )?;
                 PathAnalysisState::NotInPath
             }
-            Expression::EqFull { left: x, right: y, .. } => {
+            Expression::EqFull {
+                left: x, right: y, ..
+            } => {
                 x.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Eq, path_calc, value)?;
                 write!(value, "===")?;
                 y.to_proc_gen_rec_and_end_path(
@@ -772,7 +913,9 @@ impl Expression {
                 )?;
                 PathAnalysisState::NotInPath
             }
-            Expression::NeFull { left: x, right: y, .. } => {
+            Expression::NeFull {
+                left: x, right: y, ..
+            } => {
                 x.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Eq, path_calc, value)?;
                 write!(value, "!==")?;
                 y.to_proc_gen_rec_and_end_path(
@@ -785,25 +928,63 @@ impl Expression {
                 PathAnalysisState::NotInPath
             }
 
-            Expression::BitAnd { left: x, right: y, .. } => {
-                x.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::BitAnd, path_calc, value)?;
+            Expression::BitAnd {
+                left: x, right: y, ..
+            } => {
+                x.to_proc_gen_rec_and_end_path(
+                    w,
+                    scopes,
+                    ExpressionLevel::BitAnd,
+                    path_calc,
+                    value,
+                )?;
                 write!(value, "&")?;
                 y.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Eq, path_calc, value)?;
                 PathAnalysisState::NotInPath
             }
-            Expression::BitXor { left: x, right: y, .. } => {
-                x.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::BitOr, path_calc, value)?;
+            Expression::BitXor {
+                left: x, right: y, ..
+            } => {
+                x.to_proc_gen_rec_and_end_path(
+                    w,
+                    scopes,
+                    ExpressionLevel::BitOr,
+                    path_calc,
+                    value,
+                )?;
                 write!(value, "^")?;
-                y.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::BitAnd, path_calc, value)?;
+                y.to_proc_gen_rec_and_end_path(
+                    w,
+                    scopes,
+                    ExpressionLevel::BitAnd,
+                    path_calc,
+                    value,
+                )?;
                 PathAnalysisState::NotInPath
             }
-            Expression::BitOr { left: x, right: y, .. } => {
-                x.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::BitOr, path_calc, value)?;
+            Expression::BitOr {
+                left: x, right: y, ..
+            } => {
+                x.to_proc_gen_rec_and_end_path(
+                    w,
+                    scopes,
+                    ExpressionLevel::BitOr,
+                    path_calc,
+                    value,
+                )?;
                 write!(value, "|")?;
-                y.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::BitXor, path_calc, value)?;
+                y.to_proc_gen_rec_and_end_path(
+                    w,
+                    scopes,
+                    ExpressionLevel::BitXor,
+                    path_calc,
+                    value,
+                )?;
                 PathAnalysisState::NotInPath
             }
-            Expression::LogicAnd { left: x, right: y, .. } => {
+            Expression::LogicAnd {
+                left: x, right: y, ..
+            } => {
                 x.to_proc_gen_rec_and_end_path(
                     w,
                     scopes,
@@ -812,10 +993,18 @@ impl Expression {
                     value,
                 )?;
                 write!(value, "&&")?;
-                y.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::BitOr, path_calc, value)?;
+                y.to_proc_gen_rec_and_end_path(
+                    w,
+                    scopes,
+                    ExpressionLevel::BitOr,
+                    path_calc,
+                    value,
+                )?;
                 PathAnalysisState::NotInPath
             }
-            Expression::LogicOr { left: x, right: y, .. } => {
+            Expression::LogicOr {
+                left: x, right: y, ..
+            } => {
                 x.to_proc_gen_rec_and_end_path(
                     w,
                     scopes,
@@ -833,7 +1022,9 @@ impl Expression {
                 )?;
                 PathAnalysisState::NotInPath
             }
-            Expression::NullishCoalescing { left: x, right: y, .. } => {
+            Expression::NullishCoalescing {
+                left: x, right: y, ..
+            } => {
                 let ident = {
                     let ident = w.gen_private_ident();
                     let mut s = String::new();
@@ -851,17 +1042,16 @@ impl Expression {
                     ident
                 };
                 write!(value, "{ident}?{ident}:", ident = ident)?;
-                y.to_proc_gen_rec_and_end_path(
-                    w,
-                    scopes,
-                    ExpressionLevel::Cond,
-                    path_calc,
-                    value,
-                )?;
+                y.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Cond, path_calc, value)?;
                 PathAnalysisState::NotInPath
             }
 
-            Expression::Cond { cond, true_br, false_br, .. } => {
+            Expression::Cond {
+                cond,
+                true_br,
+                false_br,
+                ..
+            } => {
                 let ident = {
                     let ident = w.gen_private_ident();
                     let mut s = String::new();
@@ -879,13 +1069,21 @@ impl Expression {
                     ident
                 };
                 write!(value, "{}?", ident)?;
-                let true_br = true_br.to_proc_gen_rec_and_combine_paths(w, scopes, ExpressionLevel::Cond, value)?;
+                let true_br = true_br.to_proc_gen_rec_and_combine_paths(
+                    w,
+                    scopes,
+                    ExpressionLevel::Cond,
+                    value,
+                )?;
                 write!(value, ":")?;
-                let false_br = false_br.to_proc_gen_rec_and_combine_paths(w, scopes, ExpressionLevel::Cond, value)?;
+                let false_br = false_br.to_proc_gen_rec_and_combine_paths(
+                    w,
+                    scopes,
+                    ExpressionLevel::Cond,
+                    value,
+                )?;
                 PathAnalysisState::InPath(PathSliceList(vec![PathSlice::Condition(
-                    ident,
-                    true_br,
-                    false_br,
+                    ident, true_br, false_br,
                 )]))
             }
         };
@@ -901,7 +1099,12 @@ impl Expression {
         let level = ExpressionLevel::from_expression(self);
         let (pas, sub_p) =
             self.to_proc_gen_rec_and_combine_paths(w, scopes, ExpressionLevel::Cond, &mut value)?;
-        Ok(ExpressionProcGen { pas, sub_p, value, level })
+        Ok(ExpressionProcGen {
+            pas,
+            sub_p,
+            value,
+            level,
+        })
     }
 }
 

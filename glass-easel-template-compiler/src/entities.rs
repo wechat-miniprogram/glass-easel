@@ -1,7 +1,7 @@
 //! Helpers for parsing HTML entities
 
 use entities::ENTITIES;
-use std::{collections::HashMap, borrow::Cow};
+use std::{borrow::Cow, collections::HashMap};
 
 lazy_static! {
     static ref ENTITIES_MAPPING: HashMap<&'static str, &'static str> = make_mapping();

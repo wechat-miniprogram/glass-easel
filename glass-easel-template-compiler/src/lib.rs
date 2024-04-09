@@ -1,18 +1,20 @@
+#![allow(clippy::needless_borrow)]
+
 #[allow(unused_imports)]
 #[macro_use]
 extern crate log;
 #[macro_use]
 extern crate lazy_static;
 
-pub mod parse;
-pub mod stringify;
 mod binding_map;
 mod group;
+pub mod parse;
+pub mod stringify;
 pub use group::*;
-mod path;
+#[cfg(feature = "c_bindings")]
+pub mod cbinding;
 mod entities;
 mod escape;
 mod js_bindings;
-#[cfg(feature = "c_bindings")]
-pub mod cbinding;
+mod path;
 mod proc_gen;

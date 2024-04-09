@@ -39,8 +39,8 @@ macro_rules! case {
     };
 }
 
-pub mod tag;
 pub mod expr;
+pub mod tag;
 
 pub trait TemplateStructure {
     fn location(&self) -> Range<Position>;
@@ -67,7 +67,7 @@ pub struct ParseState<'s> {
 
 impl<'s> ParseState<'s> {
     /// Prepare a string for parsing.
-    /// 
+    ///
     /// `path` and `position_offset` are used to adjust warning output.
     pub fn new(path: &str, content: &'s str, position_offset: Position) -> Self {
         let s = content;
@@ -90,7 +90,11 @@ impl<'s> ParseState<'s> {
 
     /// Add a new warning.
     pub fn add_warning(&mut self, kind: ParseErrorKind, location: Range<Position>) {
-        self.warnings.push(ParseError { path: self.path.to_string(), kind, location })
+        self.warnings.push(ParseError {
+            path: self.path.to_string(),
+            kind,
+            location,
+        })
     }
 
     /// Add a new warning at the current position.
@@ -153,7 +157,11 @@ impl<'s> ParseState<'s> {
     fn skip_bytes(&mut self, count: usize) {
         let skipped = &self.cur_str()[..count];
         self.cur_index += count;
-        let line_wrap_count = skipped.as_bytes().into_iter().filter(|x| **x == b'\n').count();
+        let line_wrap_count = skipped
+            .as_bytes()
+            .into_iter()
+            .filter(|x| **x == b'\n')
+            .count();
         self.line += line_wrap_count as u32;
         if line_wrap_count > 0 {
             let last_line_start = skipped.rfind('\n').unwrap() + 1;
@@ -184,7 +192,9 @@ impl<'s> ParseState<'s> {
     }
 
     pub fn peek_chars(&mut self) -> impl 's + Iterator<Item = char> {
-        if self.auto_skip_whitespace { self.skip_whitespace(); }
+        if self.auto_skip_whitespace {
+            self.skip_whitespace();
+        }
         self.cur_str().chars()
     }
 
@@ -206,11 +216,17 @@ impl<'s> ParseState<'s> {
     }
 
     pub fn peek_str(&mut self, s: &str) -> bool {
-        if self.auto_skip_whitespace { self.skip_whitespace(); }
+        if self.auto_skip_whitespace {
+            self.skip_whitespace();
+        }
         self.cur_str().starts_with(s)
     }
 
-    fn consume_str_except_followed<const N: usize>(&mut self, s: &str, excepts: [&str; N]) -> Option<Range<Position>> {
+    fn consume_str_except_followed<const N: usize>(
+        &mut self,
+        s: &str,
+        excepts: [&str; N],
+    ) -> Option<Range<Position>> {
         if !self.peek_str(s) {
             return None;
         }
@@ -226,7 +242,11 @@ impl<'s> ParseState<'s> {
         Some(start..end)
     }
 
-    fn consume_str_except_followed_char(&mut self, s: &str, reject_followed: impl FnOnce(char) -> bool) -> Option<Range<Position>> {
+    fn consume_str_except_followed_char(
+        &mut self,
+        s: &str,
+        reject_followed: impl FnOnce(char) -> bool,
+    ) -> Option<Range<Position>> {
         if !self.peek_str(s) {
             return None;
         }
@@ -269,7 +289,9 @@ impl<'s> ParseState<'s> {
     }
 
     pub fn next(&mut self) -> Option<char> {
-        if self.auto_skip_whitespace { self.skip_whitespace(); }
+        if self.auto_skip_whitespace {
+            self.skip_whitespace();
+        }
         let mut i = self.cur_str().char_indices();
         let (_, ret) = i.next()?;
         self.cur_index += match i.next() {
@@ -310,9 +332,9 @@ impl<'s> ParseState<'s> {
     }
 
     /// Get the input slice by UTF-8 byte index range.
-    /// 
+    ///
     /// Panics if the start or the end is not at a character boundary.
-    /// 
+    ///
     pub fn code_slice(&self, range: Range<usize>) -> &'s str {
         &self.whole_str[range]
     }
