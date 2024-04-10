@@ -1151,7 +1151,10 @@ export class Component<
     TProperty extends PropertyList,
     TMethod extends MethodList,
   >(comp: Component<TData, TProperty, TMethod>, methodName: string): GeneralFuncType | undefined {
-    if (comp._$definition._$options.useMethodCallerListeners) {
+    if (
+      comp._$definition._$options.useMethodCallerListeners &&
+      Object.prototype.hasOwnProperty.call(comp._$methodCaller, methodName)
+    ) {
       const method = comp._$methodCaller[methodName]
       return typeof method === 'function' ? method : undefined
     }

@@ -935,8 +935,8 @@ export class Element implements NodeCast {
     }
     if (!cur) return
     const slotParent = cur
-    const context = slotParent._$nodeTreeContext as composedContext | null
-    if (!context) return
+    const context = slotParent._$nodeTreeContext as composedContext | DestroyedBackendContext
+    if ((context as DestroyedBackendContext).destroyed) return
 
     // detect whether it is in single-slot mode
     let sharedNonVirtualParent: composedElement | null | undefined

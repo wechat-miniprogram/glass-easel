@@ -361,7 +361,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       lifetimes: {
         workletChange(name: string, value: number) {
           if (name === 'abc') {
-            expect(value).toBe(123)
+            expect(value).toBe('abc')
           } else if (name === 'def') {
             expect(value).toBe('456')
           }
@@ -372,7 +372,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     const def = glassEasel.registerElement({
       using: { abc: abc.general() },
       template: tmpl(`
-        <abc id="a" worklet:abc="{{ 123 }}" worklet:def="456" />
+        <abc id="a" worklet:abc="abc" worklet:def="456" />
       `),
     })
     const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)

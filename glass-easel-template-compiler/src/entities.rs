@@ -1,7 +1,7 @@
 //! Helpers for parsing HTML entities
 
 use entities::ENTITIES;
-use std::{collections::HashMap, borrow::Cow};
+use std::{borrow::Cow, collections::HashMap};
 
 lazy_static! {
     static ref ENTITIES_MAPPING: HashMap<&'static str, &'static str> = make_mapping();
@@ -15,31 +15,28 @@ fn make_mapping() -> HashMap<&'static str, &'static str> {
     mapping
 }
 
-pub(crate) fn decode<'a>(entity: &'a str) -> Cow<'a, str> {
+pub(crate) fn decode(entity: &str) -> Option<Cow<'static, str>> {
     let len = entity.len();
     if &entity[(len - 1)..] != ";" {
-        return Cow::Borrowed(entity);
+        return None;
     }
     if len > 4 && &entity[1..=2] == "#x" {
         let hex_str = &entity[3..(len - 1)];
         if let Ok(hex) = u32::from_str_radix(hex_str, 16) {
             if let Some(c) = char::from_u32(hex) {
-                return Cow::Owned(String::from(c));
+                return Some(Cow::Owned(String::from(c)));
             }
         }
-        return Cow::Borrowed(entity);
+        return None;
     }
     if len > 3 && &entity[1..=1] == "#" {
         let digit_str = &entity[2..(len - 1)];
         if let Ok(hex) = u32::from_str_radix(digit_str, 10) {
             if let Some(c) = char::from_u32(hex) {
-                return Cow::Owned(String::from(c));
+                return Some(Cow::Owned(String::from(c)));
             }
         }
-        return Cow::Borrowed(entity);
+        return None;
     }
-    match ENTITIES_MAPPING.get(entity) {
-        None => Cow::Borrowed(entity),
-        Some(x) => Cow::Borrowed(*x),
-    }
+    ENTITIES_MAPPING.get(entity).map(|x| Cow::Borrowed(*x))
 }

@@ -18,13 +18,13 @@ impl<'i, 't, 'a> Deref for StepParser<'i, 't, 'a> {
     type Target = cssparser::Parser<'i, 't>;
 
     fn deref(&self) -> &Self::Target {
-        &self.parser
+        self.parser
     }
 }
 
 impl<'i, 't, 'a> DerefMut for StepParser<'i, 't, 'a> {
     fn deref_mut(&mut self) -> &mut <Self as Deref>::Target {
-        &mut self.parser
+        self.parser
     }
 }
 
@@ -143,7 +143,7 @@ impl StyleSheetTransformer {
         }
     }
 
-    fn append_nested_block<'a>(&mut self, token: Token, input: &mut StepParser) -> Token<'static> {
+    fn append_nested_block(&mut self, token: Token, input: &mut StepParser) -> Token<'static> {
         let close = match &token {
             Token::CurlyBracketBlock => Token::CloseCurlyBracket,
             Token::SquareBracketBlock => Token::CloseSquareBracket,
@@ -169,7 +169,7 @@ fn parse_rules(input: &mut StepParser, ss: &mut StyleSheetTransformer) {
 }
 
 fn parse_at_rule(input: &mut StepParser, ss: &mut StyleSheetTransformer) -> bool {
-    match input.try_parse::<_, _, ParseError<()>>(|input| {
+    let r = input.try_parse::<_, _, ParseError<()>>(|input| {
         let next = input.next()?;
         match next {
             Token::AtKeyword(x) => {
@@ -178,16 +178,14 @@ fn parse_at_rule(input: &mut StepParser, ss: &mut StyleSheetTransformer) -> bool
             }
             _ => return Err(input.new_custom_error(())),
         }
-    }) {
+    });
+    match r {
         Err(_) => return false,
         Ok(x) => {
             let x: &str = &x;
-            let contain_rule_list = match x {
-                "media" | "supports" | "document" => true,
-                _ => false,
-            };
+            let contain_rule_list = matches!(x, "media" | "supports" | "document");
             loop {
-                match input.try_parse::<_, _, ParseError<()>>(|input| {
+                let r = input.try_parse::<_, _, ParseError<()>>(|input| {
                     let next = input.next()?;
                     match next {
                         Token::CurlyBracketBlock => {
@@ -222,7 +220,8 @@ fn parse_at_rule(input: &mut StepParser, ss: &mut StyleSheetTransformer) -> bool
                         }
                     }
                     Ok(true)
-                }) {
+                });
+                match r {
                     Ok(cont) => {
                         if !cont {
                             break;
@@ -241,7 +240,7 @@ fn parse_qualified_rule(input: &mut StepParser, ss: &mut StyleSheetTransformer) 
     let mut has_whitespace = false;
     input.skip_whitespace();
     loop {
-        match input.try_parse::<_, _, ParseError<()>>(|input| {
+        let r = input.try_parse::<_, _, ParseError<()>>(|input| {
             let next = input.next_including_whitespace()?;
             match next {
                 Token::CurlyBracketBlock | Token::WhiteSpace(_) => {}
@@ -292,7 +291,8 @@ fn parse_qualified_rule(input: &mut StepParser, ss: &mut StyleSheetTransformer) 
                 }
             }
             Ok(true)
-        }) {
+        });
+        match r {
             Ok(cont) => {
                 if !cont {
                     break;
@@ -524,7 +524,7 @@ fn convert_rpx_in_block(
                             }
                         }
                         if !skip {
-                            ss.append_token(Token::WhiteSpace(" ".into()), input, None);
+                            ss.append_token(Token::WhiteSpace(" "), input, None);
                         }
                     }
                     next => {

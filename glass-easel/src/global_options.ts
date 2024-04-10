@@ -6,7 +6,7 @@ import { type DevtoolInterface } from './devtool'
 import { type TemplateEngine } from './template_engine'
 
 export const ENV = {
-  DEV: /* #__PURE__ */ (() => !(typeof process && process.env.NODE_ENV === 'production'))(),
+  DEV: /* #__PURE__ */ (() => !(typeof process !== 'undefined' && process.env.NODE_ENV === 'production'))(),
 }
 
 /**

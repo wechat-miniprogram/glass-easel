@@ -620,12 +620,12 @@ export class ShadowRoot extends VirtualNode {
     if (slotMode === SlotMode.Direct) return
 
     if (slotMode === SlotMode.Single) {
-      const oldSlot = this._$singleSlot
+      const oldSlot = this._$singleSlot as Element | null
       const newSlot = this._$subtreeSlotStart!.value
       if (oldSlot === newSlot) return
 
       this._$singleSlot = newSlot
-      Element._$insertChildReassignSlot(this, null, oldSlot || null, newSlot)
+      Element._$insertChildReassignSlot(this, null, oldSlot, newSlot)
       return
     }
 
@@ -678,12 +678,12 @@ export class ShadowRoot extends VirtualNode {
       // will call applySLotsInsertion after if slots were moved
       // no need to do anything here
       if (move) return
-      const oldSlot = this._$singleSlot
-      const newSlot = this._$subtreeSlotStart?.value
+      const oldSlot = this._$singleSlot as Element | null
+      const newSlot = this._$subtreeSlotStart?.value || null
       if (oldSlot === newSlot) return
 
       this._$singleSlot = newSlot
-      Element._$insertChildReassignSlot(this, null, oldSlot || null, newSlot || null)
+      Element._$insertChildReassignSlot(this, null, oldSlot, newSlot)
       return
     }
 

@@ -287,14 +287,21 @@ describe('component utils', () => {
   })
 
   test('#getMethodsFromDef #getMethod #callMethod (when `useMethodCallerListeners` is set)', () => {
-    const compDef = glassEasel.Component.register(
-      {
-        options: {
-          useMethodCallerListeners: true,
+    const compDef = componentSpace
+      .define()
+      .options({
+        useMethodCallerListeners: true,
+      })
+      .init(({ method }) => {
+        const def = method(() => 'def')
+        return { def }
+      })
+      .methods({
+        ghi() {
+          return 'ghi'
         },
-      },
-      componentSpace,
-    )
+      })
+      .registerComponent()
     const comp = glassEasel.Component.createWithContext('root', compDef.general(), domBackend)
     const caller = {
       abc() {
@@ -305,6 +312,12 @@ describe('component utils', () => {
     expect(glassEasel.Component.getMethodsFromDef(compDef.general()).abc).toBeUndefined()
     expect(glassEasel.Component.getMethod(comp.general(), 'abc')!()).toBe('abc')
     expect(comp.callMethod('abc')).toBe('abc')
+    expect(glassEasel.Component.getMethodsFromDef(compDef.general()).def).toBeUndefined()
+    expect(glassEasel.Component.getMethod(comp.general(), 'def')!()).toBe('def')
+    expect(comp.callMethod('def')).toBe('def')
+    expect(glassEasel.Component.getMethodsFromDef(compDef.general()).ghi).toBeTruthy()
+    expect(glassEasel.Component.getMethod(comp.general(), 'ghi')!()).toBe('ghi')
+    expect(comp.callMethod('ghi')).toBe('ghi')
   })
 
   test('#isInnerDataExcluded', () => {
@@ -387,7 +400,7 @@ describe('component utils', () => {
       },
       template: tmpl(
         `
-        <child id="child" bind:tap="onTap1" bindtap="onTap2" />
+        <child id="child" bind:tap="onTap1" bindtap="onTap2" bind:tap="onTap3" />
       `,
       ),
       methods: {
@@ -397,13 +410,16 @@ describe('component utils', () => {
         onTap2() {
           events.push(2)
         },
+        onTap3() {
+          events.push(3)
+        },
       },
     })
     const elem = glassEasel.createElement('root', compDef.general())
     expect(elem.$.child as glassEasel.Element).toBeInstanceOf(glassEasel.Element)
     expect(elem.$.child as glassEasel.Element).toBeInstanceOf(glassEasel.Component)
     glassEasel.triggerEvent(elem.$.child as glassEasel.Element, 'tap', {})
-    expect(events).toStrictEqual([1, 2])
+    expect(events).toStrictEqual([2, 1, 3])
   })
 
   test('fallback event on NativeNode', () => {
@@ -411,7 +427,7 @@ describe('component utils', () => {
     const compDef = componentSpace.defineComponent({
       template: tmpl(
         `
-        <div id="div" bind:tap="onTap1" bindtap="onTap2" />
+        <div id="div" bind:tap="onTap1" bindtap="onTap2" bind:tap="onTap3" />
       `,
         { fallbackListenerOnNativeNode: true },
       ),
@@ -422,13 +438,16 @@ describe('component utils', () => {
         onTap2() {
           events.push(2)
         },
+        onTap3() {
+          events.push(3)
+        },
       },
     })
     const elem = glassEasel.createElement('root', compDef.general())
     expect(elem.$.div as glassEasel.Element).toBeInstanceOf(glassEasel.Element)
     expect(elem.$.div as glassEasel.Element).not.toBeInstanceOf(glassEasel.Component)
     glassEasel.triggerEvent(elem.$.div as glassEasel.Element, 'tap', {})
-    expect(events).toStrictEqual([1, 2])
+    expect(events).toStrictEqual([2, 1, 3])
   })
 
   test('template content update', () => {
