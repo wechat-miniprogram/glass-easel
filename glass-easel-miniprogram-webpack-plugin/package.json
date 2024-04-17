@@ -21,14 +21,14 @@
     "lint": "eslint src/**/*.ts"
   },
   "peerDependencies": {
-    "glass-easel": "0.4.0",
-    "glass-easel-miniprogram-adapter": "0.4.0",
+    "glass-easel": "workspace:*",
+    "glass-easel-miniprogram-adapter": "workspace:*",
     "webpack": "^5.85.0"
   },
   "dependencies": {
     "chokidar": "^3.5.3",
-    "glass-easel-stylesheet-compiler": "0.4.0",
-    "glass-easel-template-compiler": "0.4.0",
+    "glass-easel-stylesheet-compiler": "workspace:*",
+    "glass-easel-template-compiler": "workspace:*",
     "source-map": "^0.7.4",
     "webpack-sources": "^3.2.1",
     "webpack-virtual-modules": "^0.5.0"
