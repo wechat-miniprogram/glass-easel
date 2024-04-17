@@ -1384,6 +1384,7 @@ mod test {
     #[test]
     fn lit_str() {
         case!("{{ '", "", ParseErrorKind::MissingExpressionEnd, 0..2);
+        case!(r#"{{ c("b") }}"#, r#"{{c("b")}}"#);
         case!(r#"{{ 'a\n\u0041\x4f\x4E' }}"#, "a\nAON");
         case!(
             r#"{{ 'a\n\u0' }}"#,
