@@ -530,6 +530,7 @@ impl std::fmt::Display for ParseErrorKind {
     }
 }
 
+#[repr(u8)]
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ParseErrorLevel {
     /// Likely to be an mistake and should be noticed.
