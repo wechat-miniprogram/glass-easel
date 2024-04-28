@@ -4,9 +4,10 @@ use cssparser::{
 use sourcemap::SourceMapBuilder;
 use std::{
     fmt::Write,
-    ops::{Deref, DerefMut},
+    ops::{Deref, DerefMut, Range},
 };
 
+pub mod error;
 pub mod js_bindings;
 
 struct StepParser<'i, 't, 'a> {
@@ -36,6 +37,14 @@ impl<'i, 't, 'a> StepParser<'i, 't, 'a> {
         }
     }
 
+    fn position(&self) -> error::Position {
+        let loc = self.parser.current_source_location();
+        error::Position {
+            line: loc.line,
+            utf16_col: loc.column - 1,
+        }
+    }
+
     fn next(&mut self) -> Result<Token<'i>, BasicParseError<'i>> {
         self.parser.skip_whitespace();
         self.last_location = self.parser.state();
@@ -60,40 +69,83 @@ impl<'i, 't, 'a> StepParser<'i, 't, 'a> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct StyleSheetOptions {
     pub class_prefix: Option<String>,
+    pub class_prefix_sign: Option<String>,
     pub rpx_ratio: f32,
+}
+
+impl Default for StyleSheetOptions {
+    fn default() -> Self {
+        Self {
+            class_prefix: None,
+            class_prefix_sign: None,
+            rpx_ratio: 750.,
+        }
+    }
 }
 
 pub struct StyleSheetTransformer {
     options: StyleSheetOptions,
+    path: String,
     output: String,
     utf16_len: u32,
     prev_ser_type: TokenSerializationType,
     source_map: SourceMapBuilder,
     source_id: u32,
+    warnings: Vec<error::ParseError>,
 }
 
 impl StyleSheetTransformer {
-    pub fn from_css(name: &str, css: &str, options: StyleSheetOptions) -> Self {
+    pub fn from_css(path: &str, css: &str, options: StyleSheetOptions) -> Self {
         let parser_input = &mut ParserInput::new(css);
         let parser = &mut cssparser::Parser::new(parser_input);
         let mut input = StepParser::wrap(parser);
         let mut source_map = SourceMapBuilder::new(None);
-        let source_id = source_map.add_source(name);
+        let source_id = source_map.add_source(path);
         source_map.set_source_contents(source_id, Some(css));
+
+        // construct this
         let mut this = Self {
             options,
+            path: path.to_string(),
             output: String::new(),
             utf16_len: 0,
             prev_ser_type: TokenSerializationType::nothing(),
             source_id,
             source_map,
+            warnings: vec![],
         };
+
+        // detect option problems
+        let err = if let Some(x) = this.options.class_prefix_sign.as_mut() {
+            if x.contains("*/") {
+                *x = String::new();
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+        if err {
+            let pos = input.position();
+            this.add_warning(error::ParseErrorKind::IllegalComment, pos..pos);
+        }
+
         {
             parse_rules(&mut input, &mut this);
         }
         this
+    }
+
+    fn add_warning(&mut self, kind: error::ParseErrorKind, location: Range<error::Position>) {
+        self.warnings.push(error::ParseError {
+            path: self.path.clone(),
+            kind,
+            location,
+        });
     }
 
     pub fn write_content(&self, mut w: impl std::io::Write) -> std::io::Result<()> {
@@ -269,6 +321,11 @@ fn parse_qualified_rule(input: &mut StepParser, ss: &mut StyleSheetTransformer) 
                     in_class = true;
                 }
                 Token::Ident(src) => {
+                    if in_class {
+                        if let Some(content) = ss.options.class_prefix_sign.clone() {
+                            ss.append_token(Token::Comment(&content), input, None);
+                        }
+                    }
                     if in_class && ss.options.class_prefix.is_some() {
                         let s = format!("{}--{}", ss.options.class_prefix.as_ref().unwrap(), src);
                         ss.append_token_space_preserved(
@@ -336,6 +393,11 @@ fn convert_class_names_and_rpx_in_block(input: &mut StepParser, ss: &mut StyleSh
                         in_class = true;
                     }
                     Token::Ident(src) => {
+                        if in_class {
+                            if let Some(content) = ss.options.class_prefix_sign.clone() {
+                                ss.append_token(Token::Comment(&content), input, None);
+                            }
+                        }
                         if in_class && ss.options.class_prefix.is_some() {
                             let s =
                                 format!("{}--{}", ss.options.class_prefix.as_ref().unwrap(), src);
@@ -544,17 +606,36 @@ mod test {
     use super::*;
 
     #[test]
+    fn remove_comments() {
+        let trans = StyleSheetTransformer::from_css(
+            "",
+            r#" /* test */ .a { } "#,
+            StyleSheetOptions {
+                ..Default::default()
+            },
+        );
+        let mut s = Vec::new();
+        trans.write_content(&mut s).unwrap();
+        let mut sm = Vec::new();
+        trans.write_source_map(&mut sm).unwrap();
+        assert_eq!(
+            std::str::from_utf8(&s).unwrap(),
+            ".a{}"
+        );
+    }
+
+    #[test]
     fn add_class_prefix() {
         let trans = StyleSheetTransformer::from_css(
             "",
             r#"
-            #a.b   [g] .c.d g:e(.f) {
-                key: .v f(.c) d.e;
-            }
-        "#,
+                #a.b   [g] .c.d g:e(.f) {
+                    key: .v f(.c) d.e;
+                }
+            "#,
             StyleSheetOptions {
                 class_prefix: Some("p".into()),
-                rpx_ratio: 750.,
+                ..Default::default()
             },
         );
         let mut s = Vec::new();
@@ -568,17 +649,63 @@ mod test {
     }
 
     #[test]
+    fn allow_class_prefix_sign() {
+        let trans = StyleSheetTransformer::from_css(
+            "",
+            r#"
+                .a g:e(.f) {}
+            "#,
+            StyleSheetOptions {
+                class_prefix: None,
+                class_prefix_sign: Some("TEST".into()),
+                ..Default::default()
+            },
+        );
+        let mut s = Vec::new();
+        trans.write_content(&mut s).unwrap();
+        let mut sm = Vec::new();
+        trans.write_source_map(&mut sm).unwrap();
+        assert_eq!(
+            std::str::from_utf8(&s).unwrap(),
+            "./*TEST*/a g:e(./*TEST*/f){}"
+        );
+    }
+
+    #[test]
+    fn allow_class_prefix_sign_before_prefix() {
+        let trans = StyleSheetTransformer::from_css(
+            "",
+            r#"
+                .a {}
+            "#,
+            StyleSheetOptions {
+                class_prefix: Some("p".into()),
+                class_prefix_sign: Some("TEST".into()),
+                ..Default::default()
+            },
+        );
+        let mut s = Vec::new();
+        trans.write_content(&mut s).unwrap();
+        let mut sm = Vec::new();
+        trans.write_source_map(&mut sm).unwrap();
+        assert_eq!(
+            std::str::from_utf8(&s).unwrap(),
+            "./*TEST*/p--a{}"
+        );
+    }
+
+    #[test]
     fn transform_rpx() {
         let trans = StyleSheetTransformer::from_css(
             "",
             r#"
-            #a.b[1rpx]  (7.5rpx){
-                key: 7.5rpx f(7.5rpx);
-            }
-        "#,
+                #a.b[1rpx]  (7.5rpx){
+                    key: 7.5rpx f(7.5rpx);
+                }
+            "#,
             StyleSheetOptions {
                 class_prefix: Some("p".into()),
-                rpx_ratio: 750.,
+                ..Default::default()
             },
         );
         let mut s = Vec::new();
@@ -594,14 +721,14 @@ mod test {
         let trans = StyleSheetTransformer::from_css(
             "",
             r#"
-            @a 75rpx;
-            .b {}
-            @c (75rpx .d) { 75rpx .e }
-            .f {}
-        "#,
+                @a 75rpx;
+                .b {}
+                @c (75rpx .d) { 75rpx .e }
+                .f {}
+            "#,
             StyleSheetOptions {
                 class_prefix: Some("p".into()),
-                rpx_ratio: 750.,
+                ..Default::default()
             },
         );
         let mut s = Vec::new();
@@ -617,15 +744,16 @@ mod test {
         let trans = StyleSheetTransformer::from_css(
             "",
             r#"
-            @media (width: 1rpx) {
-                .b [2rpx] {
-                    key: 3rpx .a;
+                @media (width: 1rpx) {
+                    .b [2rpx] {
+                        key: 3rpx .a;
+                    }
                 }
-            }
-        "#,
+            "#,
             StyleSheetOptions {
                 class_prefix: Some("p".into()),
                 rpx_ratio: 10.,
+                ..Default::default()
             },
         );
         let mut s = Vec::new();
@@ -649,6 +777,7 @@ mod test {
             StyleSheetOptions {
                 class_prefix: Some("p".into()),
                 rpx_ratio: 10.,
+                ..Default::default()
             },
         );
         let mut s = Vec::new();
@@ -667,6 +796,7 @@ mod test {
             StyleSheetOptions {
                 class_prefix: Some("p".into()),
                 rpx_ratio: 10.,
+                ..Default::default()
             },
         );
         let mut s = Vec::new();
@@ -735,6 +865,7 @@ mod test {
             StyleSheetOptions {
                 class_prefix: Some("p".into()),
                 rpx_ratio: 10.,
+                ..Default::default()
             },
         );
         let mut s = Vec::new();

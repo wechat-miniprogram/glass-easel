@@ -10,6 +10,7 @@ struct CmdArgs {
     output: Option<PathBuf>,
     sourcemap_output: Option<PathBuf>,
     class_prefix: Option<String>,
+    class_prefix_sign: Option<String>,
     rpx_ratio: f32,
 }
 
@@ -47,6 +48,13 @@ fn parse_cmd() -> CmdArgs {
                 .takes_value(true),
         )
         .arg(
+            Arg::with_name("class-prefix-sign")
+                .long("class-prefix-sign")
+                .value_name("COMMENT")
+                .help("Add a comment before each class prefix")
+                .takes_value(true),
+        )
+        .arg(
             Arg::with_name("rpx-ratio")
                 .short("r")
                 .long("rpx-ratio")
@@ -68,6 +76,7 @@ fn parse_cmd() -> CmdArgs {
     let output = matches.value_of("output-single-file").map(|x| x.into());
     let sourcemap_output = matches.value_of("sourcemap-output-file").map(|x| x.into());
     let class_prefix = matches.value_of("class-prefix").map(|x| x.into());
+    let class_prefix_sign = matches.value_of("class-prefix-sign").map(|x| x.into());
     let rpx_ratio = matches
         .value_of("rpx-ratio")
         .unwrap()
@@ -81,6 +90,7 @@ fn parse_cmd() -> CmdArgs {
         output,
         sourcemap_output,
         class_prefix,
+        class_prefix_sign,
         rpx_ratio,
     }
 }
@@ -90,6 +100,7 @@ fn main() {
     let args = parse_cmd();
     let options = StyleSheetOptions {
         class_prefix: args.class_prefix.clone(),
+        class_prefix_sign: args.class_prefix_sign.clone(),
         rpx_ratio: args.rpx_ratio,
     };
     let sst = if args.interactive {
