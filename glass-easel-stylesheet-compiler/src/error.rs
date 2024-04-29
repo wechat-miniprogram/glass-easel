@@ -59,21 +59,21 @@ impl ParseError {
 #[derive(Clone, PartialEq, Eq)]
 pub enum ParseErrorKind {
     UnexpectedCharacter = 0x10001,
-    IllegalComment,
+    IllegalImportPosition,
 }
 
 impl ParseErrorKind {
     fn static_message(&self) -> &'static str {
         match self {
             Self::UnexpectedCharacter => "unexpected character",
-            Self::IllegalComment => "illegal comment",
+            Self::IllegalImportPosition => "`@import` should be placed at the start of the stylesheet (according to CSS standard)",
         }
     }
 
     pub fn level(&self) -> ParseErrorLevel {
         match self {
             Self::UnexpectedCharacter => ParseErrorLevel::Fatal,
-            Self::IllegalComment => ParseErrorLevel::Error,
+            Self::IllegalImportPosition => ParseErrorLevel::Note,
         }
     }
 }

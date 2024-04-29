@@ -1,107 +1,52 @@
-use clap::{App, Arg};
+use clap::Parser;
 use glass_easel_stylesheet_compiler::*;
 use std::fs;
 use std::path::PathBuf;
 
-#[derive(Debug)]
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
 struct CmdArgs {
+    /// Read stylesheet from stdin (SOURCE_FILE is used as file name)
+    #[arg(short, long)]
     interactive: bool,
+
+    /// The source stylesheet file
+    #[arg(value_name = "SOURCE_FILE")]
     input: PathBuf,
+
+    /// The output file
+    #[arg(short, long)]
     output: Option<PathBuf>,
+
+    /// The output source-map file
+    #[arg(short, long)]
     sourcemap_output: Option<PathBuf>,
+
+    /// The class prefix that should be added to class names (`--` not included)
+    #[arg(short, long)]
     class_prefix: Option<String>,
+
+    /// A comment message inserted in where the class prefix should be added
+    #[arg(long)]
     class_prefix_sign: Option<String>,
+
+    /// The RPX ratio
+    #[arg(short, long, default_value = "750.")]
     rpx_ratio: f32,
-}
 
-fn parse_cmd() -> CmdArgs {
-    let matches = App::new("The Stylesheet Compiler for glass-easel")
-        .author("wechat-miniprogram")
-        .arg(
-            Arg::with_name("interactive")
-                .short("i")
-                .long("interactive")
-                .help(r#"Read stylesheet from stdin (SOURCE_FILE is only used as file name)"#),
-        )
-        .arg(
-            Arg::with_name("output-single-file")
-                .short("o")
-                .long("output-single-file")
-                .value_name("FILE")
-                .help("Sets output file path")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("sourcemap-output-file")
-                .short("s")
-                .long("sourcemap-output-file")
-                .value_name("FILE")
-                .help("Sets sourcemap output file path")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("class-prefix")
-                .short("c")
-                .long("class-prefix")
-                .value_name("PREFIX")
-                .help("Sets class prefix")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("class-prefix-sign")
-                .long("class-prefix-sign")
-                .value_name("COMMENT")
-                .help("Add a comment before each class prefix")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("rpx-ratio")
-                .short("r")
-                .long("rpx-ratio")
-                .value_name("NUMBER")
-                .help("Sets RPX ratio (default to 750)")
-                .default_value("750")
-                .required(false)
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("SOURCE_FILE")
-                .help("Sets the source stylesheet file")
-                .required(true)
-                .index(1),
-        )
-        .get_matches();
-
-    let interactive = matches.is_present("interactive");
-    let output = matches.value_of("output-single-file").map(|x| x.into());
-    let sourcemap_output = matches.value_of("sourcemap-output-file").map(|x| x.into());
-    let class_prefix = matches.value_of("class-prefix").map(|x| x.into());
-    let class_prefix_sign = matches.value_of("class-prefix-sign").map(|x| x.into());
-    let rpx_ratio = matches
-        .value_of("rpx-ratio")
-        .unwrap()
-        .parse()
-        .expect("RPX_RATIO should be a valid number");
-    let input = matches.value_of("SOURCE_FILE").unwrap().into();
-
-    CmdArgs {
-        interactive,
-        input,
-        output,
-        sourcemap_output,
-        class_prefix,
-        class_prefix_sign,
-        rpx_ratio,
-    }
+    /// A comment message inserted in where the import content should be added
+    #[arg(long)]
+    import_sign: Option<String>,
 }
 
 fn main() {
     env_logger::init();
-    let args = parse_cmd();
+    let args = CmdArgs::parse();
     let options = StyleSheetOptions {
         class_prefix: args.class_prefix.clone(),
         class_prefix_sign: args.class_prefix_sign.clone(),
         rpx_ratio: args.rpx_ratio,
+        import_sign: args.import_sign.clone(),
     };
     let sst = if args.interactive {
         use std::io::Read;
