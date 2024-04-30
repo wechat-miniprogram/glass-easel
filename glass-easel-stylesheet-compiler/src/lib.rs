@@ -6,7 +6,7 @@ use std::{
 use cssparser::{
     CowRcStr, ParseError, ParserInput, ToCss, Token, TokenSerializationType
 };
-use sourcemap::SourceMapBuilder;
+use sourcemap::{SourceMap, SourceMapBuilder};
 
 pub mod error;
 pub mod js_bindings;
@@ -91,8 +91,16 @@ impl StyleSheetTransformer {
         w.write_all(self.output.as_bytes())
     }
 
+    pub fn write_content_str(&self, mut w: impl std::fmt::Write) -> std::fmt::Result {
+        write!(w, "{}", self.output)
+    }
+
     pub fn write_source_map(self, w: impl std::io::Write) -> Result<(), sourcemap::Error> {
         self.source_map.into_sourcemap().to_writer(w)
+    }
+
+    pub fn extract_source_map(self) -> SourceMap {
+        self.source_map.into_sourcemap()
     }
 
     fn append_token(&mut self, token: StepToken, _input: &mut StepParser, src: Option<Token>) {
@@ -328,8 +336,7 @@ fn parse_at_rule(input: &mut StepParser, ss: &mut StyleSheetTransformer, at_file
                     let close = ss.append_nested_block(st, input);
                     close_stack.push(close);
                 }
-                let encoded_path: Vec<_> = url::form_urlencoded::byte_serialize(rel_path.as_bytes()).collect();
-                let comment = format!("{} {}", import_sign, encoded_path.join(""));
+                let comment = format!("{} {}", import_sign, urlencoding::encode(&rel_path));
                 let st = StepToken::wrap(Token::Comment(comment.as_str()), start_pos);
                 ss.append_token(st, input, None);
                 while let Some(close) = close_stack.pop() {

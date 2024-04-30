@@ -29,7 +29,7 @@ log = "0.4"
 console_log = "0.2"
 env_logger = "0.9"
 clap = { version = "4", features = ["derive"] }
-url = "2"
+urlencoding = "2"
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = false
