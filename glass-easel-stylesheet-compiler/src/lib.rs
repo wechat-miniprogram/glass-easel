@@ -837,7 +837,7 @@ mod test {
         trans.write_content(&mut s).unwrap();
         assert_eq!(
             std::str::from_utf8(&s).unwrap(),
-            r#"/*TEST .%2Fa%5Cb*%3F*/"#
+            r#"/*TEST .%2Fa%5Cb%2A%3F*/"#
         );
     }
 
