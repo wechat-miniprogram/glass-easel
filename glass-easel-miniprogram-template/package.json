@@ -1,6 +1,6 @@
 {
   "name": "glass-easel-miniprogram-template",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "main": "src/index.ts",
   "scripts": {
     "build": "webpack --config webpack.config.js",
