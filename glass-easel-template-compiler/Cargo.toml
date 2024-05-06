@@ -22,8 +22,6 @@ js_bindings = []
 c_bindings = ["cbindgen"]
 
 [dependencies]
-pest = "2"
-pest_derive = "2"
 entities = "1"
 lazy_static = "1"
 regex = "1"
