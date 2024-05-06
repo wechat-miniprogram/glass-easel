@@ -3532,10 +3532,10 @@ mod test {
         assert_eq!(
             ps.warnings().next().unwrap().location,
             Position {
-                line: 3,
+                line: 2,
                 utf16_col: 9
             }..Position {
-                line: 3,
+                line: 2,
                 utf16_col: 10
             },
         );
@@ -3543,10 +3543,10 @@ mod test {
         assert_eq!(
             ps.warnings().next().unwrap().location,
             Position {
-                line: 3,
+                line: 2,
                 utf16_col: 5
             }..Position {
-                line: 3,
+                line: 2,
                 utf16_col: 6
             },
         );

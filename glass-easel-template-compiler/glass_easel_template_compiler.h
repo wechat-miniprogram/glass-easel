@@ -8,6 +8,19 @@
 
 namespace glass_easel_template_compiler {
 
+enum class ParseErrorLevel : uint8_t {
+  /// Likely to be an mistake and should be noticed.
+  ///
+  /// The generator may generate code that contains this kind of mistakes.
+  Note = 1,
+  /// Should be a mistake but the compiler can guess a good way to generate proper code.
+  Warn,
+  /// An error that prevents a successful compilation, but can still continue to find more errors.
+  Error,
+  /// A very serious error that can cause continuous compiling issues, such as miss matched braces.
+  Fatal,
+};
+
 struct StrRef {
   uint8_t *buf;
   size_t len;
@@ -24,6 +37,7 @@ struct TmplGroup {
 
 struct TmplParseWarning {
   StrRef message;
+  ParseErrorLevel level;
   uint32_t start_line;
   uint32_t start_col;
   uint32_t end_line;

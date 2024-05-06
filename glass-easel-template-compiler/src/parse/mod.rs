@@ -81,7 +81,7 @@ impl<'s> ParseState<'s> {
             path: path.to_string(),
             whole_str: s,
             cur_index: 0,
-            line: position_offset.line + 1,
+            line: position_offset.line,
             utf16_col: position_offset.utf16_col,
             auto_skip_whitespace: false,
             warnings: vec![],
@@ -530,6 +530,7 @@ impl std::fmt::Display for ParseErrorKind {
     }
 }
 
+#[repr(u8)]
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ParseErrorLevel {
     /// Likely to be an mistake and should be noticed.
