@@ -1,11 +1,6 @@
-use std::{
-    fmt::Write,
-    ops::Range,
-};
+use std::{fmt::Write, ops::Range};
 
-use cssparser::{
-    CowRcStr, ParseError, ParserInput, ToCss, Token, TokenSerializationType
-};
+use cssparser::{CowRcStr, ParseError, ParserInput, ToCss, Token, TokenSerializationType};
 use sourcemap::{SourceMap, SourceMapBuilder};
 
 pub mod error;
@@ -145,7 +140,11 @@ impl StyleSheetTransformer {
         }
     }
 
-    fn append_nested_block(&mut self, token: StepToken, input: &mut StepParser) -> StepToken<'static> {
+    fn append_nested_block(
+        &mut self,
+        token: StepToken,
+        input: &mut StepParser,
+    ) -> StepToken<'static> {
         let close = match &*token {
             Token::CurlyBracketBlock => Token::CloseCurlyBracket,
             Token::SquareBracketBlock => Token::CloseSquareBracket,
@@ -179,11 +178,7 @@ fn write_maybe_class_name(
     if in_class && ss.options.class_prefix.is_some() {
         let s = format!("{}--{}", ss.options.class_prefix.as_ref().unwrap(), src);
         let st = StepToken::wrap(Token::Ident(s.as_str().into()), next.position);
-        ss.append_token_space_preserved(
-            st,
-            input,
-            Some(Token::Ident(src.clone())),
-        );
+        ss.append_token_space_preserved(st, input, Some(Token::Ident(src.clone())));
     } else {
         ss.append_token_space_preserved(next.clone(), input, None);
     }
@@ -201,12 +196,11 @@ fn write_maybe_rpx_dimension(
     let unit_str: &str = &unit;
     if unit_str == "rpx" {
         let new_value = value * 100. / ss.options.rpx_ratio;
-        let new_int_value =
-            if (new_value.round() - new_value).abs() <= f32::EPSILON {
-                Some(new_value.round() as i32)
-            } else {
-                None
-            };
+        let new_int_value = if (new_value.round() - new_value).abs() <= f32::EPSILON {
+            Some(new_value.round() as i32)
+        } else {
+            None
+        };
         let t = Token::Dimension {
             has_sign,
             value: new_value,
@@ -232,11 +226,7 @@ fn write_maybe_rpx_dimension(
             int_value,
         };
         let st = StepToken::wrap(token, next.position);
-        ss.append_token(
-            st,
-            input,
-            None,
-        );
+        ss.append_token(st, input, None);
     }
 }
 
@@ -250,7 +240,11 @@ fn parse_rules(input: &mut StepParser, ss: &mut StyleSheetTransformer) {
     }
 }
 
-fn parse_at_rule(input: &mut StepParser, ss: &mut StyleSheetTransformer, at_file_start: bool) -> bool {
+fn parse_at_rule(
+    input: &mut StepParser,
+    ss: &mut StyleSheetTransformer,
+    at_file_start: bool,
+) -> bool {
     let Ok(peek) = input.peek() else { return false };
     if let Token::AtKeyword(x) = &*peek {
         input.next().ok();
@@ -260,7 +254,10 @@ fn parse_at_rule(input: &mut StepParser, ss: &mut StyleSheetTransformer, at_file
             let import_sign = ss.options.import_sign.clone().unwrap();
             let start_pos = input.position();
             if !at_file_start {
-                ss.add_warning(error::ParseErrorKind::IllegalImportPosition, start_pos..start_pos);
+                ss.add_warning(
+                    error::ParseErrorKind::IllegalImportPosition,
+                    start_pos..start_pos,
+                );
             }
             let r = input.try_parse::<_, _, ParseError<()>>(|input| {
                 let rel_path = input.expect_string_cloned()?;
@@ -271,7 +268,10 @@ fn parse_at_rule(input: &mut StepParser, ss: &mut StyleSheetTransformer, at_file
                         Token::Function(x) => {
                             let xs: &str = &x;
                             if !matches!(xs, "layer" | "supports") {
-                                ss.add_warning(error::ParseErrorKind::UnexpectedCharacter, peek.position..peek.position);
+                                ss.add_warning(
+                                    error::ParseErrorKind::UnexpectedCharacter,
+                                    peek.position..peek.position,
+                                );
                                 break;
                             }
                             input.next().ok();
@@ -282,7 +282,8 @@ fn parse_at_rule(input: &mut StepParser, ss: &mut StyleSheetTransformer, at_file
                                     convert_class_names_and_rpx_in_block(input, ss);
                                 }
                                 "supports" => {
-                                    let st = StepToken::wrap(Token::ParenthesisBlock, peek.position);
+                                    let st =
+                                        StepToken::wrap(Token::ParenthesisBlock, peek.position);
                                     let close = ss.append_nested_block(st, input);
                                     convert_class_names_and_rpx_in_block(input, ss);
                                     ss.append_nested_block_close(close, input);
@@ -302,7 +303,10 @@ fn parse_at_rule(input: &mut StepParser, ss: &mut StyleSheetTransformer, at_file
                             break;
                         }
                         _ => {
-                            ss.add_warning(error::ParseErrorKind::UnexpectedCharacter, peek.position..peek.position);
+                            ss.add_warning(
+                                error::ParseErrorKind::UnexpectedCharacter,
+                                peek.position..peek.position,
+                            );
                             return Err(input.new_error_for_next_token());
                         }
                     }
@@ -314,7 +318,10 @@ fn parse_at_rule(input: &mut StepParser, ss: &mut StyleSheetTransformer, at_file
                     while let Ok(next) = input.next() {
                         match &*next {
                             Token::CurlyBracketBlock => {
-                                ss.add_warning(error::ParseErrorKind::UnexpectedCharacter, pos..pos);
+                                ss.add_warning(
+                                    error::ParseErrorKind::UnexpectedCharacter,
+                                    pos..pos,
+                                );
                                 return Err(input.new_error_for_next_token());
                             }
                             Token::SquareBracketBlock
@@ -471,10 +478,7 @@ fn parse_qualified_rule(input: &mut StepParser, ss: &mut StyleSheetTransformer) 
     }
 }
 
-fn convert_class_names_and_rpx_in_block(
-    input: &mut StepParser,
-    ss: &mut StyleSheetTransformer,
-) {
+fn convert_class_names_and_rpx_in_block(input: &mut StepParser, ss: &mut StyleSheetTransformer) {
     input
         .parse_nested_block::<_, (), ()>(|nested_input| {
             let input = &mut StepParser::wrap(nested_input);
@@ -529,13 +533,7 @@ fn convert_class_names_and_rpx_in_block(
                         int_value,
                     } => {
                         write_maybe_rpx_dimension(
-                            input,
-                            ss,
-                            &next,
-                            *has_sign,
-                            *value,
-                            *int_value,
-                            unit,
+                            input, ss, &next, *has_sign, *value, *int_value, unit,
                         );
                         in_class = false;
                     }
@@ -606,13 +604,7 @@ fn convert_rpx_in_block(
                         int_value,
                     } => {
                         write_maybe_rpx_dimension(
-                            input,
-                            ss,
-                            &next,
-                            *has_sign,
-                            *value,
-                            *int_value,
-                            unit,
+                            input, ss, &next, *has_sign, *value, *int_value, unit,
                         );
                     }
                     Token::WhiteSpace(_) => {
@@ -675,10 +667,7 @@ mod test {
         trans.write_content(&mut s).unwrap();
         let mut sm = Vec::new();
         trans.write_source_map(&mut sm).unwrap();
-        assert_eq!(
-            std::str::from_utf8(&s).unwrap(),
-            ".a{}"
-        );
+        assert_eq!(std::str::from_utf8(&s).unwrap(), ".a{}");
     }
 
     #[test]
@@ -745,10 +734,7 @@ mod test {
         trans.write_content(&mut s).unwrap();
         let mut sm = Vec::new();
         trans.write_source_map(&mut sm).unwrap();
-        assert_eq!(
-            std::str::from_utf8(&s).unwrap(),
-            "./*TEST*/p--a{}"
-        );
+        assert_eq!(std::str::from_utf8(&s).unwrap(), "./*TEST*/p--a{}");
     }
 
     #[test]
@@ -901,10 +887,7 @@ mod test {
             trans.warnings().map(|x| x.kind.clone()).collect::<Vec<_>>(),
             [error::ParseErrorKind::IllegalImportPosition],
         );
-        assert_eq!(
-            std::str::from_utf8(&s).unwrap(),
-            r#".a{}/*TEST .%2Fa*/"#
-        );
+        assert_eq!(std::str::from_utf8(&s).unwrap(), r#".a{}/*TEST .%2Fa*/"#);
     }
 
     #[test]

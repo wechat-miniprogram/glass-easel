@@ -2956,6 +2956,12 @@ mod test {
 
     #[test]
     fn value_parsing() {
+        case!(
+            "{{}}",
+            r#""#,
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            2..2
+        );
         case!("{ {", r#"{ {"#);
         case!("{{ a } }", "", ParseErrorKind::MissingExpressionEnd, 0..2);
         case!(

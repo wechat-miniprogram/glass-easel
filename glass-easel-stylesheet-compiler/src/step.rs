@@ -1,8 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
-use cssparser::{
-    BasicParseError, Token,
-};
+use cssparser::{BasicParseError, Token};
 
 use super::error;
 
@@ -26,9 +24,7 @@ impl<'i, 't, 'a> DerefMut for StepParser<'i, 't, 'a> {
 
 impl<'i, 't, 'a> StepParser<'i, 't, 'a> {
     pub(crate) fn wrap(parser: &'a mut cssparser::Parser<'i, 't>) -> Self {
-        Self {
-            parser,
-        }
+        Self { parser }
     }
 
     pub(crate) fn position(&self) -> error::Position {
@@ -44,15 +40,14 @@ impl<'i, 't, 'a> StepParser<'i, 't, 'a> {
         self.peek_including_whitespace()
     }
 
-    pub(crate) fn peek_including_whitespace(&mut self) -> Result<StepToken<'i>, BasicParseError<'i>> {
+    pub(crate) fn peek_including_whitespace(
+        &mut self,
+    ) -> Result<StepToken<'i>, BasicParseError<'i>> {
         let position = self.position();
         let state = self.parser.state();
         let ret = self.parser.next_including_whitespace().map(|x| x.clone());
         self.parser.reset(&state);
-        ret.map(|token| StepToken {
-            token,
-            position,
-        })
+        ret.map(|token| StepToken { token, position })
     }
 
     pub(crate) fn next(&mut self) -> Result<StepToken<'i>, BasicParseError<'i>> {
@@ -60,24 +55,20 @@ impl<'i, 't, 'a> StepParser<'i, 't, 'a> {
         self.next_including_whitespace()
     }
 
-    pub(crate) fn next_including_whitespace(&mut self) -> Result<StepToken<'i>, BasicParseError<'i>> {
+    pub(crate) fn next_including_whitespace(
+        &mut self,
+    ) -> Result<StepToken<'i>, BasicParseError<'i>> {
         let position = self.position();
         let token = self.parser.next_including_whitespace().map(|x| x.clone())?;
-        Ok(StepToken {
-            token,
-            position,
-        })
+        Ok(StepToken { token, position })
     }
 
     pub(crate) fn try_parse<F, T, E>(&mut self, thing: F) -> Result<T, E>
     where
         F: FnOnce(&mut StepParser<'i, 't, '_>) -> Result<T, E>,
     {
-        self.parser.try_parse(|parser| {
-            thing(&mut StepParser {
-                parser,
-            })
-        })
+        self.parser
+            .try_parse(|parser| thing(&mut StepParser { parser }))
     }
 }
 
@@ -97,9 +88,6 @@ impl<'i> Deref for StepToken<'i> {
 
 impl<'i> StepToken<'i> {
     pub(crate) fn wrap(token: Token<'i>, position: error::Position) -> Self {
-        Self {
-            token,
-            position,
-        }
+        Self { token, position }
     }
 }
