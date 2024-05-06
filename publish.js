@@ -74,15 +74,10 @@ if (gitStatusRes.status !== 0 || gitStatusRes.stdout.length > 0) {
   let content = fs.readFileSync(p, { encoding: 'utf8' })
   let oldVersion
   const refVersions = []
-  content = content
-    .replace(/"version": "(.+)"/, (_, v) => {
-      oldVersion = v
-      return `"version": "${version}"`
-    })
-    .replace(/"(glass-easel|glass-easel-[-a-z]+)": "(.+)"/g, (_, mod, v) => {
-      refVersions.push({ mod, v })
-      return `"${mod}": "${version}"`
-    })
+  content = content.replace(/"version": "(.+)"/, (_, v) => {
+    oldVersion = v
+    return `"version": "${version}"`
+  })
   if (!oldVersion) {
     throw new Error(`version segment not found in ${p}`)
   }
