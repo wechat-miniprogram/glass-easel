@@ -387,7 +387,6 @@ export class CodeSpace {
    * Build a behavior outside of a definition environment
    *
    * The method do not need a definition environment, so the global object pollution is avoided.
-   * `path` should be the component path (without ".js" extension).
    */
   behavior(): BehaviorBuilder {
     return BehaviorBuilder.create(this)
