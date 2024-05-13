@@ -1069,6 +1069,11 @@ export class ProcGenWrapper {
     }
   }
 
+  // update a attribute
+  a(elem: Element, name: string, v: unknown) {
+    elem.updateAttribute(name, v)
+  }
+
   // set a worklet directive value
   wl(elem: Element, name: string, value: unknown) {
     if (isComponent(elem)) {

@@ -203,6 +203,11 @@ export class ProcGenWrapperDom {
     }
   }
 
+  // update a attribute
+  a(elem: HTMLElement, name: string, v: unknown) {
+    this.r(elem, name, v)
+  }
+
   // add a change property binding
   p() {
     noop()

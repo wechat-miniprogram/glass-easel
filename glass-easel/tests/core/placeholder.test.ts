@@ -275,7 +275,6 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     const componentSpace = new glassEasel.ComponentSpace()
     componentSpace.updateComponentOptions({
       writeFieldsToNode: true,
-      writeIdToDOM: true,
     })
     componentSpace.defineComponent({
       is: '',
@@ -286,35 +285,66 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       .define()
       .placeholders({
         child: 'span',
+        c: 'span',
       })
       .definition({
         using: {
           child: 'placeholder/simple/child',
+          c: 'placeholder/simple/c',
         },
         data: {
           prop: 'old',
+          arr: ['1'],
         },
         template: tmpl(`
-          <child prop="{{ prop }}">A</child>
+          <child id="child" prop="{{ prop }}">A</child>
+          <c id="c-{{index}}" wx:for="{{arr}}" prop="{{item}}" data-index="{{index}}">{{index}}</c>
         `),
       })
       .registerComponent()
-    const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
-    expect(domHtml(elem)).toBe('<span prop="old">A</span>')
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    expect(domHtml(elem)).toBe('<span prop="old">A</span><span prop="1">0</span>')
     matchElementWithDom(elem)
 
     elem.setData({
       prop: 'new',
     })
 
-    componentSpace.defineComponent({
+    expect(domHtml(elem)).toBe('<span prop="new">A</span><span prop="1">0</span>')
+    matchElementWithDom(elem)
+
+    const childDef = componentSpace.defineComponent({
       is: 'placeholder/simple/child',
       properties: {
         prop: glassEasel.NormalizedPropertyType.String,
       },
       template: tmpl('{{ prop }}'),
     })
-    expect(domHtml(elem)).toBe('<child>new</child>')
+    const child = (elem.$.child as glassEasel.GeneralComponent).asInstanceOf(childDef)!
+    expect(domHtml(elem)).toBe('<child>new</child><span prop="1">0</span>')
+    expect(child.data.prop).toBe('new')
+
+    elem.setData({
+      arr: ['1', '2'],
+    })
+
+    expect(domHtml(elem)).toBe('<child>new</child><span prop="1">0</span><span prop="2">1</span>')
+    matchElementWithDom(elem)
+
+    const cDef = componentSpace.defineComponent({
+      is: 'placeholder/simple/c',
+      properties: {
+        prop: glassEasel.NormalizedPropertyType.String,
+      },
+      template: tmpl('{{ prop }}'),
+    })
+    const c0 = (elem.$['c-0'] as glassEasel.GeneralComponent).asInstanceOf(cDef)!
+    const c1 = (elem.$['c-1'] as glassEasel.GeneralComponent).asInstanceOf(cDef)!
+    expect(domHtml(elem)).toBe('<child>new</child><c>1</c><c>2</c>')
+    expect(c0.data.prop).toBe('1')
+    expect(c0.dataset.index).toBe(0)
+    expect(c1.data.prop).toBe('2')
+    expect(c1.dataset.index).toBe(1)
     matchElementWithDom(elem)
   })
 

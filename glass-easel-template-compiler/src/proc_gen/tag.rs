@@ -254,7 +254,7 @@ impl Node {
         }
     }
 
-    fn to_proc_gen_define_children_content<W: std::fmt::Write>(
+    fn to_proc_gen_define_children_content_inner<W: std::fmt::Write>(
         list: &[Self],
         var_slot_map: &Option<HashMap<String, (JsIdent, JsIdent)>>,
         w: &mut JsFunctionScopeWriter<W>,
@@ -263,18 +263,6 @@ impl Node {
         group: &TmplGroup,
         cur_path: &str,
     ) -> Result<(), TmplError> {
-        if let Some(var_slot_map) = var_slot_map {
-            for (slot_value_name, (var_scope, var_update_path_tree)) in var_slot_map.iter() {
-                w.expr_stmt(|w| {
-                    write!(
-                        w,
-                        "{}=X(V).{},{}=C?!0:W.{}",
-                        var_scope, slot_value_name, var_update_path_tree, slot_value_name
-                    )?;
-                    Ok(())
-                })?;
-            }
-        }
         for c in list.iter() {
             match c {
                 Node::Text(c) => match c {
@@ -346,6 +334,53 @@ impl Node {
         Ok(())
     }
 
+    fn to_proc_gen_define_children_content<W: std::fmt::Write>(
+        list: &[Self],
+        var_slot_names: &Option<Vec<String>>,
+        w: &mut JsFunctionScopeWriter<W>,
+        scopes: &mut Vec<ScopeVar>,
+        bmc: &BindingMapCollector,
+        group: &TmplGroup,
+        cur_path: &str,
+    ) -> Result<(), TmplError> {
+        if let Some(var_slot_names) = var_slot_names {
+            let mut writer = JsTopScopeWriter::new(String::new());
+            writer.align(w);
+            writer.function_scope(|w| {
+                let mut var_slot_map: HashMap<String, (JsIdent, JsIdent)> = HashMap::new();
+                for slot_value_name in var_slot_names.iter() {
+                    let var_scope = w.declare_var_on_top_scope_init(|w, var_scope| {
+                        write!(w, "X(V).{}", slot_value_name)?;
+                        Ok(var_scope)
+                    })?;
+                    let var_update_path_tree =
+                        w.declare_var_on_top_scope_init(|w, var_update_path_tree| {
+                            write!(w, "C?!0:W.{}", slot_value_name)?;
+                            Ok(var_update_path_tree)
+                        })?;
+                    var_slot_map.insert(slot_value_name.clone(), (var_scope, var_update_path_tree));
+                }
+                Node::to_proc_gen_define_children_content_inner(
+                    list,
+                    &Some(var_slot_map),
+                    w,
+                    scopes,
+                    bmc,
+                    group,
+                    cur_path,
+                )
+            })?;
+            w.expr_stmt(|w| {
+                write!(w, "{}", &writer.finish())?;
+                Ok(())
+            })
+        } else {
+            Node::to_proc_gen_define_children_content_inner(
+                list, &None, w, scopes, bmc, group, cur_path,
+            )
+        }
+    }
+
     fn to_proc_gen_define_children<'a, W: std::fmt::Write>(
         list_iter: &mut (impl IntoIterator<Item = &'a Node> + Clone),
         w: &mut JsExprWriter<W>,
@@ -353,28 +388,23 @@ impl Node {
         f: impl FnOnce(
             &str,
             &mut JsExprWriter<W>,
-            &Option<HashMap<String, (JsIdent, JsIdent)>>,
+            &Option<Vec<String>>,
             &mut Vec<ScopeVar>,
         ) -> Result<(), TmplError>,
-    ) -> Result<Option<HashMap<String, (JsIdent, JsIdent)>>, TmplError> {
-        let mut var_slot_map: Option<HashMap<String, (JsIdent, JsIdent)>> = None;
+    ) -> Result<Option<Vec<String>>, TmplError> {
+        let mut var_slot_names: Option<Vec<String>> = None;
         for item in list_iter.clone().into_iter() {
             match item {
                 Node::Text(..) => {}
                 Node::Element(elem) => {
                     if let Some(refs) = elem.slot_value_refs() {
                         for attr in refs {
-                            if var_slot_map.is_none() {
-                                var_slot_map = Some(HashMap::new());
+                            if var_slot_names.is_none() {
+                                var_slot_names = Some(vec![]);
                             }
-                            let var_slot_map = var_slot_map.as_mut().unwrap();
-                            if !var_slot_map.contains_key(attr.name.name.as_str()) {
-                                let var_scope = w.declare_var_on_top_scope()?;
-                                let var_update_path_tree = w.declare_var_on_top_scope()?;
-                                var_slot_map.insert(
-                                    attr.name.name.to_string(),
-                                    (var_scope, var_update_path_tree),
-                                );
+                            let var_slot_names = var_slot_names.as_mut().unwrap();
+                            if !var_slot_names.iter().any(|x| x == &attr.name.name) {
+                                var_slot_names.push(attr.name.name.to_string());
                             }
                         }
                     }
@@ -384,9 +414,9 @@ impl Node {
                 }
             }
         }
-        let args = Node::to_proc_gen_function_args(list_iter, var_slot_map.is_some());
-        f(args, w, &var_slot_map, scopes)?;
-        Ok(var_slot_map)
+        let args = Node::to_proc_gen_function_args(list_iter, var_slot_names.is_some());
+        f(args, w, &var_slot_names, scopes)?;
+        Ok(var_slot_names)
     }
 }
 
@@ -414,27 +444,28 @@ impl Element {
                 common,
             } => {
                 let slot_kind = SlotKind::new(&common.slot, w, scopes)?;
-                let (child_ident, var_slot_map) = w.declare_var_on_top_scope_init(|w, ident| {
-                    let var_slot_map = Node::to_proc_gen_define_children(
-                        &mut children.iter(),
-                        w,
-                        scopes,
-                        |args, w, var_slot_map, scopes| {
-                            w.function_args(args, |w| {
-                                Node::to_proc_gen_define_children_content(
-                                    &children,
-                                    &var_slot_map,
-                                    w,
-                                    scopes,
-                                    bmc,
-                                    group,
-                                    cur_path,
-                                )
-                            })
-                        },
-                    )?;
-                    Ok((ident, var_slot_map))
-                })?;
+                let (child_ident, var_slot_names) =
+                    w.declare_var_on_top_scope_init(|w, ident| {
+                        let var_slot_map = Node::to_proc_gen_define_children(
+                            &mut children.iter(),
+                            w,
+                            scopes,
+                            |args, w, var_slot_map, scopes| {
+                                w.function_args(args, |w| {
+                                    Node::to_proc_gen_define_children_content(
+                                        &children,
+                                        &var_slot_map,
+                                        w,
+                                        scopes,
+                                        bmc,
+                                        group,
+                                        cur_path,
+                                    )
+                                })
+                            },
+                        )?;
+                        Ok((ident, var_slot_map))
+                    })?;
                 w.expr_stmt(|w| {
                     write!(w, "E({},{{", gen_lit_str(&tag_name.name),)?;
                     if generics.len() > 0 {
@@ -457,7 +488,7 @@ impl Element {
                                 w.expr_stmt(|w| {
                                     write!(
                                         w,
-                                        "N.setAttribute({},{})",
+                                        "R.a(N,{},{})",
                                         gen_lit_str(&attr.name.name),
                                         gen_lit_str(&attr.value.name)
                                     )?;
@@ -517,17 +548,17 @@ impl Element {
                         Ok(())
                     })?;
                     write!(w, ",{}", child_ident)?;
-                    if common.slot.is_some() || var_slot_map.is_some() {
+                    if common.slot.is_some() || var_slot_names.is_some() {
                         write!(w, ",")?;
                         match slot_kind {
                             SlotKind::None => write!(w, "undefined")?,
                             SlotKind::Static(s) => write!(w, "{}", gen_lit_str(s))?,
                             SlotKind::Dynamic(p) => p.value_expr(w)?,
                         }
-                        if let Some(var_slot_map) = var_slot_map {
+                        if let Some(var_slot_map) = var_slot_names {
                             if var_slot_map.len() > 0 {
                                 write!(w, ",[")?;
-                                for (index, name) in var_slot_map.keys().enumerate() {
+                                for (index, name) in var_slot_map.iter().enumerate() {
                                     if index > 0 {
                                         write!(w, ",")?;
                                     }
@@ -707,17 +738,6 @@ impl Element {
                         list_expr = ListExpr::Dynamic(p);
                     }
                 }
-                let var_scope_item = w.declare_var_on_top_scope()?;
-                let var_scope_index = w.declare_var_on_top_scope()?;
-                let var_scope_item_update_path_tree = w.declare_var_on_top_scope()?;
-                let var_scope_index_update_path_tree = w.declare_var_on_top_scope()?;
-                let var_scope_item_lvalue_path = w.declare_var_on_top_scope()?;
-
-                let arg_scope_item = w.gen_private_ident();
-                let arg_scope_index = w.gen_private_ident();
-                let arg_scope_item_update_path_tree = w.gen_private_ident();
-                let arg_scope_index_update_path_tree = w.gen_private_ident();
-                let arg_scope_item_lvalue_path = w.gen_private_ident();
 
                 let lvalue_path_from_data_scope = match &list_expr {
                     ListExpr::Static(_) => None,
@@ -739,65 +759,89 @@ impl Element {
                 };
 
                 let child_ident = w.declare_var_on_top_scope_init(|w, ident| {
-                    scopes.push(ScopeVar {
-                        var: var_scope_item.clone(),
-                        update_path_tree: Some(var_scope_item_update_path_tree.clone()),
-                        lvalue_path: if let Some(from_data_scope) = lvalue_path_from_data_scope {
-                            ScopeVarLvaluePath::Var {
-                                var_name: var_scope_item_lvalue_path.clone(),
-                                from_data_scope,
-                            }
-                        } else {
-                            ScopeVarLvaluePath::Invalid
-                        },
-                    });
-                    scopes.push(ScopeVar {
-                        var: var_scope_index.clone(),
-                        update_path_tree: Some(var_scope_index_update_path_tree.clone()),
-                        lvalue_path: ScopeVarLvaluePath::Invalid,
-                    });
                     Node::to_proc_gen_define_children(
                         &mut children.iter(),
                         w,
                         scopes,
                         |args, w, var_slot_map, scopes| {
-                            let children_args = format!(
-                                "C,{},{},{},{},{}{}",
-                                arg_scope_item,
-                                arg_scope_index,
-                                arg_scope_item_update_path_tree,
-                                arg_scope_index_update_path_tree,
-                                arg_scope_item_lvalue_path,
-                                args.trim_start_matches("C"),
-                            );
-                            w.function_args(&children_args, |w| {
-                                w.expr_stmt(|w| {
-                                    write!(
-                                        w,
-                                        "{}={},{}={},{}={},{}={},{}={}",
-                                        var_scope_item,
-                                        arg_scope_item,
-                                        var_scope_index,
-                                        arg_scope_index,
-                                        var_scope_item_update_path_tree,
-                                        arg_scope_item_update_path_tree,
-                                        var_scope_index_update_path_tree,
-                                        arg_scope_index_update_path_tree,
-                                        var_scope_item_lvalue_path,
-                                        arg_scope_item_lvalue_path,
-                                    )?;
-                                    Ok(())
-                                })?;
-                                Node::to_proc_gen_define_children_content(
-                                    &children,
-                                    &var_slot_map,
-                                    w,
-                                    scopes,
-                                    bmc,
-                                    group,
-                                    cur_path,
-                                )
-                            })
+                            w.function_dyn_args(
+                                |w| {
+                                    let arg_scope_item = w.gen_ident();
+                                    let arg_scope_index = w.gen_ident();
+                                    let arg_scope_item_update_path_tree = w.gen_ident();
+                                    let arg_scope_index_update_path_tree = w.gen_ident();
+                                    let arg_scope_item_lvalue_path = w.gen_ident();
+
+                                    let mut vec_args: Vec<JsIdent> = args
+                                        .split(',')
+                                        .map(|name| JsIdent::new(name.to_string()))
+                                        .collect();
+
+                                    vec_args.splice(
+                                        1..1,
+                                        vec![
+                                            arg_scope_item,
+                                            arg_scope_index,
+                                            arg_scope_item_update_path_tree,
+                                            arg_scope_index_update_path_tree,
+                                            arg_scope_item_lvalue_path,
+                                        ],
+                                    );
+
+                                    Ok(vec_args)
+                                },
+                                |w, args| {
+                                    let arg_scope_item = &args[1];
+                                    let arg_scope_index = &args[2];
+                                    let arg_scope_item_update_path_tree = &args[3];
+                                    let arg_scope_index_update_path_tree = &args[4];
+                                    let arg_scope_item_lvalue_path = &args[5];
+
+                                    let mut writer = JsTopScopeWriter::new(String::new());
+                                    writer.align(w);
+
+                                    writer.function_scope(|w| {
+                                        scopes.push(ScopeVar {
+                                            var: arg_scope_item.clone(),
+                                            update_path_tree: Some(
+                                                arg_scope_item_update_path_tree.clone(),
+                                            ),
+                                            lvalue_path: if let Some(from_data_scope) =
+                                                lvalue_path_from_data_scope
+                                            {
+                                                ScopeVarLvaluePath::Var {
+                                                    var_name: arg_scope_item_lvalue_path.clone(),
+                                                    from_data_scope,
+                                                }
+                                            } else {
+                                                ScopeVarLvaluePath::Invalid
+                                            },
+                                        });
+                                        scopes.push(ScopeVar {
+                                            var: arg_scope_index.clone(),
+                                            update_path_tree: Some(
+                                                arg_scope_index_update_path_tree.clone(),
+                                            ),
+                                            lvalue_path: ScopeVarLvaluePath::Invalid,
+                                        });
+
+                                        Node::to_proc_gen_define_children_content(
+                                            &children,
+                                            &var_slot_map,
+                                            w,
+                                            scopes,
+                                            bmc,
+                                            group,
+                                            cur_path,
+                                        )
+                                    })?;
+
+                                    w.expr_stmt(|w| {
+                                        write!(w, "{}", &writer.finish())?;
+                                        Ok(())
+                                    })
+                                },
+                            )
                         },
                     )?;
                     scopes.pop();
