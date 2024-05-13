@@ -30,6 +30,34 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     matchElementWithDom(elem)
   })
 
+  test('comments inside template', () => {
+    const def = glassEasel
+      .registerElement({
+        template: tmpl(`
+          <!-- abc -->
+          <span>Hello world!</span>
+        `),
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    expect(domHtml(elem)).toBe('<span>Hello world!</span>')
+    matchElementWithDom(elem)
+  })
+
+  test('meta tags inside template', () => {
+    const def = glassEasel
+      .registerElement({
+        template: tmpl(`
+          <!META>
+          <span>Hello world!</span>
+        `),
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    expect(domHtml(elem)).toBe('<span>Hello world!</span>')
+    matchElementWithDom(elem)
+  })
+
   test('basic data binding', () => {
     const def = glassEasel
       .registerElement({
