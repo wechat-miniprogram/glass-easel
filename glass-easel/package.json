@@ -1,7 +1,7 @@
 {
   "name": "glass-easel",
   "description": "The core module of the glass-easel project",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "repository": {
     "type": "git",
     "url": "https://github.com/wechat-miniprogram/glass-easel.git"
