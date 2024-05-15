@@ -657,6 +657,34 @@ describe('partial update', () => {
     expect(getP()).toStrictEqual(['B', 'A', 'C'])
   })
 
+  test('should iterate Object entries', () => {
+    const compDef = componentSpace
+      .define()
+      .data(() => ({
+        obj: {
+          arr: [123],
+        },
+      }))
+      .template(
+        tmpl(`
+          <block wx:for="{{ obj }}">{{ item[0] }}</block>
+          <block wx:for="{{ obj }}" wx:key="0">-{{ item[0] }}</block>
+        `),
+      )
+      .registerComponent()
+
+    const comp = glassEasel.Component.createWithContext('root', compDef, domBackend)
+    const shadowRoot = comp.shadowRoot as glassEasel.ShadowRoot
+    expect(shadowRoot.getComposedChildren()[2]!.asTextNode()!.textContent).toBe('123')
+    expect(shadowRoot.getComposedChildren()[5]!.asTextNode()!.textContent).toBe('-123')
+
+    comp.setData({
+      'obj.arr[0]': 456,
+    })
+    expect(shadowRoot.getComposedChildren()[2]!.asTextNode()!.textContent).toBe('456')
+    expect(shadowRoot.getComposedChildren()[5]!.asTextNode()!.textContent).toBe('-456')
+  })
+
   test('should support custom property value comparer', () => {
     let execArr = [] as string[]
     const childCompDef = componentSpace

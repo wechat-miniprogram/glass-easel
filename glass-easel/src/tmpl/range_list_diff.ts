@@ -243,7 +243,7 @@ export class RangeListManager {
         const u =
           updatePathTree === true || updatePathTree === undefined
             ? updatePathTree
-            : updatePathTree[i]
+            : updatePathTree[index]
         updateListItem(item, index, u, index !== oldIndex, elem.childNodes[i]! as VirtualNode)
         i += 1
       }
