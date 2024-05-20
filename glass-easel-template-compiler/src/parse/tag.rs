@@ -2693,6 +2693,16 @@ impl Value {
         let Some(double_brace_left) = ps.consume_str("{{") else {
             return None;
         };
+        if let Some(range) = ps.consume_str("}}") {
+            ps.add_warning(
+                ParseErrorKind::EmptyExpression,
+                range.start..range.start,
+            );
+            return Some(Self::Static {
+                value: CompactString::new_inline(""),
+                location: double_brace_left.start..range.end,
+            });
+        }
         let Some(expression) = Expression::parse_expression_or_object_inner(ps, is_template_data)
         else {
             if ps.skip_until_after("}}").is_none() {
@@ -2959,7 +2969,7 @@ mod test {
         case!(
             "{{}}",
             r#""#,
-            ParseErrorKind::UnexpectedExpressionCharacter,
+            ParseErrorKind::EmptyExpression,
             2..2
         );
         case!("{ {", r#"{ {"#);
