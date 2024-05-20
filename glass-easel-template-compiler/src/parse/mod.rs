@@ -446,6 +446,7 @@ pub enum ParseErrorKind {
     MissingSourcePath,
     UnsupportedSyntax,
     ShouldQuoted,
+    EmptyExpression,
 }
 
 impl ParseErrorKind {
@@ -480,6 +481,7 @@ impl ParseErrorKind {
             Self::MissingSourcePath => "missing source path",
             Self::UnsupportedSyntax => "this syntax has not been supported yet",
             Self::ShouldQuoted => "should be quoted",
+            Self::EmptyExpression => "the expression is empty",
         }
     }
 
@@ -514,6 +516,7 @@ impl ParseErrorKind {
             Self::MissingSourcePath => ParseErrorLevel::Error,
             Self::UnsupportedSyntax => ParseErrorLevel::Error,
             Self::ShouldQuoted => ParseErrorLevel::Warn,
+            Self::EmptyExpression => ParseErrorLevel::Warn,
         }
     }
 }
