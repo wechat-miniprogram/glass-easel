@@ -42,7 +42,7 @@ export class ElementIterator {
    * It limits the returned result by an `instanceof` call.
    * The default value is `Element` ,
    * which means only elements will be returned (text nodes will not).
-   * Consider specifying `Node` if text nodes need to be returned as well as elements.
+   * Consider specifying `Object` if text nodes need to be returned as well as elements.
    * Specify `Component` will only return components.
    */
   constructor(node: Node, type: ElementIteratorType, nodeTypeLimit: unknown = Element) {
@@ -127,7 +127,7 @@ export class ElementIterator {
           if (composed) {
             node.forEachComposedChild(childFn)
           } else {
-            node.childNodes.forEach(childFn)
+            node.childNodes.every(childFn)
           }
           if (interrupted) return false
         }
