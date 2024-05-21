@@ -399,10 +399,12 @@ export type ComponentInstance<
   TData extends DataList,
   TProperty extends PropertyList,
   TMethod extends MethodList,
+  TExtraThisFields extends DataList = Empty,
 > = Component<TData, TProperty, TMethod> & {
   data: Merge<DataWithPropertyValues<TData, TProperty>>
   properties: Merge<DataWithPropertyValues<TData, TProperty>>
-} & TMethod
+} & TMethod &
+  TExtraThisFields
 
 export type ComponentParams<
   TData extends DataList,
