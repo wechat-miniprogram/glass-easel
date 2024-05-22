@@ -85,7 +85,11 @@ impl Stringify for Node {
         match self {
             Node::Text(value) => value.stringify_write(stringifier)?,
             Node::Element(element) => element.stringify_write(stringifier)?,
-            Node::Comment(..) => {}
+            Node::Comment(s, location) => {
+                stringifier.write_str(r#"<!--"#)?;
+                stringifier.write_token(&s.replace("-->", "-- >"), &s, &location)?;
+                stringifier.write_str(r#"-->"#)?;
+            }
             Node::UnknownMetaTag(s, location) => {
                 stringifier.write_str(r#"<!"#)?;
                 stringifier.write_token(&escape_html_text(&s), &s, &location)?;
