@@ -699,14 +699,17 @@ export class DataGroup<
       const isSplice = maybeSpliceDel !== undefined
       const propName = String(path[0])
       const excluded = pureDataPattern ? pureDataPattern.test(propName) : false
+      const needInnerDataUpdates = !excluded && this.innerData
       const prop: PropertyDefinition | undefined = propFields[propName]
       let changed = true
+
+      // if update 1-level fields, check if it is a property
       if (prop && path.length === 1) {
-        // do update for 1-level fields
         const oldData: unknown = this.data[propName]
         let normalizedSpliceIndex: number | undefined
         let filteredData: DataValue
         if (isSplice) {
+          // splice update for properties
           if (Array.isArray(oldData)) {
             const c = change as DataSplice
             const spliceIndex = maybeSpliceIndex as number
@@ -723,6 +726,7 @@ export class DataGroup<
           }
           filteredData = oldData
         } else {
+          // normal replace for properties
           filteredData = convertValueToType(
             newData,
             propName,
@@ -730,33 +734,35 @@ export class DataGroup<
             this._$comp as GeneralComponent | null,
           )
         }
-        if (!excluded) {
-          if (this.innerData) {
-            let innerNewData: unknown
-            if (dataDeepCopy === DeepCopyStrategy.None) {
-              change[1] = innerNewData = filteredData
-            } else if (normalizedSpliceIndex !== undefined) {
-              innerNewData = this.innerData[propName] as DataValue[]
-              let inserts: DataValue[]
-              if (dataDeepCopy === DeepCopyStrategy.SimpleWithRecursion) {
-                change[1] = inserts = deepCopy(newData as unknown[], true)
-              } else {
-                change[1] = inserts = simpleDeepCopy(newData as unknown[])
-              }
-              ;(innerNewData as DataValue[]).splice(
-                normalizedSpliceIndex,
-                maybeSpliceDel!,
-                ...inserts,
-              )
-            } else if (dataDeepCopy === DeepCopyStrategy.SimpleWithRecursion) {
-              change[1] = innerNewData = deepCopy(filteredData, true)
+
+        // if inner data is separated, update it
+        if (needInnerDataUpdates) {
+          let innerNewData: unknown
+          if (dataDeepCopy === DeepCopyStrategy.None) {
+            change[1] = innerNewData = filteredData
+          } else if (normalizedSpliceIndex !== undefined) {
+            innerNewData = this.innerData![propName] as DataValue[]
+            let inserts: DataValue[]
+            if (dataDeepCopy === DeepCopyStrategy.SimpleWithRecursion) {
+              change[1] = inserts = deepCopy(newData as unknown[], true)
             } else {
-              change[1] = innerNewData = simpleDeepCopy(filteredData)
+              change[1] = inserts = simpleDeepCopy(newData as unknown[])
             }
-            this.innerData[propName] = innerNewData
+            ;(innerNewData as DataValue[]).splice(
+              normalizedSpliceIndex,
+              maybeSpliceDel!,
+              ...inserts,
+            )
+          } else if (dataDeepCopy === DeepCopyStrategy.SimpleWithRecursion) {
+            change[1] = innerNewData = deepCopy(filteredData, true)
+          } else {
+            change[1] = innerNewData = simpleDeepCopy(filteredData)
           }
+          this.innerData![propName] = innerNewData
         }
         ;(this.data as DataList)[propName] = filteredData
+
+        // reflect to attributes for properties (if needed)
         if (this._$reflectToAttributes) {
           const be = comp!.getBackendElement()
           if (be) {
@@ -782,6 +788,8 @@ export class DataGroup<
             }
           }
         }
+
+        // run comparer for properties
         let comparerResult: boolean
         if (!isSplice && maybeSpliceIndex === true) {
           if (prop.comparer) {
@@ -810,7 +818,7 @@ export class DataGroup<
           })
         }
       } else {
-        // do update for multi-level fields
+        // find actual data fields for multi-level updates
         let curData: { [key: string]: unknown } | unknown[] = this.data
         let curSlice: string | number = propName
         for (let i = 1; i < path.length; i += 1) {
@@ -821,6 +829,19 @@ export class DataGroup<
               !Array.isArray((curData as { [key: string]: unknown })[curSlice as string])
             ) {
               ;(curData as { [key: string]: unknown })[curSlice as string] = []
+            }
+            if (!needInnerDataUpdates && !excluded) {
+              if (
+                (nextSlice as number) >=
+                ((curData as { [key: string]: unknown })[curSlice as string] as unknown[]).length
+              ) {
+                combinedChanges.push([
+                  path.slice(0, i).concat('length'),
+                  true,
+                  undefined,
+                  undefined,
+                ])
+              }
             }
           } else {
             if (
@@ -839,6 +860,8 @@ export class DataGroup<
         }
         let normalizedSpliceIndex: number | undefined
         if (isSplice) {
+          // splice update for arrays
+          const oldLength = curData.length
           const oldData = (curData as DataList)[curSlice as string]
           if (Array.isArray(oldData)) {
             const c = change as DataSplice
@@ -847,6 +870,9 @@ export class DataGroup<
               spliceIndex >= 0 && spliceIndex < oldData.length ? spliceIndex : oldData.length
             c[2] = normalizedSpliceIndex
             oldData.splice(normalizedSpliceIndex, maybeSpliceDel, ...(newData as typeof oldData))
+            if (!needInnerDataUpdates && !excluded && curData.length !== oldLength) {
+              combinedChanges.push([path.concat('length'), true, undefined, undefined])
+            }
           } else {
             triggerWarning(
               `An array splice change cannot be applied to a non-array value (on path "${path.join(
@@ -855,10 +881,14 @@ export class DataGroup<
             )
           }
         } else {
+          // normal replace
           ;(curData as DataList)[curSlice as string] = newData
         }
-        if (!excluded && this.innerData) {
-          curData = this.innerData
+
+        // if inner data is separated, update it
+        if (needInnerDataUpdates) {
+          // find actual data fields for multi-level updates again
+          curData = this.innerData!
           curSlice = propName
           for (let i = 1; i < path.length; i += 1) {
             const nextSlice = path[i]!
@@ -868,6 +898,17 @@ export class DataGroup<
                 !Array.isArray((curData as { [key: string]: unknown })[curSlice as string])
               ) {
                 ;(curData as { [key: string]: unknown })[curSlice as string] = []
+              }
+              if (
+                (nextSlice as number) >=
+                ((curData as { [key: string]: unknown })[curSlice as string] as unknown[]).length
+              ) {
+                combinedChanges.push([
+                  path.slice(0, i).concat('length'),
+                  true,
+                  undefined,
+                  undefined,
+                ])
               }
             } else {
               if (
@@ -884,10 +925,13 @@ export class DataGroup<
               | unknown[]
             curSlice = nextSlice
           }
+
+          // do the inner data updates
           let innerNewData: unknown
           if (dataDeepCopy === DeepCopyStrategy.None) {
             change[1] = innerNewData = newData
           } else if (normalizedSpliceIndex !== undefined) {
+            const oldLength = curData.length
             innerNewData = (curData as { [key: string]: unknown })[
               curSlice as string
             ] as DataValue[]
@@ -902,6 +946,9 @@ export class DataGroup<
               maybeSpliceDel!,
               ...inserts,
             )
+            if (curData.length !== oldLength) {
+              combinedChanges.push([path.concat('length'), true, undefined, undefined])
+            }
           } else if (dataDeepCopy === DeepCopyStrategy.SimpleWithRecursion) {
             change[1] = innerNewData = deepCopy(newData, true)
           } else {
@@ -909,8 +956,10 @@ export class DataGroup<
           }
           ;(curData as { [key: string]: unknown })[curSlice as string] = innerNewData
         }
+
+        // triggers property updates if it is a property
+        // NOTE for prop observers, oldVal will be undefined when doing a sub-path update
         if (!excluded && prop) {
-          // NOTE for prop observers, oldVal will be undefined when doing a sub-path update
           propChanges.push({
             propName,
             prop,
