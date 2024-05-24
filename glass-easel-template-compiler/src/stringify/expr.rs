@@ -102,7 +102,7 @@ fn expression_strigify_write<'s, W: FmtWrite>(
         }
         Expression::LitStr { value, location } => {
             let quoted = gen_lit_str(&value);
-            stringifier.write_token(&format!(r#""{}""#, quoted), &value, &location)?;
+            stringifier.write_token(&format!(r#"{}"#, quoted), &value, &location)?;
         }
         Expression::LitInt { value, location } => {
             let value = value.to_string();

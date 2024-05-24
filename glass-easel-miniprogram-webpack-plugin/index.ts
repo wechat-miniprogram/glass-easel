@@ -227,6 +227,7 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
             } catch (e) {
               /* empty */
             }
+            let hasScriptFile = false
             try {
               const tsFileStat = await fs.stat(path.join(codeRoot, `${compPath}.ts`))
               if (tsFileStat.isFile()) {
@@ -235,13 +236,7 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
                   taskConfig: staticConfig.taskConfig,
                   hasWxss,
                 }
-                styleSheetManager.add(compPath, absPath)
-                styleSheetManager.setStyleIsolation(
-                  compPath,
-                  staticConfig.styleIsolation,
-                  !!staticConfig.component,
-                )
-                return
+                hasScriptFile = true
               }
             } catch (e) {
               /* empty */
@@ -254,10 +249,19 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
                   taskConfig: staticConfig.taskConfig,
                   hasWxss,
                 }
-                return
+                hasScriptFile = true
               }
             } catch (e) {
               /* empty */
+            }
+            if (hasScriptFile) {
+              styleSheetManager.add(compPath, absPath)
+              styleSheetManager.setStyleIsolation(
+                compPath,
+                staticConfig.styleIsolation,
+                !!staticConfig.component,
+              )
+              return
             }
           }
         }

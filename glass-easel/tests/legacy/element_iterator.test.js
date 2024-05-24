@@ -118,6 +118,32 @@ describe('Element Iterator', function () {
     expect(expectResArr.length).toBe(0)
   })
 
+  it('should support shadow-descendants-root-first traversing with break', function () {
+    var elem = createElem('element-iterator-combined')
+    var expectResArr = [elem.$.g]
+    glassEasel.ElementIterator.create(elem.$.g, 'shadow-descendants-root-first', Object).forEach(
+      function (e) {
+        if (e === elem.$.h) return false
+        expect(e).toBe(expectResArr.shift())
+      },
+    )
+    expect(expectResArr.length).toBe(0)
+  })
+
+  it('should support shadow-descendants-root-last traversing with break', function () {
+    var elem = createElem('element-iterator-combined')
+    var expectResArr = [elem.$.h]
+    glassEasel.ElementIterator.create(
+      elem.$.g,
+      'shadow-descendants-root-last',
+      glassEasel.Component,
+    ).forEach(function (e) {
+      if (e === elem.$.i) return false
+      expect(e).toBe(expectResArr.shift())
+    })
+    expect(expectResArr.length).toBe(0)
+  })
+
   it('should support composed-descendants-root-first traversing', function () {
     var elem = createElem('element-iterator-combined')
     var expectResArr = [
@@ -171,7 +197,7 @@ describe('Element Iterator', function () {
     expect(expectResArr.length).toBe(0)
   })
 
-  it('should support root-first traversing with break', function () {
+  it('should support composed-descendants-root-first traversing with break', function () {
     var elem = createElem('element-iterator-combined')
     var expectResArr = [elem.$.g, elem.$.g.shadowRoot]
     glassEasel.ElementIterator.create(elem.$.g, 'composed-descendants-root-first', Object).forEach(
@@ -183,7 +209,7 @@ describe('Element Iterator', function () {
     expect(expectResArr.length).toBe(0)
   })
 
-  it('should support root-last traversing with break', function () {
+  it('should support composed-descendants-root-last traversing with break', function () {
     var elem = createElem('element-iterator-combined')
     var expectResArr = [elem.$.h, elem.$.i]
     glassEasel.ElementIterator.create(

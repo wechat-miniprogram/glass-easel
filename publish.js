@@ -30,6 +30,16 @@ if (
   throw new Error('failed to check rust modules (are there rust warnings or errors?)')
 }
 
+// force rust formatting
+console.info('Run cargo fmt --check')
+if (
+  childProcess.spawnSync('cargo', ['fmt', '--check'], {
+    stdio: 'inherit',
+  }).status !== 0
+) {
+  throw new Error('failed to check formatting of rust modules')
+}
+
 // avoid eslint warnings
 ;[
   'glass-easel',
@@ -74,15 +84,10 @@ if (gitStatusRes.status !== 0 || gitStatusRes.stdout.length > 0) {
   let content = fs.readFileSync(p, { encoding: 'utf8' })
   let oldVersion
   const refVersions = []
-  content = content
-    .replace(/"version": "(.+)"/, (_, v) => {
-      oldVersion = v
-      return `"version": "${version}"`
-    })
-    .replace(/"(glass-easel|glass-easel-[-a-z]+)": "(.+)"/g, (_, mod, v) => {
-      refVersions.push({ mod, v })
-      return `"${mod}": "${version}"`
-    })
+  content = content.replace(/"version": "(.+)"/, (_, v) => {
+    oldVersion = v
+    return `"version": "${version}"`
+  })
   if (!oldVersion) {
     throw new Error(`version segment not found in ${p}`)
   }
@@ -241,7 +246,7 @@ if (
 ;['glass-easel-template-compiler', 'glass-easel-stylesheet-compiler'].forEach((p) => {
   console.info(`Publish wasm-pack generated ${p} to npmjs`)
   if (
-    childProcess.spawnSync('npm', ['publish', '--registry', 'https://registry.npmjs.org'], {
+    childProcess.spawnSync('pnpm', ['publish', '--registry', 'https://registry.npmjs.org'], {
       cwd: `${p}/pkg-nodejs`,
       stdio: 'inherit',
     }).status !== 0
@@ -259,7 +264,7 @@ if (
 ].forEach((p) => {
   console.info(`Publish ${p} to npmjs`)
   if (
-    childProcess.spawnSync('npm', ['publish', '--registry', 'https://registry.npmjs.org'], {
+    childProcess.spawnSync('pnpm', ['publish', '--registry', 'https://registry.npmjs.org'], {
       cwd: p,
       stdio: 'inherit',
     }).status !== 0

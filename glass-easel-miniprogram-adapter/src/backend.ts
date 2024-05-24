@@ -2,6 +2,7 @@ import * as glassEasel from 'glass-easel'
 import { type MiniProgramEnv } from './env'
 import { type CodeSpace } from './space'
 import { StyleIsolation } from './types'
+import { ComponentCaller } from './component'
 
 /**
  * A backend context that has been associated to an environment
@@ -90,7 +91,14 @@ export class Root {
   }
 
   /**
-   * Get the underlying component
+   * Get the root component
+   */
+  get(): ComponentCaller<any, any, any, any> {
+    return this._$comp.getMethodCaller() as unknown as ComponentCaller<any, any, any, any>
+  }
+
+  /**
+   * Get the underlying component of the root component
    */
   getComponent(): glassEasel.GeneralComponent {
     return this._$comp

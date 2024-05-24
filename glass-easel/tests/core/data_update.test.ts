@@ -657,6 +657,126 @@ describe('partial update', () => {
     expect(getP()).toStrictEqual(['B', 'A', 'C'])
   })
 
+  test('should update length while list partial update', () => {
+    const compDef = componentSpace
+      .define()
+      .template(
+        tmpl(`
+          <div data:p="{{ arr.length }}" data:q="{{ arr[4].a }}">{{ arr.length }}</div>
+        `),
+      )
+      .data(() => ({
+        arr: [{ a: 12 }, { a: 34 }, { a: 56 }] as { a: number }[],
+      }))
+      .registerComponent()
+
+    const comp = glassEasel.Component.createWithContext('root', compDef, domBackend)
+    glassEasel.Element.pretendAttached(comp)
+    const a = comp.getShadowRoot()!.childNodes[0]!.asElement()!
+    expect(a.dataset.p).toBe(3)
+    expect(a.dataset.q).toBeUndefined()
+    expect(a.childNodes[0]!.asTextNode()!.textContent).toBe('3')
+
+    comp.setData({ 'arr[4]': { a: 78 } })
+    expect(a.dataset.p).toBe(5)
+    expect(a.dataset.q).toBe(78)
+    expect(a.childNodes[0]!.asTextNode()!.textContent).toBe('5')
+
+    comp.spliceArrayDataOnPath(['arr'], 1, 3, [{ a: 43 }, { a: 65 }])
+    comp.applyDataUpdates()
+    expect(a.dataset.p).toBe(4)
+    expect(a.dataset.q).toBeUndefined()
+    expect(a.childNodes[0]!.asTextNode()!.textContent).toBe('4')
+
+    comp.replaceDataOnPath(['arr', 4, 'a'], 89)
+    comp.spliceArrayDataOnPath(['arr'], 100, 0, [{ a: 123 }])
+    comp.applyDataUpdates()
+    expect(a.dataset.p).toBe(6)
+    expect(a.dataset.q).toBe(89)
+    expect(a.childNodes[0]!.asTextNode()!.textContent).toBe('6')
+
+    comp.setData({ 'arr[9].a': 98 })
+    expect(a.dataset.p).toBe(10)
+    expect(a.dataset.q).toBe(89)
+    expect(a.childNodes[0]!.asTextNode()!.textContent).toBe('10')
+  })
+
+  test('should update length while list partial update (without inner data)', () => {
+    const compDef = componentSpace
+      .define()
+      .options({
+        dataDeepCopy: glassEasel.DeepCopyKind.None,
+      })
+      .template(
+        tmpl(`
+          <div data:p="{{ arr.length }}" data:q="{{ arr[4].a }}">{{ arr.length }}</div>
+        `),
+      )
+      .data(() => ({
+        arr: [{ a: 12 }, { a: 34 }, { a: 56 }] as { a: number }[],
+      }))
+      .registerComponent()
+
+    const comp = glassEasel.Component.createWithContext('root', compDef, domBackend)
+    glassEasel.Element.pretendAttached(comp)
+    const a = comp.getShadowRoot()!.childNodes[0]!.asElement()!
+    expect(a.dataset.p).toBe(3)
+    expect(a.dataset.q).toBeUndefined()
+    expect(a.childNodes[0]!.asTextNode()!.textContent).toBe('3')
+
+    comp.setData({ 'arr[4]': { a: 78 } })
+    expect(a.dataset.p).toBe(5)
+    expect(a.dataset.q).toBe(78)
+    expect(a.childNodes[0]!.asTextNode()!.textContent).toBe('5')
+
+    comp.spliceArrayDataOnPath(['arr'], 1, 3, [{ a: 43 }, { a: 65 }])
+    comp.applyDataUpdates()
+    expect(a.dataset.p).toBe(4)
+    expect(a.dataset.q).toBeUndefined()
+    expect(a.childNodes[0]!.asTextNode()!.textContent).toBe('4')
+
+    comp.spliceArrayDataOnPath(['arr'], 1, 2, [])
+    comp.replaceDataOnPath(['arr', 3, 'a'], 89)
+    comp.spliceArrayDataOnPath(['arr'], 1, 0, [{ a: 123 }])
+    comp.applyDataUpdates()
+    expect(a.dataset.p).toBe(5)
+    expect(a.dataset.q).toBe(89)
+    expect(a.childNodes[0]!.asTextNode()!.textContent).toBe('5')
+
+    comp.setData({ 'arr[9].a': 98 })
+    expect(a.dataset.p).toBe(10)
+    expect(a.dataset.q).toBe(89)
+    expect(a.childNodes[0]!.asTextNode()!.textContent).toBe('10')
+  })
+
+  test('should iterate Object entries', () => {
+    const compDef = componentSpace
+      .define()
+      .data(() => ({
+        obj: {
+          arr: [123],
+        },
+      }))
+      .template(
+        tmpl(`
+          <block wx:for="{{ obj }}">{{ item[0] }}</block>
+          <block wx:for="{{ obj }}" wx:key="0">-{{ item[0] }}</block>
+        `),
+      )
+      .registerComponent()
+
+    const comp = glassEasel.Component.createWithContext('root', compDef, domBackend)
+    const shadowRoot = comp.shadowRoot as glassEasel.ShadowRoot
+    expect(shadowRoot.getComposedChildren()[2]!.asTextNode()!.textContent).toBe('123')
+    expect(shadowRoot.getComposedChildren()[5]!.asTextNode()!.textContent).toBe('-123')
+
+    comp.setData({
+      'obj.arr[0]': 456,
+    })
+    expect(shadowRoot.getComposedChildren()[2]!.asTextNode()!.textContent).toBe('456')
+    expect(shadowRoot.getComposedChildren()[5]!.asTextNode()!.textContent).toBe('-456')
+  })
+
   test('should support custom property value comparer', () => {
     let execArr = [] as string[]
     const childCompDef = componentSpace

@@ -44,6 +44,9 @@ const enum BindingMapUpdateEnabled {
   Forced,
 }
 
+// eslint-disable-next-line no-bitwise
+const isPositiveInteger = (x: string) => String((x as any) >>> 0) === x
+
 export class GlassEaselTemplateEngine implements TemplateEngine {
   create(behavior: GeneralBehavior, componentOptions: NormalizedComponentOptions): Template {
     if (componentOptions.externalComponent) {
@@ -162,27 +165,52 @@ class GlassEaselTemplateInstance implements TemplateInstance {
         if (v === true) break
         if (j === p.length - 1) {
           if (spliceDel === undefined) {
+            // replace update
             cur[field] = true
           } else {
+            // splice update
             const startIndex = spliceIndex
             if (v === undefined) {
-              cur[field] = new Array(startIndex)
-            } else if (!Array.isArray(v)) {
+              cur[field] = Object.create(new Array(startIndex)) as UpdatePathTreeNode[]
+            } else if (!Array.isArray(Object.getPrototypeOf(v))) {
+              // if the target is not an array, replace it as an array
               const arr = new Array(startIndex)
               const keys = Object.keys(v)
+              let lengthChanged = false
               for (let i = 0; i < keys.length; i += 1) {
+                // collect items that have been changed
                 const key = keys[i]!
-                const item = v[key]!
-                const index = Number(key)
-                if (arr.length < index) arr.length = index
-                arr[key as unknown as number] = item
+                const item = (v as { [key: string]: UpdatePathTreeNode })[key]!
+                if (isPositiveInteger(key)) {
+                  arr[Number(key)] = item
+                } else if (key === 'length') {
+                  lengthChanged = true
+                }
               }
-              cur[field] = arr
+              const wrappedArr = Object.create(arr) as { [key: string]: UpdatePathTreeNode }
+              if (lengthChanged) {
+                wrappedArr.length = true
+              }
+              cur[field] = wrappedArr
+            } else {
+              // if the target is already an array, use it
+              const arr = Object.getPrototypeOf(v) as UpdatePathTreeNode[]
+              if (arr.length < startIndex) arr.length = startIndex
+              const wrapper = v as { [key: string]: UpdatePathTreeNode }
+              const keys = Object.keys(wrapper)
+              for (let i = 0; i < keys.length; i += 1) {
+                // NOTE
+                // Some items may be changed separatedly after the array splice.
+                // These fields should be reassigned to the array,
+                // so that they can be spliced.
+                const key = keys[i]!
+                if (isPositiveInteger(key)) {
+                  arr[Number(key)] = wrapper[key]!
+                  delete wrapper[key]
+                }
+              }
             }
-            const arr = cur[field] as UpdatePathTreeNode[]
-            if (arr.length < startIndex) {
-              arr.length = startIndex
-            }
+            const arr = Object.getPrototypeOf(cur[field]) as UpdatePathTreeNode[]
             const inserts = new Array(newVal.length)
             inserts.fill(true)
             arr.splice(spliceIndex, spliceDel, ...inserts)

@@ -22,6 +22,7 @@ impl StyleSheetTransformer {
                 StyleSheetOptions {
                     class_prefix,
                     rpx_ratio,
+                    ..Default::default()
                 },
             ),
         }

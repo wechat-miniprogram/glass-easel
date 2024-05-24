@@ -85,7 +85,11 @@ impl Stringify for Node {
         match self {
             Node::Text(value) => value.stringify_write(stringifier)?,
             Node::Element(element) => element.stringify_write(stringifier)?,
-            Node::Comment(..) => {}
+            Node::Comment(s, location) => {
+                stringifier.write_str(r#"<!--"#)?;
+                stringifier.write_token(&s.replace("-->", "-- >"), &s, &location)?;
+                stringifier.write_str(r#"-->"#)?;
+            }
             Node::UnknownMetaTag(s, location) => {
                 stringifier.write_str(r#"<!"#)?;
                 stringifier.write_token(&escape_html_text(&s), &s, &location)?;
@@ -653,22 +657,22 @@ mod test {
             r#"<template name="a"><a href="/"> A </a></template><template is="a"/>"#
         );
         let mut expects = vec![
-            (3, 28, 1, 16, "a"),
-            (4, 16, 1, 19, "<"),
-            (4, 17, 1, 20, "a"),
-            (4, 19, 1, 22, "href"),
-            (4, 25, 1, 28, "/"),
-            (4, 27, 1, 30, ">"),
-            (4, 28, 1, 31, " A "),
-            (4, 31, 1, 34, "<"),
-            (4, 32, 1, 35, "/"),
-            (4, 17, 1, 36, "a"),
-            (4, 34, 1, 37, ">"),
-            (2, 12, 1, 49, "<"),
-            (2, 22, 1, 59, "is"),
-            (2, 26, 1, 63, "a"),
-            (2, 29, 1, 65, "/"),
-            (2, 30, 1, 66, ">"),
+            (2, 28, 0, 16, "a"),
+            (3, 16, 0, 19, "<"),
+            (3, 17, 0, 20, "a"),
+            (3, 19, 0, 22, "href"),
+            (3, 25, 0, 28, "/"),
+            (3, 27, 0, 30, ">"),
+            (3, 28, 0, 31, " A "),
+            (3, 31, 0, 34, "<"),
+            (3, 32, 0, 35, "/"),
+            (3, 17, 0, 36, "a"),
+            (3, 34, 0, 37, ">"),
+            (1, 12, 0, 49, "<"),
+            (1, 22, 0, 59, "is"),
+            (1, 26, 0, 63, "a"),
+            (1, 29, 0, 65, "/"),
+            (1, 30, 0, 66, ">"),
         ]
         .into_iter();
         for token in sourcemap.tokens() {

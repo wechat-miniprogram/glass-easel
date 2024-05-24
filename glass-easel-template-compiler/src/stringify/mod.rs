@@ -35,7 +35,7 @@ impl<'s, W: FmtWrite> Stringifier<'s, W> {
         smb.set_source_contents(source_id, Some(source));
         Self {
             w,
-            line: 1,
+            line: 0,
             utf16_col: 0,
             smb,
             source_path,

@@ -165,6 +165,9 @@ export class RangeListManager {
     const items = this.items
     const indexes = this.indexes
     const keyName = this.keyName
+    const isSpliceUpdate =
+      typeof oriUpdatePathTree === 'object' &&
+      Array.isArray(Object.getPrototypeOf(oriUpdatePathTree))
 
     // transform the update path tree if needed:
     // if the list has been splice-updated, or a key is updated,
@@ -183,7 +186,7 @@ export class RangeListManager {
       allowFastComparison = true
     } else {
       let needUpdate = false
-      if (Array.isArray(oriUpdatePathTree)) {
+      if (isSpliceUpdate) {
         needUpdate = true
       } else {
         const keys = Object.keys(oriUpdatePathTree)
@@ -231,7 +234,7 @@ export class RangeListManager {
       // transform the update path tree if needed:
       // if the list has been splice-updated, then mark the whole list
       let updatePathTree: UpdatePathTreeRoot
-      if (Array.isArray(oriUpdatePathTree)) updatePathTree = true
+      if (isSpliceUpdate) updatePathTree = true
       else updatePathTree = oriUpdatePathTree
 
       // simply match them one-by-one
@@ -243,7 +246,7 @@ export class RangeListManager {
         const u =
           updatePathTree === true || updatePathTree === undefined
             ? updatePathTree
-            : updatePathTree[i]
+            : (updatePathTree as { [key: string]: UpdatePathTreeNode })[index]
         updateListItem(item, index, u, index !== oldIndex, elem.childNodes[i]! as VirtualNode)
         i += 1
       }

@@ -81,7 +81,7 @@ impl<'s> ParseState<'s> {
             path: path.to_string(),
             whole_str: s,
             cur_index: 0,
-            line: position_offset.line + 1,
+            line: position_offset.line,
             utf16_col: position_offset.utf16_col,
             auto_skip_whitespace: false,
             warnings: vec![],
@@ -446,6 +446,7 @@ pub enum ParseErrorKind {
     MissingSourcePath,
     UnsupportedSyntax,
     ShouldQuoted,
+    EmptyExpression,
 }
 
 impl ParseErrorKind {
@@ -480,6 +481,7 @@ impl ParseErrorKind {
             Self::MissingSourcePath => "missing source path",
             Self::UnsupportedSyntax => "this syntax has not been supported yet",
             Self::ShouldQuoted => "should be quoted",
+            Self::EmptyExpression => "the expression is empty",
         }
     }
 
@@ -514,6 +516,7 @@ impl ParseErrorKind {
             Self::MissingSourcePath => ParseErrorLevel::Error,
             Self::UnsupportedSyntax => ParseErrorLevel::Error,
             Self::ShouldQuoted => ParseErrorLevel::Warn,
+            Self::EmptyExpression => ParseErrorLevel::Warn,
         }
     }
 }
@@ -530,6 +533,7 @@ impl std::fmt::Display for ParseErrorKind {
     }
 }
 
+#[repr(u8)]
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ParseErrorLevel {
     /// Likely to be an mistake and should be noticed.

@@ -1,6 +1,6 @@
 use std::slice;
 
-use crate::{group, parse::ParseError};
+use crate::{group, parse::ParseError, parse::ParseErrorLevel};
 
 #[repr(C)]
 struct StrRef {
@@ -66,6 +66,7 @@ impl Drop for StrRefArray {
 #[repr(C)]
 struct TmplParseWarning {
     message: StrRef,
+    level: ParseErrorLevel,
     start_line: u32,
     start_col: u32,
     end_line: u32,
@@ -83,6 +84,7 @@ impl From<ParseError> for TmplParseWarning {
     fn from(e: ParseError) -> Self {
         Self {
             message: e.kind.to_string().into(),
+            level: e.kind.level(),
             start_line: e.location.start.line,
             start_col: e.location.start.utf16_col,
             end_line: e.location.end.line,

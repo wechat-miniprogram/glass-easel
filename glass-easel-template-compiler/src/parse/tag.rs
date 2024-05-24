@@ -2004,6 +2004,32 @@ impl Element {
             };
 
             // wrap if condition
+            let find_if_element_index = |ret: &Vec<Node>| {
+                let mut if_index = None;
+                for (i, elem) in ret.iter().enumerate().rev() {
+                    match elem {
+                        Node::Element(Element {
+                            kind: ElementKind::If { .. },
+                            ..
+                        }) => {
+                            if_index = Some(i);
+                            break;
+                        }
+                        Node::Comment(..) => {}
+                        _ => break,
+                    }
+                }
+                if_index
+            };
+            let wrap_if_children =
+                |ret: &mut Vec<Node>, if_index: usize, wrapped_element: Element| {
+                    let mut children = wrap_children(wrapped_element);
+                    {
+                        let comments = ret.drain((if_index + 1)..);
+                        children.splice(0..0, comments);
+                    }
+                    children
+                };
             let wrapped_element = match if_condition {
                 IfCondition::None => Some(wrapped_element),
                 IfCondition::If(location, value) => {
@@ -2023,12 +2049,19 @@ impl Element {
                     Some(elem)
                 }
                 IfCondition::Elif(location, value) => {
-                    if let Some(Node::Element(Element {
-                        kind: ElementKind::If { branches, .. },
-                        ..
-                    })) = ret.last_mut()
-                    {
-                        let branch = (location, value, wrap_children(wrapped_element));
+                    if let Some(if_index) = find_if_element_index(ret) {
+                        let branch = (
+                            location,
+                            value,
+                            wrap_if_children(ret, if_index, wrapped_element),
+                        );
+                        let Node::Element(Element {
+                            kind: ElementKind::If { branches, .. },
+                            ..
+                        }) = &mut ret[if_index]
+                        else {
+                            unreachable!();
+                        };
                         branches.push(branch);
                         None
                     } else {
@@ -2037,12 +2070,15 @@ impl Element {
                     }
                 }
                 IfCondition::Else(location) => {
-                    if let Some(Node::Element(Element {
-                        kind: ElementKind::If { else_branch, .. },
-                        ..
-                    })) = ret.last_mut()
-                    {
-                        let branch = (location, wrap_children(wrapped_element));
+                    if let Some(if_index) = find_if_element_index(ret) {
+                        let branch = (location, wrap_if_children(ret, if_index, wrapped_element));
+                        let Node::Element(Element {
+                            kind: ElementKind::If { else_branch, .. },
+                            ..
+                        }) = &mut ret[if_index]
+                        else {
+                            unreachable!();
+                        };
                         *else_branch = Some(branch);
                         None
                     } else {
@@ -2693,6 +2729,13 @@ impl Value {
         let Some(double_brace_left) = ps.consume_str("{{") else {
             return None;
         };
+        if let Some(range) = ps.consume_str("}}") {
+            ps.add_warning(ParseErrorKind::EmptyExpression, range.start..range.start);
+            return Some(Self::Static {
+                value: CompactString::new_inline(""),
+                location: double_brace_left.start..range.end,
+            });
+        }
         let Some(expression) = Expression::parse_expression_or_object_inner(ps, is_template_data)
         else {
             if ps.skip_until_after("}}").is_none() {
@@ -2956,6 +2999,7 @@ mod test {
 
     #[test]
     fn value_parsing() {
+        case!("{{}}", r#""#, ParseErrorKind::EmptyExpression, 2..2);
         case!("{ {", r#"{ {"#);
         case!("{{ a } }", "", ParseErrorKind::MissingExpressionEnd, 0..2);
         case!(
@@ -3085,6 +3129,12 @@ mod test {
             r#"<div/>"#,
             ParseErrorKind::InvalidAttributeName,
             5..7
+        );
+        case!(
+            "<div a='1' a='2'></div>",
+            r#"<div a="1"/>"#,
+            ParseErrorKind::DuplicatedAttribute,
+            11..12
         );
         case!(
             "<div a a></div>",
@@ -3296,6 +3346,10 @@ mod test {
         case!(
             "<block wx:if=''/><include src='a' wx:else />",
             r#"<block wx:if/><block wx:else><include src="a"/></block>"#
+        );
+        case!(
+            "<block wx:if='{{a}}'/> <!--abc--> <block wx:elif /><!----><block wx:else />",
+            r#"<block wx:if="{{a}}"/><block wx:elif><!--abc--></block><block wx:else><!----></block>"#
         );
     }
 
@@ -3532,10 +3586,10 @@ mod test {
         assert_eq!(
             ps.warnings().next().unwrap().location,
             Position {
-                line: 3,
+                line: 2,
                 utf16_col: 9
             }..Position {
-                line: 3,
+                line: 2,
                 utf16_col: 10
             },
         );
@@ -3543,10 +3597,10 @@ mod test {
         assert_eq!(
             ps.warnings().next().unwrap().location,
             Position {
-                line: 3,
+                line: 2,
                 utf16_col: 5
             }..Position {
-                line: 3,
+                line: 2,
                 utf16_col: 6
             },
         );

@@ -379,9 +379,7 @@ impl Node {
                         }
                     }
                 }
-                Node::Comment(..) | Node::UnknownMetaTag(..) => {
-                    return Ok(None);
-                }
+                Node::Comment(..) | Node::UnknownMetaTag(..) => {}
             }
         }
         let args = Node::to_proc_gen_function_args(list_iter, var_slot_map.is_some());

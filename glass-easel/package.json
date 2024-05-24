@@ -1,7 +1,7 @@
 {
   "name": "glass-easel",
   "description": "The core module of the glass-easel project",
-  "version": "0.4.0",
+  "version": "0.5.4",
   "repository": {
     "type": "git",
     "url": "https://github.com/wechat-miniprogram/glass-easel.git"
@@ -25,6 +25,6 @@
     "coverage": "jest -c jest.config.js --collect-coverage"
   },
   "devDependencies": {
-    "glass-easel-template-compiler": "0.4.0"
+    "glass-easel-template-compiler": "workspace:*"
   }
 }
