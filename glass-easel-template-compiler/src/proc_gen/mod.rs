@@ -24,6 +24,12 @@ pub(crate) struct JsIdent {
     name: String,
 }
 
+impl JsIdent {
+    fn new(name: String) -> Self {
+        Self { name }
+    }
+}
+
 impl fmt::Display for JsIdent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.name)
@@ -156,6 +162,30 @@ impl<'a, W: fmt::Write> JsTopScopeWriter<W> {
         self.top_declares.push(sub_str);
         self.block.need_stat_sep = need_stat_sep;
         ret
+    }
+}
+
+pub(crate) struct JsFunctionArgsAssigner<'a, W: fmt::Write> {
+    block: Option<&'a mut JsBlockStat>,
+    top_scope: &'a mut JsTopScopeWriter<W>,
+}
+
+impl<'a, W: fmt::Write> JsFunctionArgsAssigner<'a, W> {
+    fn get_block_mut(&mut self) -> &mut JsBlockStat {
+        if self.block.is_some() {
+            self.block.as_mut().unwrap()
+        } else {
+            &mut self.top_scope.block
+        }
+    }
+
+    pub(crate) fn gen_ident(&mut self) -> JsIdent {
+        let block = self.get_block_mut();
+        let var_id = block.ident_id_inc;
+        block.ident_id_inc += 1;
+        JsIdent {
+            name: get_var_name(var_id),
+        }
     }
 }
 
@@ -340,6 +370,36 @@ impl<'a, W: fmt::Write> JsExprWriter<'a, W> {
         Ok(ret)
     }
 
+    pub(crate) fn function_dyn_args<R>(
+        &mut self,
+        args_f: impl FnOnce(&mut JsFunctionArgsAssigner<W>) -> Result<Vec<JsIdent>, TmplError>,
+        f: impl FnOnce(&mut JsFunctionScopeWriter<W>, Vec<JsIdent>) -> Result<R, TmplError>,
+    ) -> Result<R, TmplError> {
+        let mut block = self.get_block().extend();
+        let args = args_f(&mut JsFunctionArgsAssigner {
+            block: Some(&mut block),
+            top_scope: &mut self.top_scope,
+        })?;
+        write!(
+            &mut self.w,
+            "({})=>{{",
+            args.iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        )?;
+        let ret = f(
+            &mut JsFunctionScopeWriter {
+                w: self.w,
+                block: Some(&mut block),
+                top_scope: &mut self.top_scope,
+            },
+            args,
+        )?;
+        write!(&mut self.w, "}}")?;
+        Ok(ret)
+    }
+
     pub(crate) fn brace_block<R>(
         &mut self,
         f: impl FnOnce(&mut JsFunctionScopeWriter<W>) -> Result<R, TmplError>,
@@ -367,6 +427,7 @@ impl<'a, W: fmt::Write> JsExprWriter<'a, W> {
         Ok(ret)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn declare_var_on_top_scope(&mut self) -> Result<JsIdent, TmplError> {
         let block = &mut self.top_scope.block;
         let var_id = block.ident_id_inc;
