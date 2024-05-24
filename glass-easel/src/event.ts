@@ -176,6 +176,7 @@ export class Event<TDetail> {
   detail: TDetail
   bubbles: boolean
   composed: boolean
+  extraFields: Record<string, unknown> | undefined
   /** @internal */
   private _$eventName: string
   /** @internal */
@@ -211,6 +212,7 @@ export class Event<TDetail> {
     this._$handleListenerReturn = options.handleListenerReturn
     if (options.extraFields) {
       Object.assign(this, options.extraFields)
+      this.extraFields = options.extraFields
     }
   }
 
