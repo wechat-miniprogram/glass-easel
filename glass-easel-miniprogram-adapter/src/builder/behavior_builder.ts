@@ -30,6 +30,7 @@ export class BehaviorBuilder<
   TChainingFilter extends ChainingFilterType = never,
   TPendingChainingFilter extends ChainingFilterType = never,
   TComponentExport = never,
+  TExtraThisFields extends DataList = Empty,
 > extends BaseBehaviorBuilder<
   TPrevData,
   TData,
@@ -37,7 +38,8 @@ export class BehaviorBuilder<
   TMethod,
   TChainingFilter,
   TPendingChainingFilter,
-  TComponentExport
+  TComponentExport,
+  TExtraThisFields
 > {
   private _$definitionFilter: DefinitionFilter | undefined
 
@@ -66,7 +68,8 @@ export class BehaviorBuilder<
         add: TAddedFields
         remove: TRemovedFields
       },
-      TComponentExport
+      TComponentExport,
+      TExtraThisFields
     >,
     TChainingFilter
   > {
@@ -80,8 +83,9 @@ export class BehaviorBuilder<
     UProperty extends PropertyList,
     UMethod extends MethodList,
     UChainingFilter extends ChainingFilterType,
+    UExtraThisFields extends DataList,
   >(
-    behavior: Behavior<UData, UProperty, UMethod, UChainingFilter>,
+    behavior: Behavior<UData, UProperty, UMethod, UChainingFilter, UExtraThisFields>,
   ): ResolveBehaviorBuilder<
     BehaviorBuilder<
       TPrevData,
@@ -90,7 +94,8 @@ export class BehaviorBuilder<
       TMethod & UMethod,
       UChainingFilter,
       TPendingChainingFilter,
-      TComponentExport
+      TComponentExport,
+      TExtraThisFields & UExtraThisFields
     >,
     UChainingFilter
   > {
@@ -111,7 +116,8 @@ export class BehaviorBuilder<
       TMethod,
       TChainingFilter,
       TPendingChainingFilter,
-      TNewComponentExport
+      TNewComponentExport,
+      TExtraThisFields
     >,
     TChainingFilter
   > {
@@ -134,7 +140,8 @@ export class BehaviorBuilder<
       TMethod,
       TChainingFilter,
       TPendingChainingFilter,
-      TComponentExport
+      TComponentExport,
+      TExtraThisFields
     >,
     TChainingFilter
   > {
@@ -157,7 +164,8 @@ export class BehaviorBuilder<
       TMethod,
       TChainingFilter,
       TPendingChainingFilter,
-      TComponentExport
+      TComponentExport,
+      TExtraThisFields
     >,
     TChainingFilter
   > {
@@ -170,7 +178,7 @@ export class BehaviorBuilder<
    * The public method can be used as an event handler, and can be visited in component instance.
    */
   override methods<T extends MethodList>(
-    funcs: T & ThisType<Component<TData, TProperty, TMethod & T, any>>,
+    funcs: T & ThisType<Component<TData, TProperty, TMethod & T, any, TExtraThisFields>>,
   ): ResolveBehaviorBuilder<
     BehaviorBuilder<
       TPrevData,
@@ -179,7 +187,8 @@ export class BehaviorBuilder<
       TMethod & T,
       TChainingFilter,
       TPendingChainingFilter,
-      TComponentExport
+      TComponentExport,
+      TExtraThisFields
     >,
     TChainingFilter
   > {
@@ -195,11 +204,11 @@ export class BehaviorBuilder<
    */
   override init<TExport extends Record<string, TaggedMethod<(...args: any[]) => any>> | void>(
     func: (
-      this: Component<TData, TProperty, TMethod, TComponentExport>,
+      this: Component<TData, TProperty, TMethod, TComponentExport, TExtraThisFields>,
       builderContext: BuilderContext<
         TPrevData,
         TProperty,
-        Component<TData, TProperty, TMethod, TComponentExport>
+        Component<TData, TProperty, TMethod, TComponentExport, TExtraThisFields>
       >,
     ) => TExport,
     // eslint-disable-next-line function-paren-newline
@@ -211,7 +220,8 @@ export class BehaviorBuilder<
       TMethod,
       TChainingFilter,
       TPendingChainingFilter,
-      TComponentExport
+      TComponentExport,
+      TExtraThisFields
     >,
     TChainingFilter
   > {
@@ -231,7 +241,8 @@ export class BehaviorBuilder<
           TData & TNewData,
           TProperty & TNewProperty,
           TMethod & TNewMethod,
-          TNewComponentExport
+          TNewComponentExport,
+          TExtraThisFields
         >
       >,
   ): ResolveBehaviorBuilder<
@@ -242,7 +253,8 @@ export class BehaviorBuilder<
       TMethod & TNewMethod,
       TChainingFilter,
       TPendingChainingFilter,
-      TNewComponentExport
+      TNewComponentExport,
+      TExtraThisFields
     >,
     TChainingFilter
   > {
@@ -254,12 +266,38 @@ export class BehaviorBuilder<
   /**
    * Finish the behavior definition process
    */
-  register(): Behavior<TData, TProperty, TMethod, TPendingChainingFilter, TComponentExport> {
+  register(): Behavior<
+    TData,
+    TProperty,
+    TMethod,
+    TPendingChainingFilter,
+    TComponentExport,
+    TExtraThisFields
+  > {
     return new Behavior(
       this._$.registerBehavior(),
       this._$parents,
       this._$definitionFilter,
       this._$export,
     )
+  }
+
+  /**
+   * Add extra this fields type
+   */
+  extraThisFieldsType<T extends DataList>(): ResolveBehaviorBuilder<
+    BehaviorBuilder<
+      TPrevData,
+      TData,
+      TProperty,
+      TMethod,
+      TChainingFilter,
+      TPendingChainingFilter,
+      TComponentExport,
+      TExtraThisFields & T
+    >,
+    TChainingFilter
+  > {
+    return this as any
   }
 }

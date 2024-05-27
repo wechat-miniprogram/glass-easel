@@ -5,6 +5,7 @@ import { SelectorQuery } from './selector_query'
 import { IntersectionObserver } from './intersection'
 import { MediaQueryObserver } from './media_query'
 
+type Empty = typeUtils.Empty
 type DataList = typeUtils.DataList
 type PropertyList = typeUtils.PropertyList
 type MethodList = typeUtils.MethodList
@@ -76,9 +77,10 @@ export type Component<
   TProperty extends PropertyList,
   TMethod extends MethodList,
   TComponentExport,
+  TExtraThisFields extends DataList = Empty,
 > = ComponentCaller<TData, TProperty, TMethod, TComponentExport> & {
   [k in keyof TMethod]: TMethod[k]
-}
+} & TExtraThisFields
 
 export class ComponentCaller<
   TData extends DataList,

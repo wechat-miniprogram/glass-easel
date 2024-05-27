@@ -2,6 +2,7 @@ import type * as glassEasel from 'glass-easel'
 import { type GeneralComponentDefinition, type utils as typeUtils } from './types'
 import { type GeneralComponent } from './component'
 
+type Empty = typeUtils.Empty
 type DataList = typeUtils.DataList
 type PropertyList = typeUtils.PropertyList
 type MethodList = typeUtils.MethodList
@@ -16,6 +17,7 @@ export type GeneralBehavior = Behavior<
   Record<string, any>,
   Record<string, any>,
   Record<string, any>,
+  any,
   any
 >
 
@@ -25,6 +27,7 @@ export class Behavior<
   TMethod extends MethodList,
   TChainingFilter extends ChainingFilterType,
   TComponentExport = never,
+  TExtraThisFields extends DataList = Empty,
 > {
   /** @internal */
   _$: glassEasel.GeneralBehavior
@@ -35,7 +38,7 @@ export class Behavior<
 
   /** @internal */
   constructor(
-    inner: glassEasel.Behavior<TData, TProperty, TMethod, TChainingFilter>,
+    inner: glassEasel.Behavior<TData, TProperty, TMethod, TChainingFilter, TExtraThisFields>,
     parents: GeneralBehavior[],
     definitionFilter: DefinitionFilter | undefined,
     componentExport: ((source: GeneralComponent | null) => TComponentExport) | undefined,

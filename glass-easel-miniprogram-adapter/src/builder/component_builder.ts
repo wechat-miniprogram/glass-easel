@@ -36,6 +36,7 @@ export class ComponentBuilder<
   TChainingFilter extends ChainingFilterType = never,
   TPendingChainingFilter extends ChainingFilterType = never,
   TComponentExport = never,
+  TExtraThisFields extends DataList = Empty,
 > extends BaseBehaviorBuilder<
   TPrevData,
   TData,
@@ -43,7 +44,8 @@ export class ComponentBuilder<
   TMethod,
   TChainingFilter,
   TPendingChainingFilter,
-  TComponentExport
+  TComponentExport,
+  TExtraThisFields
 > {
   private _$is!: string
   private _$alias?: string[]
@@ -92,8 +94,16 @@ export class ComponentBuilder<
     UMethod extends MethodList,
     UChainingFilter extends ChainingFilterType,
     UComponentExport,
+    UExtraThisFields extends DataList,
   >(
-    behavior: Behavior<UData, UProperty, UMethod, UChainingFilter, UComponentExport>,
+    behavior: Behavior<
+      UData,
+      UProperty,
+      UMethod,
+      UChainingFilter,
+      UComponentExport,
+      UExtraThisFields
+    >,
   ): ResolveBehaviorBuilder<
     ComponentBuilder<
       TPrevData,
@@ -102,7 +112,8 @@ export class ComponentBuilder<
       TMethod & UMethod,
       UChainingFilter,
       TPendingChainingFilter,
-      UComponentExport
+      UComponentExport,
+      TExtraThisFields & UExtraThisFields
     >,
     UChainingFilter
   > {
@@ -127,7 +138,8 @@ export class ComponentBuilder<
       TMethod,
       TChainingFilter,
       TPendingChainingFilter,
-      TNewComponentExport
+      TNewComponentExport,
+      TExtraThisFields
     >,
     TChainingFilter
   > {
@@ -152,7 +164,8 @@ export class ComponentBuilder<
       TMethod,
       TChainingFilter,
       TPendingChainingFilter,
-      TComponentExport
+      TComponentExport,
+      TExtraThisFields
     >,
     TChainingFilter
   > {
@@ -175,7 +188,8 @@ export class ComponentBuilder<
       TMethod,
       TChainingFilter,
       TPendingChainingFilter,
-      TComponentExport
+      TComponentExport,
+      TExtraThisFields
     >,
     TChainingFilter
   > {
@@ -188,7 +202,7 @@ export class ComponentBuilder<
    * The public method can be used as an event handler, and can be visited in component instance.
    */
   override methods<T extends MethodList>(
-    funcs: T & ThisType<Component<TData, TProperty, TMethod & T, any>>,
+    funcs: T & ThisType<Component<TData, TProperty, TMethod & T, any, TExtraThisFields>>,
   ): ResolveBehaviorBuilder<
     ComponentBuilder<
       TPrevData,
@@ -197,7 +211,8 @@ export class ComponentBuilder<
       TMethod & T,
       TChainingFilter,
       TPendingChainingFilter,
-      TComponentExport
+      TComponentExport,
+      TExtraThisFields
     >,
     TChainingFilter
   > {
@@ -213,11 +228,11 @@ export class ComponentBuilder<
    */
   override init<TExport extends Record<string, TaggedMethod<(...args: any[]) => any>> | void>(
     func: (
-      this: Component<TData, TProperty, TMethod, TComponentExport>,
+      this: Component<TData, TProperty, TMethod, TComponentExport, TExtraThisFields>,
       builderContext: BuilderContext<
         TPrevData,
         TProperty,
-        Component<TData, TProperty, TMethod, TComponentExport>
+        Component<TData, TProperty, TMethod, TComponentExport, TExtraThisFields>
       >,
     ) => TExport,
     // eslint-disable-next-line function-paren-newline
@@ -229,7 +244,8 @@ export class ComponentBuilder<
       TMethod,
       TChainingFilter,
       TPendingChainingFilter,
-      TComponentExport
+      TComponentExport,
+      TExtraThisFields
     >,
     TChainingFilter
   > {
@@ -249,7 +265,8 @@ export class ComponentBuilder<
           TData & TNewData,
           TProperty & TNewProperty,
           TMethod & TNewMethod,
-          TNewComponentExport
+          TNewComponentExport,
+          TExtraThisFields
         >
       >,
   ): ResolveBehaviorBuilder<
@@ -260,7 +277,8 @@ export class ComponentBuilder<
       TMethod & TNewMethod,
       TChainingFilter,
       TPendingChainingFilter,
-      TNewComponentExport
+      TNewComponentExport,
+      TExtraThisFields
     >,
     TChainingFilter
   > {
@@ -271,7 +289,15 @@ export class ComponentBuilder<
 
   pageDefinition<TNewData extends DataList, TNewExtraFields extends { [k: PropertyKey]: any }>(
     def: PageDefinition<TNewData, TNewExtraFields> &
-      ThisType<Component<TData & TNewData, TProperty, TMethod & TNewExtraFields, undefined>>,
+      ThisType<
+        Component<
+          TData & TNewData,
+          TProperty,
+          TMethod & TNewExtraFields,
+          undefined,
+          TExtraThisFields
+        >
+      >,
   ): ResolveBehaviorBuilder<
     ComponentBuilder<
       TPrevData,
@@ -280,7 +306,8 @@ export class ComponentBuilder<
       TMethod & TNewExtraFields,
       TChainingFilter,
       TPendingChainingFilter,
-      TComponentExport
+      TComponentExport,
+      TExtraThisFields
     >,
     TChainingFilter
   > {
@@ -333,5 +360,24 @@ export class ComponentBuilder<
       this._$codeSpace.getComponentSpace().exportComponent(alias, this._$is)
     })
     return new ComponentType(compDef)
+  }
+
+  /**
+   * Add extra this fields type
+   */
+  extraThisFieldsType<T extends DataList>(): ResolveBehaviorBuilder<
+    ComponentBuilder<
+      TPrevData,
+      TData,
+      TProperty,
+      TMethod,
+      TChainingFilter,
+      TPendingChainingFilter,
+      TComponentExport,
+      TExtraThisFields & T
+    >,
+    TChainingFilter
+  > {
+    return this as any
   }
 }

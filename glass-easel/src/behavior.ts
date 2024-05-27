@@ -122,7 +122,8 @@ export type GeneralBehaviorBuilder = BehaviorBuilder<
   Record<string, any>,
   Record<string, any>,
   never,
-  never
+  never,
+  Record<string, any>
 >
 
 export class BehaviorBuilder<
@@ -132,6 +133,7 @@ export class BehaviorBuilder<
   TMethod extends MethodList = Empty,
   TChainingFilter extends ChainingFilterType = never,
   TPendingChainingFilter extends ChainingFilterType = never,
+  TExtraThisFields extends DataList = Empty,
 > {
   /** @internal */
   _$ownerSpace: ComponentSpace
@@ -182,7 +184,7 @@ export class BehaviorBuilder<
   /** @internal */
   _$init: ((this: any, ctx: any) => any)[] = []
   /** @internal */
-  _$methodCallerInit?: (this: ComponentInstance<TData, TProperty, TMethod>) => any
+  _$methodCallerInit?: (this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>) => any
 
   /** @internal */
   constructor(is: string | undefined, ownerSpace: ComponentSpace) {
@@ -197,7 +199,7 @@ export class BehaviorBuilder<
    * that will be used in future.
    */
   methodCallerInit(
-    func: (this: ComponentInstance<TData, TProperty, TMethod>) => any,
+    func: (this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>) => any,
   ): ResolveBehaviorBuilder<this, TChainingFilter> {
     this._$methodCallerInit = func
     return this as any
@@ -213,8 +215,9 @@ export class BehaviorBuilder<
     UProperty extends PropertyList,
     UMethod extends MethodList,
     UChainingFilter extends ChainingFilterType,
+    UExtraThisFields extends DataList,
   >(
-    behavior: Behavior<UData, UProperty, UMethod, UChainingFilter>,
+    behavior: Behavior<UData, UProperty, UMethod, UChainingFilter, UExtraThisFields>,
   ): ResolveBehaviorBuilder<
     BehaviorBuilder<
       TPrevData,
@@ -222,7 +225,8 @@ export class BehaviorBuilder<
       TProperty & UProperty,
       TMethod & UMethod,
       UChainingFilter,
-      TPendingChainingFilter
+      TPendingChainingFilter,
+      TExtraThisFields & UExtraThisFields
     >,
     UChainingFilter
   > {
@@ -254,7 +258,8 @@ export class BehaviorBuilder<
       {
         add: TAddedFields
         remove: TRemovedFields
-      }
+      },
+      TExtraThisFields
     >,
     TChainingFilter
   > {
@@ -349,7 +354,15 @@ export class BehaviorBuilder<
   data<T extends DataList>(
     gen: () => NewFieldList<DataWithPropertyValues<TData, TProperty>, T>,
   ): ResolveBehaviorBuilder<
-    BehaviorBuilder<T, TData & T, TProperty, TMethod, TChainingFilter, TPendingChainingFilter>,
+    BehaviorBuilder<
+      T,
+      TData & T,
+      TProperty,
+      TMethod,
+      TChainingFilter,
+      TPendingChainingFilter,
+      TExtraThisFields
+    >,
     TChainingFilter
   > {
     this._$data.push(() => safeCallback('Data Generator', gen, null, [], this._$is) ?? {})
@@ -366,7 +379,15 @@ export class BehaviorBuilder<
   staticData<T extends DataList>(
     data: NewFieldList<DataWithPropertyValues<TData, TProperty>, T>,
   ): ResolveBehaviorBuilder<
-    BehaviorBuilder<T, TData & T, TProperty, TMethod, TChainingFilter, TPendingChainingFilter>,
+    BehaviorBuilder<
+      T,
+      TData & T,
+      TProperty,
+      TMethod,
+      TChainingFilter,
+      TPendingChainingFilter,
+      TExtraThisFields
+    >,
     TChainingFilter
   > {
     this._$staticData = data
@@ -388,7 +409,8 @@ export class BehaviorBuilder<
       TProperty & Record<N, unknown extends V ? T : PropertyOption<T, V>>,
       TMethod,
       TChainingFilter,
-      TPendingChainingFilter
+      TPendingChainingFilter,
+      TExtraThisFields
     >,
     TChainingFilter
   > {
@@ -403,7 +425,7 @@ export class BehaviorBuilder<
    * The public method can be used as an event handler, and can be visited in component instance.
    */
   methods<T extends MethodList>(
-    funcs: T & ThisType<ComponentInstance<TData, TProperty, TMethod & T>>,
+    funcs: T & ThisType<ComponentInstance<TData, TProperty, TMethod & T, TExtraThisFields>>,
   ): ResolveBehaviorBuilder<
     BehaviorBuilder<
       TPrevData,
@@ -411,7 +433,8 @@ export class BehaviorBuilder<
       TProperty,
       TMethod & T,
       TChainingFilter,
-      TPendingChainingFilter
+      TPendingChainingFilter,
+      TExtraThisFields
     >,
     TChainingFilter
   > {
@@ -432,7 +455,10 @@ export class BehaviorBuilder<
     V = Merge<GetFromObserverPathString<DataWithPropertyValues<TPrevData, TProperty>, P>>,
   >(
     paths: P,
-    func: (this: ComponentInstance<TData, TProperty, TMethod>, newValue: V) => void,
+    func: (
+      this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>,
+      newValue: V,
+    ) => void,
     once?: boolean,
   ): ResolveBehaviorBuilder<this, TChainingFilter>
   observer<
@@ -445,14 +471,17 @@ export class BehaviorBuilder<
   >(
     paths: readonly [...P],
     func: (
-      this: ComponentInstance<TData, TProperty, TMethod>,
+      this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>,
       ...newValues: V extends any[] ? V : never
     ) => void,
     once?: boolean,
   ): ResolveBehaviorBuilder<this, TChainingFilter>
   observer(
     paths: string | readonly string[],
-    func: (this: ComponentInstance<TData, TProperty, TMethod>, ...args: any[]) => any,
+    func: (
+      this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>,
+      ...args: any[]
+    ) => any,
     once = false,
   ): ResolveBehaviorBuilder<this, TChainingFilter> {
     if (!this._$observers) this._$observers = []
@@ -471,7 +500,7 @@ export class BehaviorBuilder<
   lifetime<L extends keyof Lifetimes>(
     name: L,
     func: (
-      this: ComponentInstance<TData, TProperty, TMethod>,
+      this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>,
       ...args: Parameters<Lifetimes[L]>
     ) => ReturnType<Lifetimes[L]>,
     once = false,
@@ -485,7 +514,10 @@ export class BehaviorBuilder<
    */
   pageLifetime(
     name: string,
-    func: (this: ComponentInstance<TData, TProperty, TMethod>, ...args: any[]) => any,
+    func: (
+      this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>,
+      ...args: any[]
+    ) => any,
     once = false,
   ): ResolveBehaviorBuilder<this, TChainingFilter> {
     if (!this._$pageLifetimes) this._$pageLifetimes = []
@@ -498,7 +530,7 @@ export class BehaviorBuilder<
    */
   relation(
     name: string,
-    rel: RelationParams & ThisType<ComponentInstance<TData, TProperty, TMethod>>,
+    rel: RelationParams & ThisType<ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>>,
   ): ResolveBehaviorBuilder<this, TChainingFilter> {
     if (!this._$relations) this._$relations = []
     this._$relations.push({ name, rel })
@@ -514,11 +546,11 @@ export class BehaviorBuilder<
    */
   init<TExport extends Record<string, TaggedMethod<(...args: any[]) => any>> | void>(
     func: (
-      this: ComponentInstance<TData, TProperty, TMethod>,
+      this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>,
       builderContext: BuilderContext<
         TPrevData,
         TProperty,
-        ComponentInstance<TData, TProperty, TMethod>
+        ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>
       >,
     ) => TExport,
     // eslint-disable-next-line function-paren-newline
@@ -534,7 +566,8 @@ export class BehaviorBuilder<
               [K in keyof TExport]: UnTaggedMethod<TExport[K]>
             }),
       TChainingFilter,
-      TPendingChainingFilter
+      TPendingChainingFilter,
+      TExtraThisFields
     >,
     TChainingFilter
   > {
@@ -551,7 +584,14 @@ export class BehaviorBuilder<
     TNewMethod extends MethodList = Empty,
   >(
     def: ComponentParams<TNewData, TNewProperty, TNewMethod> &
-      ThisType<ComponentInstance<TData & TNewData, TProperty & TNewProperty, TMethod & TNewMethod>>,
+      ThisType<
+        ComponentInstance<
+          TData & TNewData,
+          TProperty & TNewProperty,
+          TMethod & TNewMethod,
+          TExtraThisFields
+        >
+      >,
   ): ResolveBehaviorBuilder<
     BehaviorBuilder<
       TPrevData,
@@ -559,7 +599,8 @@ export class BehaviorBuilder<
       TProperty & TNewProperty,
       TMethod & TNewMethod,
       TChainingFilter,
-      TPendingChainingFilter
+      TPendingChainingFilter,
+      TExtraThisFields
     >,
     TChainingFilter
   > {
@@ -683,13 +724,34 @@ export class BehaviorBuilder<
   /**
    * Finish build, generate a behavior, and register it in the component space
    */
-  registerBehavior(): Behavior<TData, TProperty, TMethod, TPendingChainingFilter> {
+  registerBehavior(): Behavior<
+    TData,
+    TProperty,
+    TMethod,
+    TPendingChainingFilter,
+    TExtraThisFields
+  > {
     const is = this._$is
     const behavior = new Behavior(this)
     if (is !== undefined) {
       this._$ownerSpace._$registerBehavior(is, behavior as unknown as GeneralBehavior)
     }
     return behavior as any
+  }
+
+  extraThisFieldsType<T extends DataList>(): ResolveBehaviorBuilder<
+    BehaviorBuilder<
+      TPrevData,
+      TData,
+      TProperty,
+      TMethod,
+      TChainingFilter,
+      TPendingChainingFilter,
+      TExtraThisFields & T
+    >,
+    TChainingFilter
+  > {
+    return this as any
   }
 
   /**
@@ -717,13 +779,22 @@ export class Behavior<
   TProperty extends PropertyList,
   TMethod extends MethodList,
   TChainingFilter extends ChainingFilterType,
+  TExtraThisFields extends DataList = Empty,
 > {
   /** @internal */
   private _$unprepared: boolean
   is: string
   ownerSpace: ComponentSpace
   /** @internal */
-  private _$builder: BehaviorBuilder<any, TData, TProperty, TMethod, any, TChainingFilter>
+  private _$builder: BehaviorBuilder<
+    any,
+    TData,
+    TProperty,
+    TMethod,
+    any,
+    TChainingFilter,
+    TExtraThisFields
+  >
   /** @internal */
   private _$flatAncestors: Set<GeneralBehavior>
   /** @internal */
@@ -764,8 +835,8 @@ export class Behavior<
   _$init: ((this: any, ctx: any) => any)[]
   /** @internal */
   _$methodCallerInit?: (
-    this: ComponentInstance<TData, TProperty, TMethod>,
-  ) => ComponentInstance<TData, TProperty, TMethod>
+    this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>,
+  ) => ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>
 
   /**
    * Create a behavior with classic-style definition
@@ -781,7 +852,17 @@ export class Behavior<
   }
 
   /** @internal */
-  constructor(builder: BehaviorBuilder<any, TData, TProperty, TMethod, any, TChainingFilter>) {
+  constructor(
+    builder: BehaviorBuilder<
+      any,
+      TData,
+      TProperty,
+      TMethod,
+      any,
+      TChainingFilter,
+      TExtraThisFields
+    >,
+  ) {
     this._$unprepared = true
     this.is = builder._$is || ''
     this.ownerSpace = builder._$ownerSpace
@@ -1379,5 +1460,6 @@ export type GeneralBehavior = Behavior<
   Record<string, any>,
   Record<string, any>,
   Record<string, any>,
+  any,
   any
 >

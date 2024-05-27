@@ -1069,4 +1069,43 @@ describe('define', () => {
     glassEasel.Element.pretendAttached(root.getComponent())
     expect(domHtml(root.getComponent())).toBe('<list><div>2</div><item></item><item></item></list>')
   })
+
+  test('chaining extraThisFieldsType', () => {
+    const env = new MiniProgramEnv()
+    const codeSpace = env.createCodeSpace('', true)
+
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
+      <div>{{hello}}</div>
+    `),
+    )
+
+    const beh = codeSpace
+      .behavior()
+      .extraThisFieldsType<{ behDelayedData: string }>()
+      .lifetime('created', function () {
+        this.behDelayedData = ' World!'
+      })
+      .register()
+
+    codeSpace
+      .component('path/to/comp')
+      .behavior(beh)
+      .extraThisFieldsType<{ delayedData: string }>()
+      .data(() => ({
+        hello: '',
+      }))
+      .lifetime('created', function () {
+        this.delayedData = 'Hello'
+        this.setData({
+          hello: this.delayedData + this.behDelayedData,
+        })
+      })
+      .register()
+
+    const ab = env.associateBackend()
+    const root = ab.createRoot('body', codeSpace, 'path/to/comp')
+    expect(domHtml(root.getComponent())).toBe('<div>Hello World!</div>')
+  })
 })

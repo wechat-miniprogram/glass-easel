@@ -379,7 +379,9 @@ export class ComponentSpace {
    *
    * This API is generally designed for adapters which require special method callers.
    */
-  defineWithMethodCaller(is?: string): BehaviorBuilder<Empty, Empty, Empty, Empty, never, never> {
+  defineWithMethodCaller(
+    is?: string,
+  ): BehaviorBuilder<Empty, Empty, Empty, Empty, never, never, Empty> {
     return new BehaviorBuilder(is, this)
   }
 
