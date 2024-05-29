@@ -1,6 +1,11 @@
+import { type GeneralComponent, type Component } from './component'
 import { Element } from './element'
+import { type NativeNode } from './native_node'
 import { type Node } from './node'
+import { type ShadowRoot } from './shadow_root'
+import { type TextNode } from './text_node'
 import { isElement, isTextNode } from './type_symbol'
+import { type VirtualNode } from './virtual_node'
 
 /** The iterator direction and order */
 export const enum ElementIteratorType {
@@ -23,7 +28,7 @@ export const enum ElementIteratorType {
  *
  * This iterator is convenient but seems a little slower.
  */
-export class ElementIterator {
+export class ElementIterator<T extends Node = Element> {
   /* @internal */
   private _$node: Node
   /* @internal */
@@ -85,18 +90,107 @@ export class ElementIterator {
   }
 
   /** Same as constructor (for backward compatibility) */
-  static create(node: Node, type: ElementIteratorType, nodeTypeLimit?: unknown): ElementIterator {
-    return new ElementIterator(node, type, nodeTypeLimit)
+  static create(
+    node: Node,
+    type: ElementIteratorType,
+    nodeTypeLimit?: typeof Element,
+  ): ElementIterator<Element>
+  static create(
+    node: Node,
+    type: ElementIteratorType,
+    nodeTypeLimit: typeof Component,
+  ): ElementIterator<GeneralComponent>
+  static create(
+    node: Node,
+    type: ElementIteratorType,
+    nodeTypeLimit: typeof NativeNode,
+  ): ElementIterator<NativeNode>
+  static create(
+    node: Node,
+    type: ElementIteratorType,
+    nodeTypeLimit: typeof ShadowRoot,
+  ): ElementIterator<ShadowRoot>
+  static create(
+    node: Node,
+    type: ElementIteratorType,
+    nodeTypeLimit: typeof VirtualNode,
+  ): ElementIterator<VirtualNode>
+  static create(
+    node: Node,
+    type: ElementIteratorType,
+    nodeTypeLimit: typeof TextNode,
+  ): ElementIterator<TextNode>
+  static create(
+    node: Node,
+    type: ElementIteratorType,
+    nodeTypeLimit: typeof Object,
+  ): ElementIterator<Node>
+  static create(node: Node, type: ElementIteratorType, nodeTypeLimit?: unknown) {
+    return new ElementIterator<Node>(node, type, nodeTypeLimit)
   }
 
-  forEach(f: (node: Node) => boolean) {
+  [Symbol.iterator](): Generator<T, void, boolean | void> {
+    return this._$getIterator()
+  }
+
+  private *_$getIterator(): Generator<T, void, boolean | void> {
     const nodeTypeLimit: any = this._$nodeTypeLimit
     const composed = this._$composed
     if (this._$isAncestor) {
       let cur = this._$node
       for (;;) {
         if (cur instanceof nodeTypeLimit) {
-          if (f(cur) === false) return
+          if ((yield cur as T) === false) return
+        }
+        let next: Element | null
+        if (composed) {
+          next = cur.getComposedParent()
+        } else {
+          next = cur.parentNode
+        }
+        if (next) cur = next
+        else break
+      }
+    } else {
+      const rootFirst = this._$rootFirst
+      const rec = function* (node: Node): Generator<T, void, boolean | void> {
+        if (rootFirst) {
+          if (node instanceof nodeTypeLimit) {
+            if ((yield node as T) === false) return
+          }
+        }
+        if (isElement(node)) {
+          if (composed) {
+            const iterator = node.iterateComposedChild()
+            for (let it = iterator.next(); !it.done; it = iterator.next()) {
+              yield* rec(it.value)
+            }
+          } else {
+            const childNodes = node.childNodes
+            for (let i = 0; i < childNodes.length; i += 1) {
+              const child = childNodes[i]!
+              yield* rec(child)
+            }
+          }
+        }
+        if (!rootFirst) {
+          if (node instanceof nodeTypeLimit) {
+            yield node as T
+          }
+        }
+      }
+      yield* rec(this._$node)
+    }
+  }
+
+  forEach(f: (node: T) => boolean | void) {
+    const nodeTypeLimit: any = this._$nodeTypeLimit
+    const composed = this._$composed
+    if (this._$isAncestor) {
+      let cur = this._$node
+      for (;;) {
+        if (cur instanceof nodeTypeLimit) {
+          if (f(cur as T) === false) return
         }
         let next: Element | null
         if (composed) {
@@ -112,7 +206,7 @@ export class ElementIterator {
       const rec = (node: Node): boolean => {
         if (rootFirst) {
           if (node instanceof nodeTypeLimit) {
-            if (f(node) === false) return false
+            if (f(node as T) === false) return false
           }
         }
         if (isElement(node)) {
@@ -133,7 +227,7 @@ export class ElementIterator {
         }
         if (!rootFirst) {
           if (node instanceof nodeTypeLimit) {
-            if (f(node) === false) return false
+            if (f(node as T) === false) return false
           }
         }
         return true
