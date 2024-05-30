@@ -14,7 +14,7 @@ import type {
 import { IDGenerator } from './utils'
 import { Fragment, ViewController } from './view_controller'
 
-export enum ChannelEventType {
+export const enum ChannelEventType {
   CREATE = 1,
   CREATE_CALLBACK,
   DESTROY,
