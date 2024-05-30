@@ -587,4 +587,4 @@ export class ViewController {
 //   }
 // }
 
-export { ChannelEventType, MessageChannelViewSide } from './message_channel'
+export { ChannelEventType, MessageChannelViewSide, getNodeId } from './message_channel'

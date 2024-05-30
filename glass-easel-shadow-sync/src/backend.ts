@@ -593,4 +593,7 @@ export const SyncBehavior = <TBehaviorBuilder extends GeneralBehaviorBuilder>(
   return builder
 }
 
+export const getNodeId = (node: Node) =>
+  (node.getBackendElement() as unknown as ShadowDomElement).id
+
 export { Channel, ChannelEventType, MessageChannelDataSide } from './message_channel'
