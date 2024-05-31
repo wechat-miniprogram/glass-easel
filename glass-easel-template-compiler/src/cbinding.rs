@@ -187,7 +187,7 @@ impl TmplGroup {
         let path = String::from_utf8_lossy(slice::from_raw_parts(path_buf, path_len)).to_string();
         self.inner()
             .direct_dependencies(&path)
-            .map(|x| x.map(|x| x.into()).collect::<Box<_>>())
+            .map(|x| x.map(|x| x.into()).collect::<Box<[StrRef]>>())
             .unwrap_or_default()
             .into()
     }
@@ -201,7 +201,7 @@ impl TmplGroup {
         let path = String::from_utf8_lossy(slice::from_raw_parts(path_buf, path_len)).to_string();
         self.inner()
             .script_dependencies(&path)
-            .map(|x| x.map(|x| x.into()).collect::<Box<_>>())
+            .map(|x| x.map(|x| x.into()).collect::<Box<[StrRef]>>())
             .unwrap_or_default()
             .into()
     }
@@ -215,7 +215,7 @@ impl TmplGroup {
         let path = String::from_utf8_lossy(slice::from_raw_parts(path_buf, path_len)).to_string();
         self.inner()
             .inline_script_module_names(&path)
-            .map(|x| x.map(|x| x.into()).collect::<Box<_>>())
+            .map(|x| x.map(|x| x.into()).collect::<Box<[StrRef]>>())
             .unwrap_or_default()
             .into()
     }
