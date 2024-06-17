@@ -1,7 +1,7 @@
 {
   "name": "glass-easel-stylesheet-compiler",
   "description": "The stylesheet compiler of the glass-easel project.",
-  "version": "0.5.4",
+  "version": "0.6.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/wechat-miniprogram/glass-easel.git"
