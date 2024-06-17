@@ -10,8 +10,10 @@ use self::parse::{ParseError, ParseErrorLevel};
 use super::*;
 
 #[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TemplateParseError {
     is_error: bool,
+    level: ParseErrorLevel,
     code: u32,
     message: String,
     path: String,
@@ -25,6 +27,7 @@ impl From<ParseError> for TemplateParseError {
     fn from(value: ParseError) -> Self {
         Self {
             is_error: value.kind.level() >= ParseErrorLevel::Error,
+            level: value.kind.level(),
             code: value.code() as u32,
             message: value.kind.to_string(),
             path: value.path.to_string(),
