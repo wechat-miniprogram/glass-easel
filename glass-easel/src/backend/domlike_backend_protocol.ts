@@ -3,7 +3,7 @@ import { type EventBubbleStatus, type EventOptions, type MutLevel } from '../eve
 import { type BackendMode } from './shared'
 import type * as suggestedBackend from './suggested_backend_protocol'
 
-export interface Context extends Partial<suggestedBackend.ContextForDomLike<Element>> {
+export interface Context extends Partial<suggestedBackend.ContextForDomLike<Element, Element>> {
   mode: BackendMode.Domlike
   destroy(): void
   getWindowWidth(): number

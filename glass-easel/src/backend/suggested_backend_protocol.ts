@@ -1,4 +1,3 @@
-import { type Node } from '../node'
 import {
   type BoundingClientRect,
   type GetAllComputedStylesResponses,
@@ -36,21 +35,21 @@ export type ElementForDomLike = {
   readonly scrollHeight: number
 }
 
-export interface Context<Ctx> {
+export interface Context<Ctx, Elem> {
   createContext(
     options: unknown,
-    cb: (ContextWrapper: GetWrapper<Partial<Context<Ctx> & Ctx>>) => void,
+    cb: (ContextWrapper: GetWrapper<Partial<Context<Ctx, Elem> & Ctx>>) => void,
   ): void
 
-  setFocusedNode(target: Node): void
-  getFocusedNode(cb: (node: Node | undefined) => void): void
+  setFocusedNode(target: Elem): void
+  getFocusedNode(cb: (node: Elem | null) => void): void
 
   onWindowResize(
     cb: (res: { width: number; height: number; devicePixelRatio: number }) => void,
   ): void
   onThemeChange(cb: (res: { theme: string }) => void): void
 
-  elementFromPoint(left: number, top: number, cb: (node: Node) => void): void
+  elementFromPoint(left: number, top: number, cb: (node: Elem | null) => void): void
 
   createMediaQueryObserver(
     status: MediaQueryStatus,
@@ -120,15 +119,16 @@ type UnshiftTarget<Fn, T> = Fn extends (...args: infer Args) => infer Ret
 
 type UnshiftTargets<T, E> = { [K in keyof T]: UnshiftTarget<T[K], E> }
 
-export type ContextForDomLike<Ctx> = Context<Ctx> &
+export type ContextForDomLike<Ctx, Elem> = Context<Ctx, Elem> &
   UnshiftTargets<
     Pick<
-      Element<Ctx>,
+      Element<Elem>,
       | 'getAllComputedStyles'
       | 'createIntersectionObserver'
       | 'getMatchedRules'
+      | 'getScrollOffset'
       | 'setScrollPosition'
       | 'getContext'
     >,
-    Ctx
+    Elem
   >

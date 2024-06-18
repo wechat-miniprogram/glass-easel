@@ -47,7 +47,7 @@ export type GetMatchedRulesResponses = {
 }
 
 export type GetAllComputedStylesResponses = {
-  properties: CSSProperty[]
+  properties: { name: string; value: string }[]
 }
 
 export interface Observer {

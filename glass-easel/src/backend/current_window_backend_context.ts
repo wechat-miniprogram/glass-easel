@@ -8,6 +8,7 @@ import { triggerWarning } from '../warning'
 import { type Context, type Element } from './domlike_backend_protocol'
 import {
   BackendMode,
+  type ScrollOffset,
   type IntersectionStatus,
   type MediaQueryStatus,
   type Observer,
@@ -70,7 +71,7 @@ export class CurrentWindowBackendContext implements Context {
   }
 
   getTheme(): string {
-    return 'light'
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   }
 
   registerStyleSheetContent(path: string, content: unknown): void {
@@ -473,6 +474,80 @@ export class CurrentWindowBackendContext implements Context {
   }
 
   getContext(element: Element, cb: (res: unknown) => void): void {
-    cb(null)
+    cb(element)
+  }
+
+  setFocusedNode(target: Element): void {
+    ;(target as unknown as HTMLElement).focus()
+  }
+
+  getFocusedNode(cb: (node: Element | null) => void): void {
+    const node = document.activeElement as Element | null
+    cb(node)
+  }
+
+  onWindowResize(
+    cb: (res: { width: number; height: number; devicePixelRatio: number }) => void,
+  ): void {
+    window.addEventListener('resize', () => {
+      cb({
+        width: this.getWindowWidth(),
+        height: this.getWindowHeight(),
+        devicePixelRatio: this.getDevicePixelRatio(),
+      })
+    })
+  }
+
+  onThemeChange(cb: (res: { theme: string }) => void): void {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      cb({ theme: this.getTheme() })
+    })
+  }
+
+  elementFromPoint(left: number, top: number, cb: (node: Element | null) => void): void {
+    const node = document.elementFromPoint(left, top) as Element | null
+    cb(node)
+  }
+
+  getAllComputedStyle(
+    target: Element,
+    cb: (computedStyle: { name: string; value: string }[]) => void,
+  ): void {
+    const style = window.getComputedStyle(target as unknown as HTMLElement)
+    const res: { name: string; value: string }[] = []
+    for (let i = 0; i < style.length; i += 1) {
+      const name = style[i]!
+      res.push({ name, value: style.getPropertyValue(name) })
+    }
+    cb(res)
+  }
+
+  getScrollOffset(target: Element, cb: (res: ScrollOffset) => void): void {
+    const elem = target as unknown as HTMLElement
+    const scrollLeft = elem.scrollLeft
+    const scrollTop = elem.scrollTop
+    const scrollWidth = elem.scrollWidth
+    const scrollHeight = elem.scrollHeight
+    cb({ scrollLeft, scrollTop, scrollWidth, scrollHeight })
+  }
+
+  setScrollPosition(
+    target: Element,
+    scrollLeft: number,
+    scrollTop: number,
+    duration: number,
+  ): void {
+    if (scrollLeft <= 0 && scrollTop <= 0) {
+      ;(target as unknown as HTMLElement).scrollIntoView({
+        behavior: duration !== 0 ? 'smooth' : 'auto',
+      })
+    } else {
+      const { left, top } = (target as unknown as HTMLElement).getBoundingClientRect()
+      window.scrollTo({
+        left: left + scrollLeft,
+        top: top + scrollTop,
+        behavior: duration !== 0 ? 'smooth' : 'auto',
+      })
+    }
   }
 }

@@ -7,7 +7,7 @@ import type * as suggestedBackend from './suggested_backend_protocol'
 
 export * from './shared'
 
-export interface Context extends Partial<suggestedBackend.Context<Context>> {
+export interface Context extends Partial<suggestedBackend.Context<Context, Element>> {
   mode: BackendMode.Shadow
   destroy(): void
   getWindowWidth(): number
