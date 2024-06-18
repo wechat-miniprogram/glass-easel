@@ -1,4 +1,4 @@
-import { type ComponentDefinition } from './component'
+import { type GeneralComponent, type ComponentDefinition } from './component'
 import {
   type ComponentInstance,
   type DataList,
@@ -41,6 +41,13 @@ export interface NodeCast {
    * Returns `null` if the element is not a virtual node.
    */
   asVirtualNode(): VirtualNode | null
+
+  /**
+   * Cast an element to a general component
+   *
+   * Returns `null` if the element is not a component
+   */
+  asGeneralComponent(): GeneralComponent | null
 
   /**
    * Cast an element to the instance of the specified component

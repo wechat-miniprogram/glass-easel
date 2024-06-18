@@ -12,7 +12,7 @@ import {
   type domlikeBackend,
 } from './backend'
 import { type ClassList } from './class_list'
-import { type ComponentDefinition } from './component'
+import { type GeneralComponent, type ComponentDefinition } from './component'
 import {
   type ComponentInstance,
   type DataList,
@@ -333,6 +333,13 @@ export class Element implements NodeCast {
 
   asVirtualNode(): VirtualNode | null {
     if (isVirtualNode(this)) {
+      return this
+    }
+    return null
+  }
+
+  asGeneralComponent(): GeneralComponent | null {
+    if (isComponent(this)) {
       return this
     }
     return null
