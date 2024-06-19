@@ -3392,7 +3392,9 @@ mod test {
         );
         case!(
             "<block wx:if='{{a}}'/> <!--abc--> <block wx:elif /><!----><block wx:else />",
-            r#"<block wx:if="{{a}}"/><block wx:elif><!--abc--></block><block wx:else><!----></block>"#
+            r#"<block wx:if="{{a}}"/><block wx:elif><!--abc--></block><block wx:else><!----></block>"#,
+            ParseErrorKind::MissingAttributeValue,
+            44..48
         );
     }
 
