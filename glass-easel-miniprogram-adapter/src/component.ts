@@ -167,7 +167,7 @@ export class ComponentCaller<
    */
   // eslint-disable-next-line class-methods-use-this
   groupSetData(callback: () => void) {
-    callback()
+    glassEasel.safeCallback('GroupSetData Callback', callback, this, [], this._$)
   }
 
   /**
@@ -188,7 +188,7 @@ export class ComponentCaller<
     this._$.setData(data as any)
     if (callback) {
       glassEasel.triggerRender(this._$, () => {
-        callback()
+        glassEasel.safeCallback('SetData Callback', callback, this, [], this._$)
       })
     }
   }
@@ -280,8 +280,10 @@ export class ComponentCaller<
    * and then apply them at the end of the callback.
    * `setData` and `applyDataUpdates` calls inside the callback still apply updates immediately.
    */
-  groupUpdates<T>(callback: () => T): T {
-    return this._$.groupUpdates(callback)
+  groupUpdates<T>(callback: () => T): T | undefined {
+    return this._$.groupUpdates(() =>
+      glassEasel.safeCallback('GroupUpdates Callback', callback, this, [], this._$),
+    )
   }
 
   /**
