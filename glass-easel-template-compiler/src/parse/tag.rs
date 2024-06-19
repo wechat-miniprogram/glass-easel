@@ -759,14 +759,14 @@ impl Element {
                 // actually parse the value
                 enum AttrPrefixParseResult {
                     Invalid,
-                    Value(Value),
+                    Value(Value, bool),
                     StaticStr(StrName),
                     ScopeName(StrName),
                 }
                 let attr_value = match parse_kind {
                     AttrPrefixParseKind::Value => {
                         if let Some(attr) = Attribute::parse_optional_value(ps, attr_name.clone()) {
-                            AttrPrefixParseResult::Value(attr.value)
+                            AttrPrefixParseResult::Value(attr.value, attr.is_value_unspecified)
                         } else {
                             AttrPrefixParseResult::Invalid
                         }
@@ -775,7 +775,7 @@ impl Element {
                         if let Some(attr) =
                             Attribute::parse_optional_value_as_object(ps, attr_name.clone())
                         {
-                            AttrPrefixParseResult::Value(attr.value)
+                            AttrPrefixParseResult::Value(attr.value, attr.is_value_unspecified)
                         } else {
                             AttrPrefixParseResult::Invalid
                         }
@@ -819,13 +819,14 @@ impl Element {
                 ) {
                     match element {
                         ElementKind::Normal { common, .. } | ElementKind::Slot { common, .. } => {
-                            if let AttrPrefixParseResult::Value(value) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
                                 common.event_bindings.push(EventBinding {
                                     name: attr_name,
                                     value,
                                     is_catch,
                                     is_mut,
                                     is_capture,
+                                    is_value_unspecified,
                                     prefix_location,
                                 });
                             }
@@ -845,7 +846,7 @@ impl Element {
                         | ElementKind::Slot {
                             values: attributes, ..
                         } => {
-                            if let AttrPrefixParseResult::Value(value) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
                                 if attributes
                                     .iter()
                                     .find(|x| x.name.name_eq(&attr_name))
@@ -860,6 +861,7 @@ impl Element {
                                         name: attr_name,
                                         value,
                                         is_model: false,
+                                        is_value_unspecified,
                                         prefix_location: None,
                                     };
                                     attributes.push(attr);
@@ -876,13 +878,16 @@ impl Element {
                     },
                     AttrPrefixKind::Id => match &mut element {
                         ElementKind::Normal { common, .. } | ElementKind::Slot { common, .. } => {
-                            if let AttrPrefixParseResult::Value(value) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
                                 if common.id.is_some() {
                                     ps.add_warning(
                                         ParseErrorKind::DuplicatedAttribute,
                                         attr_name.location,
                                     );
                                 } else {
+                                    if is_value_unspecified {
+                                        ps.add_warning(ParseErrorKind::MissingAttributeValue, attr_name.location.clone());
+                                    }
                                     common.id = Some((attr_name.location(), value));
                                 }
                             }
@@ -905,7 +910,7 @@ impl Element {
                             common: CommonElementAttributes { slot, .. },
                             ..
                         } => {
-                            if let AttrPrefixParseResult::Value(value) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, _) = attr_value {
                                 if slot.is_some() {
                                     ps.add_warning(
                                         ParseErrorKind::DuplicatedAttribute,
@@ -925,7 +930,7 @@ impl Element {
                     },
                     AttrPrefixKind::ClassString => match &mut element {
                         ElementKind::Normal { class, .. } => {
-                            if let AttrPrefixParseResult::Value(value) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
                                 if let ClassAttribute::Multiple(..) | ClassAttribute::String(..) =
                                     class
                                 {
@@ -934,6 +939,9 @@ impl Element {
                                         attr_name.location,
                                     );
                                 } else {
+                                    if is_value_unspecified {
+                                        ps.add_warning(ParseErrorKind::MissingAttributeValue, attr_name.location.clone());
+                                    }
                                     *class = ClassAttribute::String(attr_name.location(), value);
                                 }
                             }
@@ -949,7 +957,7 @@ impl Element {
                     },
                     AttrPrefixKind::StyleString => match &mut element {
                         ElementKind::Normal { style, .. } => {
-                            if let AttrPrefixParseResult::Value(value) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
                                 if let StyleAttribute::Multiple(..) | StyleAttribute::String(..) =
                                     style
                                 {
@@ -958,6 +966,9 @@ impl Element {
                                         attr_name.location,
                                     );
                                 } else {
+                                    if is_value_unspecified {
+                                        ps.add_warning(ParseErrorKind::MissingAttributeValue, attr_name.location.clone());
+                                    }
                                     *style = StyleAttribute::String(attr_name.location(), value);
                                 }
                             }
@@ -972,25 +983,31 @@ impl Element {
                         }
                     },
                     AttrPrefixKind::WxIf => {
-                        if let AttrPrefixParseResult::Value(value) = attr_value {
+                        if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
                             if wx_if.is_some() {
                                 ps.add_warning(
                                     ParseErrorKind::DuplicatedAttribute,
                                     attr_name.location,
                                 );
                             } else {
+                                if is_value_unspecified {
+                                    ps.add_warning(ParseErrorKind::MissingAttributeValue, attr_name.location.clone());
+                                }
                                 wx_if = Some((attr_name.location(), value));
                             }
                         }
                     }
                     AttrPrefixKind::WxElif => {
-                        if let AttrPrefixParseResult::Value(value) = attr_value {
+                        if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
                             if wx_elif.is_some() {
                                 ps.add_warning(
                                     ParseErrorKind::DuplicatedAttribute,
                                     attr_name.location,
                                 );
                             } else {
+                                if is_value_unspecified {
+                                    ps.add_warning(ParseErrorKind::MissingAttributeValue, attr_name.location.clone());
+                                }
                                 wx_elif = Some((attr_name.location(), value));
                             }
                         }
@@ -1014,13 +1031,16 @@ impl Element {
                         }
                     }
                     AttrPrefixKind::WxFor => {
-                        if let AttrPrefixParseResult::Value(value) = attr_value {
+                        if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
                             if wx_for.is_some() {
                                 ps.add_warning(
                                     ParseErrorKind::DuplicatedAttribute,
                                     attr_name.location,
                                 );
                             } else {
+                                if is_value_unspecified {
+                                    ps.add_warning(ParseErrorKind::MissingAttributeValue, attr_name.location.clone());
+                                }
                                 wx_for = Some((attr_name.location(), value));
                             }
                         }
@@ -1081,13 +1101,16 @@ impl Element {
                     }
                     AttrPrefixKind::TemplateIs => match &mut element {
                         ElementKind::TemplateRef { target, .. } => {
-                            if let AttrPrefixParseResult::Value(value) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
                                 if target.1.location().end != default_attr_position {
                                     ps.add_warning(
                                         ParseErrorKind::DuplicatedAttribute,
                                         attr_name.location,
                                     );
                                 } else {
+                                    if is_value_unspecified {
+                                        ps.add_warning(ParseErrorKind::MissingAttributeValue, attr_name.location.clone());
+                                    }
                                     *target = (attr_name.location(), value);
                                 }
                             }
@@ -1096,13 +1119,16 @@ impl Element {
                     },
                     AttrPrefixKind::TemplateData => match &mut element {
                         ElementKind::TemplateRef { data, .. } => {
-                            if let AttrPrefixParseResult::Value(value) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
                                 if data.1.location().end != default_attr_position {
                                     ps.add_warning(
                                         ParseErrorKind::DuplicatedAttribute,
                                         attr_name.location,
                                     );
                                 } else {
+                                    if is_value_unspecified {
+                                        ps.add_warning(ParseErrorKind::MissingAttributeValue, attr_name.location.clone());
+                                    }
                                     *data = (attr_name.location(), value);
                                 }
                             }
@@ -1150,7 +1176,7 @@ impl Element {
                     }
                     AttrPrefixKind::SlotName => match &mut element {
                         ElementKind::Slot { name, .. } => {
-                            if let AttrPrefixParseResult::Value(value) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, _) = attr_value {
                                 if name.1.location().end != default_attr_position {
                                     ps.add_warning(
                                         ParseErrorKind::DuplicatedAttribute,
@@ -1165,7 +1191,7 @@ impl Element {
                     },
                     AttrPrefixKind::Model(prefix_location) => match &mut element {
                         ElementKind::Normal { attributes, .. } => {
-                            if let AttrPrefixParseResult::Value(value) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
                                 if attributes
                                     .iter()
                                     .find(|x| x.name.name_eq(&attr_name))
@@ -1180,6 +1206,7 @@ impl Element {
                                         name: attr_name,
                                         value,
                                         is_model: true,
+                                        is_value_unspecified,
                                         prefix_location: Some(prefix_location),
                                     };
                                     attributes.push(attr);
@@ -1199,7 +1226,7 @@ impl Element {
                         ElementKind::Normal {
                             change_attributes, ..
                         } => {
-                            if let AttrPrefixParseResult::Value(value) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
                                 if change_attributes
                                     .iter()
                                     .find(|x| x.name.name_eq(&attr_name))
@@ -1214,6 +1241,7 @@ impl Element {
                                         name: attr_name,
                                         value,
                                         is_model: false,
+                                        is_value_unspecified,
                                         prefix_location: Some(prefix_location),
                                     });
                                 }
@@ -1262,7 +1290,7 @@ impl Element {
                     },
                     AttrPrefixKind::Data(prefix_location) => match &mut element {
                         ElementKind::Normal { data, .. } => {
-                            if let AttrPrefixParseResult::Value(value) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
                                 if data
                                     .iter()
                                     .find(|attr| attr.name.name_eq(&attr_name))
@@ -1277,6 +1305,7 @@ impl Element {
                                         name: attr_name,
                                         value,
                                         is_model: false,
+                                        is_value_unspecified,
                                         prefix_location: Some(prefix_location),
                                     });
                                 }
@@ -1293,7 +1322,7 @@ impl Element {
                     },
                     AttrPrefixKind::DataHyphen => match &mut element {
                         ElementKind::Normal { data, .. } => {
-                            if let AttrPrefixParseResult::Value(value) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
                                 if data
                                     .iter()
                                     .find(|attr| attr.name.name_eq(&attr_name))
@@ -1310,6 +1339,7 @@ impl Element {
                                         name: attr_name,
                                         value,
                                         is_model: false,
+                                        is_value_unspecified,
                                         prefix_location: Some(prefix_location),
                                     });
                                 }
@@ -1326,7 +1356,7 @@ impl Element {
                     },
                     AttrPrefixKind::Class(prefix_location) => match &mut element {
                         ElementKind::Normal { .. } => {
-                            if let AttrPrefixParseResult::Value(value) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, _) = attr_value {
                                 if class_attrs
                                     .iter()
                                     .find(|(_, x, _)| x.name_eq(&attr_name))
@@ -1352,7 +1382,7 @@ impl Element {
                     },
                     AttrPrefixKind::Style(prefix_location) => match &mut element {
                         ElementKind::Normal { .. } => {
-                            if let AttrPrefixParseResult::Value(value) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, _) = attr_value {
                                 if class_attrs
                                     .iter()
                                     .find(|(_, x, _)| x.name_eq(&attr_name))
@@ -1450,7 +1480,7 @@ impl Element {
                     }
                     AttrPrefixKind::Mark(prefix_location) => match &mut element {
                         ElementKind::Normal { common, .. } | ElementKind::Slot { common, .. } => {
-                            if let AttrPrefixParseResult::Value(value) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
                                 if common
                                     .marks
                                     .iter()
@@ -1466,6 +1496,7 @@ impl Element {
                                         name: attr_name,
                                         value,
                                         is_model: false,
+                                        is_value_unspecified,
                                         prefix_location: Some(prefix_location),
                                     });
                                 }
@@ -2266,6 +2297,7 @@ pub struct Attribute {
     pub name: Ident,
     pub value: Value,
     pub is_model: bool,
+    pub is_value_unspecified: bool,
     pub prefix_location: Option<Range<Position>>,
 }
 
@@ -2325,6 +2357,7 @@ impl Attribute {
 
     /// Parse the value part of the attribute, including the leading `=` .
     pub fn parse_optional_value(ps: &mut ParseState, name: Ident) -> Option<Self> {
+        let mut is_value_unspecified = false;
         let value = Attribute::parse_optional_value_part(
             ps,
             |ps, ch| {
@@ -2335,12 +2368,16 @@ impl Attribute {
                 value: v.name,
                 location: v.location,
             },
-            || Value::new_empty(name.location.end),
+            || {
+                is_value_unspecified = true;
+                Value::new_empty(name.location.end)
+            },
         );
         value.map(|value| Self {
             name,
             value,
             is_model: false,
+            is_value_unspecified,
             prefix_location: None,
         })
     }
@@ -2352,6 +2389,7 @@ impl Attribute {
     /// It is useful when compiling the `data` field in `<template />` .
     ///
     pub fn parse_optional_value_as_object(ps: &mut ParseState, name: Ident) -> Option<Self> {
+        let mut is_value_unspecified = false;
         let value = Attribute::parse_optional_value_part(
             ps,
             |ps, ch| {
@@ -2377,12 +2415,16 @@ impl Attribute {
                 value: v.name,
                 location: v.location,
             },
-            || Value::new_empty(name.location.end),
+            || {
+                is_value_unspecified = true;
+                Value::new_empty(name.location.end)
+            },
         );
         value.map(|value| Self {
             name,
             value,
             is_model: false,
+            is_value_unspecified,
             prefix_location: None,
         })
     }
@@ -2440,6 +2482,7 @@ pub struct EventBinding {
     pub is_catch: bool,
     pub is_mut: bool,
     pub is_capture: bool,
+    pub is_value_unspecified: bool,
     pub prefix_location: Range<Position>,
 }
 
