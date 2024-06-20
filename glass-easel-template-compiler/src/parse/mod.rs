@@ -504,7 +504,7 @@ impl ParseErrorKind {
             Self::DuplicatedName => ParseErrorLevel::Note,
             Self::AvoidUppercaseLetters => ParseErrorLevel::Note,
             Self::UnexpectedWhitespace => ParseErrorLevel::Note,
-            Self::MissingAttributeValue => ParseErrorLevel::Warn,
+            Self::MissingAttributeValue => ParseErrorLevel::Note,
             Self::DataBindingNotAllowed => ParseErrorLevel::Note,
             Self::InvalidIdentifier => ParseErrorLevel::Fatal,
             Self::InvalidScopeName => ParseErrorLevel::Note,
