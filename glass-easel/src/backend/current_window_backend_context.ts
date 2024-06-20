@@ -482,7 +482,10 @@ export class CurrentWindowBackendContext implements Context {
   }
 
   getFocusedNode(cb: (node: Element | null) => void): void {
-    const node = document.activeElement as Element | null
+    let node = document.activeElement as Element | null
+    while (!node?.__wxElement) {
+      node = node?.parentNode || null
+    }
     cb(node)
   }
 
@@ -505,7 +508,10 @@ export class CurrentWindowBackendContext implements Context {
   }
 
   elementFromPoint(left: number, top: number, cb: (node: Element | null) => void): void {
-    const node = document.elementFromPoint(left, top) as Element | null
+    let node = document.elementFromPoint(left, top) as Element | null
+    while (!node?.__wxElement) {
+      node = node?.parentNode || null
+    }
     cb(node)
   }
 

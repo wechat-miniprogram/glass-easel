@@ -81,6 +81,7 @@ export class NativeNode extends Element {
         }
       }
       if (ENV.DEV) performanceMeasureStart('backend.associateValue')
+      backendElement.__wxElement = node
       if (!(BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike))) {
         ;(backendElement as backend.Element | composedBackend.Element).associateValue(node)
       } else {

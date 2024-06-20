@@ -633,6 +633,7 @@ export class Component<
     // associate in backend
     if (backendElement) {
       if (ENV.DEV) performanceMeasureStart('backend.associateValue')
+      backendElement.__wxElement = comp
       if (!(BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext!.mode === BackendMode.Domlike))) {
         ;(backendElement as backend.Element | composedBackend.Element).associateValue(comp)
       } else {

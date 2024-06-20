@@ -29,6 +29,7 @@ export interface Context extends Partial<suggestedBackend.Context<Context, Eleme
 }
 
 export interface Element extends Partial<suggestedBackend.Element<Element>> {
+  __wxElement?: GlassEaselElement
   release(): void
   associateValue(v: GlassEaselElement): void
   appendChild(child: Element): void

@@ -227,7 +227,8 @@ abstract class Node implements glassEasel.backend.Element {
   DOCUMENT_FRAGMENT_NODE = NODE_TYPE.DOCUMENT_FRAGMENT_NODE as const
 
   public abstract nodeType: NODE_TYPE
-  public __wxElement: glassEasel.Node | undefined
+  public __wxElement: glassEasel.Element | undefined
+  public _$wxElement: glassEasel.Element | undefined
   public containingSlot: NativeNode | VirtualNode | null | undefined
   public slotNodes: Node[] = []
   public id = ''
@@ -510,9 +511,10 @@ abstract class Node implements glassEasel.backend.Element {
     this._$ownerContext._$allElements.splice(index, 1)
   }
 
-  associateValue(v: glassEasel.Node): void {
-    if (this.__wxElement) throw new Error(`associate value multiple times`)
-    this.__wxElement = v
+  associateValue(v: glassEasel.Element): void {
+    if (this._$wxElement) throw new Error(`associate value multiple times`)
+    if (v !== this.__wxElement) throw new Error(`wrong associate value`)
+    this._$wxElement = v
     if (v.ownerShadowRoot) {
       const ownerSpace = v.ownerShadowRoot.getHostNode()._$behavior.ownerSpace
       this._$styleScopeManager = ownerSpace.styleScopeManager
