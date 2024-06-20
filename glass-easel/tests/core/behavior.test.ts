@@ -612,4 +612,37 @@ describe('chaining-form interface', () => {
     const elem = glassEasel.Component.createWithContext('root', compDef, domBackend)
     expect(domHtml(elem)).toBe('<div>123</div>')
   })
+
+  test('chaining extraThisFieldsType', () => {
+    const beh = componentSpace
+      .define()
+      .extraThisFieldsType<{ behDelayedData: string }>()
+      .lifetime('created', function () {
+        this.behDelayedData = ' World!'
+      })
+      .registerBehavior()
+
+    const compDef = componentSpace
+      .define()
+      .behavior(beh)
+      .extraThisFieldsType<{ delayedData: string }>()
+      .data(() => ({
+        hello: '',
+      }))
+      .lifetime('created', function () {
+        this.delayedData = 'Hello'
+        this.setData({
+          hello: this.delayedData + this.behDelayedData,
+        })
+      })
+      .template(
+        tmpl(`
+        <div>{{hello}}</div>
+      `),
+      )
+      .registerComponent()
+
+    const elem = glassEasel.Component.createWithContext('root', compDef, domBackend)
+    expect(domHtml(elem)).toBe('<div>Hello World!</div>')
+  })
 })

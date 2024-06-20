@@ -1,6 +1,7 @@
 use std::ops::Range;
 
 use super::binding_map;
+use serde::{Deserialize, Serialize};
 pub use tag::Template;
 
 #[cfg(test)]
@@ -503,7 +504,7 @@ impl ParseErrorKind {
             Self::DuplicatedName => ParseErrorLevel::Note,
             Self::AvoidUppercaseLetters => ParseErrorLevel::Note,
             Self::UnexpectedWhitespace => ParseErrorLevel::Note,
-            Self::MissingAttributeValue => ParseErrorLevel::Warn,
+            Self::MissingAttributeValue => ParseErrorLevel::Note,
             Self::DataBindingNotAllowed => ParseErrorLevel::Note,
             Self::InvalidIdentifier => ParseErrorLevel::Fatal,
             Self::InvalidScopeName => ParseErrorLevel::Note,
@@ -534,7 +535,7 @@ impl std::fmt::Display for ParseErrorKind {
 }
 
 #[repr(u8)]
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum ParseErrorLevel {
     /// Likely to be an mistake and should be noticed.
     ///

@@ -1173,7 +1173,12 @@ impl Attribute {
         match &self.value {
             Value::Static { value, location: _ } => {
                 w.expr_stmt(|w| {
-                    write!(w, "if(C)O(N,{},{})", attr_name, gen_lit_str(value))?;
+                    let value = if self.is_value_unspecified {
+                        "true".into()
+                    } else {
+                        gen_lit_str(value)
+                    };
+                    write!(w, "if(C)O(N,{},{})", attr_name, value)?;
                     Ok(())
                 })?;
             }

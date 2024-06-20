@@ -2,7 +2,7 @@ import * as glassEasel from 'glass-easel'
 import { type MiniProgramEnv } from './env'
 import { type CodeSpace } from './space'
 import { StyleIsolation } from './types'
-import { ComponentCaller } from './component'
+import type { ComponentCaller } from './component'
 
 /**
  * A backend context that has been associated to an environment

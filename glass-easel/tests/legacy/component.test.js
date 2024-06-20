@@ -434,6 +434,34 @@ const testCases = function (testBackend) {
       expect(elem.data.a).toBe(1)
     })
 
+    it('should convert boolean typed template properties', function () {
+      regElem({
+        is: 'component-template-boolean-child',
+        properties: {
+          propString: String,
+          propBoolean: Boolean,
+        },
+      })
+      regElem({
+        is: 'component-template-boolean',
+        template: `
+          <component-template-boolean-child id="a" prop-string prop-boolean />
+          <component-template-boolean-child id="b" prop-string="{{d}}" prop-boolean="{{d}}" />
+        `,
+        data: {
+          d: false
+        },
+      })
+      var elem = createElem('component-template-boolean')
+      expect(elem.$.a.data.propString).toBe('true')
+      expect(elem.$.a.data.propBoolean).toBe(true)
+      expect(elem.$.b.data.propString).toBe('false')
+      expect(elem.$.b.data.propBoolean).toBe(false)
+      elem.setData({ d: true })
+      expect(elem.$.b.data.propString).toBe('true')
+      expect(elem.$.b.data.propBoolean).toBe(true)
+    })
+
     it('should call methods with proper arguments (method name binding)', function () {
       var callOrder = []
       regElem({

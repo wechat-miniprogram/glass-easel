@@ -12,7 +12,7 @@ import {
   type domlikeBackend,
 } from './backend'
 import { type ClassList } from './class_list'
-import { type ComponentDefinition } from './component'
+import { type GeneralComponent, type ComponentDefinition } from './component'
 import {
   type ComponentInstance,
   type DataList,
@@ -333,6 +333,13 @@ export class Element implements NodeCast {
 
   asVirtualNode(): VirtualNode | null {
     if (isVirtualNode(this)) {
+      return this
+    }
+    return null
+  }
+
+  asGeneralComponent(): GeneralComponent | null {
+    if (isComponent(this)) {
       return this
     }
     return null
@@ -2895,6 +2902,39 @@ export class Element implements NodeCast {
       return true
     }
     return recInheritSlots(this.childNodes)
+  }
+
+  /**
+   * Iterate composed child nodes (including virtual nodes)
+   *
+   * if `f` returns `false` then the iteration is interrupted.
+   * Returns `true` if that happens.
+   */
+  *iterateComposedChild(): Generator<Node, void, void> {
+    if (this._$inheritSlots) return
+    if (isComponent(this) && !this._$external) {
+      yield this.shadowRoot as ShadowRoot
+      return
+    }
+    if (this._$slotName !== null) {
+      const ownerShadowRoot = this.ownerShadowRoot
+      if (!ownerShadowRoot) return
+      const childNodes = this.slotNodes!
+      for (let i = 0; i < childNodes.length; i += 1) {
+        yield childNodes[i]!
+      }
+      return
+    }
+    const recInheritSlots = function* (children: Node[]): Generator<Node, void, void> {
+      for (let i = 0; i < children.length; i += 1) {
+        const child = children[i]!
+        yield child
+        if (child._$inheritSlots) {
+          yield* recInheritSlots(child.childNodes)
+        }
+      }
+    }
+    yield* recInheritSlots(this.childNodes)
   }
 
   /**

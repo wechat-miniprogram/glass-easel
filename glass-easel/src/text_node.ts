@@ -13,6 +13,7 @@ import { MutationObserverTarget } from './mutation_observer'
 import { type NodeCast } from './node'
 import { type ShadowRoot } from './shadow_root'
 import { TEXT_NODE_SYMBOL, isTextNode } from './type_symbol'
+import { GeneralComponent } from './component'
 
 export class TextNode implements NodeCast {
   /* @internal */
@@ -86,6 +87,11 @@ export class TextNode implements NodeCast {
 
   // eslint-disable-next-line class-methods-use-this
   asVirtualNode(): null {
+    return null
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  asGeneralComponent(): null {
     return null
   }
 

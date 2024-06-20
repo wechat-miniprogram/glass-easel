@@ -5,6 +5,7 @@ import { SelectorQuery } from './selector_query'
 import { IntersectionObserver } from './intersection'
 import { MediaQueryObserver } from './media_query'
 
+type Empty = typeUtils.Empty
 type DataList = typeUtils.DataList
 type PropertyList = typeUtils.PropertyList
 type MethodList = typeUtils.MethodList
@@ -76,9 +77,10 @@ export type Component<
   TProperty extends PropertyList,
   TMethod extends MethodList,
   TComponentExport,
+  TExtraThisFields extends DataList = Empty,
 > = ComponentCaller<TData, TProperty, TMethod, TComponentExport> & {
   [k in keyof TMethod]: TMethod[k]
-}
+} & TExtraThisFields
 
 export class ComponentCaller<
   TData extends DataList,
@@ -165,7 +167,7 @@ export class ComponentCaller<
    */
   // eslint-disable-next-line class-methods-use-this
   groupSetData(callback: () => void) {
-    callback()
+    glassEasel.safeCallback('GroupSetData Callback', callback, this, [], this._$)
   }
 
   /**
@@ -186,7 +188,7 @@ export class ComponentCaller<
     this._$.setData(data as any)
     if (callback) {
       glassEasel.triggerRender(this._$, () => {
-        callback()
+        glassEasel.safeCallback('SetData Callback', callback, this, [], this._$)
       })
     }
   }
@@ -278,8 +280,10 @@ export class ComponentCaller<
    * and then apply them at the end of the callback.
    * `setData` and `applyDataUpdates` calls inside the callback still apply updates immediately.
    */
-  groupUpdates<T>(callback: () => T): T {
-    return this._$.groupUpdates(callback)
+  groupUpdates<T>(callback: () => T): T | undefined {
+    return this._$.groupUpdates(() =>
+      glassEasel.safeCallback('GroupUpdates Callback', callback, this, [], this._$),
+    )
   }
 
   /**

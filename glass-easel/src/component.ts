@@ -248,7 +248,7 @@ export class ComponentDefinition<
   TMethod extends MethodList,
 > {
   is: string
-  behavior: Behavior<TData, TProperty, TMethod, any>
+  behavior: Behavior<TData, TProperty, TMethod, any, any>
   /** @internal */
   _$detail: ComponentDefinitionDetail<TData, TProperty, TMethod> | null
   /** @internal */
@@ -257,7 +257,7 @@ export class ComponentDefinition<
   private _$templateEngine: TemplateEngine
 
   /** @internal */
-  constructor(behavior: Behavior<TData, TProperty, TMethod, any>) {
+  constructor(behavior: Behavior<TData, TProperty, TMethod, any, any>) {
     this.behavior = behavior
     this.is = this.behavior.is
     this._$detail = null
@@ -428,7 +428,7 @@ export class Component<
 > extends Element {
   [COMPONENT_SYMBOL]: true
   /** @internal */
-  _$behavior: Behavior<TData, TProperty, TMethod, any>
+  _$behavior: Behavior<TData, TProperty, TMethod, any, any>
   /** @internal */
   _$definition: ComponentDefinition<TData, TProperty, TMethod>
   /** @internal */
@@ -708,7 +708,11 @@ export class Component<
 
     // call method caller init
     if (behavior._$methodCallerInit) {
-      const methodCaller = behavior._$methodCallerInit.call(comp)
+      const methodCaller = behavior._$methodCallerInit.call(comp) as unknown as ComponentInstance<
+        TData,
+        TProperty,
+        TMethod
+      >
       comp._$methodCaller = methodCaller
     }
 

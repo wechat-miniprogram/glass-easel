@@ -34,7 +34,7 @@ export type MutationObserverTextEvent = {
 
 export type MutationObserverChildEvent = {
   type: 'childList'
-  target: Node
+  target: Element
   addedNodes?: Node[]
   removedNodes?: Node[]
 }
