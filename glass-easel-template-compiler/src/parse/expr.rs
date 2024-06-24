@@ -1115,8 +1115,23 @@ define_operator!(logic_and, "&&", ["="]);
 define_operator!(logic_or, "||", ["="]);
 define_operator!(nullish_coalescing, "??", ["="]);
 
-define_operator!(condition, "?", ["?", "."]);
 define_operator!(condition_end, ":", []);
+
+impl ParseOperator {
+    fn condition(ps: &mut ParseState) -> Option<Range<Position>> {
+        ps
+            .consume_str_except_followed("?", ["?", "."])
+            .or_else(|| {
+                let [p0, p1, p2] = ps.peek_n::<3>()?;
+                if p0 == '?' && p1 == '.' && ('0'..='9').contains(&p2) {
+                    // `?.1` should be treated as `?` and `.1`
+                    ps.consume_str("?")
+                } else {
+                    None
+                }
+            })
+    }
+}
 
 // `=` `+=` `-=` `**=` `*=` `/=` `%=` `<<=` `>>=` `>>>=` `&=` `^=` `|=` `&&=` `||=` `??=` are not allowed
 
@@ -1955,6 +1970,13 @@ mod test {
             ParseErrorKind::UnexpectedExpressionCharacter,
             5..5
         );
+        case!(
+            "{{ a ?. 1 : 2 }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            5..5
+        );
+        case!("{{ a ?.1 : 2 }}", "{{a?0.1:2}}");
         case!("{{ a ? b : c }}", "{{a?b:c}}");
     }
 
