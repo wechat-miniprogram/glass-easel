@@ -517,6 +517,7 @@ export class DataGroup<
     combined: DataChange[]
     count: number
   } | null = null
+  private _$recUpdateLevel = 0
 
   private _$generateInnerData(data: { [key: string]: DataValue }) {
     const pureDataPattern = this._$pureDataPattern
@@ -990,7 +991,15 @@ export class DataGroup<
     }
 
     // tell template engine what changed
+    if (this._$recUpdateLevel > 0 && comp) {
+      triggerWarning(
+        `recursive update detected: a data update is applying during another data update for component "${comp.is}" - this may disorder node trees`,
+        comp,
+      )
+    }
+    this._$recUpdateLevel += 1
     this._$updateListener?.(this.innerData || this.data, combinedChanges)
+    this._$recUpdateLevel -= 1
 
     // trigger prop observers (to simulating legacy behaviors)
     if (comp) {
