@@ -362,7 +362,7 @@ impl Expression {
         ps: &mut ParseState,
         prefer_object_inner: bool,
     ) -> Option<Box<Self>> {
-        ps.parse_on_auto_whitespace(|ps| {
+        ps.parse_on_auto_whitespace(|ps| ps.skip_whitespace_with_js_comments(), |ps| {
             let mut is_object_inner = false;
             ps.try_parse(|ps| -> Option<()> {
                 // try parse as an object
@@ -1106,8 +1106,8 @@ define_operator!(void, "void");
 
 // `**` is not supported
 
-define_operator!(multiply, "*", ["*", "="]);
-define_operator!(divide, "/", ["/", "="]);
+define_operator!(multiply, "*", ["*", "/", "="]);
+define_operator!(divide, "/", ["*", "/", "="]);
 define_operator!(remainer, "%", ["="]);
 
 define_operator!(plus, "+", ["+", "="]);
@@ -1416,6 +1416,14 @@ mod test {
     use crate::stringify::Stringify;
 
     use super::*;
+
+    #[test]
+    fn comments() {
+        case!("{{ /* TEST */ }}", "", ParseErrorKind::EmptyExpression, 14..14);
+        case!("{{ /* TEST */ a }}", "{{a}}");
+        case!("{{ /* * / }}", "", ParseErrorKind::MissingExpressionEnd, 0..2);
+        case!("{{ a -/**/-1 }}", "{{a- -1}}");
+    }
 
     #[test]
     fn ident() {

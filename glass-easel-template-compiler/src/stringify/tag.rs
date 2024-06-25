@@ -85,11 +85,7 @@ impl Stringify for Node {
         match self {
             Node::Text(value) => value.stringify_write(stringifier)?,
             Node::Element(element) => element.stringify_write(stringifier)?,
-            Node::Comment(s, location) => {
-                stringifier.write_str(r#"<!--"#)?;
-                stringifier.write_token(&s.replace("-->", "-- >"), None, &location)?;
-                stringifier.write_str(r#"-->"#)?;
-            }
+            Node::Comment(..) => {}
             Node::UnknownMetaTag(s, location) => {
                 stringifier.write_str(r#"<!"#)?;
                 stringifier.write_token(&escape_html_text(&s), None, &location)?;
@@ -98,6 +94,18 @@ impl Stringify for Node {
         }
         Ok(())
     }
+}
+
+fn is_children_empty(children: &[Node]) -> bool {
+    for n in children {
+        match n {
+            Node::Comment(..) => {}
+            Node::Element(..) | Node::Text(..) | Node::UnknownMetaTag(..) => {
+                return false;
+            }
+        }
+    }
+    true
 }
 
 impl Stringify for Element {
@@ -264,7 +272,7 @@ impl Stringify for Element {
                     "wx:elif"
                 };
                 write_named_attr(stringifier, name, loc, value)?;
-                if children.len() > 0 {
+                if !is_children_empty(children) {
                     stringifier.write_token(">", None, &self.start_tag_location.1)?;
                     for child in children {
                         child.stringify_write(stringifier)?;
@@ -299,7 +307,7 @@ impl Stringify for Element {
                 stringifier.write_str("block")?;
                 stringifier.write_str(" ")?;
                 stringifier.write_token("wx:else", None, loc)?;
-                if children.len() > 0 {
+                if !is_children_empty(children) {
                     stringifier.write_token(">", None, &self.start_tag_location.1)?;
                     for child in children {
                         child.stringify_write(stringifier)?;
@@ -512,7 +520,7 @@ impl Stringify for Element {
         // write tag body and end
         let empty_children = vec![];
         let children = self.children().unwrap_or(&empty_children);
-        if children.len() > 0 {
+        if !is_children_empty(children) {
             stringifier.write_token(">", None, &self.start_tag_location.1)?;
             for child in children {
                 child.stringify_write(stringifier)?;

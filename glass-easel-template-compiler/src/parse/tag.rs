@@ -2826,7 +2826,10 @@ impl Value {
         let Some(double_brace_left) = ps.consume_str("{{") else {
             return None;
         };
-        if let Some(range) = ps.consume_str("}}") {
+        if let Some(range) = ps.try_parse(|ps| {
+            ps.skip_whitespace_with_js_comments();
+            ps.consume_str("}}")
+        }) {
             ps.add_warning(ParseErrorKind::EmptyExpression, range.start..range.start);
             return Some(Self::Static {
                 value: CompactString::new_inline(""),
@@ -3097,6 +3100,7 @@ mod test {
     #[test]
     fn value_parsing() {
         case!("{{}}", r#""#, ParseErrorKind::EmptyExpression, 2..2);
+        case!("{{ }}", r#""#, ParseErrorKind::EmptyExpression, 3..3);
         case!("{ {", r#"{ {"#);
         case!("{{ a } }", "", ParseErrorKind::MissingExpressionEnd, 0..2);
         case!(
@@ -3446,7 +3450,7 @@ mod test {
         );
         case!(
             "<block wx:if='{{a}}'/> <!--abc--> <block wx:elif /><!----><block wx:else />",
-            r#"<block wx:if="{{a}}"/><block wx:elif><!--abc--></block><block wx:else><!----></block>"#,
+            r#"<block wx:if="{{a}}"/><block wx:elif/><block wx:else/>"#,
             ParseErrorKind::MissingAttributeValue,
             44..48
         );
