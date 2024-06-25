@@ -362,40 +362,43 @@ impl Expression {
         ps: &mut ParseState,
         prefer_object_inner: bool,
     ) -> Option<Box<Self>> {
-        ps.parse_on_auto_whitespace(|ps| ps.skip_whitespace_with_js_comments(), |ps| {
-            let mut is_object_inner = false;
-            ps.try_parse(|ps| -> Option<()> {
-                // try parse as an object
-                match Self::try_parse_field_name(ps) {
-                    Some(_) => {
-                        let peek = ps.peek::<0>()?;
-                        if peek == ':' || peek == ',' {
-                            is_object_inner = true;
-                        } else if prefer_object_inner && ps.peek_str("}}") {
-                            is_object_inner = true;
+        ps.parse_on_auto_whitespace(
+            |ps| ps.skip_whitespace_with_js_comments(),
+            |ps| {
+                let mut is_object_inner = false;
+                ps.try_parse(|ps| -> Option<()> {
+                    // try parse as an object
+                    match Self::try_parse_field_name(ps) {
+                        Some(_) => {
+                            let peek = ps.peek::<0>()?;
+                            if peek == ':' || peek == ',' {
+                                is_object_inner = true;
+                            } else if prefer_object_inner && ps.peek_str("}}") {
+                                is_object_inner = true;
+                            }
+                        }
+                        None => {
+                            if ps.peek_str("...") {
+                                is_object_inner = true;
+                            }
                         }
                     }
-                    None => {
-                        if ps.peek_str("...") {
-                            is_object_inner = true;
-                        }
-                    }
+                    None
+                });
+                if is_object_inner {
+                    let pos = ps.position();
+                    let fields = Self::parse_object_inner(ps)?;
+                    let end_pos = ps.position();
+                    let brace_location = (pos.clone()..pos, end_pos.clone()..end_pos);
+                    Some(Box::new(Expression::LitObj {
+                        fields,
+                        brace_location,
+                    }))
+                } else {
+                    Self::parse_cond(ps)
                 }
-                None
-            });
-            if is_object_inner {
-                let pos = ps.position();
-                let fields = Self::parse_object_inner(ps)?;
-                let end_pos = ps.position();
-                let brace_location = (pos.clone()..pos, end_pos.clone()..end_pos);
-                Some(Box::new(Expression::LitObj {
-                    fields,
-                    brace_location,
-                }))
-            } else {
-                Self::parse_cond(ps)
-            }
-        })
+            },
+        )
     }
 
     fn try_parse_field_name(ps: &mut ParseState) -> Option<(CompactString, Range<Position>)> {
@@ -1144,17 +1147,15 @@ define_operator!(condition_end, ":", []);
 
 impl ParseOperator {
     fn condition(ps: &mut ParseState) -> Option<Range<Position>> {
-        ps
-            .consume_str_except_followed("?", ["?", "."])
-            .or_else(|| {
-                let [p0, p1, p2] = ps.peek_n::<3>()?;
-                if p0 == '?' && p1 == '.' && ('0'..='9').contains(&p2) {
-                    // `?.1` should be treated as `?` and `.1`
-                    ps.consume_str("?")
-                } else {
-                    None
-                }
-            })
+        ps.consume_str_except_followed("?", ["?", "."]).or_else(|| {
+            let [p0, p1, p2] = ps.peek_n::<3>()?;
+            if p0 == '?' && p1 == '.' && ('0'..='9').contains(&p2) {
+                // `?.1` should be treated as `?` and `.1`
+                ps.consume_str("?")
+            } else {
+                None
+            }
+        })
     }
 }
 
@@ -1419,9 +1420,19 @@ mod test {
 
     #[test]
     fn comments() {
-        case!("{{ /* TEST */ }}", "", ParseErrorKind::EmptyExpression, 14..14);
+        case!(
+            "{{ /* TEST */ }}",
+            "",
+            ParseErrorKind::EmptyExpression,
+            14..14
+        );
         case!("{{ /* TEST */ a }}", "{{a}}");
-        case!("{{ /* * / }}", "", ParseErrorKind::MissingExpressionEnd, 0..2);
+        case!(
+            "{{ /* * / }}",
+            "",
+            ParseErrorKind::MissingExpressionEnd,
+            0..2
+        );
         case!("{{ a -/**/-1 }}", "{{a- -1}}");
     }
 

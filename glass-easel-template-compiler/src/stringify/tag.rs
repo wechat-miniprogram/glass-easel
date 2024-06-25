@@ -192,7 +192,11 @@ impl Stringify for Element {
                     attr.prefix_location.as_ref().unwrap_or(&attr.name.location),
                 )?;
                 stringifier.write_str(":")?;
-                stringifier.write_token(&attr.name.name, Some(&attr.name.name), &attr.name.location)?;
+                stringifier.write_token(
+                    &attr.name.name,
+                    Some(&attr.name.name),
+                    &attr.name.location,
+                )?;
                 if value != &attr.name.name {
                     stringifier.write_str(r#"="#)?;
                     stringifier.write_str_name_quoted(&StrName {

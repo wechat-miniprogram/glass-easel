@@ -341,7 +341,7 @@ impl<'s> ParseState<'s> {
                 if start_pos.is_none() {
                     start_pos = Some(range.start);
                 }
-                continue
+                continue;
             }
             if self.cur_str().starts_with("/*") {
                 if start_pos.is_none() {
@@ -349,9 +349,9 @@ impl<'s> ParseState<'s> {
                 }
                 self.skip_bytes(2);
                 self.skip_until_after("*/");
-                continue
+                continue;
             }
-            break
+            break;
         }
         start_pos.map(|x| x..self.position())
     }
