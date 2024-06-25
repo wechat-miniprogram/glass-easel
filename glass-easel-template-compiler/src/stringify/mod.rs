@@ -72,7 +72,7 @@ impl<'s, W: FmtWrite> Stringifier<'s, W> {
 
     fn write_scope_name(&mut self, index: usize, location: &Range<Position>) -> FmtResult {
         let name = self.get_scope_name(index).to_string();
-        self.write_token(&name, &name, location)
+        self.write_token(&name, Some(&name), location)
     }
 
     fn write_str(&mut self, s: &str) -> FmtResult {
@@ -91,7 +91,7 @@ impl<'s, W: FmtWrite> Stringifier<'s, W> {
     fn write_token(
         &mut self,
         dest_text: &str,
-        source_text: &str,
+        source_text: Option<&str>,
         location: &Range<Position>,
     ) -> FmtResult {
         self.smb.add(
@@ -100,7 +100,7 @@ impl<'s, W: FmtWrite> Stringifier<'s, W> {
             location.start.line,
             location.start.utf16_col,
             Some(self.source_path),
-            Some(source_text),
+            source_text,
         );
         self.write_str(dest_text)?;
         Ok(())
@@ -109,13 +109,13 @@ impl<'s, W: FmtWrite> Stringifier<'s, W> {
     fn write_str_name_quoted(&mut self, n: &StrName) -> FmtResult {
         let quoted = escape_html_quote(&n.name);
         self.write_str("\"")?;
-        self.write_token(&quoted, &n.name, &n.location())?;
+        self.write_token(&quoted, Some(&n.name), &n.location())?;
         self.write_str("\"")?;
         Ok(())
     }
 
-    fn write_ident(&mut self, n: &Ident) -> FmtResult {
-        self.write_token(&n.name, &n.name, &n.location())
+    fn write_ident(&mut self, n: &Ident, need_name: bool) -> FmtResult {
+        self.write_token(&n.name, need_name.then_some(&n.name), &n.location())
     }
 }
 
