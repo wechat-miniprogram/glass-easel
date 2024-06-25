@@ -801,6 +801,49 @@ impl Expression {
                 PathAnalysisState::NotInPath
             }
 
+            Expression::LeftShift {
+                left: x, right: y, ..
+            } => {
+                x.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Shift, path_calc, value)?;
+                write!(value, "<<")?;
+                y.to_proc_gen_rec_and_end_path(
+                    w,
+                    scopes,
+                    ExpressionLevel::Plus,
+                    path_calc,
+                    value,
+                )?;
+                PathAnalysisState::NotInPath
+            }
+            Expression::RightShift {
+                left: x, right: y, ..
+            } => {
+                x.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Shift, path_calc, value)?;
+                write!(value, ">>")?;
+                y.to_proc_gen_rec_and_end_path(
+                    w,
+                    scopes,
+                    ExpressionLevel::Plus,
+                    path_calc,
+                    value,
+                )?;
+                PathAnalysisState::NotInPath
+            }
+            Expression::UnsignedRightShift {
+                left: x, right: y, ..
+            } => {
+                x.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Shift, path_calc, value)?;
+                write!(value, ">>>")?;
+                y.to_proc_gen_rec_and_end_path(
+                    w,
+                    scopes,
+                    ExpressionLevel::Plus,
+                    path_calc,
+                    value,
+                )?;
+                PathAnalysisState::NotInPath
+            }
+
             Expression::Lt {
                 left: x, right: y, ..
             } => {
@@ -812,7 +855,7 @@ impl Expression {
                     value,
                 )?;
                 write!(value, "<")?;
-                y.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Plus, path_calc, value)?;
+                y.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Shift, path_calc, value)?;
                 PathAnalysisState::NotInPath
             }
             Expression::Gt {
@@ -826,7 +869,7 @@ impl Expression {
                     value,
                 )?;
                 write!(value, ">")?;
-                y.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Plus, path_calc, value)?;
+                y.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Shift, path_calc, value)?;
                 PathAnalysisState::NotInPath
             }
             Expression::Lte {
@@ -840,7 +883,7 @@ impl Expression {
                     value,
                 )?;
                 write!(value, "<=")?;
-                y.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Plus, path_calc, value)?;
+                y.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Shift, path_calc, value)?;
                 PathAnalysisState::NotInPath
             }
             Expression::Gte {
@@ -854,7 +897,7 @@ impl Expression {
                     value,
                 )?;
                 write!(value, ">=")?;
-                y.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Plus, path_calc, value)?;
+                y.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Shift, path_calc, value)?;
                 PathAnalysisState::NotInPath
             }
             Expression::InstanceOf {
@@ -868,7 +911,7 @@ impl Expression {
                     value,
                 )?;
                 write!(value, " instanceof ")?;
-                y.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Plus, path_calc, value)?;
+                y.to_proc_gen_rec_and_end_path(w, scopes, ExpressionLevel::Shift, path_calc, value)?;
                 PathAnalysisState::NotInPath
             }
             Expression::Eq {
@@ -1202,6 +1245,9 @@ fn proc_gen_expression_level(expr: &Expression) -> ExpressionLevel {
         Expression::Remainer { .. } => ExpressionLevel::Multiply,
         Expression::Plus { .. } => ExpressionLevel::Plus,
         Expression::Minus { .. } => ExpressionLevel::Plus,
+        Expression::LeftShift { .. } => ExpressionLevel::Shift,
+        Expression::RightShift { .. } => ExpressionLevel::Shift,
+        Expression::UnsignedRightShift { .. } => ExpressionLevel::Shift,
         Expression::Lt { .. } => ExpressionLevel::Comparison,
         Expression::Gt { .. } => ExpressionLevel::Comparison,
         Expression::Lte { .. } => ExpressionLevel::Comparison,
