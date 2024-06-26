@@ -4,7 +4,7 @@
   "main": "src/index.ts",
   "scripts": {
     "build": "webpack --config webpack.config.js",
-    "dev": "webpack --config webpack.config.js --watch"
+    "dev": "webpack --config webpack.dev.config.js --watch"
   },
   "dependencies": {
     "glass-easel": "workspace:*",

@@ -40,10 +40,11 @@ const genConfig = (
   type: 'dynamic' | 'shadow' | 'composed' | 'domlike',
   ext: string,
   format: ModuleFormat,
+  dev: boolean,
 ): RollupOptions => ({
   input: './src/index.ts',
   output: {
-    file: `dist/glass_easel.${ext ? `${ext}.` : ''}js`,
+    file: `dist/glass_easel.${dev ? 'dev.' : ''}${ext ? `${ext}.` : ''}js`,
     sourcemap,
     format,
     name: 'glassEasel',
@@ -78,24 +79,30 @@ const config: RollupOptions[] = [dtsCompilation]
 if (jobs.length) {
   jobs.forEach((name) => {
     const map = {
-      all: () => genConfig('dynamic', 'all', 'cjs'),
-      'all-es': () => genConfig('dynamic', 'all.es', 'es'),
-      'all-global': () => genConfig('dynamic', 'all.global', 'iife'),
-      shadow: () => genConfig('shadow', 'shadow', 'cjs'),
-      'shadow-es': () => genConfig('shadow', 'shadow.es', 'es'),
-      'shadow-global': () => genConfig('shadow', 'shadow.global', 'iife'),
-      composed: () => genConfig('composed', 'composed', 'cjs'),
-      'composed-es': () => genConfig('composed', 'composed.es', 'es'),
-      'composed-global': () => genConfig('composed', 'composed.global', 'iife'),
-      domlike: () => genConfig('domlike', 'domlike', 'cjs'),
-      'domlike-es': () => genConfig('domlike', 'domlike.es', 'es'),
-      'domlike-global': () => genConfig('domlike', 'domlike.global', 'iife'),
+      all: () => genConfig('dynamic', 'all', 'cjs', dev),
+      'all-es': () => genConfig('dynamic', 'all.es', 'es', dev),
+      'all-global': () => genConfig('dynamic', 'all.global', 'iife', dev),
+      shadow: () => genConfig('shadow', 'shadow', 'cjs', dev),
+      'shadow-es': () => genConfig('shadow', 'shadow.es', 'es', dev),
+      'shadow-global': () => genConfig('shadow', 'shadow.global', 'iife', dev),
+      composed: () => genConfig('composed', 'composed', 'cjs', dev),
+      'composed-es': () => genConfig('composed', 'composed.es', 'es', dev),
+      'composed-global': () => genConfig('composed', 'composed.global', 'iife', dev),
+      domlike: () => genConfig('domlike', 'domlike', 'cjs', dev),
+      'domlike-es': () => genConfig('domlike', 'domlike.es', 'es', dev),
+      'domlike-global': () => genConfig('domlike', 'domlike.global', 'iife', dev),
     } as Record<string, () => RollupOptions>
     if (!map[name]) throw new Error(`Unknown job: ${name}`)
     config.push(map[name]!())
   })
+} else if (dev) {
+  config.push(genConfig('dynamic', 'all.es', 'es', true))
 } else {
-  config.push(genConfig('dynamic', 'all', 'cjs'), genConfig('dynamic', 'all.es', 'es'))
+  config.push(
+    genConfig('dynamic', 'all', 'cjs', false),
+    genConfig('dynamic', 'all.es', 'es', false),
+    genConfig('dynamic', 'all.es', 'es', true),
+  )
 }
 
 export default config
