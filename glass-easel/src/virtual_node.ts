@@ -1,5 +1,5 @@
 import { BM, BackendMode, type GeneralBackendContext } from './backend'
-import { performanceMeasureEnd, performanceMeasureStart } from './devtool'
+import { performanceMeasureEnd, performanceMeasureStart } from './dev_tools'
 import { Element } from './element'
 import { ENV } from './global_options'
 import { type ShadowRoot } from './shadow_root'

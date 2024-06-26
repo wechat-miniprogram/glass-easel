@@ -1,7 +1,18 @@
 import { type AnyComponent, type GeneralComponent } from './component'
+import type { Element } from './element'
 import { ENV, globalOptions } from './global_options'
 
-export type DevtoolInterface = {
+export interface DevTools {
+  inspector?: InspectorDevTools
+  performance?: PerformanceDevTools
+}
+
+export interface InspectorDevTools {
+  addMountPoint(root: Element): void
+  removeMountPoint(root: Element): void
+}
+
+export interface PerformanceDevTools {
   now: () => number
   addTimelineEvent: (time: number, type: string, data?: Record<string, unknown>) => void
   addTimelineComponentEvent: (
@@ -28,17 +39,17 @@ export type DevtoolInterface = {
   ) => void
 }
 
-let defaultDevtools: DevtoolInterface | null | undefined
+let cachedDevTools: DevTools | undefined
 
-export const getDevtool = (): DevtoolInterface | null | undefined => {
+const getDevTools = (): DevTools | null | undefined => {
   if (!ENV.DEV) return null
-  if (defaultDevtools === undefined) {
-    defaultDevtools =
-      globalOptions.devtool ||
+  if (cachedDevTools === undefined) {
+    cachedDevTools =
+      globalOptions.devTools ||
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      ((globalThis as any).__glass_easel_devtool__ as DevtoolInterface | undefined)
+      ((globalThis as any).__glassEaselDevTools__ as DevTools | undefined)
   }
-  return defaultDevtools
+  return cachedDevTools
 }
 
 export const performanceMeasureStart = (
@@ -46,11 +57,13 @@ export const performanceMeasureStart = (
   comp: AnyComponent | string | null = null,
   data?: Record<string, unknown>,
 ) => {
-  getDevtool()?.addTimelinePerformanceMeasureStart(getDevtool()!.now(), type, comp, data)
+  const perf = getDevTools()?.performance
+  perf?.addTimelinePerformanceMeasureStart(perf.now(), type, comp, data)
 }
 
 export const performanceMeasureEnd = () => {
-  getDevtool()?.addTimelinePerformanceMeasureEnd(getDevtool()!.now())
+  const perf = getDevTools()?.performance
+  perf?.addTimelinePerformanceMeasureEnd(perf.now())
 }
 
 export const performanceMeasureRenderWaterfall = (
@@ -59,13 +72,13 @@ export const performanceMeasureRenderWaterfall = (
   comp: AnyComponent,
   render: () => void,
 ) => {
-  const devtool = getDevtool()
-  if (!devtool) {
+  const perf = getDevTools()?.performance
+  if (!perf) {
     render()
     return
   }
 
-  const pendingTimestamp = devtool.now()
+  const pendingTimestamp = perf.now()
   const nodeTreeContext = comp.getBackendContext()
   if (nodeTreeContext) {
     const measureId = nodeTreeContext.performanceTraceStart?.()
@@ -73,7 +86,7 @@ export const performanceMeasureRenderWaterfall = (
     render()
     performanceMeasureEnd()
     nodeTreeContext.performanceTraceEnd?.(measureId!, ({ startTimestamp, endTimestamp }) => {
-      devtool.addTimelineBackendWaterfall(waterfallType, [
+      perf.addTimelineBackendWaterfall(waterfallType, [
         pendingTimestamp,
         startTimestamp,
         endTimestamp,
@@ -85,5 +98,16 @@ export const performanceMeasureRenderWaterfall = (
 }
 
 export const addTimelineEvent = (type: string, data?: Record<string, unknown>) => {
-  getDevtool()?.addTimelineEvent(getDevtool()!.now(), type, data)
+  const perf = getDevTools()?.performance
+  perf?.addTimelineEvent(perf.now(), type, data)
+}
+
+export const attachInspector = (elem: Element) => {
+  const inspector = getDevTools()?.inspector
+  inspector?.addMountPoint(elem)
+}
+
+export const detachInspector = (elem: Element) => {
+  const inspector = getDevTools()?.inspector
+  inspector?.removeMountPoint(elem)
 }

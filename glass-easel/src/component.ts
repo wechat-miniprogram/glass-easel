@@ -51,7 +51,7 @@ import {
   performanceMeasureEnd,
   performanceMeasureRenderWaterfall,
   performanceMeasureStart,
-} from './devtool'
+} from './dev_tools'
 import { Element } from './element'
 import { type EventListener, type EventListenerOptions } from './event'
 import { type ExternalShadowRoot } from './external_shadow_tree'
