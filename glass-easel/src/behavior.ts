@@ -1229,15 +1229,15 @@ export class Behavior<
                     [],
                     is,
                   )
-                  return value !== undefined ? value : fallbackValue
+                  return value !== undefined ? value : simpleDeepCopy(fallbackValue)
                 }
-              : () => fallbackValue
+              : () => simpleDeepCopy(fallbackValue)
           if (typeof propDef.default === 'function') {
             initialValueFn = defaultFn
           } else if (propDef.value !== undefined) {
             initialValueFn = () => simpleDeepCopy(propDef.value)
           } else {
-            initialValueFn = () => fallbackValue
+            initialValueFn = () => simpleDeepCopy(fallbackValue)
           }
           let observer: ((newValue: any, oldValue: any) => void) | null
           if (typeof propDef.observer === 'function') {
