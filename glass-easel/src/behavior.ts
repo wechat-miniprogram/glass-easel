@@ -1275,7 +1275,7 @@ export class Behavior<
         this._$propertyMap[name] = d
         initValueFuncs.push({
           name,
-          func: d.default === undefined ? () => simpleDeepCopy(d.value) : d.default,
+          func: typeof d.default !== 'function' ? () => simpleDeepCopy(d.value) : d.default,
         })
       }
       this._$data.push(() => {
