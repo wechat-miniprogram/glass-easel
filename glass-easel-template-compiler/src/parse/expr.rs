@@ -120,6 +120,22 @@ pub enum Expression {
         location: Range<Position>,
     },
 
+    LeftShift {
+        left: Box<Expression>,
+        right: Box<Expression>,
+        location: Range<Position>,
+    },
+    RightShift {
+        left: Box<Expression>,
+        right: Box<Expression>,
+        location: Range<Position>,
+    },
+    UnsignedRightShift {
+        left: Box<Expression>,
+        right: Box<Expression>,
+        location: Range<Position>,
+    },
+
     Lt {
         left: Box<Expression>,
         right: Box<Expression>,
@@ -267,6 +283,9 @@ impl TemplateStructure for Expression {
             Self::Remainer { left, .. } => left.location_start(),
             Self::Plus { left, .. } => left.location_start(),
             Self::Minus { left, .. } => left.location_start(),
+            Self::LeftShift { left, .. } => left.location_start(),
+            Self::RightShift { left, .. } => left.location_start(),
+            Self::UnsignedRightShift { left, .. } => left.location_start(),
             Self::Lt { left, .. } => left.location_start(),
             Self::Gt { left, .. } => left.location_start(),
             Self::Lte { left, .. } => left.location_start(),
@@ -315,6 +334,9 @@ impl TemplateStructure for Expression {
             Self::Remainer { right, .. } => right.location_end(),
             Self::Plus { right, .. } => right.location_end(),
             Self::Minus { right, .. } => right.location_end(),
+            Self::LeftShift { right, .. } => right.location_end(),
+            Self::RightShift { right, .. } => right.location_end(),
+            Self::UnsignedRightShift { right, .. } => right.location_end(),
             Self::Lt { right, .. } => right.location_end(),
             Self::Gt { right, .. } => right.location_end(),
             Self::Lte { right, .. } => right.location_end(),
@@ -340,40 +362,43 @@ impl Expression {
         ps: &mut ParseState,
         prefer_object_inner: bool,
     ) -> Option<Box<Self>> {
-        ps.parse_on_auto_whitespace(|ps| {
-            let mut is_object_inner = false;
-            ps.try_parse(|ps| -> Option<()> {
-                // try parse as an object
-                match Self::try_parse_field_name(ps) {
-                    Some(_) => {
-                        let peek = ps.peek::<0>()?;
-                        if peek == ':' || peek == ',' {
-                            is_object_inner = true;
-                        } else if prefer_object_inner && ps.peek_str("}}") {
-                            is_object_inner = true;
+        ps.parse_on_auto_whitespace(
+            |ps| ps.skip_whitespace_with_js_comments(),
+            |ps| {
+                let mut is_object_inner = false;
+                ps.try_parse(|ps| -> Option<()> {
+                    // try parse as an object
+                    match Self::try_parse_field_name(ps) {
+                        Some(_) => {
+                            let peek = ps.peek::<0>()?;
+                            if peek == ':' || peek == ',' {
+                                is_object_inner = true;
+                            } else if prefer_object_inner && ps.peek_str("}}") {
+                                is_object_inner = true;
+                            }
+                        }
+                        None => {
+                            if ps.peek_str("...") {
+                                is_object_inner = true;
+                            }
                         }
                     }
-                    None => {
-                        if ps.peek_str("...") {
-                            is_object_inner = true;
-                        }
-                    }
+                    None
+                });
+                if is_object_inner {
+                    let pos = ps.position();
+                    let fields = Self::parse_object_inner(ps)?;
+                    let end_pos = ps.position();
+                    let brace_location = (pos.clone()..pos, end_pos.clone()..end_pos);
+                    Some(Box::new(Expression::LitObj {
+                        fields,
+                        brace_location,
+                    }))
+                } else {
+                    Self::parse_cond(ps)
                 }
-                None
-            });
-            if is_object_inner {
-                let pos = ps.position();
-                let fields = Self::parse_object_inner(ps)?;
-                let end_pos = ps.position();
-                let brace_location = (pos.clone()..pos, end_pos.clone()..end_pos);
-                Some(Box::new(Expression::LitObj {
-                    fields,
-                    brace_location,
-                }))
-            } else {
-                Self::parse_cond(ps)
-            }
-        })
+            },
+        )
     }
 
     fn try_parse_field_name(ps: &mut ParseState) -> Option<(CompactString, Range<Position>)> {
@@ -1036,7 +1061,8 @@ macro_rules! parse_left_to_right {
 
 parse_left_to_right!(parse_multiply, parse_reverse, multiply => Multiply, divide => Divide, remainer => Remainer);
 parse_left_to_right!(parse_plus, parse_multiply, plus => Plus, minus => Minus);
-parse_left_to_right!(parse_cmp, parse_plus, lt => Lt, gt => Gt, lte => Lte, gte => Gte, instanceof => InstanceOf);
+parse_left_to_right!(parse_shift, parse_plus, left_shift => LeftShift, right_shift => RightShift, unsigned_right_shift => UnsignedRightShift);
+parse_left_to_right!(parse_cmp, parse_shift, lt => Lt, gt => Gt, lte => Lte, gte => Gte, instanceof => InstanceOf);
 parse_left_to_right!(parse_eq, parse_cmp, eq => Eq, ne => Ne, eq_full => EqFull, ne_full => NeFull);
 parse_left_to_right!(parse_bit_and, parse_eq, bit_and => BitAnd);
 parse_left_to_right!(parse_bit_xor, parse_bit_and, bit_xor => BitXor);
@@ -1083,14 +1109,16 @@ define_operator!(void, "void");
 
 // `**` is not supported
 
-define_operator!(multiply, "*", ["*", "="]);
-define_operator!(divide, "/", ["/", "="]);
+define_operator!(multiply, "*", ["*", "/", "="]);
+define_operator!(divide, "/", ["*", "/", "="]);
 define_operator!(remainer, "%", ["="]);
 
 define_operator!(plus, "+", ["+", "="]);
 define_operator!(minus, "-", ["-", "="]);
 
-// `<<` `>>` `>>>` are not supported
+define_operator!(left_shift, "<<", ["="]);
+define_operator!(right_shift, ">>", [">", "="]);
+define_operator!(unsigned_right_shift, ">>>", ["="]);
 
 define_operator!(lt, "<", ["<", "="]);
 define_operator!(lte, "<=", []);
@@ -1115,8 +1143,21 @@ define_operator!(logic_and, "&&", ["="]);
 define_operator!(logic_or, "||", ["="]);
 define_operator!(nullish_coalescing, "??", ["="]);
 
-define_operator!(condition, "?", ["?", "."]);
 define_operator!(condition_end, ":", []);
+
+impl ParseOperator {
+    fn condition(ps: &mut ParseState) -> Option<Range<Position>> {
+        ps.consume_str_except_followed("?", ["?", "."]).or_else(|| {
+            let [p0, p1, p2] = ps.peek_n::<3>()?;
+            if p0 == '?' && p1 == '.' && ('0'..='9').contains(&p2) {
+                // `?.1` should be treated as `?` and `.1`
+                ps.consume_str("?")
+            } else {
+                None
+            }
+        })
+    }
+}
 
 // `=` `+=` `-=` `**=` `*=` `/=` `%=` `<<=` `>>=` `>>>=` `&=` `^=` `|=` `&&=` `||=` `??=` are not allowed
 
@@ -1309,6 +1350,9 @@ macro_rules! iter_sub_expr {
                     | Expression::Remainer { left, right, .. }
                     | Expression::Plus { left, right, .. }
                     | Expression::Minus { left, right, .. }
+                    | Expression::LeftShift { left, right, .. }
+                    | Expression::RightShift { left, right, .. }
+                    | Expression::UnsignedRightShift { left, right, .. }
                     | Expression::Lt { left, right, .. }
                     | Expression::Gt { left, right, .. }
                     | Expression::Lte { left, right, .. }
@@ -1373,6 +1417,24 @@ mod test {
     use crate::stringify::Stringify;
 
     use super::*;
+
+    #[test]
+    fn comments() {
+        case!(
+            "{{ /* TEST */ }}",
+            "",
+            ParseErrorKind::EmptyExpression,
+            14..14
+        );
+        case!("{{ /* TEST */ a }}", "{{a}}");
+        case!(
+            "{{ /* * / }}",
+            "",
+            ParseErrorKind::MissingExpressionEnd,
+            0..2
+        );
+        case!("{{ a -/**/-1 }}", "{{a- -1}}");
+    }
 
     #[test]
     fn ident() {
@@ -1716,6 +1778,57 @@ mod test {
     }
 
     #[test]
+    fn left_shift() {
+        case!(
+            "{{ a << }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            8..8
+        );
+        case!(
+            "{{ a <<= b }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            5..5
+        );
+        case!("{{ a << b + c }}", "{{a<<b+c}}");
+    }
+
+    #[test]
+    fn right_shift() {
+        case!(
+            "{{ a >> }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            8..8
+        );
+        case!(
+            "{{ a >>= b }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            5..5
+        );
+        case!("{{ a >> b + c }}", "{{a>>b+c}}");
+    }
+
+    #[test]
+    fn unsigned_right_shift() {
+        case!(
+            "{{ a >>> }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            9..9
+        );
+        case!(
+            "{{ a >>>= b }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            5..5
+        );
+        case!("{{ a >>> b + c }}", "{{a>>>b+c}}");
+    }
+
+    #[test]
     fn lt() {
         case!(
             "{{ a < }}",
@@ -1723,13 +1836,7 @@ mod test {
             ParseErrorKind::UnexpectedExpressionCharacter,
             7..7
         );
-        case!(
-            "{{ a << b }}",
-            "",
-            ParseErrorKind::UnexpectedExpressionCharacter,
-            5..5
-        );
-        case!("{{ a < b + c }}", "{{a<b+c}}");
+        case!("{{ a < b << c }}", "{{a<b<<c}}");
     }
 
     #[test]
@@ -1740,7 +1847,7 @@ mod test {
             ParseErrorKind::UnexpectedExpressionCharacter,
             8..8
         );
-        case!("{{ a <= b + c }}", "{{a<=b+c}}");
+        case!("{{ a <= b << c }}", "{{a<=b<<c}}");
     }
 
     #[test]
@@ -1751,13 +1858,7 @@ mod test {
             ParseErrorKind::UnexpectedExpressionCharacter,
             7..7
         );
-        case!(
-            "{{ a >> b }}",
-            "",
-            ParseErrorKind::UnexpectedExpressionCharacter,
-            5..5
-        );
-        case!("{{ a > b + c }}", "{{a>b+c}}");
+        case!("{{ a > b << c }}", "{{a>b<<c}}");
     }
 
     #[test]
@@ -1768,7 +1869,7 @@ mod test {
             ParseErrorKind::UnexpectedExpressionCharacter,
             8..8
         );
-        case!("{{ a >= b + c }}", "{{a>=b+c}}");
+        case!("{{ a >= b << c }}", "{{a>=b<<c}}");
     }
 
     #[test]
@@ -1786,7 +1887,7 @@ mod test {
             ParseErrorKind::UnexpectedExpressionCharacter,
             5..5
         );
-        case!("{{ a instanceof b + c }}", "{{a instanceof b+c}}");
+        case!("{{ a instanceof b >> c }}", "{{a instanceof b>>c}}");
     }
 
     #[test]
@@ -1955,6 +2056,13 @@ mod test {
             ParseErrorKind::UnexpectedExpressionCharacter,
             5..5
         );
+        case!(
+            "{{ a ?. 1 : 2 }}",
+            "",
+            ParseErrorKind::UnexpectedExpressionCharacter,
+            5..5
+        );
+        case!("{{ a ?.1 : 2 }}", "{{a?0.1:2}}");
         case!("{{ a ? b : c }}", "{{a?b:c}}");
     }
 

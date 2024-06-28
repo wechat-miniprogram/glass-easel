@@ -44,6 +44,7 @@ import {
   type DataGroupObserverTree,
   type DataValue,
   type DeepCopyStrategy,
+  type DataObserver,
 } from './data_proxy'
 import { simpleDeepCopy } from './data_utils'
 import {
@@ -229,7 +230,6 @@ type ComponentDefinitionDetail<
 > = {
   proto: ComponentInstProto<TData, TProperty, TMethod>
   template: Template
-  dataGroupObserverTree: DataGroupObserverTree
   dataDeepCopy: DeepCopyStrategy
   propertyPassingDeepCopy: DeepCopyStrategy
   relationDefinitionGroup: RelationDefinitionGroup | null
@@ -372,7 +372,7 @@ export class ComponentDefinition<
     proto._$methodMap = behavior._$methodMap
 
     // init other helpers
-    const dataGroupObserverTree = behavior._$generateObserverTree()
+    proto._$dataGroupObserverTree = behavior._$generateObserverTree()
     proto._$lifetimeFuncs = behavior._$getAllLifetimeFuncs()
     proto._$pageLifetimeFuncs = behavior._$getAllPageLifetimeFuncs()
     const relationDefinitionGroup = generateRelationDefinitionGroup(behavior._$relationMap)
@@ -385,7 +385,6 @@ export class ComponentDefinition<
     this._$detail = {
       proto,
       template,
-      dataGroupObserverTree,
       dataDeepCopy,
       propertyPassingDeepCopy,
       relationDefinitionGroup,
@@ -424,6 +423,8 @@ export class Component<
   _$behavior: Behavior<TData, TProperty, TMethod, any, any>
   /** @internal */
   _$definition: ComponentDefinition<TData, TProperty, TMethod>
+  /** @internal */
+  _$dataGroupObserverTree: DataGroupObserverTree
   /** @internal */
   _$lifetimeFuncs: LifetimeFuncs
   /** @internal */
@@ -527,7 +528,6 @@ export class Component<
     }
     const { proto, template, dataDeepCopy, propertyPassingDeepCopy, relationDefinitionGroup } =
       def._$detail!
-    let dataGroupObserverTree = def._$detail!.dataGroupObserverTree
     const options = def._$options
     const behavior = def.behavior
     const nodeTreeContext: GeneralBackendContext | null = owner
@@ -633,6 +633,7 @@ export class Component<
     // associate in backend
     if (backendElement) {
       if (ENV.DEV) performanceMeasureStart('backend.associateValue')
+      backendElement.__wxElement = comp
       if (!(BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext!.mode === BackendMode.Domlike))) {
         ;(backendElement as backend.Element | composedBackend.Element).associateValue(comp)
       } else {
@@ -747,9 +748,6 @@ export class Component<
       return { list, listAsTrait } as any
     }
     if (behavior._$init.length > 0) {
-      let cowObserver = true
-      let cowLifetime = true
-      let cowPageLifetime = true
       let cowMethodMap = true
       const methodCaller = comp.getMethodCaller()
       const builderContext: BuilderContext<any, any, any> = {
@@ -776,16 +774,7 @@ export class Component<
               '[implement]',
               behavior.is,
             )
-          if (cowObserver) {
-            cowObserver = false
-            dataGroupObserverTree = dataGroupObserverTree.cloneSub()
-          }
-          try {
-            dataGroupObserverTree.addObserver(func, parseMultiPaths(dataPaths))
-          } catch (e) {
-            // parse multi paths may throw errors
-            dispatchError(e, `observer`, behavior.is)
-          }
+          comp.dynamicAddObserver(func, dataPaths)
         },
         lifetime: <T extends keyof Lifetimes>(name: T, func: Lifetimes[T]): void => {
           if (initDone)
@@ -794,17 +783,7 @@ export class Component<
               '[implement]',
               behavior.is,
             )
-          if (cowLifetime) {
-            cowLifetime = false
-            comp._$lifetimeFuncs = behavior._$getAllLifetimeFuncs()
-          }
-          const fag = comp._$lifetimeFuncs
-          if (fag[name]) {
-            fag[name]!.add(func as GeneralFuncType)
-          } else {
-            const fa = (fag[name] = new FuncArr('lifetime') as LifetimeFuncs[T])
-            fa!.add(func as GeneralFuncType)
-          }
+          comp.addLifetimeListener(name, func)
         },
         pageLifetime: (name: string, func: (...args: unknown[]) => void): void => {
           if (initDone)
@@ -813,17 +792,7 @@ export class Component<
               '[implement]',
               behavior.is,
             )
-          if (cowPageLifetime) {
-            cowPageLifetime = false
-            comp._$pageLifetimeFuncs = behavior._$getAllPageLifetimeFuncs()
-          }
-          const fag = comp._$pageLifetimeFuncs
-          if (fag[name]) {
-            fag[name]!.add(func)
-          } else {
-            const fa = (fag[name] = new FuncArr('pageLifetime'))
-            fa.add(func)
-          }
+          comp.addPageLifetimeListener(name, func)
         },
         method: <Fn extends ComponentMethod>(func: Fn) => Component._$tagMethod(func),
         listener: <T>(func: EventListener<T>) => Component._$tagMethod(func),
@@ -871,7 +840,7 @@ export class Component<
       dataDeepCopy,
       propertyPassingDeepCopy,
       options.reflectToAttributes,
-      dataGroupObserverTree,
+      comp._$dataGroupObserverTree,
     )
     comp._$dataGroup = dataGroup
 
@@ -1227,6 +1196,32 @@ export class Component<
   }
 
   /**
+   * Add a lifetime event listener on the component
+   */
+  addLifetimeListener<N extends keyof Lifetimes>(name: N, func: Lifetimes[N]) {
+    if (!Object.prototype.hasOwnProperty.call(this, '_$lifetimeFuncs')) {
+      // copy on write
+      this._$lifetimeFuncs = this._$behavior._$getAllLifetimeFuncs()
+    }
+    const fag = this._$lifetimeFuncs
+    const fa = (fag[name] = fag[name] || (new FuncArr('lifetime') as LifetimeFuncs[N]))
+    fa!.add(func as GeneralFuncType)
+  }
+
+  /**
+   * remove a lifetime event listener on the component
+   */
+  removeLifetimeListener<N extends keyof Lifetimes>(name: N, func: Lifetimes[N]) {
+    if (!Object.prototype.hasOwnProperty.call(this, '_$lifetimeFuncs')) {
+      // copy on write
+      this._$lifetimeFuncs = this._$behavior._$getAllLifetimeFuncs()
+    }
+    const fag = this._$lifetimeFuncs
+    const fa = fag[name]
+    fa?.remove(func as GeneralFuncType)
+  }
+
+  /**
    * Triggers a life-time callback on an element
    *
    * Normally external life-times should only be triggered by template engine.
@@ -1243,6 +1238,32 @@ export class Component<
    */
   triggerLifeTime(name: string, args: Parameters<GeneralFuncType>) {
     return this.triggerLifetime(name, args)
+  }
+
+  /**
+   * Add a page lifetime event listener on the component
+   */
+  addPageLifetimeListener(name: string, func: (...args: unknown[]) => void) {
+    if (!Object.prototype.hasOwnProperty.call(this, '_$pageLifetimeFuncs')) {
+      // copy on write
+      this._$pageLifetimeFuncs = this._$behavior._$getAllPageLifetimeFuncs()
+    }
+    const fag = this._$pageLifetimeFuncs
+    const fa = (fag[name] = fag[name] || new FuncArr('pageLifetime'))
+    fa.add(func)
+  }
+
+  /**
+   * remove a page lifetime event listener on the component
+   */
+  removePageLifetimeListener(name: string, func: (...args: unknown[]) => void) {
+    if (!Object.prototype.hasOwnProperty.call(this, '_$pageLifetimeFuncs')) {
+      // copy on write
+      this._$pageLifetimeFuncs = this._$behavior._$getAllPageLifetimeFuncs()
+    }
+    const fag = this._$pageLifetimeFuncs
+    const fa = fag[name]
+    fa?.remove(func)
   }
 
   /**
@@ -1274,6 +1295,25 @@ export class Component<
    */
   triggerPageLifeTime(name: string, args: Parameters<GeneralFuncType>) {
     return this.triggerPageLifetime(name, args)
+  }
+
+  /**
+   * Add an observer on the runtime
+   * @note This method is for debug or inspect use only, do not use it in production.
+   */
+  dynamicAddObserver(func: DataObserver, dataPaths: string | readonly string[]) {
+    if (!Object.prototype.hasOwnProperty.call(this, '_$dataGroupObserverTree')) {
+      // copy on write
+      this._$dataGroupObserverTree = this._$dataGroupObserverTree.cloneSub()
+      if (this._$dataGroup) this._$dataGroup._$observerTree = this._$dataGroupObserverTree
+    }
+    const dataGroupObserverTree = this._$dataGroupObserverTree
+    try {
+      dataGroupObserverTree.addObserver(func, parseMultiPaths(dataPaths))
+    } catch (e) {
+      // parse multi paths may throw errors
+      dispatchError(e, `observer`, this.is)
+    }
   }
 
   /**
@@ -1549,6 +1589,7 @@ type ComponentInstProto<
 > = Component<TData, TProperty, TMethod> & {
   _$behavior: Behavior<TData, TProperty, TMethod, any>
   _$definition: ComponentDefinition<TData, TProperty, TMethod>
+  _$dataGroupObserverTree: DataGroupObserverTree
   _$lifetimeFuncs: LifetimeFuncs
   _$pageLifetimeFuncs: PageLifetimeFuncs
   _$methodMap: MethodList

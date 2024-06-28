@@ -336,7 +336,7 @@ type ObserverNode = {
 
 export class DataGroupObserverTree {
   propFields: { [name: string]: PropertyDefinition }
-  observerTree: ObserverNode = { sub: {} }
+  observerRoot: ObserverNode = { sub: {} }
   observers: DataObserverWithPath[] = []
 
   constructor(propFields: { [name: string]: PropertyDefinition }) {
@@ -346,7 +346,7 @@ export class DataGroupObserverTree {
   cloneSub(): DataGroupObserverTree {
     const ret = new DataGroupObserverTree(this.propFields)
     if (this.observers.length > 0) {
-      ret.observerTree = simpleDeepCopy(this.observerTree)
+      ret.observerRoot = simpleDeepCopy(this.observerRoot)
       ret.observers = this.observers.slice()
     }
     return ret
@@ -360,7 +360,7 @@ export class DataGroupObserverTree {
     })
     for (let i = 0; i < dataPath.length; i += 1) {
       const singlePath = dataPath[i]!
-      let cur = this.observerTree
+      let cur = this.observerRoot
       let wildcard = false
       for (let j = 0; j < singlePath.length; j += 1) {
         const pathSlice = singlePath[j]!
@@ -504,8 +504,8 @@ export class DataGroup<
   private _$propertyPassingDeepCopy: DeepCopyStrategy
   private _$reflectToAttributes: boolean
   private _$propFields: { [name: string]: PropertyDefinition }
-  private _$observerTree: ObserverNode
-  private _$observers: DataObserverWithPath[]
+  /** @internal */
+  _$observerTree: DataGroupObserverTree
   private _$observerStatus: boolean[]
   private _$modelBindingListener: { [name: string]: ModelBindingListener } | null = null
   private _$updateListener?: DataUpdateCallback
@@ -515,6 +515,7 @@ export class DataGroup<
     combined: DataChange[]
     count: number
   } | null = null
+  private _$recUpdateLevel = 0
 
   private _$generateInnerData(data: { [key: string]: DataValue }) {
     const pureDataPattern = this._$pureDataPattern
@@ -555,8 +556,7 @@ export class DataGroup<
     this._$propertyPassingDeepCopy = propertyPassingDeepCopy
     this._$reflectToAttributes = reflectToAttributes && !!associatedComponent
     this._$propFields = observerTree.propFields
-    this._$observerTree = observerTree.observerTree
-    this._$observers = observerTree.observers
+    this._$observerTree = observerTree
     this._$observerStatus = new Array(observerTree.observers.length) as boolean[]
     this.innerData = this._$generateInnerData(data)
   }
@@ -668,7 +668,7 @@ export class DataGroup<
     const isChainedUpdates = !!this._$doingUpdates
     let combinedChanges: DataChange[]
     let propChanges: PropertyChange[]
-    if (this._$observers.length > 0) {
+    if (this._$observerTree.observers.length > 0) {
       if (this._$doingUpdates) {
         combinedChanges = this._$doingUpdates.combined
         propChanges = this._$doingUpdates.prop
@@ -967,7 +967,7 @@ export class DataGroup<
           })
         }
       }
-      markTriggerBitOnPath(this._$observerTree, this._$observerStatus, path)
+      markTriggerBitOnPath(this._$observerTree.observerRoot, this._$observerStatus, path)
       if (!excluded && changed) {
         combinedChanges.push(change)
       }
@@ -982,13 +982,26 @@ export class DataGroup<
       let changesCount: number
       do {
         changesCount = this._$doingUpdates.count
-        triggerAndCleanTriggerBit(this._$observers, this._$observerStatus, comp, this.data)
+        triggerAndCleanTriggerBit(
+          this._$observerTree.observers,
+          this._$observerStatus,
+          comp,
+          this.data,
+        )
       } while (changesCount !== this._$doingUpdates.count)
       this._$doingUpdates = null
     }
 
     // tell template engine what changed
+    if (this._$recUpdateLevel > 0 && comp) {
+      triggerWarning(
+        `recursive update detected: a data update is applying during another data update for component "${comp.is}" - this may disorder node trees`,
+        comp,
+      )
+    }
+    this._$recUpdateLevel += 1
     this._$updateListener?.(this.innerData || this.data, combinedChanges)
+    this._$recUpdateLevel -= 1
 
     // trigger prop observers (to simulating legacy behaviors)
     if (comp) {

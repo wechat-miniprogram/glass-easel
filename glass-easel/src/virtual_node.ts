@@ -33,6 +33,7 @@ export class VirtualNode extends Element {
       if (ENV.DEV) performanceMeasureEnd()
       this._$initialize(true, be, owner, nodeTreeContext)
       if (ENV.DEV) performanceMeasureStart('backend.associateValue')
+      be.__wxElement = this
       be.associateValue(this)
       if (ENV.DEV) performanceMeasureEnd()
     } else {

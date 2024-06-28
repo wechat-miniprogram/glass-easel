@@ -151,7 +151,7 @@ export class RangeListManager {
       index: string | number,
       updatePathTree: UpdatePathTreeRoot,
       indexChanged: boolean,
-      node: VirtualNode,
+      node: VirtualNode | undefined,
     ) => void,
   ) {
     // generate new list for comparison
@@ -247,7 +247,13 @@ export class RangeListManager {
           updatePathTree === true || updatePathTree === undefined
             ? updatePathTree
             : (updatePathTree as { [key: string]: UpdatePathTreeNode })[index]
-        updateListItem(item, index, u, index !== oldIndex, elem.childNodes[i]! as VirtualNode)
+        updateListItem(
+          item,
+          index,
+          u,
+          index !== oldIndex,
+          elem.childNodes[i] as VirtualNode | undefined,
+        )
         i += 1
       }
 
@@ -331,7 +337,13 @@ export class RangeListManager {
           updatePathTree === true || updatePathTree === undefined
             ? updatePathTree
             : (updatePathTree as UpdatePathTreeNode[])[i]
-        updateListItem(item, index, u, index !== oldIndex, elem.childNodes[i]! as VirtualNode)
+        updateListItem(
+          item,
+          index,
+          u,
+          index !== oldIndex,
+          elem.childNodes[i] as VirtualNode | undefined,
+        )
         i += 1
       }
       return
@@ -376,7 +388,7 @@ export class RangeListManager {
       } else {
         oldListOp[oldPos] = OpKind.ForwardMove
       }
-      changedItems[i] = elem.childNodes[oldPos] as VirtualNode
+      changedItems[i] = elem.childNodes[oldPos] as VirtualNode | undefined
     }
 
     // visit the op list again and do the operations one-by-one
@@ -412,7 +424,7 @@ export class RangeListManager {
 
       // insert or move items between two LCS items
       while (opIndex < nextStable) {
-        const newItem = changedItems[opIndex]!
+        const newItem = changedItems[opIndex]
         const oldPos = oldPosList[opIndex]!
         if (oldPos === -1) {
           const start = opIndex
@@ -428,7 +440,7 @@ export class RangeListManager {
           )
           realListDiff += count
         } else {
-          elem.insertChildAt(newItem, nextStableOldPos + realListDiff)
+          if (newItem) elem.insertChildAt(newItem, nextStableOldPos + realListDiff)
           const item = items[opIndex]!
           const index = indexes === null ? opIndex : indexes[opIndex]!
           const oldIndex = oldIndexes === null ? oldPos : oldIndexes[oldPos]!
@@ -455,7 +467,7 @@ export class RangeListManager {
           updatePathTree === true || updatePathTree === undefined
             ? updatePathTree
             : (updatePathTree as UpdatePathTreeNode[])[nextStable]
-        const node = elem.childNodes[nextStableOldPos + realListDiff]! as VirtualNode
+        const node = elem.childNodes[nextStableOldPos + realListDiff] as VirtualNode | undefined
         updateListItem(item, index, u, index !== oldIndex, node)
       }
 

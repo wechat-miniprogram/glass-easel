@@ -891,4 +891,38 @@ describe('partial update', () => {
     comp.setData(undefined)
     expect(comp.data.a).toBe(456)
   })
+
+  test('should warn recursive updates', () => {
+    const childCompDef = componentSpace
+      .define()
+      .property('a', String)
+      .observer('a', function () {
+        this.triggerEvent('b')
+      })
+      .registerComponent()
+    const compDef = componentSpace
+      .define()
+      .usingComponents({
+        child: childCompDef,
+      })
+      .template(
+        tmpl(`
+          <child wx:if="{{ cond }}" a="123" bind:b="ev" />
+        `),
+      )
+      .data(() => ({
+        cond: false,
+      }))
+      .methods({
+        ev() {
+          this.setData({ cond: true })
+        },
+      })
+      .registerComponent()
+    const comp = glassEasel.Component.createWithContext('root', compDef, domBackend)
+    glassEasel.Element.pretendAttached(comp)
+    execWithWarn(1, () => {
+      comp.setData({ cond: true })
+    })
+  })
 })

@@ -434,6 +434,7 @@ export class ProcGenWrapper {
       (textContent: string | undefined) => {
         const elem = childNodes[index] as TextNode
         index += 1
+        if (!elem) return
         if (slotElement) {
           const tmplArgs = getTmplArgs(elem)
           if (!tmplArgs.dynamicSlotNameMatched) {
@@ -456,6 +457,7 @@ export class ProcGenWrapper {
       ) => {
         const elem = childNodes[index] as Element
         index += 1
+        if (!elem) return
         if (slotElement) {
           const tmplArgs = getTmplArgs(elem)
           if (dynamicSlotName! === (slot || '')) {
@@ -504,8 +506,9 @@ export class ProcGenWrapper {
       (branchKey: number | string, branchFunc: DefineChildren) => {
         const elem = childNodes[index] as Element
         index += 1
-        const tmplArgs = getTmplArgs(elem)
-        if (tmplArgs.key === branchKey) {
+        if (!elem) return
+        const prevTmplArgs = getTmplArgs(elem)
+        if (prevTmplArgs.key === branchKey) {
           this.handleChildrenUpdate(branchFunc, elem, slotElement, dynamicSlotName)
         } else {
           const newElem = this.shadowRoot.createVirtualNode('wx:if')
@@ -513,7 +516,7 @@ export class ProcGenWrapper {
           Element.setInheritSlots(newElem)
           if (slotElement) Element.setSlotElement(newElem, slotElement)
           const tmplArgs = getTmplArgs(newElem)
-          tmplArgs.key = branchKey
+          prevTmplArgs.key = tmplArgs.key = branchKey
           this.handleChildrenCreationAndInsert(branchFunc, newElem, slotElement, dynamicSlotName)
           if (slotElement) parentNode.replaceChild(newElem, elem)
           else parentNode.replaceChildAt(newElem, index - 1)
@@ -543,6 +546,7 @@ export class ProcGenWrapper {
       ) => {
         const elem = childNodes[index] as Element
         index += 1
+        if (!elem) return
         const tmplArgs = getTmplArgs(elem)
         const keyListManager = tmplArgs.keyList!
         keyListManager.diff(
@@ -590,8 +594,9 @@ export class ProcGenWrapper {
             index: string | number,
             updatePathTree: UpdatePathTreeRoot,
             indexChanged: boolean,
-            childNode: Element,
+            childNode: Element | undefined,
           ) => {
+            if (!childNode) return
             this.handleChildrenUpdate(
               (
                 isCreation,
@@ -629,6 +634,7 @@ export class ProcGenWrapper {
       (slotName: string | undefined, slotValueInit?: (elem: Element) => void, slot?: string) => {
         const elem = childNodes[index] as Element
         index += 1
+        if (!elem) return
         if (slotName !== undefined) {
           Element.setSlotName(elem, dataValueToString(slotName))
         }
@@ -643,6 +649,7 @@ export class ProcGenWrapper {
       (children: DefineChildren, slot: string | undefined) => {
         const elem = childNodes[index] as Element
         index += 1
+        if (!elem) return
         if (slot !== undefined) {
           if (slotElement) {
             const tmplArgs = getTmplArgs(elem)

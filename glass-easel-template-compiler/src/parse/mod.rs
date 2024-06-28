@@ -62,7 +62,7 @@ pub struct ParseState<'s> {
     cur_index: usize,
     line: u32,
     utf16_col: u32,
-    auto_skip_whitespace: bool,
+    auto_skip_whitespace: Option<for<'ss> fn(&mut ParseState<'ss>) -> Option<Range<Position>>>,
     warnings: Vec<ParseError>,
 }
 
@@ -84,7 +84,7 @@ impl<'s> ParseState<'s> {
             cur_index: 0,
             line: position_offset.line,
             utf16_col: position_offset.utf16_col,
-            auto_skip_whitespace: false,
+            auto_skip_whitespace: None,
             warnings: vec![],
         }
     }
@@ -124,9 +124,12 @@ impl<'s> ParseState<'s> {
     }
 
     /// Continue parsing with auto-skip-whitespace enabled.
-    fn parse_on_auto_whitespace<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
-        let prev = self.auto_skip_whitespace;
-        self.auto_skip_whitespace = true;
+    fn parse_on_auto_whitespace<T>(
+        &mut self,
+        whitespace_fn: for<'ss> fn(&mut ParseState<'ss>) -> Option<Range<Position>>,
+        f: impl FnOnce(&mut Self) -> T,
+    ) -> T {
+        let prev = self.auto_skip_whitespace.replace(whitespace_fn);
         let ret = f(self);
         self.auto_skip_whitespace = prev;
         ret
@@ -134,8 +137,7 @@ impl<'s> ParseState<'s> {
 
     /// Continue parsing with auto-skip-whitespace disabled.
     fn parse_off_auto_whitespace<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
-        let prev = self.auto_skip_whitespace;
-        self.auto_skip_whitespace = false;
+        let prev = self.auto_skip_whitespace.take();
         let ret = f(self);
         self.auto_skip_whitespace = prev;
         ret
@@ -193,8 +195,8 @@ impl<'s> ParseState<'s> {
     }
 
     pub fn peek_chars(&mut self) -> impl 's + Iterator<Item = char> {
-        if self.auto_skip_whitespace {
-            self.skip_whitespace();
+        if let Some(f) = self.auto_skip_whitespace.as_ref() {
+            f(self);
         }
         self.cur_str().chars()
     }
@@ -217,8 +219,8 @@ impl<'s> ParseState<'s> {
     }
 
     pub fn peek_str(&mut self, s: &str) -> bool {
-        if self.auto_skip_whitespace {
-            self.skip_whitespace();
+        if let Some(f) = self.auto_skip_whitespace.as_ref() {
+            f(self);
         }
         self.cur_str().starts_with(s)
     }
@@ -290,8 +292,8 @@ impl<'s> ParseState<'s> {
     }
 
     pub fn next(&mut self) -> Option<char> {
-        if self.auto_skip_whitespace {
-            self.skip_whitespace();
+        if let Some(f) = self.auto_skip_whitespace.as_ref() {
+            f(self);
         }
         let mut i = self.cur_str().char_indices();
         let (_, ret) = i.next()?;
@@ -329,6 +331,28 @@ impl<'s> ParseState<'s> {
                 self.utf16_col += c.encode_utf16(&mut [0; 2]).len() as u32;
             }
         };
+        start_pos.map(|x| x..self.position())
+    }
+
+    pub(crate) fn skip_whitespace_with_js_comments(&mut self) -> Option<Range<Position>> {
+        let mut start_pos = None;
+        loop {
+            if let Some(range) = self.skip_whitespace() {
+                if start_pos.is_none() {
+                    start_pos = Some(range.start);
+                }
+                continue;
+            }
+            if self.cur_str().starts_with("/*") {
+                if start_pos.is_none() {
+                    start_pos = Some(self.position());
+                }
+                self.skip_bytes(2);
+                self.skip_until_after("*/");
+                continue;
+            }
+            break;
+        }
         start_pos.map(|x| x..self.position())
     }
 

@@ -40,7 +40,7 @@ impl Template {
                             write!(w, "if(!S)S=Object.assign({{}}")?;
                             for target_path in self.globals.imports.iter() {
                                 let p = crate::path::resolve(&self.path, &target_path.name);
-                                write!(w, ",G[{}]._", gen_lit_str(&p))?;
+                                write!(w, ",(G[{}]||{{}})._", gen_lit_str(&p))?;
                             }
                             write!(w, ",H)")?;
                             Ok(())
