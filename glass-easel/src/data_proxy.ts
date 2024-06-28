@@ -30,8 +30,7 @@ export const enum NormalizedPropertyType {
 export type PropertyDefinition = {
   type: NormalizedPropertyType
   optionalTypes: NormalizedPropertyType[] | null
-  value: unknown
-  default: (() => unknown) | undefined
+  defaultFn: () => unknown
   observer: ((newValue: unknown, oldValue: unknown) => void) | null
   comparer: ((newValue: unknown, oldValue: unknown) => boolean) | null
   reflectIdPrefix: boolean
@@ -76,13 +75,31 @@ export const shallowMerge = (dest: { [key: string]: unknown }, src: { [key: stri
   }
 }
 
+export const getPropertyFallbackValue = (type: NormalizedPropertyType) => {
+  switch (type) {
+    case NormalizedPropertyType.String:
+      return ''
+    case NormalizedPropertyType.Number:
+      return 0
+    case NormalizedPropertyType.Boolean:
+      return false
+    case NormalizedPropertyType.Array:
+      return []
+    case NormalizedPropertyType.Function:
+      return function () {
+        /* empty */
+      }
+    default:
+      return null
+  }
+}
+
 export const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefinition | null => {
   if (propDef === NormalizedPropertyType.String || propDef === String) {
     return {
       type: NormalizedPropertyType.String,
       optionalTypes: null,
-      value: '',
-      default: undefined,
+      defaultFn: () => '',
       observer: null,
       comparer: null,
       reflectIdPrefix: false,
@@ -92,8 +109,7 @@ export const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefini
     return {
       type: NormalizedPropertyType.Number,
       optionalTypes: null,
-      value: 0,
-      default: undefined,
+      defaultFn: () => 0,
       observer: null,
       comparer: null,
       reflectIdPrefix: false,
@@ -103,8 +119,7 @@ export const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefini
     return {
       type: NormalizedPropertyType.Boolean,
       optionalTypes: null,
-      value: false,
-      default: undefined,
+      defaultFn: () => false,
       observer: null,
       comparer: null,
       reflectIdPrefix: false,
@@ -114,8 +129,7 @@ export const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefini
     return {
       type: NormalizedPropertyType.Object,
       optionalTypes: null,
-      value: null,
-      default: undefined,
+      defaultFn: () => null,
       observer: null,
       comparer: null,
       reflectIdPrefix: false,
@@ -125,8 +139,7 @@ export const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefini
     return {
       type: NormalizedPropertyType.Array,
       optionalTypes: null,
-      value: [],
-      default: undefined,
+      defaultFn: () => [],
       observer: null,
       comparer: null,
       reflectIdPrefix: false,
@@ -136,10 +149,10 @@ export const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefini
     return {
       type: NormalizedPropertyType.Function,
       optionalTypes: null,
-      value() {
-        /* empty */
-      },
-      default: undefined,
+      defaultFn: () =>
+        function () {
+          /* empty */
+        },
       observer: null,
       comparer: null,
       reflectIdPrefix: false,
@@ -149,8 +162,7 @@ export const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefini
     return {
       type: NormalizedPropertyType.Any,
       optionalTypes: null,
-      value: null,
-      default: undefined,
+      defaultFn: () => null,
       observer: null,
       comparer: null,
       reflectIdPrefix: false,
@@ -188,20 +200,8 @@ export const convertValueToType = (
   value: unknown,
   propName: string,
   prop: PropertyDefinition,
-  component: GeneralComponent | null,
 ): unknown => {
   const type = prop.type
-  const defaultFn = (fallbackValue: unknown) => {
-    if (typeof prop.default !== 'function') return fallbackValue
-    const defaultValue = safeCallback(
-      `Property "${propName}" Default`,
-      prop.default,
-      null,
-      [],
-      component || undefined,
-    )
-    return defaultValue !== undefined ? defaultValue : fallbackValue
-  }
   // try match optional types
   const optionalTypes = prop.optionalTypes
   if (optionalTypes) {
@@ -217,7 +217,7 @@ export const convertValueToType = (
       triggerWarning(
         `property "${propName}" received type-incompatible value: expected <String> but get null value. Used default value instead.`,
       )
-      return defaultFn('')
+      return prop.defaultFn()
     }
     if (typeof value === 'object') {
       triggerWarning(
@@ -239,7 +239,7 @@ export const convertValueToType = (
         `property "${propName}" received type-incompatible value: expected <Number> but got non-number value. Used default value instead.`,
       )
     }
-    return defaultFn(0)
+    return prop.defaultFn()
   }
   // for boolean
   if (type === NormalizedPropertyType.Boolean) {
@@ -251,7 +251,7 @@ export const convertValueToType = (
     triggerWarning(
       `property "${propName}" received type-incompatible value: expected <Array> but got non-array value. Used default value instead.`,
     )
-    return defaultFn([])
+    return prop.defaultFn()
   }
   // for object
   if (type === NormalizedPropertyType.Object) {
@@ -259,7 +259,7 @@ export const convertValueToType = (
     triggerWarning(
       `property "${propName}" received type-incompatible value: expected <Object> but got non-object value. Used default value instead.`,
     )
-    return defaultFn(null)
+    return prop.defaultFn()
   }
   // for function
   if (type === NormalizedPropertyType.Function) {
@@ -267,13 +267,10 @@ export const convertValueToType = (
     triggerWarning(
       `property "${propName}" received type-incompatible value: expected <Function> but got non-function value. Used default value instead.`,
     )
-    // eslint-disable-next-line func-names, prefer-arrow-callback
-    return defaultFn(function () {
-      /* empty */
-    })
+    return prop.defaultFn()
   }
   // for any-typed, just return the value and avoid undefined
-  if (value === undefined) return defaultFn(null)
+  if (value === undefined) return prop.defaultFn()
   return value
 }
 
@@ -725,12 +722,7 @@ export class DataGroup<
           filteredData = oldData
         } else {
           // normal replace for properties
-          filteredData = convertValueToType(
-            newData,
-            propName,
-            prop,
-            this._$comp as GeneralComponent | null,
-          )
+          filteredData = convertValueToType(newData, propName, prop)
         }
 
         // if inner data is separated, update it
