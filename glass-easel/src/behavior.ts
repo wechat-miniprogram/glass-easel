@@ -1187,7 +1187,7 @@ export class Behavior<
     // init properties
     const properties = builder._$properties
     if (properties !== undefined) {
-      const initValueFuncs: { name: string; func: (this: null) => any }[] = []
+      const initValueFuncs: { name: string; func: () => any }[] = []
       for (let i = 0; i < properties.length; i += 1) {
         const { name, def } = properties[i]!
         const shortHandDef = normalizePropertyTypeShortHand(def)
@@ -1275,14 +1275,20 @@ export class Behavior<
         this._$propertyMap[name] = d
         initValueFuncs.push({
           name,
-          func: typeof d.default !== 'function' ? () => simpleDeepCopy(d.value) : d.default,
+          func: () => {
+            if (typeof d.default === 'function') {
+              const value = safeCallback(`Property "${name}" Default`, d.default, null, [], is)
+              if (value !== undefined) return value
+            }
+            return simpleDeepCopy(d.value)
+          },
         })
       }
       this._$data.push(() => {
         const ret: DataList = {}
         for (let i = 0; i < initValueFuncs.length; i += 1) {
           const { name, func } = initValueFuncs[i]!
-          ret[name] = safeCallback(`Property "${name}" Default`, func, null, [], is)
+          ret[name] = func()
         }
         return ret
       })
