@@ -191,17 +191,17 @@ export const convertValueToType = (
   component: GeneralComponent | null,
 ): unknown => {
   const type = prop.type
-  const defaultFn =
-    prop.default === undefined
-      ? undefined
-      : () =>
-          safeCallback(
-            `Property "${propName}" Default`,
-            prop.default!,
-            null,
-            [],
-            component || undefined,
-          )
+  const defaultFn = (fallbackValue: unknown) => {
+    if (typeof prop.default !== 'function') return fallbackValue
+    const defaultValue = safeCallback(
+      `Property "${propName}" Default`,
+      prop.default,
+      null,
+      [],
+      component || undefined,
+    )
+    return defaultValue !== undefined ? defaultValue : fallbackValue
+  }
   // try match optional types
   const optionalTypes = prop.optionalTypes
   if (optionalTypes) {
@@ -217,7 +217,7 @@ export const convertValueToType = (
       triggerWarning(
         `property "${propName}" received type-incompatible value: expected <String> but get null value. Used default value instead.`,
       )
-      return defaultFn === undefined ? '' : defaultFn()
+      return defaultFn('')
     }
     if (typeof value === 'object') {
       triggerWarning(
@@ -239,7 +239,7 @@ export const convertValueToType = (
         `property "${propName}" received type-incompatible value: expected <Number> but got non-number value. Used default value instead.`,
       )
     }
-    return defaultFn === undefined ? 0 : defaultFn()
+    return defaultFn(0)
   }
   // for boolean
   if (type === NormalizedPropertyType.Boolean) {
@@ -251,7 +251,7 @@ export const convertValueToType = (
     triggerWarning(
       `property "${propName}" received type-incompatible value: expected <Array> but got non-array value. Used default value instead.`,
     )
-    return defaultFn === undefined ? [] : defaultFn()
+    return defaultFn([])
   }
   // for object
   if (type === NormalizedPropertyType.Object) {
@@ -259,7 +259,7 @@ export const convertValueToType = (
     triggerWarning(
       `property "${propName}" received type-incompatible value: expected <Object> but got non-object value. Used default value instead.`,
     )
-    return defaultFn === undefined ? null : defaultFn()
+    return defaultFn(null)
   }
   // for function
   if (type === NormalizedPropertyType.Function) {
@@ -267,15 +267,13 @@ export const convertValueToType = (
     triggerWarning(
       `property "${propName}" received type-incompatible value: expected <Function> but got non-function value. Used default value instead.`,
     )
-    // eslint-disable-next-line func-names
-    return defaultFn === undefined
-      ? function () {
-          /* empty */
-        }
-      : defaultFn()
+    // eslint-disable-next-line func-names, prefer-arrow-callback
+    return defaultFn(function () {
+      /* empty */
+    })
   }
   // for any-typed, just return the value and avoid undefined
-  if (value === undefined) return defaultFn === undefined ? null : defaultFn()
+  if (value === undefined) return defaultFn(null)
   return value
 }
 
