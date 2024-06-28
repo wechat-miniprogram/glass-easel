@@ -1275,13 +1275,13 @@ export class Behavior<
         this._$propertyMap[name] = d
         initValueFuncs.push({
           name,
-          func: () => {
-            if (typeof d.default === 'function') {
-              const value = safeCallback(`Property "${name}" Default`, d.default, null, [], is)
-              if (value !== undefined) return value
-            }
-            return simpleDeepCopy(d.value)
-          },
+          func:
+            typeof d.default === 'function'
+              ? () => {
+                  const value = safeCallback(`Property "${name}" Default`, d.default!, null, [], is)
+                  return value !== undefined ? value : simpleDeepCopy(d.value)
+                }
+              : () => simpleDeepCopy(d.value),
         })
       }
       this._$data.push(() => {
