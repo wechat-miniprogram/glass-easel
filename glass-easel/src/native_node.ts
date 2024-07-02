@@ -10,7 +10,7 @@ import { ClassList, StyleScopeManager } from './class_list'
 import { type DataValue, type ModelBindingListener } from './data_proxy'
 import { Element } from './element'
 import { ENV, globalOptions } from './global_options'
-import { performanceMeasureEnd, performanceMeasureStart } from './devtool'
+import { performanceMeasureEnd, performanceMeasureStart } from './dev_tools'
 import { type ShadowRoot } from './shadow_root'
 import { NATIVE_NODE_SYMBOL, isNativeNode } from './type_symbol'
 

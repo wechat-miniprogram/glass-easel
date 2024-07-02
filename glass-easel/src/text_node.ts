@@ -9,7 +9,7 @@ import {
 } from './backend'
 import { type Element } from './element'
 import { ENV } from './global_options'
-import { performanceMeasureEnd, performanceMeasureStart } from './devtool'
+import { performanceMeasureEnd, performanceMeasureStart } from './dev_tools'
 import { MutationObserverTarget } from './mutation_observer'
 import { type NodeCast } from './node'
 import { type ShadowRoot } from './shadow_root'
