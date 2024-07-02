@@ -47,7 +47,17 @@ impl Template {
 
         // 1st round: parse the string into AST
         let mut content = vec![];
-        Node::parse_vec_node(ps, &mut globals, &mut content);
+        while !ps.ended() {
+            Node::parse_vec_node(ps, &mut globals, &mut content);
+            if ps.peek_str("</") {
+                let pos = ps.position();
+                ps.skip_until_after(">");
+                ps.add_warning(
+                    ParseErrorKind::InvalidEndTag,
+                    pos..ps.position(),
+                );
+            }
+        }
 
         // 2nd round: traverse tree to alternate some details
         for sub in globals.sub_templates.iter_mut() {
@@ -1999,10 +2009,21 @@ impl Element {
                         name: CompactString::new_inline("wx-x"),
                         location: end.location(),
                     }
+                } else if let Some(mut x) = tag_name_slices.pop() {
+                    if x.has_uppercase() {
+                        ps.add_warning(ParseErrorKind::AvoidUppercaseLetters, x.location());
+                        x.name = x.name.to_ascii_lowercase().into();
+                    }
+                    x
                 } else {
-                    tag_name_slices.pop().unwrap()
+                    let location = end_tag_start_location.start..close_location.end;
+                    ps.add_warning(
+                        ParseErrorKind::InvalidEndTag,
+                        location.clone(),
+                    );
+                    Ident { name: CompactString::new(""), location }
                 };
-                if end_tag_name.name != tag_name.name {
+                if end_tag_name.name.len() > 0 && end_tag_name.name != tag_name.name.to_ascii_lowercase() {
                     return None;
                 }
                 ps.skip_whitespace();
@@ -3150,6 +3171,16 @@ mod test {
             ParseErrorKind::MissingEndTag,
             1..4
         );
+        case!(
+            "<div></span><a href=></a>",
+            r#"<div/><a href/>"#,
+            ParseErrorKind::MissingEndTag,
+            1..4,
+            ParseErrorKind::InvalidEndTag,
+            5..12,
+            ParseErrorKind::MissingAttributeValue,
+            19..20
+        );
         case!("<div >", r#"<div/>"#, ParseErrorKind::MissingEndTag, 1..4);
         case!(
             "<a:div/>",
@@ -3183,13 +3214,13 @@ mod test {
         );
         case!(
             "<div a =''/>",
-            r#"<div a/>"#,
+            r#"<div a=""/>"#,
             ParseErrorKind::UnexpectedWhitespace,
             6..7
         );
         case!(
             "<div a= ''/>",
-            r#"<div a/>"#,
+            r#"<div a=""/>"#,
             ParseErrorKind::UnexpectedWhitespace,
             7..8
         );
@@ -3249,6 +3280,12 @@ mod test {
             ParseErrorKind::UnexpectedCharacter,
             12..16
         );
+        case!(
+            "<div></>",
+            r#"<div/>"#,
+            ParseErrorKind::InvalidEndTag,
+            5..7
+        );
     }
 
     #[test]
@@ -3257,15 +3294,21 @@ mod test {
             "<Div></div>",
             r#"<Div/>"#,
             ParseErrorKind::AvoidUppercaseLetters,
-            1..4,
-            ParseErrorKind::MissingEndTag,
             1..4
+        );
+        case!(
+            "<div></Div>",
+            r#"<div/>"#,
+            ParseErrorKind::AvoidUppercaseLetters,
+            7..10
         );
         case!(
             "<diV></diV>",
             r#"<diV/>"#,
             ParseErrorKind::AvoidUppercaseLetters,
-            1..4
+            1..4,
+            ParseErrorKind::AvoidUppercaseLetters,
+            7..10
         );
         case!("<div a='1'></div>", r#"<div a="1"/>"#);
         case!(
@@ -3276,8 +3319,13 @@ mod test {
         );
         case!("<div class='a b'></div>", r#"<div class="a b"/>"#);
         case!("<div style='a:b'></div>", r#"<div style="a:b"/>"#);
+        case!("<div model:a='{{b}}'></div>", r#"<div model:a="{{b}}"/>"#);
+        case!("<div model:a=''></div>", r#"<div model:a=""/>"#);
+        case!("<div model:a></div>", r#"<div model:a/>"#);
         case!("<div change:a='fn'></div>", r#"<div change:a="fn"/>"#);
+        case!("<div change:a=''></div>", r#"<div change:a/>"#);
         case!("<div worklet:a='fn'></div>", r#"<div worklet:a="fn"/>"#);
+        case!("<div worklet:a=''></div>", r#"<div worklet:a/>"#);
         case!(
             "<div worklet:a='{{ a }}'></div>",
             r#"<div worklet:a="{{ a }}"/>"#,
@@ -3285,7 +3333,11 @@ mod test {
             16..23
         );
         case!("<div mark:aB='fn'></div>", r#"<div mark:aB="fn"/>"#);
+        case!("<div mark:aB=''></div>", r#"<div mark:aB=""/>"#);
+        case!("<div mark:aB></div>", r#"<div mark:aB/>"#);
         case!("<div data:aB='fn'></div>", r#"<div data:aB="fn"/>"#);
+        case!("<div data:aB=''></div>", r#"<div data:aB=""/>"#);
+        case!("<div data:aB></div>", r#"<div data:aB/>"#);
         case!(
             "<div data-a-bC='fn'></div>",
             r#"<div data:aBc="fn"/>"#,
