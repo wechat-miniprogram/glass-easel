@@ -78,7 +78,7 @@ export {
   removeGlobalErrorListener,
   removeGlobalWarningListener,
 } from './warning'
-export { DevTools, InspectorDevTools, PerformanceDevTools } from './dev_tools'
+export { DevTools, InspectorDevTools, PerformanceDevTools, MountPointEnv } from './dev_tools'
 
 import { type Behavior } from './behavior'
 import {

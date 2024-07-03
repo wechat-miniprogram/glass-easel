@@ -7,8 +7,10 @@ export interface DevTools {
   performance?: PerformanceDevTools
 }
 
+export interface MountPointEnv {}
+
 export interface InspectorDevTools {
-  addMountPoint(root: Element): void
+  addMountPoint(root: Element, env: MountPointEnv): void
   removeMountPoint(root: Element): void
 }
 
@@ -103,11 +105,13 @@ export const addTimelineEvent = (type: string, data?: Record<string, unknown>) =
 }
 
 export const attachInspector = (elem: Element) => {
+  if (!ENV.DEV) return
   const inspector = getDevTools()?.inspector
-  inspector?.addMountPoint(elem)
+  inspector?.addMountPoint(elem, {})
 }
 
 export const detachInspector = (elem: Element) => {
+  if (!ENV.DEV) return
   const inspector = getDevTools()?.inspector
   inspector?.removeMountPoint(elem)
 }
