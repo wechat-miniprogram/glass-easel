@@ -518,7 +518,7 @@ impl Element {
                             attr.to_proc_gen_as_normal(w, scopes, bmc)?;
                         }
                         for attr in data.iter() {
-                            attr.to_proc_gen_with_method(w, "R.d", scopes, bmc)?;
+                            attr.to_proc_gen_with_method(w, "R.d", true, scopes, bmc)?;
                         }
                         common.to_proc_gen_without_slot(w, scopes, bmc)?;
                         if let SlotKind::Dynamic(p) = &slot_kind {
@@ -1094,7 +1094,7 @@ impl CommonElementAttributes {
             marks,
         } = self;
         for mark in marks {
-            mark.to_proc_gen_with_method(w, "M", scopes, bmc)?;
+            mark.to_proc_gen_with_method(w, "M", true, scopes, bmc)?;
         }
         for ev in event_bindings {
             ev.to_proc_gen(w, scopes, bmc)?;
@@ -1111,18 +1111,24 @@ impl Attribute {
         &self,
         w: &mut JsFunctionScopeWriter<W>,
         method_name: &str,
+        respect_value_unspecified: bool,
         scopes: &Vec<ScopeVar>,
         bmc: &BindingMapCollector,
     ) -> Result<(), TmplError> {
         match &self.value {
             Value::Static { value, location: _ } => {
+                let value = if respect_value_unspecified && self.is_value_unspecified {
+                    "true".into()
+                } else {
+                    gen_lit_str(value)
+                };
                 w.expr_stmt(|w| {
                     write!(
                         w,
                         "if(C){}(N,{},{})",
                         method_name,
                         gen_lit_str(&self.name.name),
-                        gen_lit_str(value)
+                        value
                     )?;
                     Ok(())
                 })?;

@@ -440,6 +440,7 @@ impl ParseError {
     }
 }
 
+#[repr(u32)]
 #[derive(Clone, PartialEq, Eq)]
 pub enum ParseErrorKind {
     UnexpectedCharacter = 0x10001,
@@ -472,6 +473,7 @@ pub enum ParseErrorKind {
     UnsupportedSyntax,
     ShouldQuoted,
     EmptyExpression,
+    InvalidEndTag,
 }
 
 impl ParseErrorKind {
@@ -507,6 +509,7 @@ impl ParseErrorKind {
             Self::UnsupportedSyntax => "this syntax has not been supported yet",
             Self::ShouldQuoted => "should be quoted",
             Self::EmptyExpression => "the expression is empty",
+            Self::InvalidEndTag => "invalid end tag",
         }
     }
 
@@ -542,6 +545,7 @@ impl ParseErrorKind {
             Self::UnsupportedSyntax => ParseErrorLevel::Error,
             Self::ShouldQuoted => ParseErrorLevel::Warn,
             Self::EmptyExpression => ParseErrorLevel::Warn,
+            Self::InvalidEndTag => ParseErrorLevel::Warn,
         }
     }
 }
