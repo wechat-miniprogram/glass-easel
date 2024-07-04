@@ -30,8 +30,7 @@ export const enum NormalizedPropertyType {
 export type PropertyDefinition = {
   type: NormalizedPropertyType
   optionalTypes: NormalizedPropertyType[] | null
-  value: unknown
-  default: (() => unknown) | undefined
+  defaultFn: () => unknown
   observer: ((newValue: unknown, oldValue: unknown) => void) | null
   comparer: ((newValue: unknown, oldValue: unknown) => boolean) | null
   reflectIdPrefix: boolean
@@ -76,13 +75,31 @@ export const shallowMerge = (dest: { [key: string]: unknown }, src: { [key: stri
   }
 }
 
+export const getPropertyFallbackValue = (type: NormalizedPropertyType) => {
+  switch (type) {
+    case NormalizedPropertyType.String:
+      return ''
+    case NormalizedPropertyType.Number:
+      return 0
+    case NormalizedPropertyType.Boolean:
+      return false
+    case NormalizedPropertyType.Array:
+      return []
+    case NormalizedPropertyType.Function:
+      return function () {
+        /* empty */
+      }
+    default:
+      return null
+  }
+}
+
 export const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefinition | null => {
   if (propDef === NormalizedPropertyType.String || propDef === String) {
     return {
       type: NormalizedPropertyType.String,
       optionalTypes: null,
-      value: '',
-      default: undefined,
+      defaultFn: () => '',
       observer: null,
       comparer: null,
       reflectIdPrefix: false,
@@ -92,8 +109,7 @@ export const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefini
     return {
       type: NormalizedPropertyType.Number,
       optionalTypes: null,
-      value: 0,
-      default: undefined,
+      defaultFn: () => 0,
       observer: null,
       comparer: null,
       reflectIdPrefix: false,
@@ -103,8 +119,7 @@ export const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefini
     return {
       type: NormalizedPropertyType.Boolean,
       optionalTypes: null,
-      value: false,
-      default: undefined,
+      defaultFn: () => false,
       observer: null,
       comparer: null,
       reflectIdPrefix: false,
@@ -114,8 +129,7 @@ export const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefini
     return {
       type: NormalizedPropertyType.Object,
       optionalTypes: null,
-      value: null,
-      default: undefined,
+      defaultFn: () => null,
       observer: null,
       comparer: null,
       reflectIdPrefix: false,
@@ -125,8 +139,7 @@ export const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefini
     return {
       type: NormalizedPropertyType.Array,
       optionalTypes: null,
-      value: [],
-      default: undefined,
+      defaultFn: () => [],
       observer: null,
       comparer: null,
       reflectIdPrefix: false,
@@ -136,10 +149,10 @@ export const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefini
     return {
       type: NormalizedPropertyType.Function,
       optionalTypes: null,
-      value() {
-        /* empty */
-      },
-      default: undefined,
+      defaultFn: () =>
+        function () {
+          /* empty */
+        },
       observer: null,
       comparer: null,
       reflectIdPrefix: false,
@@ -149,8 +162,7 @@ export const normalizePropertyTypeShortHand = (propDef: unknown): PropertyDefini
     return {
       type: NormalizedPropertyType.Any,
       optionalTypes: null,
-      value: null,
-      default: undefined,
+      defaultFn: () => null,
       observer: null,
       comparer: null,
       reflectIdPrefix: false,
@@ -188,20 +200,8 @@ export const convertValueToType = (
   value: unknown,
   propName: string,
   prop: PropertyDefinition,
-  component: GeneralComponent | null,
 ): unknown => {
   const type = prop.type
-  const defaultFn =
-    prop.default === undefined
-      ? undefined
-      : () =>
-          safeCallback(
-            `Property "${propName}" Default`,
-            prop.default!,
-            null,
-            [],
-            component || undefined,
-          )
   // try match optional types
   const optionalTypes = prop.optionalTypes
   if (optionalTypes) {
@@ -217,7 +217,7 @@ export const convertValueToType = (
       triggerWarning(
         `property "${propName}" received type-incompatible value: expected <String> but get null value. Used default value instead.`,
       )
-      return defaultFn === undefined ? '' : defaultFn()
+      return prop.defaultFn()
     }
     if (typeof value === 'object') {
       triggerWarning(
@@ -239,7 +239,7 @@ export const convertValueToType = (
         `property "${propName}" received type-incompatible value: expected <Number> but got non-number value. Used default value instead.`,
       )
     }
-    return defaultFn === undefined ? 0 : defaultFn()
+    return prop.defaultFn()
   }
   // for boolean
   if (type === NormalizedPropertyType.Boolean) {
@@ -251,7 +251,7 @@ export const convertValueToType = (
     triggerWarning(
       `property "${propName}" received type-incompatible value: expected <Array> but got non-array value. Used default value instead.`,
     )
-    return defaultFn === undefined ? [] : defaultFn()
+    return prop.defaultFn()
   }
   // for object
   if (type === NormalizedPropertyType.Object) {
@@ -259,7 +259,7 @@ export const convertValueToType = (
     triggerWarning(
       `property "${propName}" received type-incompatible value: expected <Object> but got non-object value. Used default value instead.`,
     )
-    return defaultFn === undefined ? null : defaultFn()
+    return prop.defaultFn()
   }
   // for function
   if (type === NormalizedPropertyType.Function) {
@@ -267,15 +267,10 @@ export const convertValueToType = (
     triggerWarning(
       `property "${propName}" received type-incompatible value: expected <Function> but got non-function value. Used default value instead.`,
     )
-    // eslint-disable-next-line func-names
-    return defaultFn === undefined
-      ? function () {
-          /* empty */
-        }
-      : defaultFn()
+    return prop.defaultFn()
   }
   // for any-typed, just return the value and avoid undefined
-  if (value === undefined) return defaultFn === undefined ? null : defaultFn()
+  if (value === undefined) return prop.defaultFn()
   return value
 }
 
@@ -338,7 +333,7 @@ type ObserverNode = {
 
 export class DataGroupObserverTree {
   propFields: { [name: string]: PropertyDefinition }
-  observerTree: ObserverNode = { sub: {} }
+  observerRoot: ObserverNode = { sub: {} }
   observers: DataObserverWithPath[] = []
 
   constructor(propFields: { [name: string]: PropertyDefinition }) {
@@ -348,7 +343,7 @@ export class DataGroupObserverTree {
   cloneSub(): DataGroupObserverTree {
     const ret = new DataGroupObserverTree(this.propFields)
     if (this.observers.length > 0) {
-      ret.observerTree = simpleDeepCopy(this.observerTree)
+      ret.observerRoot = simpleDeepCopy(this.observerRoot)
       ret.observers = this.observers.slice()
     }
     return ret
@@ -362,7 +357,7 @@ export class DataGroupObserverTree {
     })
     for (let i = 0; i < dataPath.length; i += 1) {
       const singlePath = dataPath[i]!
-      let cur = this.observerTree
+      let cur = this.observerRoot
       let wildcard = false
       for (let j = 0; j < singlePath.length; j += 1) {
         const pathSlice = singlePath[j]!
@@ -506,8 +501,8 @@ export class DataGroup<
   private _$propertyPassingDeepCopy: DeepCopyStrategy
   private _$reflectToAttributes: boolean
   private _$propFields: { [name: string]: PropertyDefinition }
-  private _$observerTree: ObserverNode
-  private _$observers: DataObserverWithPath[]
+  /** @internal */
+  _$observerTree: DataGroupObserverTree
   private _$observerStatus: boolean[]
   private _$modelBindingListener: { [name: string]: ModelBindingListener } | null = null
   private _$updateListener?: DataUpdateCallback
@@ -517,6 +512,7 @@ export class DataGroup<
     combined: DataChange[]
     count: number
   } | null = null
+  private _$recUpdateLevel = 0
 
   private _$generateInnerData(data: { [key: string]: DataValue }) {
     const pureDataPattern = this._$pureDataPattern
@@ -557,8 +553,7 @@ export class DataGroup<
     this._$propertyPassingDeepCopy = propertyPassingDeepCopy
     this._$reflectToAttributes = reflectToAttributes && !!associatedComponent
     this._$propFields = observerTree.propFields
-    this._$observerTree = observerTree.observerTree
-    this._$observers = observerTree.observers
+    this._$observerTree = observerTree
     this._$observerStatus = new Array(observerTree.observers.length) as boolean[]
     this.innerData = this._$generateInnerData(data)
   }
@@ -670,7 +665,7 @@ export class DataGroup<
     const isChainedUpdates = !!this._$doingUpdates
     let combinedChanges: DataChange[]
     let propChanges: PropertyChange[]
-    if (this._$observers.length > 0) {
+    if (this._$observerTree.observers.length > 0) {
       if (this._$doingUpdates) {
         combinedChanges = this._$doingUpdates.combined
         propChanges = this._$doingUpdates.prop
@@ -727,12 +722,7 @@ export class DataGroup<
           filteredData = oldData
         } else {
           // normal replace for properties
-          filteredData = convertValueToType(
-            newData,
-            propName,
-            prop,
-            this._$comp as GeneralComponent | null,
-          )
+          filteredData = convertValueToType(newData, propName, prop)
         }
 
         // if inner data is separated, update it
@@ -969,7 +959,7 @@ export class DataGroup<
           })
         }
       }
-      markTriggerBitOnPath(this._$observerTree, this._$observerStatus, path)
+      markTriggerBitOnPath(this._$observerTree.observerRoot, this._$observerStatus, path)
       if (!excluded && changed) {
         combinedChanges.push(change)
       }
@@ -984,13 +974,26 @@ export class DataGroup<
       let changesCount: number
       do {
         changesCount = this._$doingUpdates.count
-        triggerAndCleanTriggerBit(this._$observers, this._$observerStatus, comp, this.data)
+        triggerAndCleanTriggerBit(
+          this._$observerTree.observers,
+          this._$observerStatus,
+          comp,
+          this.data,
+        )
       } while (changesCount !== this._$doingUpdates.count)
       this._$doingUpdates = null
     }
 
     // tell template engine what changed
+    if (this._$recUpdateLevel > 0 && comp) {
+      triggerWarning(
+        `recursive update detected: a data update is applying during another data update for component "${comp.is}" - this may disorder node trees`,
+        comp,
+      )
+    }
+    this._$recUpdateLevel += 1
     this._$updateListener?.(this.innerData || this.data, combinedChanges)
+    this._$recUpdateLevel -= 1
 
     // trigger prop observers (to simulating legacy behaviors)
     if (comp) {

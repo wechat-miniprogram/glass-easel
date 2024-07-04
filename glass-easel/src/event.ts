@@ -1,6 +1,6 @@
 import { type GeneralBackendElement } from './backend'
 import { type GeneralComponent } from './component'
-import { addTimelineEvent, performanceMeasureEnd, performanceMeasureStart } from './devtool'
+import { addTimelineEvent, performanceMeasureEnd, performanceMeasureStart } from './dev_tools'
 import { type Element } from './element'
 import { type ExternalShadowRoot } from './external_shadow_tree'
 import { FuncArrWithMeta } from './func_arr'

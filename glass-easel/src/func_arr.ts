@@ -1,5 +1,5 @@
 import { type AnyComponent, type GeneralComponent } from './component'
-import { performanceMeasureEnd, performanceMeasureStart } from './devtool'
+import { performanceMeasureEnd, performanceMeasureStart } from './dev_tools'
 import { ENV } from './global_options'
 import { type Node } from './node'
 

@@ -311,24 +311,33 @@ export class ComponentBuilder<
     >,
     TChainingFilter
   > {
-    const freeData = Object.create(null) as { [k: string]: any }
+    const customFields = Object.create(null) as { [k: string]: unknown }
     const compDef = {
       methods: {},
     } as { [k: string]: any }
     const keys = Object.keys(def)
     for (let i = 0; i < keys.length; i += 1) {
       const k = keys[i]!
-      if (k === 'data' || k === 'options' || k === 'behaviors') {
-        compDef[k] = def[k]
+      if (k === 'data') {
+        compDef.data = def.data
       } else if (typeof def[k] === 'function') {
         ;(compDef.methods as { [k: string]: unknown })[k] = def[k] as unknown
+      } else if (k === 'methods') {
+        customFields.methods = def.methods
       } else {
-        ;(freeData as { [k: string]: unknown })[k] = def[k]
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        compDef[k] = def[k]
       }
     }
     this.definition(compDef)
+    const keys2 = Object.keys(compDef)
+    for (let i = 0; i < keys2.length; i += 1) {
+      const k = keys2[i]!
+      if (k === 'data' || k === 'methods' || k === 'behaviors') continue
+      customFields[k] = compDef[k]
+    }
     this._$.init(function () {
-      Object.assign(this, glassEasel.dataUtils.simpleDeepCopy(freeData))
+      Object.assign(this, glassEasel.dataUtils.simpleDeepCopy(customFields))
     })
     return this as any
   }

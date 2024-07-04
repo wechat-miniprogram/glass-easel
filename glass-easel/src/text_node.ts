@@ -1,6 +1,7 @@
 import {
   BM,
   BackendMode,
+  type GeneralBackendContext,
   type GeneralBackendElement,
   type backend,
   type composedBackend,
@@ -8,12 +9,11 @@ import {
 } from './backend'
 import { type Element } from './element'
 import { ENV } from './global_options'
-import { performanceMeasureEnd, performanceMeasureStart } from './devtool'
+import { performanceMeasureEnd, performanceMeasureStart } from './dev_tools'
 import { MutationObserverTarget } from './mutation_observer'
 import { type NodeCast } from './node'
 import { type ShadowRoot } from './shadow_root'
 import { TEXT_NODE_SYMBOL, isTextNode } from './type_symbol'
-import { GeneralComponent } from './component'
 
 export class TextNode implements NodeCast {
   /* @internal */
@@ -125,6 +125,11 @@ export class TextNode implements NodeCast {
   /** Get the backend element */
   getBackendElement(): GeneralBackendElement | null {
     return this._$backendElement
+  }
+
+  /** Get the backend context */
+  getBackendContext(): GeneralBackendContext | null {
+    return this.ownerShadowRoot.getBackendContext()
   }
 
   /** Get composed parent (including virtual nodes) */

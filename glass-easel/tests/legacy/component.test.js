@@ -328,6 +328,175 @@ const testCases = function (testBackend) {
       expect(elem.data.g).toBe(789)
     })
 
+    it('should prefer default function over value', function () {
+      const f = function () {}
+      const def = regElem({
+        is: 'component-property-prefer-default',
+        properties: {
+          a: {
+            type: String,
+            value: 'abc',
+            default: function () {
+              return 'def'
+            },
+          },
+          b: {
+            type: Number,
+            value: 123,
+            default: function () {
+              return 456
+            },
+          },
+          c: {
+            type: Boolean,
+            value: false,
+            default: function () {
+              return true
+            },
+          },
+          d: {
+            type: Object,
+            value: { a: 1 },
+            default: function () {
+              return { obj: null }
+            },
+          },
+          e: {
+            type: Array,
+            value: [0],
+            default: function () {
+              return [null]
+            },
+          },
+          f: {
+            type: Function,
+            value: function() { return 1 },
+            default: function () {
+              return f
+            },
+          },
+          g: {
+            type: null,
+            value: Symbol(),
+            default: function () {
+              return 789
+            },
+          },
+        },
+      })
+      // one warning for each of 7 props: value is not used
+      execWithWarn(7, () => {
+        def.prepare()
+      })
+      const elem = createElem('component-property-prefer-default')
+      expect(elem.data.a).toBe('def')
+      expect(elem.data.b).toBe(456)
+      expect(elem.data.c).toBe(true)
+      expect(elem.data.d).toStrictEqual({ obj: null })
+      expect(elem.data.e).toStrictEqual([null])
+      expect(elem.data.f).toBe(f)
+      expect(elem.data.g).toBe(789)
+    })
+
+    it('should use property value when default is not a function', function () {
+      const f1 = function () {}
+      const f2 = function () {}
+      const def = regElem({
+        is: 'component-property-default-not-function',
+        properties: {
+          a: {
+            type: String,
+            value: 'abc',
+            default: 'def',
+          },
+          b: {
+            type: Function,
+            value: f1,
+            default: 123,
+          },
+          c: {
+            type: Function,
+            value: f1,
+            default: () => f2,
+          },
+        },
+      })
+      // one warning for "c": value is not used
+      execWithWarn(1, () => {
+        def.prepare()
+      })
+      const elem = createElem('component-property-default-not-function')
+      expect(elem.data.a).toBe('abc')
+      expect(elem.data.b).toBe(f1)
+      expect(elem.data.c).toBe(f2)
+    })
+
+    it('should get fallback value when default function works wrong', function () {
+      var oldConsoleError = console.error
+      console.error = function () {}
+      var errorCount = 0
+      var errorListener = function () {
+        errorCount++
+        return false
+      }
+      glassEasel.addGlobalErrorListener(errorListener)
+
+      regElem({
+        is: 'component-property-default-wrong',
+        properties: {
+          a: {
+            type: String,
+            default() {
+              return 'abc'
+            },
+          },
+          b: {
+            type: String,
+            value: 'def',
+            default() {
+              return undefined
+            },
+          },
+          c: {
+            type: String,
+            value: 'ghi',
+            default() {
+              throw new Error('err')
+            },
+          },
+        },
+      })
+      var elem
+      // one warning for "b" and "c": value is not used
+      execWithWarn(2, () => {
+        elem = createElem('component-property-default-wrong')
+      })
+      expect(elem.data.a).toBe('abc')
+      expect(elem.data.b).toBe('')
+      expect(elem.data.c).toBe('')
+      // one error for "c" default throwing
+      expect(errorCount).toBe(1)
+      errorCount = 0
+
+      elem.setData({ b: 'abc', c: 'abc' })
+      expect(elem.data.b).toBe('abc')
+      expect(elem.data.c).toBe('abc')
+      // no new error thrown this turn: value for "b" and "c" are valid
+      expect(errorCount).toBe(0)
+
+      // one warning for "b" and "c": property received incompatible value
+      execWithWarn(2, () => {
+        elem.setData({ b: null, c: null })
+      })
+      expect(elem.data.b).toBe('')
+      expect(elem.data.c).toBe('')
+      // one error for "c" default throwing
+      expect(errorCount).toBe(1)
+
+      console.error = oldConsoleError
+      glassEasel.removeGlobalErrorListener(errorListener)
+    })
+
     it('should support optional types (number and boolean)', function () {
       regElem({
         is: 'component-optional-types',
@@ -826,14 +995,15 @@ const testCases = function (testBackend) {
 
     var waitingEvents = 3
     var elem = null
-    var id = glassEasel.addGlobalErrorListener(function (e, info) {
+    var errorListener = function (e, info) {
       if (waitingEvents === 0) {
         return true
       }
       expect(Number(e.message)).toBe(waitingEvents)
       waitingEvents--
       return false
-    })
+    }
+    glassEasel.addGlobalErrorListener(errorListener)
     var def = regElem({
       is: 'component-h',
       template: '<div attr-a="{{a}}"></div>',
@@ -871,7 +1041,7 @@ const testCases = function (testBackend) {
     }
     expect(hasError).toBe(true)
     expect(waitingEvents).toBe(0)
-    glassEasel.removeGlobalErrorListener(id)
+    glassEasel.removeGlobalErrorListener(errorListener)
   })
 
   it('should call error lifetimes', function () {

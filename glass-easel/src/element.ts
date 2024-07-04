@@ -19,7 +19,12 @@ import {
   type MethodList,
   type PropertyList,
 } from './component_params'
-import { performanceMeasureEnd, performanceMeasureStart } from './devtool'
+import {
+  attachInspector,
+  detachInspector,
+  performanceMeasureEnd,
+  performanceMeasureStart,
+} from './dev_tools'
 import {
   Event,
   EventTarget,
@@ -2517,6 +2522,7 @@ export class Element implements NodeCast {
       if (ENV.DEV) performanceMeasureEnd()
     }
     Element.checkAndCallAttached(element)
+    if (ENV.DEV) attachInspector(element)
   }
 
   /**
@@ -2529,6 +2535,7 @@ export class Element implements NodeCast {
     if (!element._$attached) {
       Element.checkAndCallAttached(element)
     }
+    if (ENV.DEV) attachInspector(element)
   }
 
   /**
@@ -2540,6 +2547,7 @@ export class Element implements NodeCast {
     if (element._$attached) {
       Element.checkAndCallDetached(element)
     }
+    if (ENV.DEV) detachInspector(element)
   }
 
   /** Check the element is attached or not */

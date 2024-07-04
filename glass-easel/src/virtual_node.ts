@@ -1,5 +1,5 @@
 import { BM, BackendMode, type GeneralBackendContext } from './backend'
-import { performanceMeasureEnd, performanceMeasureStart } from './devtool'
+import { performanceMeasureEnd, performanceMeasureStart } from './dev_tools'
 import { Element } from './element'
 import { ENV } from './global_options'
 import { type ShadowRoot } from './shadow_root'
@@ -33,6 +33,7 @@ export class VirtualNode extends Element {
       if (ENV.DEV) performanceMeasureEnd()
       this._$initialize(true, be, owner, nodeTreeContext)
       if (ENV.DEV) performanceMeasureStart('backend.associateValue')
+      be.__wxElement = this
       be.associateValue(this)
       if (ENV.DEV) performanceMeasureEnd()
     } else {

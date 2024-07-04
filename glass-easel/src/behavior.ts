@@ -42,6 +42,7 @@ import { parseMultiPaths, type MultiPaths } from './data_path'
 import {
   DataGroupObserverTree,
   NormalizedPropertyType,
+  getPropertyFallbackValue,
   normalizePropertyType,
   normalizePropertyTypeShortHand,
   shallowMerge,
@@ -1187,13 +1188,15 @@ export class Behavior<
     // init properties
     const properties = builder._$properties
     if (properties !== undefined) {
-      const initValueFuncs: { name: string; func: (this: null) => any }[] = []
+      const initValueFuncs: { name: string; func: () => any }[] = []
       for (let i = 0; i < properties.length; i += 1) {
         const { name, def } = properties[i]!
         const shortHandDef = normalizePropertyTypeShortHand(def)
         let d: PropertyDefinition
+        let initialValueFn: () => DataValue
         if (shortHandDef !== null) {
           d = shortHandDef
+          initialValueFn = shortHandDef.defaultFn
         } else {
           const propDef = def as PropertyOption<any, unknown>
           let type = normalizePropertyType(propDef.type)
@@ -1209,18 +1212,32 @@ export class Behavior<
           if (type === NormalizedPropertyType.Invalid) {
             dispatchError(new Error(`the type of property "${name}" is illegal`), `[prepare]`, is)
           }
-          let value: DataValue = propDef.value
-          if (propDef.value === undefined) {
-            if (type === NormalizedPropertyType.String) value = ''
-            else if (type === NormalizedPropertyType.Number) value = 0
-            else if (type === NormalizedPropertyType.Boolean) value = false
-            else if (type === NormalizedPropertyType.Array) value = []
-            else value = null
-          } else if (propDef.default !== undefined) {
+          const fallbackValue = getPropertyFallbackValue(type)
+          if (typeof propDef.default === 'function' && propDef.value !== undefined) {
             triggerWarning(
               `the initial value of property "${name}" is not used when its default is provided.`,
               is,
             )
+          }
+          const defaultFn =
+            typeof propDef.default === 'function'
+              ? () => {
+                  const value = safeCallback(
+                    `Property "${name}" Default`,
+                    propDef.default!,
+                    null,
+                    [],
+                    is,
+                  )
+                  return value !== undefined ? value : simpleDeepCopy(fallbackValue)
+                }
+              : () => simpleDeepCopy(fallbackValue)
+          if (typeof propDef.default === 'function') {
+            initialValueFn = defaultFn
+          } else if (propDef.value !== undefined) {
+            initialValueFn = () => simpleDeepCopy(propDef.value)
+          } else {
+            initialValueFn = () => simpleDeepCopy(fallbackValue)
           }
           let observer: ((newValue: any, oldValue: any) => void) | null
           if (typeof propDef.observer === 'function') {
@@ -1265,8 +1282,7 @@ export class Behavior<
           d = {
             type,
             optionalTypes,
-            value,
-            default: propDef.default,
+            defaultFn,
             observer,
             comparer,
             reflectIdPrefix,
@@ -1275,14 +1291,14 @@ export class Behavior<
         this._$propertyMap[name] = d
         initValueFuncs.push({
           name,
-          func: d.default === undefined ? () => simpleDeepCopy(d.value) : d.default,
+          func: initialValueFn,
         })
       }
       this._$data.push(() => {
         const ret: DataList = {}
         for (let i = 0; i < initValueFuncs.length; i += 1) {
           const { name, func } = initValueFuncs[i]!
-          ret[name] = safeCallback(`Property "${name}" Default`, func, null, [], is)
+          ret[name] = func()
         }
         return ret
       })

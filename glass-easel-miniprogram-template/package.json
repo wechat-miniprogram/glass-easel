@@ -1,10 +1,10 @@
 {
   "name": "glass-easel-miniprogram-template",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "main": "src/index.ts",
   "scripts": {
     "build": "webpack --config webpack.config.js",
-    "dev": "webpack --config webpack.config.js --watch"
+    "dev": "webpack --config webpack.dev.config.js --watch"
   },
   "dependencies": {
     "glass-easel": "workspace:*",

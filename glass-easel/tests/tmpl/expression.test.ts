@@ -101,6 +101,26 @@ describe('binding expression', () => {
     expect(n4.dataset.a).toEqual(-789)
   })
 
+  test('shift operators', () => {
+    const def = glassEasel.registerElement({
+      template: tmpl(`
+        <div id="n1" data-a="{{ a << 2 >> 1 }}"></div>
+        <div id="n2" data-a="{{ a >>> 3 }}"></div>
+      `),
+      data: {
+        a: 0x10,
+      },
+    })
+    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    const n1 = elem.getShadowRoot()!.getElementById('n1')!
+    const n2 = elem.getShadowRoot()!.getElementById('n2')!
+    expect(n1.dataset.a).toEqual(0x20)
+    expect(n2.dataset.a).toEqual(0x02)
+    elem.setData({ a: -0x10 })
+    expect(n1.dataset.a).toEqual(-0x20)
+    expect(n2.dataset.a).toEqual(0x1ffffffe)
+  })
+
   test('comparison operators', () => {
     const def = glassEasel.registerElement({
       template: tmpl(`

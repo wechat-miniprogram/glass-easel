@@ -47,7 +47,17 @@ impl Template {
 
         // 1st round: parse the string into AST
         let mut content = vec![];
-        Node::parse_vec_node(ps, &mut globals, &mut content);
+        while !ps.ended() {
+            Node::parse_vec_node(ps, &mut globals, &mut content);
+            if ps.peek_str("</") {
+                let pos = ps.position();
+                ps.skip_until_after(">");
+                ps.add_warning(
+                    ParseErrorKind::InvalidEndTag,
+                    pos..ps.position(),
+                );
+            }
+        }
 
         // 2nd round: traverse tree to alternate some details
         for sub in globals.sub_templates.iter_mut() {
@@ -819,7 +829,9 @@ impl Element {
                 ) {
                     match element {
                         ElementKind::Normal { common, .. } | ElementKind::Slot { common, .. } => {
-                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) =
+                                attr_value
+                            {
                                 common.event_bindings.push(EventBinding {
                                     name: attr_name,
                                     value,
@@ -846,7 +858,9 @@ impl Element {
                         | ElementKind::Slot {
                             values: attributes, ..
                         } => {
-                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) =
+                                attr_value
+                            {
                                 if attributes
                                     .iter()
                                     .find(|x| x.name.name_eq(&attr_name))
@@ -878,7 +892,9 @@ impl Element {
                     },
                     AttrPrefixKind::Id => match &mut element {
                         ElementKind::Normal { common, .. } | ElementKind::Slot { common, .. } => {
-                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) =
+                                attr_value
+                            {
                                 if common.id.is_some() {
                                     ps.add_warning(
                                         ParseErrorKind::DuplicatedAttribute,
@@ -886,7 +902,10 @@ impl Element {
                                     );
                                 } else {
                                     if is_value_unspecified {
-                                        ps.add_warning(ParseErrorKind::MissingAttributeValue, attr_name.location.clone());
+                                        ps.add_warning(
+                                            ParseErrorKind::MissingAttributeValue,
+                                            attr_name.location.clone(),
+                                        );
                                     }
                                     common.id = Some((attr_name.location(), value));
                                 }
@@ -930,7 +949,9 @@ impl Element {
                     },
                     AttrPrefixKind::ClassString => match &mut element {
                         ElementKind::Normal { class, .. } => {
-                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) =
+                                attr_value
+                            {
                                 if let ClassAttribute::Multiple(..) | ClassAttribute::String(..) =
                                     class
                                 {
@@ -940,7 +961,10 @@ impl Element {
                                     );
                                 } else {
                                     if is_value_unspecified {
-                                        ps.add_warning(ParseErrorKind::MissingAttributeValue, attr_name.location.clone());
+                                        ps.add_warning(
+                                            ParseErrorKind::MissingAttributeValue,
+                                            attr_name.location.clone(),
+                                        );
                                     }
                                     *class = ClassAttribute::String(attr_name.location(), value);
                                 }
@@ -957,7 +981,9 @@ impl Element {
                     },
                     AttrPrefixKind::StyleString => match &mut element {
                         ElementKind::Normal { style, .. } => {
-                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) =
+                                attr_value
+                            {
                                 if let StyleAttribute::Multiple(..) | StyleAttribute::String(..) =
                                     style
                                 {
@@ -967,7 +993,10 @@ impl Element {
                                     );
                                 } else {
                                     if is_value_unspecified {
-                                        ps.add_warning(ParseErrorKind::MissingAttributeValue, attr_name.location.clone());
+                                        ps.add_warning(
+                                            ParseErrorKind::MissingAttributeValue,
+                                            attr_name.location.clone(),
+                                        );
                                     }
                                     *style = StyleAttribute::String(attr_name.location(), value);
                                 }
@@ -983,7 +1012,9 @@ impl Element {
                         }
                     },
                     AttrPrefixKind::WxIf => {
-                        if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
+                        if let AttrPrefixParseResult::Value(value, is_value_unspecified) =
+                            attr_value
+                        {
                             if wx_if.is_some() {
                                 ps.add_warning(
                                     ParseErrorKind::DuplicatedAttribute,
@@ -991,14 +1022,19 @@ impl Element {
                                 );
                             } else {
                                 if is_value_unspecified {
-                                    ps.add_warning(ParseErrorKind::MissingAttributeValue, attr_name.location.clone());
+                                    ps.add_warning(
+                                        ParseErrorKind::MissingAttributeValue,
+                                        attr_name.location.clone(),
+                                    );
                                 }
                                 wx_if = Some((attr_name.location(), value));
                             }
                         }
                     }
                     AttrPrefixKind::WxElif => {
-                        if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
+                        if let AttrPrefixParseResult::Value(value, is_value_unspecified) =
+                            attr_value
+                        {
                             if wx_elif.is_some() {
                                 ps.add_warning(
                                     ParseErrorKind::DuplicatedAttribute,
@@ -1006,7 +1042,10 @@ impl Element {
                                 );
                             } else {
                                 if is_value_unspecified {
-                                    ps.add_warning(ParseErrorKind::MissingAttributeValue, attr_name.location.clone());
+                                    ps.add_warning(
+                                        ParseErrorKind::MissingAttributeValue,
+                                        attr_name.location.clone(),
+                                    );
                                 }
                                 wx_elif = Some((attr_name.location(), value));
                             }
@@ -1031,7 +1070,9 @@ impl Element {
                         }
                     }
                     AttrPrefixKind::WxFor => {
-                        if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
+                        if let AttrPrefixParseResult::Value(value, is_value_unspecified) =
+                            attr_value
+                        {
                             if wx_for.is_some() {
                                 ps.add_warning(
                                     ParseErrorKind::DuplicatedAttribute,
@@ -1039,7 +1080,10 @@ impl Element {
                                 );
                             } else {
                                 if is_value_unspecified {
-                                    ps.add_warning(ParseErrorKind::MissingAttributeValue, attr_name.location.clone());
+                                    ps.add_warning(
+                                        ParseErrorKind::MissingAttributeValue,
+                                        attr_name.location.clone(),
+                                    );
                                 }
                                 wx_for = Some((attr_name.location(), value));
                             }
@@ -1101,7 +1145,9 @@ impl Element {
                     }
                     AttrPrefixKind::TemplateIs => match &mut element {
                         ElementKind::TemplateRef { target, .. } => {
-                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) =
+                                attr_value
+                            {
                                 if target.1.location().end != default_attr_position {
                                     ps.add_warning(
                                         ParseErrorKind::DuplicatedAttribute,
@@ -1109,7 +1155,10 @@ impl Element {
                                     );
                                 } else {
                                     if is_value_unspecified {
-                                        ps.add_warning(ParseErrorKind::MissingAttributeValue, attr_name.location.clone());
+                                        ps.add_warning(
+                                            ParseErrorKind::MissingAttributeValue,
+                                            attr_name.location.clone(),
+                                        );
                                     }
                                     *target = (attr_name.location(), value);
                                 }
@@ -1119,7 +1168,9 @@ impl Element {
                     },
                     AttrPrefixKind::TemplateData => match &mut element {
                         ElementKind::TemplateRef { data, .. } => {
-                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) =
+                                attr_value
+                            {
                                 if data.1.location().end != default_attr_position {
                                     ps.add_warning(
                                         ParseErrorKind::DuplicatedAttribute,
@@ -1127,7 +1178,10 @@ impl Element {
                                     );
                                 } else {
                                     if is_value_unspecified {
-                                        ps.add_warning(ParseErrorKind::MissingAttributeValue, attr_name.location.clone());
+                                        ps.add_warning(
+                                            ParseErrorKind::MissingAttributeValue,
+                                            attr_name.location.clone(),
+                                        );
                                     }
                                     *data = (attr_name.location(), value);
                                 }
@@ -1191,7 +1245,9 @@ impl Element {
                     },
                     AttrPrefixKind::Model(prefix_location) => match &mut element {
                         ElementKind::Normal { attributes, .. } => {
-                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) =
+                                attr_value
+                            {
                                 if attributes
                                     .iter()
                                     .find(|x| x.name.name_eq(&attr_name))
@@ -1226,7 +1282,9 @@ impl Element {
                         ElementKind::Normal {
                             change_attributes, ..
                         } => {
-                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) =
+                                attr_value
+                            {
                                 if change_attributes
                                     .iter()
                                     .find(|x| x.name.name_eq(&attr_name))
@@ -1290,7 +1348,9 @@ impl Element {
                     },
                     AttrPrefixKind::Data(prefix_location) => match &mut element {
                         ElementKind::Normal { data, .. } => {
-                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) =
+                                attr_value
+                            {
                                 if data
                                     .iter()
                                     .find(|attr| attr.name.name_eq(&attr_name))
@@ -1322,7 +1382,9 @@ impl Element {
                     },
                     AttrPrefixKind::DataHyphen => match &mut element {
                         ElementKind::Normal { data, .. } => {
-                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) =
+                                attr_value
+                            {
                                 if data
                                     .iter()
                                     .find(|attr| attr.name.name_eq(&attr_name))
@@ -1480,7 +1542,9 @@ impl Element {
                     }
                     AttrPrefixKind::Mark(prefix_location) => match &mut element {
                         ElementKind::Normal { common, .. } | ElementKind::Slot { common, .. } => {
-                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) = attr_value {
+                            if let AttrPrefixParseResult::Value(value, is_value_unspecified) =
+                                attr_value
+                            {
                                 if common
                                     .marks
                                     .iter()
@@ -1945,10 +2009,21 @@ impl Element {
                         name: CompactString::new_inline("wx-x"),
                         location: end.location(),
                     }
+                } else if let Some(mut x) = tag_name_slices.pop() {
+                    if x.has_uppercase() {
+                        ps.add_warning(ParseErrorKind::AvoidUppercaseLetters, x.location());
+                        x.name = x.name.to_ascii_lowercase().into();
+                    }
+                    x
                 } else {
-                    tag_name_slices.pop().unwrap()
+                    let location = end_tag_start_location.start..close_location.end;
+                    ps.add_warning(
+                        ParseErrorKind::InvalidEndTag,
+                        location.clone(),
+                    );
+                    Ident { name: CompactString::new(""), location }
                 };
-                if end_tag_name.name != tag_name.name {
+                if end_tag_name.name.len() > 0 && end_tag_name.name != tag_name.name.to_ascii_lowercase() {
                     return None;
                 }
                 ps.skip_whitespace();
@@ -2772,7 +2847,10 @@ impl Value {
         let Some(double_brace_left) = ps.consume_str("{{") else {
             return None;
         };
-        if let Some(range) = ps.consume_str("}}") {
+        if let Some(range) = ps.try_parse(|ps| {
+            ps.skip_whitespace_with_js_comments();
+            ps.consume_str("}}")
+        }) {
             ps.add_warning(ParseErrorKind::EmptyExpression, range.start..range.start);
             return Some(Self::Static {
                 value: CompactString::new_inline(""),
@@ -3043,6 +3121,7 @@ mod test {
     #[test]
     fn value_parsing() {
         case!("{{}}", r#""#, ParseErrorKind::EmptyExpression, 2..2);
+        case!("{{ }}", r#""#, ParseErrorKind::EmptyExpression, 3..3);
         case!("{ {", r#"{ {"#);
         case!("{{ a } }", "", ParseErrorKind::MissingExpressionEnd, 0..2);
         case!(
@@ -3092,6 +3171,16 @@ mod test {
             ParseErrorKind::MissingEndTag,
             1..4
         );
+        case!(
+            "<div></span><a href=></a>",
+            r#"<div/><a href/>"#,
+            ParseErrorKind::MissingEndTag,
+            1..4,
+            ParseErrorKind::InvalidEndTag,
+            5..12,
+            ParseErrorKind::MissingAttributeValue,
+            19..20
+        );
         case!("<div >", r#"<div/>"#, ParseErrorKind::MissingEndTag, 1..4);
         case!(
             "<a:div/>",
@@ -3125,13 +3214,13 @@ mod test {
         );
         case!(
             "<div a =''/>",
-            r#"<div a/>"#,
+            r#"<div a=""/>"#,
             ParseErrorKind::UnexpectedWhitespace,
             6..7
         );
         case!(
             "<div a= ''/>",
-            r#"<div a/>"#,
+            r#"<div a=""/>"#,
             ParseErrorKind::UnexpectedWhitespace,
             7..8
         );
@@ -3191,6 +3280,12 @@ mod test {
             ParseErrorKind::UnexpectedCharacter,
             12..16
         );
+        case!(
+            "<div></>",
+            r#"<div/>"#,
+            ParseErrorKind::InvalidEndTag,
+            5..7
+        );
     }
 
     #[test]
@@ -3199,15 +3294,21 @@ mod test {
             "<Div></div>",
             r#"<Div/>"#,
             ParseErrorKind::AvoidUppercaseLetters,
-            1..4,
-            ParseErrorKind::MissingEndTag,
             1..4
+        );
+        case!(
+            "<div></Div>",
+            r#"<div/>"#,
+            ParseErrorKind::AvoidUppercaseLetters,
+            7..10
         );
         case!(
             "<diV></diV>",
             r#"<diV/>"#,
             ParseErrorKind::AvoidUppercaseLetters,
-            1..4
+            1..4,
+            ParseErrorKind::AvoidUppercaseLetters,
+            7..10
         );
         case!("<div a='1'></div>", r#"<div a="1"/>"#);
         case!(
@@ -3218,8 +3319,13 @@ mod test {
         );
         case!("<div class='a b'></div>", r#"<div class="a b"/>"#);
         case!("<div style='a:b'></div>", r#"<div style="a:b"/>"#);
+        case!("<div model:a='{{b}}'></div>", r#"<div model:a="{{b}}"/>"#);
+        case!("<div model:a=''></div>", r#"<div model:a=""/>"#);
+        case!("<div model:a></div>", r#"<div model:a/>"#);
         case!("<div change:a='fn'></div>", r#"<div change:a="fn"/>"#);
+        case!("<div change:a=''></div>", r#"<div change:a/>"#);
         case!("<div worklet:a='fn'></div>", r#"<div worklet:a="fn"/>"#);
+        case!("<div worklet:a=''></div>", r#"<div worklet:a/>"#);
         case!(
             "<div worklet:a='{{ a }}'></div>",
             r#"<div worklet:a="{{ a }}"/>"#,
@@ -3227,7 +3333,11 @@ mod test {
             16..23
         );
         case!("<div mark:aB='fn'></div>", r#"<div mark:aB="fn"/>"#);
+        case!("<div mark:aB=''></div>", r#"<div mark:aB=""/>"#);
+        case!("<div mark:aB></div>", r#"<div mark:aB/>"#);
         case!("<div data:aB='fn'></div>", r#"<div data:aB="fn"/>"#);
+        case!("<div data:aB=''></div>", r#"<div data:aB=""/>"#);
+        case!("<div data:aB></div>", r#"<div data:aB/>"#);
         case!(
             "<div data-a-bC='fn'></div>",
             r#"<div data:aBc="fn"/>"#,
@@ -3392,7 +3502,7 @@ mod test {
         );
         case!(
             "<block wx:if='{{a}}'/> <!--abc--> <block wx:elif /><!----><block wx:else />",
-            r#"<block wx:if="{{a}}"/><block wx:elif><!--abc--></block><block wx:else><!----></block>"#,
+            r#"<block wx:if="{{a}}"/><block wx:elif/><block wx:else/>"#,
             ParseErrorKind::MissingAttributeValue,
             44..48
         );

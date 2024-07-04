@@ -2,7 +2,7 @@ import { type GeneralBackendContext } from './backend'
 import { type StyleScopeId } from './class_list'
 import { type GeneralComponent } from './component'
 import { type ComponentSpace } from './component_space'
-import { type DevtoolInterface } from './devtool'
+import { type DevTools } from './dev_tools'
 import { type TemplateEngine } from './template_engine'
 
 export const ENV = {
@@ -119,7 +119,7 @@ export type EnvironmentOptions = {
   /** The default backend context */
   backendContext: GeneralBackendContext | null
   /** The devtool interface */
-  devtool: DevtoolInterface | null
+  devTools: DevTools | null
 }
 
 /**
@@ -149,7 +149,7 @@ export const globalOptions: NormalizedComponentOptions & EnvironmentOptions = {
   throwGlobalError: false,
   writeExtraInfoToAttr: false,
   backendContext: null,
-  devtool: null,
+  devTools: null,
 }
 
 export const normalizeComponentOptions = (

@@ -42,7 +42,7 @@ impl Stringify for Template {
                         stringifier.write_str(r#">"#)?;
                         stringifier.write_token(
                             &content.replace("</wxs", "< /wxs"),
-                            content,
+                            None,
                             content_location,
                         )?;
                         stringifier.write_str(r#"</wxs>"#)?;
@@ -85,19 +85,27 @@ impl Stringify for Node {
         match self {
             Node::Text(value) => value.stringify_write(stringifier)?,
             Node::Element(element) => element.stringify_write(stringifier)?,
-            Node::Comment(s, location) => {
-                stringifier.write_str(r#"<!--"#)?;
-                stringifier.write_token(&s.replace("-->", "-- >"), &s, &location)?;
-                stringifier.write_str(r#"-->"#)?;
-            }
+            Node::Comment(..) => {}
             Node::UnknownMetaTag(s, location) => {
                 stringifier.write_str(r#"<!"#)?;
-                stringifier.write_token(&escape_html_text(&s), &s, &location)?;
+                stringifier.write_token(&escape_html_text(&s), None, &location)?;
                 stringifier.write_str(r#">"#)?;
             }
         }
         Ok(())
     }
+}
+
+fn is_children_empty(children: &[Node]) -> bool {
+    for n in children {
+        match n {
+            Node::Comment(..) => {}
+            Node::Element(..) | Node::Text(..) | Node::UnknownMetaTag(..) => {
+                return false;
+            }
+        }
+    }
+    true
 }
 
 impl Stringify for Element {
@@ -112,15 +120,20 @@ impl Stringify for Element {
         let write_attr = |stringifier: &mut Stringifier<'s, W>,
                           prefix: Option<(&str, &Range<Position>)>,
                           name: &Ident,
-                          value: &Value|
+                          value: &Value,
+                          is_value_unspecified: Option<bool>|
          -> FmtResult {
             stringifier.write_str(" ")?;
             if let Some((p, loc)) = prefix {
-                stringifier.write_token(p, p, loc)?;
+                stringifier.write_token(p, None, loc)?;
                 stringifier.write_str(":")?;
             }
-            stringifier.write_ident(name)?;
-            if !is_empty_value(value) {
+            stringifier.write_ident(name, true)?;
+            let need_value = match is_value_unspecified {
+                None => !is_empty_value(value),
+                Some(x) => !x,
+            };
+            if need_value {
                 stringifier.write_str(r#"=""#)?;
                 value.stringify_write(stringifier)?;
                 stringifier.write_str(r#"""#)?;
@@ -134,10 +147,10 @@ impl Stringify for Element {
          -> FmtResult {
             stringifier.write_str(" ")?;
             if let Some((p, loc)) = prefix {
-                stringifier.write_token(p, p, loc)?;
+                stringifier.write_token(p, None, loc)?;
                 stringifier.write_str(":")?;
             }
-            stringifier.write_ident(name)?;
+            stringifier.write_ident(name, true)?;
             if value.name.len() > 0 {
                 stringifier.write_str(r#"="#)?;
                 stringifier.write_str_name_quoted(value)?;
@@ -150,7 +163,7 @@ impl Stringify for Element {
                                 value: &Value|
          -> FmtResult {
             stringifier.write_str(" ")?;
-            stringifier.write_token(name, name, location)?;
+            stringifier.write_token(name, Some(name), location)?;
             if !is_empty_value(value) {
                 stringifier.write_str(r#"=""#)?;
                 value.stringify_write(stringifier)?;
@@ -164,7 +177,7 @@ impl Stringify for Element {
                                        value: &StrName|
          -> FmtResult {
             stringifier.write_str(" ")?;
-            stringifier.write_token(name, name, location)?;
+            stringifier.write_token(name, Some(name), location)?;
             if value.name.len() > 0 {
                 stringifier.write_str(r#"="#)?;
                 stringifier.write_str_name_quoted(value)?;
@@ -180,11 +193,15 @@ impl Stringify for Element {
                 stringifier.write_str(" ")?;
                 stringifier.write_token(
                     "slot",
-                    "slot",
+                    None,
                     attr.prefix_location.as_ref().unwrap_or(&attr.name.location),
                 )?;
                 stringifier.write_str(":")?;
-                stringifier.write_token(&attr.name.name, &attr.name.name, &attr.name.location)?;
+                stringifier.write_token(
+                    &attr.name.name,
+                    Some(&attr.name.name),
+                    &attr.name.location,
+                )?;
                 if value != &attr.name.name {
                     stringifier.write_str(r#"="#)?;
                     stringifier.write_str_name_quoted(&StrName {
@@ -215,7 +232,7 @@ impl Stringify for Element {
                         "mark",
                         attr.prefix_location.as_ref().unwrap_or(&attr.name.location),
                     );
-                    write_attr(stringifier, Some(prefix), &attr.name, &attr.value)?;
+                    write_attr(stringifier, Some(prefix), &attr.name, &attr.value, Some(attr.is_value_unspecified))?;
                 }
                 for ev in event_bindings.iter() {
                     let prefix = if ev.is_catch {
@@ -242,6 +259,7 @@ impl Stringify for Element {
                         Some((prefix, &ev.prefix_location)),
                         &ev.name,
                         &ev.value,
+                        None,
                     )?;
                 }
                 Ok(())
@@ -255,7 +273,7 @@ impl Stringify for Element {
         {
             let mut is_first = true;
             for (loc, value, children) in branches {
-                stringifier.write_token("<", "<", &self.start_tag_location.0)?;
+                stringifier.write_token("<", None, &self.start_tag_location.0)?;
                 stringifier.write_str("block")?;
                 let name = if is_first {
                     is_first = false;
@@ -264,25 +282,25 @@ impl Stringify for Element {
                     "wx:elif"
                 };
                 write_named_attr(stringifier, name, loc, value)?;
-                if children.len() > 0 {
-                    stringifier.write_token(">", ">", &self.start_tag_location.1)?;
+                if !is_children_empty(children) {
+                    stringifier.write_token(">", None, &self.start_tag_location.1)?;
                     for child in children {
                         child.stringify_write(stringifier)?;
                     }
                     stringifier.write_token(
                         "<",
-                        "<",
+                        None,
                         &self
                             .end_tag_location
                             .as_ref()
                             .unwrap_or(&self.start_tag_location)
                             .0,
                     )?;
-                    stringifier.write_token("/", "/", &self.close_location)?;
+                    stringifier.write_token("/", None, &self.close_location)?;
                     stringifier.write_str("block")?;
                     stringifier.write_token(
                         ">",
-                        ">",
+                        None,
                         &self
                             .end_tag_location
                             .as_ref()
@@ -290,34 +308,34 @@ impl Stringify for Element {
                             .1,
                     )?;
                 } else {
-                    stringifier.write_token("/", "/", &self.close_location)?;
-                    stringifier.write_token(">", ">", &self.start_tag_location.1)?;
+                    stringifier.write_token("/", None, &self.close_location)?;
+                    stringifier.write_token(">", None, &self.start_tag_location.1)?;
                 }
             }
             if let Some((loc, children)) = else_branch.as_ref() {
-                stringifier.write_token("<", "<", &self.start_tag_location.0)?;
+                stringifier.write_token("<", None, &self.start_tag_location.0)?;
                 stringifier.write_str("block")?;
                 stringifier.write_str(" ")?;
-                stringifier.write_token("wx:else", "wx:else", loc)?;
-                if children.len() > 0 {
-                    stringifier.write_token(">", ">", &self.start_tag_location.1)?;
+                stringifier.write_token("wx:else", None, loc)?;
+                if !is_children_empty(children) {
+                    stringifier.write_token(">", None, &self.start_tag_location.1)?;
                     for child in children {
                         child.stringify_write(stringifier)?;
                     }
                     stringifier.write_token(
                         "<",
-                        "<",
+                        None,
                         &self
                             .end_tag_location
                             .as_ref()
                             .unwrap_or(&self.start_tag_location)
                             .0,
                     )?;
-                    stringifier.write_token("/", "/", &self.close_location)?;
+                    stringifier.write_token("/", None, &self.close_location)?;
                     stringifier.write_str("block")?;
                     stringifier.write_token(
                         ">",
-                        ">",
+                        None,
                         &self
                             .end_tag_location
                             .as_ref()
@@ -325,8 +343,8 @@ impl Stringify for Element {
                             .1,
                     )?;
                 } else {
-                    stringifier.write_token("/", "/", &self.close_location)?;
-                    stringifier.write_token(">", ">", &self.start_tag_location.1)?;
+                    stringifier.write_token("/", None, &self.close_location)?;
+                    stringifier.write_token(">", None, &self.start_tag_location.1)?;
                 }
             }
             return Ok(());
@@ -334,7 +352,7 @@ impl Stringify for Element {
 
         // write tag start
         let prev_scopes_count = stringifier.scope_names.len();
-        stringifier.write_token("<", "<", &self.start_tag_location.0)?;
+        stringifier.write_token("<", None, &self.start_tag_location.0)?;
         match &self.kind {
             ElementKind::Normal {
                 tag_name,
@@ -349,7 +367,7 @@ impl Stringify for Element {
                 extra_attr,
                 common,
             } => {
-                stringifier.write_ident(&tag_name)?;
+                stringifier.write_ident(&tag_name, true)?;
                 write_slot_and_slot_values(stringifier, &common.slot, &common.slot_value_refs)?;
                 match class {
                     ClassAttribute::None => {}
@@ -362,6 +380,7 @@ impl Stringify for Element {
                                 location: location.clone(),
                             },
                             &value,
+                            None,
                         )?;
                     }
                     ClassAttribute::Multiple(..) => {
@@ -379,6 +398,7 @@ impl Stringify for Element {
                                 location: location.clone(),
                             },
                             &value,
+                            None,
                         )?;
                     }
                     StyleAttribute::Multiple(..) => {
@@ -390,14 +410,14 @@ impl Stringify for Element {
                         "model",
                         attr.prefix_location.as_ref().unwrap_or(&attr.name.location),
                     ));
-                    write_attr(stringifier, prefix, &attr.name, &attr.value)?;
+                    write_attr(stringifier, prefix, &attr.name, &attr.value, Some(attr.is_value_unspecified))?;
                 }
                 for attr in change_attributes.iter() {
                     let prefix = (
                         "change",
                         attr.prefix_location.as_ref().unwrap_or(&attr.name.location),
                     );
-                    write_attr(stringifier, Some(prefix), &attr.name, &attr.value)?;
+                    write_attr(stringifier, Some(prefix), &attr.name, &attr.value, None)?;
                 }
                 for attr in worklet_attributes.iter() {
                     write_static_attr(
@@ -415,7 +435,7 @@ impl Stringify for Element {
                         "data",
                         attr.prefix_location.as_ref().unwrap_or(&attr.name.location),
                     );
-                    write_attr(stringifier, Some(prefix), &attr.name, &attr.value)?;
+                    write_attr(stringifier, Some(prefix), &attr.name, &attr.value, Some(attr.is_value_unspecified))?;
                 }
                 for attr in generics.iter() {
                     write_static_attr(
@@ -503,7 +523,7 @@ impl Stringify for Element {
                     write_named_attr(stringifier, "name", &name.0, &name.1)?;
                 }
                 for attr in values.iter() {
-                    write_attr(stringifier, None, &attr.name, &attr.value)?;
+                    write_attr(stringifier, None, &attr.name, &attr.value, None)?;
                 }
                 write_common_attributes_without_slot(stringifier, common)?;
             }
@@ -512,24 +532,24 @@ impl Stringify for Element {
         // write tag body and end
         let empty_children = vec![];
         let children = self.children().unwrap_or(&empty_children);
-        if children.len() > 0 {
-            stringifier.write_token(">", ">", &self.start_tag_location.1)?;
+        if !is_children_empty(children) {
+            stringifier.write_token(">", None, &self.start_tag_location.1)?;
             for child in children {
                 child.stringify_write(stringifier)?;
             }
             stringifier.write_token(
                 "<",
-                "<",
+                None,
                 &self
                     .end_tag_location
                     .as_ref()
                     .unwrap_or(&self.start_tag_location)
                     .0,
             )?;
-            stringifier.write_token("/", "/", &self.close_location)?;
+            stringifier.write_token("/", None, &self.close_location)?;
             match &self.kind {
                 ElementKind::Normal { tag_name, .. } => {
-                    stringifier.write_ident(&tag_name)?;
+                    stringifier.write_ident(&tag_name, false)?;
                 }
                 ElementKind::Pure { .. } | ElementKind::For { .. } => {
                     stringifier.write_str("block")?;
@@ -547,7 +567,7 @@ impl Stringify for Element {
             }
             stringifier.write_token(
                 ">",
-                ">",
+                None,
                 &self
                     .end_tag_location
                     .as_ref()
@@ -555,8 +575,8 @@ impl Stringify for Element {
                     .1,
             )?;
         } else {
-            stringifier.write_token("/", "/", &self.close_location)?;
-            stringifier.write_token(">", ">", &self.start_tag_location.1)?;
+            stringifier.write_token("/", None, &self.close_location)?;
+            stringifier.write_token(">", None, &self.start_tag_location.1)?;
         }
 
         // reset scopes
@@ -571,7 +591,7 @@ impl Stringify for Value {
         match self {
             Self::Static { value, location } => {
                 let quoted = escape_html_body(&value);
-                stringifier.write_token(&format!("{}", quoted), &value, &location)?;
+                stringifier.write_token(&format!("{}", quoted), None, &location)?;
             }
             Self::Dynamic {
                 expression,
@@ -586,13 +606,13 @@ impl Stringify for Value {
                 ) -> FmtResult {
                     match expr {
                         Expression::LitStr { value, location } => {
-                            stringifier.write_token(&escape_html_body(value), value, location)?;
+                            stringifier.write_token(&escape_html_body(value), None, location)?;
                             return Ok(());
                         }
                         Expression::ToStringWithoutUndefined { value, location } => {
-                            stringifier.write_token("{{", "{{", &start_location)?;
+                            stringifier.write_token("{{", None, &start_location)?;
                             value.stringify_write(stringifier)?;
-                            stringifier.write_token("}}", "}}", &location)?;
+                            stringifier.write_token("}}", None, &location)?;
                             return Ok(());
                         }
                         Expression::Plus {
@@ -619,9 +639,9 @@ impl Stringify for Value {
                         }
                         _ => {}
                     }
-                    stringifier.write_token("{{", "{{", &start_location)?;
+                    stringifier.write_token("{{", None, &start_location)?;
                     expr.stringify_write(stringifier)?;
-                    stringifier.write_token("}}", "}}", &end_location)?;
+                    stringifier.write_token("}}", None, &end_location)?;
                     Ok(())
                 }
                 split_expression(
@@ -657,22 +677,22 @@ mod test {
             r#"<template name="a"><a href="/"> A </a></template><template is="a"/>"#
         );
         let mut expects = vec![
-            (2, 28, 0, 16, "a"),
-            (3, 16, 0, 19, "<"),
-            (3, 17, 0, 20, "a"),
-            (3, 19, 0, 22, "href"),
-            (3, 25, 0, 28, "/"),
-            (3, 27, 0, 30, ">"),
-            (3, 28, 0, 31, " A "),
-            (3, 31, 0, 34, "<"),
-            (3, 32, 0, 35, "/"),
-            (3, 17, 0, 36, "a"),
-            (3, 34, 0, 37, ">"),
-            (1, 12, 0, 49, "<"),
-            (1, 22, 0, 59, "is"),
-            (1, 26, 0, 63, "a"),
-            (1, 29, 0, 65, "/"),
-            (1, 30, 0, 66, ">"),
+            (2, 28, 0, 16, Some("a")),
+            (3, 16, 0, 19, None),
+            (3, 17, 0, 20, Some("a")),
+            (3, 19, 0, 22, Some("href")),
+            (3, 25, 0, 28, None),
+            (3, 27, 0, 30, None),
+            (3, 28, 0, 31, None),
+            (3, 31, 0, 34, None),
+            (3, 32, 0, 35, None),
+            (3, 17, 0, 36, None),
+            (3, 34, 0, 37, None),
+            (1, 12, 0, 49, None),
+            (1, 22, 0, 59, Some("is")),
+            (1, 26, 0, 63, None),
+            (1, 29, 0, 65, None),
+            (1, 30, 0, 66, None),
         ]
         .into_iter();
         for token in sourcemap.tokens() {
@@ -681,7 +701,7 @@ mod test {
                 token.get_src_col(),
                 token.get_dst_line(),
                 token.get_dst_col(),
-                token.get_name().unwrap(),
+                token.get_name(),
             );
             assert_eq!(Some(token), expects.next());
         }

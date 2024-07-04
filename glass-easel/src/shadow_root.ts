@@ -115,7 +115,10 @@ export class ShadowRoot extends VirtualNode {
     node._$initialize(true, be, node, host._$nodeTreeContext)
     node._$host = host
     host.shadowRoot = node
-    be?.associateValue(node)
+    if (be) {
+      be.__wxElement = node
+      be.associateValue(node)
+    }
     return node
   }
 

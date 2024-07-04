@@ -8,7 +8,7 @@ import {
 } from './backend'
 import { ClassList, StyleScopeManager } from './class_list'
 import { type DataValue, type ModelBindingListener } from './data_proxy'
-import { performanceMeasureEnd, performanceMeasureStart } from './devtool'
+import { performanceMeasureEnd, performanceMeasureStart } from './dev_tools'
 import { Element } from './element'
 import { type EventListener } from './event'
 import { ENV, globalOptions } from './global_options'
@@ -121,6 +121,7 @@ export class NativeNode extends Element {
         }
       }
       if (ENV.DEV) performanceMeasureStart('backend.associateValue')
+      backendElement.__wxElement = node
       if (!(BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike))) {
         // ;(backendElement as backend.Element | composedBackend.Element).associateValue(node)
         ;(backendElement as unknown as { __wxElement: typeof node }).__wxElement = node
