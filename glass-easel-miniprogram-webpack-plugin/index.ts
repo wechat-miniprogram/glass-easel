@@ -6,6 +6,11 @@ import { NormalModule, type Compiler, type WebpackPluginInstance } from 'webpack
 import { TmplGroup } from 'glass-easel-template-compiler'
 import { escapeJsString } from './helpers'
 
+type VirtualModulePluginType = {
+  apply: (compiler: Compiler) => void
+  writeModule: (p: string, c: string) => void
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const chokidar = require('chokidar')
 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -18,6 +23,7 @@ export const GlassEaselMiniprogramWxssLoader = path.join(__dirname, 'wxss_loader
 
 const PLUGIN_NAME = 'GlassEaselMiniprogramWebpackPlugin'
 const CACHE_ETAG = 1
+const HOST_STYLES_MODULE = '__glass_easel_host_styles__.wxss'
 
 type PluginConfig = {
   path: string
@@ -66,13 +72,24 @@ const writeCache = <T>(compiler: Compiler, key: string, value: T): Promise<void>
   })
 
 class StyleSheetManager {
-  map = Object.create(null) as { [path: string]: { scopeName: string; srcPath: string } }
+  map = Object.create(null) as {
+    [path: string]: { scopeName: string; srcPath: string; lowPriority: string }
+  }
   enableStyleScope = Object.create(null) as { [path: string]: boolean }
   scopeNameInc = 0
   disableClassPrefix: boolean
+  codeRoot: string
+  virtualModules: VirtualModulePluginType
+  hostStylesReady = false
 
-  constructor(disableClassPrefix: boolean) {
+  constructor(
+    disableClassPrefix: boolean,
+    codeRoot: string,
+    virtualModules: VirtualModulePluginType,
+  ) {
     this.disableClassPrefix = disableClassPrefix
+    this.codeRoot = codeRoot
+    this.virtualModules = virtualModules
   }
 
   add(compPath: string, srcPath: string) {
@@ -93,6 +110,7 @@ class StyleSheetManager {
     this.map[compPath] = {
       srcPath,
       scopeName,
+      lowPriority: '',
     }
   }
 
@@ -111,16 +129,33 @@ class StyleSheetManager {
     return undefined
   }
 
+  setLowPriorityStyles(compPath: string, source: string, _map: string) {
+    const meta = this.map[compPath]
+    if (meta && meta.lowPriority !== source) {
+      meta.lowPriority = source
+    }
+  }
+
+  prepareHostStyles() {
+    const lowPriorityContent = Object.values(this.map)
+      .map(({ lowPriority }) => lowPriority)
+      .join('\n')
+    const fullPath = path.join(this.codeRoot, HOST_STYLES_MODULE)
+    this.virtualModules.writeModule(fullPath, lowPriorityContent)
+    this.hostStylesReady = true
+  }
+
   toCodeString() {
     const arr = Object.entries(this.map).map(([compPath, { srcPath }]) => {
       const s = `backend.registerStyleSheetContent('${escapeJsString(
         compPath,
-      )}', require('${escapeJsString(srcPath)}'));`
+      )}', (require('${escapeJsString(srcPath)}').default||''));`
       return s
     })
+    const req = this.hostStylesReady ? `(require('./${HOST_STYLES_MODULE}').default||'')` : "''"
     return `
       function (backend) {
-        backend.registerStyleSheetContent('app', require('./app.wxss'))
+        backend.registerStyleSheetContent('app', ${req} + (require('./app.wxss').default||''))
         ${arr.join('')}
       }
     `
@@ -134,10 +169,7 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
   customBootstrap: boolean
   disableClassPrefix: boolean
   // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-  virtualModules = new VirtualModulesPlugin() as {
-    apply: (compiler: Compiler) => void
-    writeModule: (p: string, c: string) => void
-  }
+  virtualModules = new VirtualModulesPlugin() as VirtualModulePluginType
 
   constructor(options: Partial<PluginConfig>) {
     this.path = options.path || './src'
@@ -157,7 +189,15 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
     let globalStaticConfig = {} as GlobalStaticConfig
     let appEntry: 'app.js' | 'app.ts' | null = null
     const depsTmplGroup = new TmplGroup()
-    const styleSheetManager = new StyleSheetManager(this.disableClassPrefix)
+
+    // init style sheet manager
+    const virtualModules = this.virtualModules
+    virtualModules.apply(compiler)
+    const styleSheetManager = new StyleSheetManager(
+      this.disableClassPrefix,
+      codeRoot,
+      this.virtualModules,
+    )
 
     // cleanup wasm modules
     compiler.hooks.shutdown.tap(PLUGIN_NAME, () => {
@@ -351,8 +391,6 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
     })
 
     // collect virtual files
-    const virtualModules = this.virtualModules
-    virtualModules.apply(compiler)
     compiler.hooks.compilation.tap(PLUGIN_NAME, (compilation) => {
       // add loaders
       NormalModule.getCompilationHooks(compilation).beforeLoaders.tap(
@@ -364,11 +402,18 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
             const relPath = path.relative(codeRoot, absPath).split(path.sep).join('/')
             const compPath = relPath.slice(0, -extName.length)
             if (extName === '.wxss') {
-              loaders.forEach((x) => {
+              loaders.forEach((x, i) => {
                 if (x.loader === GlassEaselMiniprogramWxssLoader) {
-                  x.options = {
-                    classPrefix: styleSheetManager.getScopeName(compPath),
-                    relPath,
+                  if (relPath === HOST_STYLES_MODULE) {
+                    loaders.splice(i, loaders.length - i)
+                  } else {
+                    x.options = {
+                      classPrefix: styleSheetManager.getScopeName(compPath),
+                      compPath,
+                      setLowPriorityStyles: (s: string, map: string) => {
+                        styleSheetManager.setLowPriorityStyles(compPath, s, map)
+                      },
+                    }
                   }
                 }
               })
@@ -446,6 +491,7 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
         // write index module
         await Promise.all(tasks)
         await new Promise<void>((resolve) => {
+          styleSheetManager.prepareHostStyles()
           updateVirtualIndexFile(tmplGroup)
           tmplGroup.free()
           compilation.rebuildModule(indexModule!, () => resolve())
@@ -515,14 +561,14 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
             if (typeof global !== 'undefined') { return global }
             throw new Error('The global object cannot be recognized')
           })()
-        `
-        const entryFooter = `
           var initWithBackend = function (backend) {
             var ab = env.associateBackend(backend)
             ;(${styleSheetManager.toCodeString()})(ab)
             return ab
           }
           exports.initWithBackend = initWithBackend
+        `
+        const entryFooter = `
           var registerGlobalEventListener = function (backend) {
             backend.onEvent((target, type, detail, options) => {
               glassEasel.triggerEvent(target, type, detail, options)

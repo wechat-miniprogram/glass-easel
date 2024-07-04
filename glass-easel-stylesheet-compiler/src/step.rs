@@ -90,4 +90,9 @@ impl<'i> StepToken<'i> {
     pub(crate) fn wrap(token: Token<'i>, position: error::Position) -> Self {
         Self { token, position }
     }
+
+    pub(crate) fn wrap_at(token: Token<'i>, other: &Self) -> Self {
+        let position = other.position.clone();
+        Self { token, position }
+    }
 }

@@ -557,6 +557,7 @@ export class Component<
           backendElement = (nodeTreeContext as domlikeBackend.Context).document.createElement(
             tagName,
           )
+          backendElement.setAttribute('is', def.is)
           if (ENV.DEV) performanceMeasureEnd()
         }
       } else if (BM.COMPOSED || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Composed)) {

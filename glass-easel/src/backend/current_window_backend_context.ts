@@ -35,7 +35,7 @@ export class CurrentWindowBackendContext implements Context {
     createDocumentFragment(): Element
   }
   /* @internal */
-  private _$styleSheets: HTMLElement[] = []
+  private _$styleSheets: (HTMLElement | undefined)[] = []
   /* @internal */
   private _$styleSheetRegistry = Object.create(null) as { [path: string]: string }
   /* @internal */
@@ -81,6 +81,11 @@ export class CurrentWindowBackendContext implements Context {
   appendStyleSheetPath(path: string, styleScope?: number): number {
     const styleText = this._$styleSheetRegistry[path]
     if (styleText === undefined) throw new Error(`No style sheet registry "${path}"`)
+    if (styleText === '') {
+      const id = this._$styleSheets.length
+      this._$styleSheets.push(undefined)
+      return id
+    }
     const s = document.createElement('style')
     s.type = 'text/css'
     s.innerHTML = styleText

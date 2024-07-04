@@ -1,12 +1,13 @@
-use std::{fmt::Write, ops::Range};
+use std::ops::Range;
 
-use cssparser::{CowRcStr, ParseError, ParserInput, ToCss, Token, TokenSerializationType};
-use sourcemap::{SourceMap, SourceMapBuilder};
+use cssparser::{CowRcStr, ParseError, ParserInput, Token};
 
 pub mod error;
 pub mod js_bindings;
 mod step;
+pub mod output;
 
+use output::StyleSheetOutput;
 use step::{StepParser, StepToken};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -15,6 +16,7 @@ pub struct StyleSheetOptions {
     pub class_prefix_sign: Option<String>,
     pub rpx_ratio: f32,
     pub import_sign: Option<String>,
+    pub host_is: Option<String>,
 }
 
 impl Default for StyleSheetOptions {
@@ -24,6 +26,7 @@ impl Default for StyleSheetOptions {
             class_prefix_sign: None,
             rpx_ratio: 750.,
             import_sign: None,
+            host_is: None,
         }
     }
 }
@@ -31,12 +34,11 @@ impl Default for StyleSheetOptions {
 pub struct StyleSheetTransformer {
     options: StyleSheetOptions,
     path: String,
-    output: String,
-    utf16_len: u32,
-    prev_ser_type: TokenSerializationType,
-    source_map: SourceMapBuilder,
-    source_id: u32,
+    normal_output: StyleSheetOutput,
+    low_priority_output: StyleSheetOutput,
+    using_low_priority: bool,
     warnings: Vec<error::ParseError>,
+    cur_at_rule_stacks: Vec<String>,
 }
 
 impl StyleSheetTransformer {
@@ -44,20 +46,16 @@ impl StyleSheetTransformer {
         let parser_input = &mut ParserInput::new(css);
         let parser = &mut cssparser::Parser::new(parser_input);
         let mut input = StepParser::wrap(parser);
-        let mut source_map = SourceMapBuilder::new(None);
-        let source_id = source_map.add_source(path);
-        source_map.set_source_contents(source_id, Some(css));
 
         // construct this
         let mut this = Self {
             options,
             path: path.to_string(),
-            output: String::new(),
-            utf16_len: 0,
-            prev_ser_type: TokenSerializationType::Nothing,
-            source_id,
-            source_map,
+            normal_output: StyleSheetOutput::new(path, css),
+            low_priority_output: StyleSheetOutput::new(path, css),
+            using_low_priority: false,
             warnings: vec![],
+            cur_at_rule_stacks: vec![],
         };
 
         {
@@ -82,68 +80,26 @@ impl StyleSheetTransformer {
         std::mem::replace(&mut self.warnings, vec![])
     }
 
-    pub fn write_content(&self, mut w: impl std::io::Write) -> std::io::Result<()> {
-        w.write_all(self.output.as_bytes())
+    pub fn output(self) -> StyleSheetOutput {
+        self.normal_output
     }
 
-    pub fn write_content_str(&self, mut w: impl std::fmt::Write) -> std::fmt::Result {
-        write!(w, "{}", self.output)
+    pub fn output_and_low_priority_output(self) -> (StyleSheetOutput, StyleSheetOutput) {
+        (self.normal_output, self.low_priority_output)
     }
 
-    pub fn write_source_map(self, w: impl std::io::Write) -> Result<(), sourcemap::Error> {
-        self.source_map.into_sourcemap().to_writer(w)
+    fn current_output(&self) -> &StyleSheetOutput {
+        if self.using_low_priority { &self.low_priority_output } else { &self.normal_output }
     }
 
-    pub fn extract_source_map(self) -> SourceMap {
-        self.source_map.into_sourcemap()
-    }
-
-    fn append_token(&mut self, token: StepToken, _input: &mut StepParser, src: Option<Token>) {
-        let next_ser_type = token.serialization_type();
-        if self
-            .prev_ser_type
-            .needs_separator_when_before(next_ser_type)
-        {
-            write!(&mut self.output, " ").unwrap();
-            self.utf16_len += 1;
-        }
-        self.prev_ser_type = next_ser_type;
-        let output_start_pos = self.output.len();
-        token.to_css(&mut self.output).unwrap();
-        let name = src.map(|x| {
-            let s = x.to_css_string();
-            self.source_map.add_name(&s)
-        });
-        self.source_map.add_raw(
-            0,
-            self.utf16_len,
-            token.position.line,
-            token.position.utf16_col,
-            Some(self.source_id),
-            name,
-        );
-        self.utf16_len += str::encode_utf16(&self.output[output_start_pos..]).count() as u32;
-    }
-
-    fn append_token_space_preserved(
-        &mut self,
-        token: StepToken,
-        input: &mut StepParser,
-        src: Option<Token>,
-    ) {
-        if let Token::WhiteSpace(_) = &*token {
-            self.prev_ser_type = token.serialization_type();
-            self.output.push(' ');
-            self.utf16_len += 1;
-        } else {
-            self.append_token(token, input, src);
-        }
+    fn current_output_mut(&mut self) -> &mut StyleSheetOutput {
+        if self.using_low_priority { &mut self.low_priority_output } else { &mut self.normal_output }
     }
 
     fn append_nested_block(
         &mut self,
         token: StepToken,
-        input: &mut StepParser,
+        _input: &mut StepParser,
     ) -> StepToken<'static> {
         let close = match &*token {
             Token::CurlyBracketBlock => Token::CloseCurlyBracket,
@@ -153,12 +109,58 @@ impl StyleSheetTransformer {
             _ => unreachable!(),
         };
         let position = token.position;
-        self.append_token(token, input, None);
+        self.current_output_mut().append_token(token, None);
         StepToken::wrap(close, position)
     }
 
-    fn append_nested_block_close(&mut self, close: StepToken<'static>, input: &mut StepParser) {
-        self.append_token(close, input, None);
+    fn append_nested_block_close(&mut self, close: StepToken<'static>, _input: &mut StepParser) {
+        self.current_output_mut().append_token(close, None);
+    }
+
+    fn write_in_low_priority<R>(
+        &mut self,
+        input: &mut StepParser,
+        f: impl FnOnce(&mut Self, &mut StepParser) -> R,
+    ) -> R {
+        self.using_low_priority = true;
+        for item in self.cur_at_rule_stacks.iter() {
+            self.low_priority_output.append_raw(&item);
+            self.low_priority_output.append_raw("{");
+        }
+        let r = f(self, input);
+        for _ in self.cur_at_rule_stacks.iter() {
+            self.low_priority_output.append_raw("}");
+        }
+        self.using_low_priority = false;
+        r
+    }
+
+    fn append_token(&mut self, token: StepToken, _input: &mut StepParser, src: Option<Token>) {
+        self.current_output_mut().append_token(token, src)
+    }
+
+    fn append_token_space_preserved(&mut self, token: StepToken, _input: &mut StepParser, src: Option<Token>) {
+        self.current_output_mut().append_token_space_preserved(token, src)
+    }
+
+    fn cur_output_utf8_len(&self) -> usize {
+        self.current_output().cur_utf8_len()
+    }
+
+    fn get_output_segment(&self, range: std::ops::Range<usize>) -> &str {
+        self.current_output().get_output_segment(range)
+    }
+
+    fn wrap_at_rule_output<'a, R>(
+        &mut self,
+        input: &mut StepParser,
+        at_rule_str: String,
+        f: impl FnOnce(&mut Self, &mut StepParser) -> R,
+    ) -> R {
+        self.cur_at_rule_stacks.push(at_rule_str);
+        let r = f(self, input);
+        self.cur_at_rule_stacks.pop();
+        r
     }
 }
 
@@ -362,6 +364,7 @@ fn parse_at_rule(
         } else {
             // process other at-rules
             let st = StepToken::wrap(Token::AtKeyword(x.clone()), peek.position);
+            let output_index = ss.cur_output_utf8_len();
             ss.append_token(st, input, None);
             let x: &str = &x;
             let contain_rule_list = matches!(x, "media" | "supports" | "document");
@@ -370,19 +373,22 @@ fn parse_at_rule(
                     let next = input.next()?;
                     match next.token.clone() {
                         Token::CurlyBracketBlock => {
-                            let close = ss.append_nested_block(next, input);
-                            if contain_rule_list {
-                                input
-                                    .parse_nested_block::<_, (), ()>(|nested_input| {
-                                        let input = &mut StepParser::wrap(nested_input);
-                                        parse_rules(input, ss);
-                                        Ok(())
-                                    })
-                                    .ok();
-                            } else {
-                                convert_rpx_in_block(input, ss, None);
-                            }
-                            ss.append_nested_block_close(close, input);
+                            let at_rule_str = ss.get_output_segment(output_index..ss.cur_output_utf8_len()).to_string();
+                            ss.wrap_at_rule_output(input, at_rule_str, |ss, input| {
+                                let close = ss.append_nested_block(next, input);
+                                if contain_rule_list {
+                                    input
+                                        .parse_nested_block::<_, (), ()>(|nested_input| {
+                                            let input = &mut StepParser::wrap(nested_input);
+                                            parse_rules(input, ss);
+                                            Ok(())
+                                        })
+                                        .ok();
+                                } else {
+                                    convert_rpx_in_block(input, ss, None);
+                                }
+                                ss.append_nested_block_close(close, input);
+                            });
                             return Ok(false);
                         }
                         Token::SquareBracketBlock
@@ -422,6 +428,43 @@ fn parse_qualified_rule(input: &mut StepParser, ss: &mut StyleSheetTransformer) 
     let mut in_class = false;
     let mut has_whitespace = false;
     input.skip_whitespace();
+    if let Some(host_is) = ss.options.host_is.as_ref() {
+        let quoted_host_is = Token::QuotedString(host_is.clone().into());
+        let r = input.try_parse::<_, _, ParseError<()>>(|input| {
+            input.expect_colon()?;
+            input.expect_ident_matching("host")?;
+            let mut invalid = false;
+            let next = loop {
+                let Ok(next) = input.next() else { return Ok(()) };
+                if *next != Token::CurlyBracketBlock {
+                    invalid = true;
+                    let pos = input.position();
+                    ss.add_warning(
+                        error::ParseErrorKind::HostSelectorCombination,
+                        pos..pos,
+                    );
+                } else {
+                    break next;
+                }
+            };
+            if !invalid {
+                ss.write_in_low_priority(input, |ss, input| {
+                    ss.append_token(StepToken::wrap_at(Token::SquareBracketBlock, &next), input, None);
+                    ss.append_token(StepToken::wrap_at(Token::Ident("is".into()), &next), input, None);
+                    ss.append_token(StepToken::wrap_at(Token::Delim('='), &next), input, None);
+                    ss.append_token(StepToken::wrap_at(quoted_host_is, &next), input, None);
+                    ss.append_token(StepToken::wrap_at(Token::CloseSquareBracket, &next), input, None);
+                    let close = ss.append_nested_block(next, input);
+                    convert_rpx_in_block(input, ss, None);
+                    ss.append_nested_block_close(close, input);
+                });
+            }
+            Ok(())
+        });
+        if r.is_ok() {
+            return
+        }
+    }
     loop {
         let r = input.try_parse::<_, _, ParseError<()>>(|input| {
             let next = input.next_including_whitespace()?;
@@ -664,9 +707,10 @@ mod test {
             },
         );
         let mut s = Vec::new();
-        trans.write_content(&mut s).unwrap();
+        let output = trans.output();
+        output.write(&mut s).unwrap();
         let mut sm = Vec::new();
-        trans.write_source_map(&mut sm).unwrap();
+        output.write_source_map(&mut sm).unwrap();
         assert_eq!(std::str::from_utf8(&s).unwrap(), ".a{}");
     }
 
@@ -685,9 +729,10 @@ mod test {
             },
         );
         let mut s = Vec::new();
-        trans.write_content(&mut s).unwrap();
+        let output = trans.output();
+        output.write(&mut s).unwrap();
         let mut sm = Vec::new();
-        trans.write_source_map(&mut sm).unwrap();
+        output.write_source_map(&mut sm).unwrap();
         assert_eq!(
             std::str::from_utf8(&s).unwrap(),
             "#a.p--b [g] .p--c.p--d g:e(.p--f){key:.v f(.c)d.e;}"
@@ -708,9 +753,10 @@ mod test {
             },
         );
         let mut s = Vec::new();
-        trans.write_content(&mut s).unwrap();
+        let output = trans.output();
+        output.write(&mut s).unwrap();
         let mut sm = Vec::new();
-        trans.write_source_map(&mut sm).unwrap();
+        output.write_source_map(&mut sm).unwrap();
         assert_eq!(
             std::str::from_utf8(&s).unwrap(),
             "./*TEST*/a g:e(./*TEST*/f){}"
@@ -731,9 +777,10 @@ mod test {
             },
         );
         let mut s = Vec::new();
-        trans.write_content(&mut s).unwrap();
+        let output = trans.output();
+        output.write(&mut s).unwrap();
         let mut sm = Vec::new();
-        trans.write_source_map(&mut sm).unwrap();
+        output.write_source_map(&mut sm).unwrap();
         assert_eq!(std::str::from_utf8(&s).unwrap(), "./*TEST*/p--a{}");
     }
 
@@ -752,7 +799,8 @@ mod test {
             },
         );
         let mut s = Vec::new();
-        trans.write_content(&mut s).unwrap();
+        let output = trans.output();
+        output.write(&mut s).unwrap();
         assert_eq!(
             std::str::from_utf8(&s).unwrap(),
             "#a.p--b[0.133333vw] (1vw){key:1vw f(1vw);}"
@@ -775,7 +823,8 @@ mod test {
             },
         );
         let mut s = Vec::new();
-        trans.write_content(&mut s).unwrap();
+        let output = trans.output();
+        output.write(&mut s).unwrap();
         assert_eq!(
             std::str::from_utf8(&s).unwrap(),
             "@a 75rpx;.p--b{}@c(10vw .p--d){10vw.e}.p--f{}"
@@ -800,10 +849,76 @@ mod test {
             },
         );
         let mut s = Vec::new();
-        trans.write_content(&mut s).unwrap();
+        let output = trans.output();
+        output.write(&mut s).unwrap();
         assert_eq!(
             std::str::from_utf8(&s).unwrap(),
             "@media(width: 10vw){.p--b [20vw]{key:30vw.a;}}"
+        );
+    }
+
+    #[test]
+    fn host_select() {
+        let trans = StyleSheetTransformer::from_css(
+            "",
+            r#"
+                :host {
+                    color: red;
+                }
+            "#,
+            StyleSheetOptions {
+                host_is: Some("TEST".to_string()),
+                ..Default::default()
+            },
+        );
+        let (output, lp) = trans.output_and_low_priority_output();
+        let mut s = Vec::new();
+        output.write(&mut s).unwrap();
+        assert!(std::str::from_utf8(&s).unwrap().is_empty());
+        let mut s = Vec::new();
+        lp.write(&mut s).unwrap();
+        assert_eq!(
+            std::str::from_utf8(&s).unwrap(),
+            r#"[is="TEST"]{color:red;}"#
+        );
+    }
+
+    #[test]
+    fn host_select_inside_at_rules() {
+        let trans = StyleSheetTransformer::from_css(
+            "",
+            r#"
+                @media (width: 1px) {
+                    @supports (color: red) {
+                        .a {
+                            color: red;
+                        }
+                        :host {
+                            color: pink;
+                        }
+                        .b {
+                            color: green;
+                        }
+                    }
+                }
+            "#,
+            StyleSheetOptions {
+                host_is: Some("/\"\\".to_string()),
+                ..Default::default()
+            },
+        );
+        let (output, lp) = trans.output_and_low_priority_output();
+        let mut s = Vec::new();
+        output.write(&mut s).unwrap();
+        assert_eq!(
+            std::str::from_utf8(&s).unwrap(),
+            r#"@media(width: 1px){@supports(color: red){.a{color:red;}.b{color:green;}}}"#
+        );
+        let mut s = Vec::new();
+        lp.write(&mut s).unwrap();
+        assert_eq!(
+            std::str::from_utf8(&s).unwrap(),
+            r#"@media(width: 1px){@supports(color: red){[is="/\"\\"]{color:pink;}}}"#
         );
     }
 
@@ -820,7 +935,8 @@ mod test {
             },
         );
         let mut s = Vec::new();
-        trans.write_content(&mut s).unwrap();
+        let output = trans.output();
+        output.write(&mut s).unwrap();
         assert_eq!(
             std::str::from_utf8(&s).unwrap(),
             r#"/*TEST .%2Fa%5Cb%2A%3F*/"#
@@ -841,7 +957,8 @@ mod test {
             },
         );
         let mut s = Vec::new();
-        trans.write_content(&mut s).unwrap();
+        let output = trans.output();
+        output.write(&mut s).unwrap();
         assert_eq!(
             std::str::from_utf8(&s).unwrap(),
             r#"@media(min-width: 10px){/*TEST .%2Fa*/}.a{}"#
@@ -861,7 +978,8 @@ mod test {
             },
         );
         let mut s = Vec::new();
-        trans.write_content(&mut s).unwrap();
+        let output = trans.output();
+        output.write(&mut s).unwrap();
         assert_eq!(
             std::str::from_utf8(&s).unwrap(),
             r#"@layer a{@supports(color: red){@media print and (min-width: 10px){/*TEST .%2Fa*/}}}"#
@@ -882,11 +1000,12 @@ mod test {
             },
         );
         let mut s = Vec::new();
-        trans.write_content(&mut s).unwrap();
         assert_eq!(
             trans.warnings().map(|x| x.kind.clone()).collect::<Vec<_>>(),
             [error::ParseErrorKind::IllegalImportPosition],
         );
+        let output = trans.output();
+        output.write(&mut s).unwrap();
         assert_eq!(std::str::from_utf8(&s).unwrap(), r#".a{}/*TEST .%2Fa*/"#);
     }
 
@@ -907,7 +1026,8 @@ mod test {
             },
         );
         let mut s = Vec::new();
-        trans.write_content(&mut s).unwrap();
+        let output = trans.output();
+        output.write(&mut s).unwrap();
         assert_eq!(
             std::str::from_utf8(&s).unwrap(),
             ".p--a{margin:10px 200vw 30px calc(10px + 20px/2);padding:calc(100vw*2 + 30px);}"
@@ -926,13 +1046,14 @@ mod test {
             },
         );
         let mut s = Vec::new();
-        trans.write_content(&mut s).unwrap();
+        let output = trans.output();
+        output.write(&mut s).unwrap();
         assert_eq!(
             std::str::from_utf8(&s).unwrap(),
             ".p--a{padding:calc(100vw*2 + 30px);}"
         );
         let mut sm = Vec::new();
-        trans.write_source_map(&mut sm).unwrap();
+        output.write_source_map(&mut sm).unwrap();
         let sm: &[u8] = &sm;
         let source_map = SourceMap::from_reader(sm).unwrap();
         {
@@ -995,10 +1116,11 @@ mod test {
             },
         );
         let mut s = Vec::new();
-        trans.write_content(&mut s).unwrap();
+        let output = trans.output();
+        output.write(&mut s).unwrap();
         assert_eq!(std::str::from_utf8(&s).unwrap(), ".p--a{width:10vw}");
         let mut sm = Vec::new();
-        trans.write_source_map(&mut sm).unwrap();
+        output.write_source_map(&mut sm).unwrap();
         let sm: &[u8] = &sm;
         let source_map = SourceMap::from_reader(sm).unwrap();
         {
