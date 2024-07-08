@@ -176,11 +176,13 @@ describe('Element Iterator', function () {
       elem.$.i.shadowRoot,
       elem.$.i.shadowRoot.childNodes[0],
     ]
-    glassEasel.ElementIterator.create(elem.$.g.$.e, 'composed-descendants-root-first', Object).forEach(
-      function (e) {
-        expect(e).toBe(expectResArr.shift())
-      },
-    )
+    glassEasel.ElementIterator.create(
+      elem.$.g.$.e,
+      'composed-descendants-root-first',
+      Object,
+    ).forEach(function (e) {
+      expect(e).toBe(expectResArr.shift())
+    })
     expect(expectResArr.length).toBe(0)
   })
 

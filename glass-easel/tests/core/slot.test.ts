@@ -88,7 +88,9 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         a.appendChild(slotA1)
         expect(childElem.childNodes.length).toBe(4)
         expect(slotA1.getComposedChildren()).toEqual(childElem.childNodes)
-        expect(domHtml(parentElem)).toBe('<child is=""><span id="a"><comp is="">A</comp></span></child>')
+        expect(domHtml(parentElem)).toBe(
+          '<child is=""><span id="a"><comp is="">A</comp></span></child>',
+        )
         expect(ops).toEqual([[-1, 'A']])
         matchElementWithDom(parentElem)
 
@@ -847,7 +849,9 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         ).asInstanceOf(parent)!
 
         glassEasel.Element.pretendAttached(parentElem)
-        expect(domHtml(parentElem)).toBe('<c1 is=""><a></a></c1><c2 is=""><a></a></c2><c3 is=""><a></a></c3>')
+        expect(domHtml(parentElem)).toBe(
+          '<c1 is=""><a></a></c1><c2 is=""><a></a></c2><c3 is=""><a></a></c3>',
+        )
         expect(ops).toEqual([
           [-1, '1:A'],
           [-1, '1:B'],
@@ -963,7 +967,9 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
 
         ops = []
         parentElem.setData({ enableA1: false })
-        expect(domHtml(parentElem)).toBe('<c1 is=""><a></a></c1><c2 is=""><a></a></c2><c3 is=""><a></a></c3>')
+        expect(domHtml(parentElem)).toBe(
+          '<c1 is=""><a></a></c1><c2 is=""><a></a></c2><c3 is=""><a></a></c3>',
+        )
         expect(ops).toEqual([
           [-2, '3:C'],
           [-2, '3:B'],
@@ -1313,21 +1319,29 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         const noneElem = parentElem.getShadowRoot()!.childNodes[0]!.asInstanceOf(none)!
         const recElem = parentElem.getShadowRoot()!.childNodes[1]!.asInstanceOf(rec)!
 
-        expect(domHtml(parentElem)).toBe('<none is=""><div>123</div></none><rec is=""><div>abc</div></rec>')
+        expect(domHtml(parentElem)).toBe(
+          '<none is=""><div>123</div></none><rec is=""><div>abc</div></rec>',
+        )
         matchElementWithDom(parentElem)
 
         noneElem.setData({ 'sp.text': 456 })
-        expect(domHtml(parentElem)).toBe('<none is=""><div>123</div></none><rec is=""><div>abc</div></rec>')
+        expect(domHtml(parentElem)).toBe(
+          '<none is=""><div>123</div></none><rec is=""><div>abc</div></rec>',
+        )
         matchElementWithDom(parentElem)
 
         noneElem.setData({ sp: { text: 789 } })
-        expect(domHtml(parentElem)).toBe('<none is=""><div>789</div></none><rec is=""><div>abc</div></rec>')
+        expect(domHtml(parentElem)).toBe(
+          '<none is=""><div>789</div></none><rec is=""><div>abc</div></rec>',
+        )
         matchElementWithDom(parentElem)
 
         const recObj = {} as { r: any }
         recObj.r = recObj
         recElem.setData({ sp: { text: 'def' }, recObj })
-        expect(domHtml(parentElem)).toBe('<none is=""><div>789</div></none><rec is=""><div>def</div></rec>')
+        expect(domHtml(parentElem)).toBe(
+          '<none is=""><div>789</div></none><rec is=""><div>def</div></rec>',
+        )
         matchElementWithDom(parentElem)
       })
 

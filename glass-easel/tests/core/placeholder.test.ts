@@ -65,7 +65,9 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       is: 'placeholder/simple/child',
       template: tmpl('child<div><slot/></div>'),
     })
-    expect(domHtml(elem)).toBe('<div><child is="placeholder/simple/child">child<div><span></span></div></child></div>')
+    expect(domHtml(elem)).toBe(
+      '<div><child is="placeholder/simple/child">child<div><span></span></div></child></div>',
+    )
     matchElementWithDom(elem)
 
     elem.setData({
@@ -175,7 +177,9 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     matchElementWithDom(elem)
 
     extraCs.exportComponent('child-pub', 'child')
-    expect(domHtml(elem)).toBe('<child is="child">A</child><child-private is="child">A</child-private>')
+    expect(domHtml(elem)).toBe(
+      '<child is="child">A</child><child-private is="child">A</child-private>',
+    )
     matchElementWithDom(elem)
   })
 
@@ -267,7 +271,9 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       is: 'placeholder/simple/child-of-child',
       template: tmpl('<slot />C'),
     })
-    expect(domHtml(elem)).toBe('<child is="placeholder/simple/child">A<g is="placeholder/simple/child-of-child">BC</g></child>')
+    expect(domHtml(elem)).toBe(
+      '<child is="placeholder/simple/child">A<g is="placeholder/simple/child-of-child">BC</g></child>',
+    )
     matchElementWithDom(elem)
   })
 
@@ -330,7 +336,9 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       arr: ['1', '2'],
     })
 
-    expect(domHtml(elem)).toBe('<child is="placeholder/simple/child">new</child><span prop="1">0</span><span prop="2">1</span>')
+    expect(domHtml(elem)).toBe(
+      '<child is="placeholder/simple/child">new</child><span prop="1">0</span><span prop="2">1</span>',
+    )
     matchElementWithDom(elem)
 
     const cDef = componentSpace.defineComponent({
@@ -342,7 +350,9 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     })
     const c0 = (elem.$['c-0'] as glassEasel.GeneralComponent).asInstanceOf(cDef)!
     const c1 = (elem.$['c-1'] as glassEasel.GeneralComponent).asInstanceOf(cDef)!
-    expect(domHtml(elem)).toBe('<child is="placeholder/simple/child">new</child><c is="placeholder/simple/c">1</c><c is="placeholder/simple/c">2</c>')
+    expect(domHtml(elem)).toBe(
+      '<child is="placeholder/simple/child">new</child><c is="placeholder/simple/c">1</c><c is="placeholder/simple/c">2</c>',
+    )
     expect(c0.data.prop).toBe('1')
     expect(c0.dataset.index).toBe(0)
     expect(c1.data.prop).toBe('2')

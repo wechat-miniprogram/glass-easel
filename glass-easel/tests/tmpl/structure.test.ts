@@ -391,7 +391,9 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         { k: 'e', v: 70 },
       ],
     })
-    expect(domHtml(elem)).toBe('<x-c is="">30</x-c><x-c is="">60</x-c><x-c is="">40</x-c><x-c is="">50</x-c><x-c is="">70</x-c>')
+    expect(domHtml(elem)).toBe(
+      '<x-c is="">30</x-c><x-c is="">60</x-c><x-c is="">40</x-c><x-c is="">50</x-c><x-c is="">70</x-c>',
+    )
     matchElementWithDom(elem)
     checkIndex()
     expect(ops).toEqual([[-3, 'b:60']])
@@ -405,7 +407,9 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         { k: 'a', v: 70 },
       ],
     })
-    expect(domHtml(elem)).toBe('<x-c is="">30</x-c><x-c is="">40</x-c><x-c is="">50</x-c><x-c is="">60</x-c><x-c is="">70</x-c>')
+    expect(domHtml(elem)).toBe(
+      '<x-c is="">30</x-c><x-c is="">40</x-c><x-c is="">50</x-c><x-c is="">60</x-c><x-c is="">70</x-c>',
+    )
     matchElementWithDom(elem)
     checkIndex()
     expect(ops).toEqual([[-3, 'a:40']])
@@ -419,7 +423,9 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         { k: 'a', v: 70 },
       ],
     })
-    expect(domHtml(elem)).toBe('<x-c is="">30</x-c><x-c is="">40</x-c><x-c is="">50</x-c><x-c is="">60</x-c><x-c is="">70</x-c>')
+    expect(domHtml(elem)).toBe(
+      '<x-c is="">30</x-c><x-c is="">40</x-c><x-c is="">50</x-c><x-c is="">60</x-c><x-c is="">70</x-c>',
+    )
     matchElementWithDom(elem)
     checkIndex()
     expect(ops).toEqual([])
@@ -675,7 +681,9 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         f2: { k: 'b', v: 50 },
       },
     })
-    expect(domHtml(elem)).toBe('<x-c is="">10</x-c><x-c is="">20</x-c><x-c is="">30</x-c><x-c is="">40</x-c><x-c is="">50</x-c>')
+    expect(domHtml(elem)).toBe(
+      '<x-c is="">10</x-c><x-c is="">20</x-c><x-c is="">30</x-c><x-c is="">40</x-c><x-c is="">50</x-c>',
+    )
     matchElementWithDom(elem)
     checkIndex()
     expect(ops).toEqual([

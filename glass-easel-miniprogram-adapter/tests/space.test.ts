@@ -249,7 +249,9 @@ describe('define', () => {
 
     const ab = env.associateBackend()
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
-    expect(domHtml(root.getComponent())).toBe('<a is="comp/a"><c is="comp/b"><span>B</span></c></a>')
+    expect(domHtml(root.getComponent())).toBe(
+      '<a is="comp/a"><c is="comp/b"><span>B</span></c></a>',
+    )
   })
 
   test('options placeholder', () => {
@@ -1067,7 +1069,9 @@ describe('define', () => {
     const ab = env.associateBackend()
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
-    expect(domHtml(root.getComponent())).toBe('<list is="child/list"><div>2</div><item is="child/item"></item><item is="child/item"></item></list>')
+    expect(domHtml(root.getComponent())).toBe(
+      '<list is="child/list"><div>2</div><item is="child/item"></item><item is="child/item"></item></list>',
+    )
   })
 
   test('chaining extraThisFieldsType', () => {

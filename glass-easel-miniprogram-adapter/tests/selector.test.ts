@@ -72,7 +72,9 @@ describe('selector query', () => {
     const ab = env.associateBackend()
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
-    expect(domHtml(root.getComponent())).toBe('<div><child is="child/comp">456</child><child is="child/comp">789</child></div>')
+    expect(domHtml(root.getComponent())).toBe(
+      '<div><child is="child/comp">456</child><child is="child/comp">789</child></div>',
+    )
   })
 
   test('select single component (with custom export)', () => {
@@ -159,7 +161,9 @@ describe('selector query', () => {
     const ab = env.associateBackend()
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
-    expect(domHtml(root.getComponent())).toBe('<div><child1 is="child1/comp">456</child1><child2 is="child2/comp">789</child2></div>')
+    expect(domHtml(root.getComponent())).toBe(
+      '<div><child1 is="child1/comp">456</child1><child2 is="child2/comp">789</child2></div>',
+    )
   })
 
   test('select single component (with custom export on behavior)', () => {
@@ -251,7 +255,9 @@ describe('selector query', () => {
     const ab = env.associateBackend()
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
-    expect(domHtml(root.getComponent())).toBe('<div><child1 is="child1/comp">456</child1><child2 is="child2/comp">789</child2></div>')
+    expect(domHtml(root.getComponent())).toBe(
+      '<div><child1 is="child1/comp">456</child1><child2 is="child2/comp">789</child2></div>',
+    )
   })
 
   test('select all components', () => {
