@@ -72,7 +72,7 @@ describe('selector query', () => {
     const ab = env.associateBackend()
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
-    expect(domHtml(root.getComponent())).toBe('<div><child>456</child><child>789</child></div>')
+    expect(domHtml(root.getComponent())).toBe('<div><child is="child/comp">456</child><child is="child/comp">789</child></div>')
   })
 
   test('select single component (with custom export)', () => {
@@ -159,7 +159,7 @@ describe('selector query', () => {
     const ab = env.associateBackend()
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
-    expect(domHtml(root.getComponent())).toBe('<div><child1>456</child1><child2>789</child2></div>')
+    expect(domHtml(root.getComponent())).toBe('<div><child1 is="child1/comp">456</child1><child2 is="child2/comp">789</child2></div>')
   })
 
   test('select single component (with custom export on behavior)', () => {
@@ -251,7 +251,7 @@ describe('selector query', () => {
     const ab = env.associateBackend()
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
-    expect(domHtml(root.getComponent())).toBe('<div><child1>456</child1><child2>789</child2></div>')
+    expect(domHtml(root.getComponent())).toBe('<div><child1 is="child1/comp">456</child1><child2 is="child2/comp">789</child2></div>')
   })
 
   test('select all components', () => {
@@ -316,7 +316,7 @@ describe('selector query', () => {
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
     expect(domHtml(root.getComponent())).toBe(
-      '<div><child class="c">0</child><child class="c">1</child><child-b class="c">2</child-b></div>',
+      '<div><child is="child/comp" class="c">0</child><child is="child/comp" class="c">1</child><child-b is="child/comp2" class="c">2</child-b></div>',
     )
   })
 
