@@ -138,7 +138,7 @@ describe('trait behavior', () => {
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
     expect(domHtml(root.getComponent())).toBe(
-      '<list><div>2</div><item>2</item><item>3</item></list>',
+      '<list is="child/list"><div>2</div><item is="child/item">2</item><item is="child/item">3</item></list>',
     )
   })
 })

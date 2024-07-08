@@ -5,12 +5,14 @@ const { StyleSheetTransformer } = require('glass-easel-stylesheet-compiler')
 
 module.exports = function (src, prevMap, meta) {
   const callback = this.async()
-  const { classPrefix } = this.query
-  const sst = new StyleSheetTransformer(this.resourcePath, src, classPrefix, 750)
+  const { classPrefix, compPath, setLowPriorityStyles } = this.query
+  const sst = new StyleSheetTransformer(this.resourcePath, src, classPrefix, 750, compPath)
+  setLowPriorityStyles(sst.getLowPriorityContent(), sst.getLowPrioritySourceMap())
   const ss = sst.getContent()
   let map
   if (this.sourceMap) {
-    const ssSourceMap = JSON.parse(sst.toSourceMap())
+    const ssSourceMap = JSON.parse(sst.getSourceMap())
+    sst.free()
     if (prevMap) {
       const destConsumer = new SourceMapConsumer(ssSourceMap)
       const srcConsumer = new SourceMapConsumer(prevMap)

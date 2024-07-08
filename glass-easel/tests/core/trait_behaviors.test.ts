@@ -154,6 +154,8 @@ describe('trait behaviors', () => {
     const comp = glassEasel.Component.createWithContext('root', compDef, domBackend)
     glassEasel.Element.pretendAttached(comp)
     expect(eventArr).toStrictEqual([1, 2, 1, 2, 1, 2])
-    expect(domHtml(comp)).toBe('<parent><child>A</child><child>B</child><child>C</child></parent>')
+    expect(domHtml(comp)).toBe(
+      '<parent is=""><child is="">A</child><child is="">B</child><child is="">C</child></parent>',
+    )
   })
 })

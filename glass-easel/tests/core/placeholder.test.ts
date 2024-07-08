@@ -58,21 +58,23 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
     expect(listener).toHaveBeenCalledTimes(1)
     expect(listener).toHaveBeenNthCalledWith(1, false, 'placeholder/simple/child', elem)
-    expect(domHtml(elem)).toBe('<div><child><span></span></child></div>')
+    expect(domHtml(elem)).toBe('<div><child is=""><span></span></child></div>')
     matchElementWithDom(elem)
 
     componentSpace.defineComponent({
       is: 'placeholder/simple/child',
       template: tmpl('child<div><slot/></div>'),
     })
-    expect(domHtml(elem)).toBe('<div><child>child<div><span></span></div></child></div>')
+    expect(domHtml(elem)).toBe(
+      '<div><child is="placeholder/simple/child">child<div><span></span></div></child></div>',
+    )
     matchElementWithDom(elem)
 
     elem.setData({
       b: true,
     })
     expect(domHtml(elem)).toBe(
-      '<div><child>child<div><span></span></div></child><child-another id="b"></child-another></div>',
+      '<div><child is="placeholder/simple/child">child<div><span></span></div></child><child-another id="b"></child-another></div>',
     )
     matchElementWithDom(elem)
   })
@@ -95,7 +97,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       })
       .registerComponent()
     const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
-    expect(domHtml(elem)).toBe('<child>test</child>')
+    expect(domHtml(elem)).toBe('<child is="view">test</child>')
     matchElementWithDom(elem)
   })
 
@@ -116,7 +118,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       })
       .registerComponent()
     const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
-    expect(domHtml(elem)).toBe('<parent></parent>')
+    expect(domHtml(elem)).toBe('<parent is=""></parent>')
     matchElementWithDom(elem)
 
     componentSpace.groupRegister(() => {
@@ -131,7 +133,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       const childDef = componentSpace.define('child').template(tmpl('CHILD')).registerComponent()
       componentSpace.setGlobalUsingComponent('child', childDef)
     })
-    expect(domHtml(elem)).toBe('<parent><child>CHILD</child></parent>')
+    expect(domHtml(elem)).toBe('<parent is="parent"><child is="child">CHILD</child></parent>')
     matchElementWithDom(elem)
   })
 
@@ -164,18 +166,20 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect(listener).toHaveBeenCalledTimes(2)
     expect(listener).toHaveBeenNthCalledWith(1, true, 'child-pub', elem)
     expect(listener).toHaveBeenNthCalledWith(2, false, 'child', elem)
-    expect(domHtml(elem)).toBe('<child></child><child-private></child-private>')
+    expect(domHtml(elem)).toBe('<child is=""></child><child-private is=""></child-private>')
     matchElementWithDom(elem)
 
     extraCs.defineComponent({
       is: 'child',
       template: tmpl('A'),
     })
-    expect(domHtml(elem)).toBe('<child></child><child-private>A</child-private>')
+    expect(domHtml(elem)).toBe('<child is=""></child><child-private is="child">A</child-private>')
     matchElementWithDom(elem)
 
     extraCs.exportComponent('child-pub', 'child')
-    expect(domHtml(elem)).toBe('<child>A</child><child-private>A</child-private>')
+    expect(domHtml(elem)).toBe(
+      '<child is="child">A</child><child-private is="child">A</child-private>',
+    )
     matchElementWithDom(elem)
   })
 
@@ -218,7 +222,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       is: 'placeholder/simple/child',
       template: tmpl('<slot />B'),
     })
-    expect(domHtml(elem)).toBe('<child>AB</child>')
+    expect(domHtml(elem)).toBe('<child is="placeholder/simple/child">AB</child>')
     matchElementWithDom(elem)
   })
 
@@ -260,14 +264,16 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       },
       template: tmpl('<slot /><g>B</g>'),
     })
-    expect(domHtml(elem)).toBe('<child>A<span>B</span></child>')
+    expect(domHtml(elem)).toBe('<child is="placeholder/simple/child">A<span>B</span></child>')
     matchElementWithDom(elem)
 
     componentSpace.defineComponent({
       is: 'placeholder/simple/child-of-child',
       template: tmpl('<slot />C'),
     })
-    expect(domHtml(elem)).toBe('<child>A<g>BC</g></child>')
+    expect(domHtml(elem)).toBe(
+      '<child is="placeholder/simple/child">A<g is="placeholder/simple/child-of-child">BC</g></child>',
+    )
     matchElementWithDom(elem)
   })
 
@@ -321,14 +327,18 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       template: tmpl('{{ prop }}'),
     })
     const child = (elem.$.child as glassEasel.GeneralComponent).asInstanceOf(childDef)!
-    expect(domHtml(elem)).toBe('<child>new</child><span prop="1">0</span>')
+    expect(domHtml(elem)).toBe(
+      '<child is="placeholder/simple/child">new</child><span prop="1">0</span>',
+    )
     expect(child.data.prop).toBe('new')
 
     elem.setData({
       arr: ['1', '2'],
     })
 
-    expect(domHtml(elem)).toBe('<child>new</child><span prop="1">0</span><span prop="2">1</span>')
+    expect(domHtml(elem)).toBe(
+      '<child is="placeholder/simple/child">new</child><span prop="1">0</span><span prop="2">1</span>',
+    )
     matchElementWithDom(elem)
 
     const cDef = componentSpace.defineComponent({
@@ -340,7 +350,9 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     })
     const c0 = (elem.$['c-0'] as glassEasel.GeneralComponent).asInstanceOf(cDef)!
     const c1 = (elem.$['c-1'] as glassEasel.GeneralComponent).asInstanceOf(cDef)!
-    expect(domHtml(elem)).toBe('<child>new</child><c>1</c><c>2</c>')
+    expect(domHtml(elem)).toBe(
+      '<child is="placeholder/simple/child">new</child><c is="placeholder/simple/c">1</c><c is="placeholder/simple/c">2</c>',
+    )
     expect(c0.data.prop).toBe('1')
     expect(c0.dataset.index).toBe(0)
     expect(c1.data.prop).toBe('2')
@@ -404,7 +416,9 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect(callOrder).toStrictEqual([1])
     glassEasel.Element.pretendAttached(elem)
     expect(callOrder).toStrictEqual([1, 2, 7])
-    expect(domHtml(elem)).toBe('<child><span>3<a></a></span></child>')
+    expect(domHtml(elem)).toBe(
+      '<child is=""><span>3<a is="placeholder/lifetime/a"></a></span></child>',
+    )
     matchElementWithDom(elem)
     callOrder.splice(0, 99)
 
@@ -430,7 +444,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       },
     })
     expect(callOrder).toStrictEqual([4, 3, 5, 8])
-    expect(domHtml(elem)).toBe('<child><div>21</div></child>')
+    expect(domHtml(elem)).toBe('<child is="placeholder/lifetime/child"><div>21</div></child>')
     matchElementWithDom(elem)
   })
 

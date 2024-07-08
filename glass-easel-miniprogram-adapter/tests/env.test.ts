@@ -135,7 +135,7 @@ describe('env', () => {
     const ab = env.associateBackend(backend)
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     expect(domHtml(root.getComponent())).toBe(
-      '<c-a>A</c-a><c-aa>A</c-aa><i-a></i-a><i-b></i-b><c-b>B</c-b>',
+      '<c-a is="inner-comp-1">A</c-a><c-aa is="inner-comp-1">A</c-aa><i-a></i-a><i-b></i-b><c-b is="inner-comp-2">B</c-b>',
     )
   })
 })

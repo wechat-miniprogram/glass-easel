@@ -605,11 +605,10 @@ describe('Component Relations', function () {
       var def = regElem({
         is: 'relation/path',
         using: {
-          'a': './path/a',
-          'b': 'path/b',
+          a: './path/a',
+          b: 'path/b',
         },
-        template:
-          '<a id="a"> <b id="b" /> </a>',
+        template: '<a id="a"> <b id="b" /> </a>',
       })
       var elem = glassEasel.Component.createWithContext('test', def, domBackend)
       glassEasel.Element.pretendAttached(elem)
