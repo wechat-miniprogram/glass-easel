@@ -322,7 +322,7 @@ export class BaseBehaviorBuilder<
         TExtraThisFields
       >
 
-      return func.call(methodCaller, {
+      const exported = func.call(methodCaller, {
         self: methodCaller,
         data,
         setData: (newData, callback) => {
@@ -341,6 +341,18 @@ export class BaseBehaviorBuilder<
         method,
         listener,
       })
+
+      if (exported) {
+        const exportedKeys = Object.keys(exported)
+        for (let j = 0; j < exportedKeys.length; j += 1) {
+          const exportedKey = exportedKeys[j]!
+          const exportItem: unknown = exported[exportedKey]
+          if (glassEasel.Component.isTaggedMethod(exportItem)) {
+            ;(methodCaller as { [key: string]: unknown })[exportedKey] = exportItem
+          }
+        }
+      }
+      return exported
     })
     return this as any
   }

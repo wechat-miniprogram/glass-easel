@@ -855,14 +855,13 @@ describe('define', () => {
     // eslint-disable-next-line arrow-body-style
     const parentType = codeSpace.componentEnv('path/to/comp', ({ Component }) => {
       return Component()
-        .methods({
-          parentFn() {
-            return 456
-          },
-        })
         .lifetime('attached', function () {
           expect(this.selectComponent('#c', childType)!.childFn()).toBe(123)
           callOrder.push(2)
+        })
+        .init(({ method }) => {
+          const parentFn = method(() => 456)
+          return { parentFn }
         })
         .register()
     })
