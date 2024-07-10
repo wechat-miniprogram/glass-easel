@@ -502,8 +502,7 @@ export class Component<
     return taggedMethod
   }
 
-  /** @internal */
-  static _$isTaggedMethod(func: unknown): func is TaggedMethod<ComponentMethod> {
+  static isTaggedMethod(func: unknown): func is TaggedMethod<ComponentMethod> {
     return typeof func === 'function' && !!(func as unknown as { [tag: symbol]: true })[METHOD_TAG]
   }
 
@@ -815,7 +814,7 @@ export class Component<
           for (let j = 0; j < exportedKeys.length; j += 1) {
             const exportedKey = exportedKeys[j]!
             const exportItem: unknown = exported[exportedKey]
-            if (Component._$isTaggedMethod(exportItem)) {
+            if (Component.isTaggedMethod(exportItem)) {
               if (cowMethodMap) {
                 cowMethodMap = false
                 comp._$methodMap = Object.create(comp._$methodMap) as MethodList
