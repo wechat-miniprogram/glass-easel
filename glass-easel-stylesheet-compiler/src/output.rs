@@ -1,6 +1,6 @@
 use std::fmt::Write;
 
-use cssparser::{TokenSerializationType, ToCss, Token};
+use cssparser::{ToCss, Token, TokenSerializationType};
 use sourcemap::{SourceMap, SourceMapBuilder};
 
 use crate::step::StepToken;
@@ -85,11 +85,7 @@ impl StyleSheetOutput {
         self.utf16_len += str::encode_utf16(&self.s[output_start_pos..]).count() as u32;
     }
 
-    pub(crate) fn append_token_space_preserved(
-        &mut self,
-        token: StepToken,
-        src: Option<Token>,
-    ) {
+    pub(crate) fn append_token_space_preserved(&mut self, token: StepToken, src: Option<Token>) {
         if let Token::WhiteSpace(_) = &*token {
             self.prev_ser_type = token.serialization_type();
             self.s.push(' ');

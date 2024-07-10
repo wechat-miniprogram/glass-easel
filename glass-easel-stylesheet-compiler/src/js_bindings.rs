@@ -50,7 +50,13 @@ pub struct StyleSheetTransformer {
 #[wasm_bindgen]
 impl StyleSheetTransformer {
     #[wasm_bindgen(constructor)]
-    pub fn new(name: &str, s: &str, class_prefix: Option<String>, rpx_ratio: f32, host_is: Option<String>) -> Self {
+    pub fn new(
+        name: &str,
+        s: &str,
+        class_prefix: Option<String>,
+        rpx_ratio: f32,
+        host_is: Option<String>,
+    ) -> Self {
         let mut sst = crate::StyleSheetTransformer::from_css(
             name,
             s,
@@ -72,7 +78,9 @@ impl StyleSheetTransformer {
         let mut low_priority_content = String::new();
         low_priority.write_str(&mut low_priority_content).unwrap();
         let mut low_priority_source_map = Vec::new();
-        low_priority.write_source_map(&mut low_priority_source_map).unwrap();
+        low_priority
+            .write_source_map(&mut low_priority_source_map)
+            .unwrap();
 
         Self {
             warnings,

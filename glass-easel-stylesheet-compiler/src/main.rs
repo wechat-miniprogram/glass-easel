@@ -86,7 +86,8 @@ fn main() {
     let (output, low_priority_output) = sst.output_and_low_priority_output();
 
     if let Some(output_file) = args.low_priority_output {
-        let output_file = fs::File::create(output_file).expect("Failed to open or create output file");
+        let output_file =
+            fs::File::create(output_file).expect("Failed to open or create output file");
         low_priority_output.write(output_file).unwrap();
     } else {
         let mut s = Vec::new();
@@ -100,7 +101,8 @@ fn main() {
     }
 
     if let Some(output_file) = args.output {
-        let output_file = fs::File::create(output_file).expect("Failed to open or create output file");
+        let output_file =
+            fs::File::create(output_file).expect("Failed to open or create output file");
         output.write(output_file).unwrap();
     } else {
         let mut s = Vec::new();

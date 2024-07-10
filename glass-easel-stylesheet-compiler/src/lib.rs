@@ -4,8 +4,8 @@ use cssparser::{CowRcStr, ParseError, ParserInput, Token};
 
 pub mod error;
 pub mod js_bindings;
-mod step;
 pub mod output;
+mod step;
 
 use output::StyleSheetOutput;
 use step::{StepParser, StepToken};
@@ -89,11 +89,19 @@ impl StyleSheetTransformer {
     }
 
     fn current_output(&self) -> &StyleSheetOutput {
-        if self.using_low_priority { &self.low_priority_output } else { &self.normal_output }
+        if self.using_low_priority {
+            &self.low_priority_output
+        } else {
+            &self.normal_output
+        }
     }
 
     fn current_output_mut(&mut self) -> &mut StyleSheetOutput {
-        if self.using_low_priority { &mut self.low_priority_output } else { &mut self.normal_output }
+        if self.using_low_priority {
+            &mut self.low_priority_output
+        } else {
+            &mut self.normal_output
+        }
     }
 
     fn append_nested_block(
@@ -139,8 +147,14 @@ impl StyleSheetTransformer {
         self.current_output_mut().append_token(token, src)
     }
 
-    fn append_token_space_preserved(&mut self, token: StepToken, _input: &mut StepParser, src: Option<Token>) {
-        self.current_output_mut().append_token_space_preserved(token, src)
+    fn append_token_space_preserved(
+        &mut self,
+        token: StepToken,
+        _input: &mut StepParser,
+        src: Option<Token>,
+    ) {
+        self.current_output_mut()
+            .append_token_space_preserved(token, src)
     }
 
     fn cur_output_utf8_len(&self) -> usize {
@@ -373,7 +387,9 @@ fn parse_at_rule(
                     let next = input.next()?;
                     match next.token.clone() {
                         Token::CurlyBracketBlock => {
-                            let at_rule_str = ss.get_output_segment(output_index..ss.cur_output_utf8_len()).to_string();
+                            let at_rule_str = ss
+                                .get_output_segment(output_index..ss.cur_output_utf8_len())
+                                .to_string();
                             ss.wrap_at_rule_output(input, at_rule_str, |ss, input| {
                                 let close = ss.append_nested_block(next, input);
                                 if contain_rule_list {
@@ -432,14 +448,18 @@ fn parse_qualified_rule(input: &mut StepParser, ss: &mut StyleSheetTransformer) 
         let quoted_host_is = Token::QuotedString(host_is.clone().into());
         let r = input.try_parse::<_, _, ParseError<()>>(|input| {
             input.expect_colon()?;
-            let Ok(next) = input.next() else { return Ok(()) };
+            let Ok(next) = input.next() else {
+                return Ok(());
+            };
             let mut invalid = match &*next {
                 Token::Ident(x) if x.as_bytes() == b"host" => None,
                 Token::Function(x) if x.as_bytes() == b"host" => Some(input.position()),
-                _ => { return Err(input.new_custom_error(())) }
+                _ => return Err(input.new_custom_error(())),
             };
             let next = loop {
-                let Ok(next) = input.next() else { return Ok(()) };
+                let Ok(next) = input.next() else {
+                    return Ok(());
+                };
                 if *next != Token::CurlyBracketBlock {
                     if invalid.is_none() {
                         invalid = Some(input.position());
@@ -449,17 +469,26 @@ fn parse_qualified_rule(input: &mut StepParser, ss: &mut StyleSheetTransformer) 
                 }
             };
             if let Some(pos) = invalid {
-                ss.add_warning(
-                    error::ParseErrorKind::HostSelectorCombination,
-                    pos..pos,
-                );
+                ss.add_warning(error::ParseErrorKind::HostSelectorCombination, pos..pos);
             } else {
                 ss.write_in_low_priority(input, |ss, input| {
-                    ss.append_token(StepToken::wrap_at(Token::SquareBracketBlock, &next), input, None);
-                    ss.append_token(StepToken::wrap_at(Token::Ident("is".into()), &next), input, None);
+                    ss.append_token(
+                        StepToken::wrap_at(Token::SquareBracketBlock, &next),
+                        input,
+                        None,
+                    );
+                    ss.append_token(
+                        StepToken::wrap_at(Token::Ident("is".into()), &next),
+                        input,
+                        None,
+                    );
                     ss.append_token(StepToken::wrap_at(Token::Delim('='), &next), input, None);
                     ss.append_token(StepToken::wrap_at(quoted_host_is, &next), input, None);
-                    ss.append_token(StepToken::wrap_at(Token::CloseSquareBracket, &next), input, None);
+                    ss.append_token(
+                        StepToken::wrap_at(Token::CloseSquareBracket, &next),
+                        input,
+                        None,
+                    );
                     let close = ss.append_nested_block(next, input);
                     convert_rpx_in_block(input, ss, None);
                     ss.append_nested_block_close(close, input);
@@ -468,7 +497,7 @@ fn parse_qualified_rule(input: &mut StepParser, ss: &mut StyleSheetTransformer) 
             Ok(())
         });
         if r.is_ok() {
-            return
+            return;
         }
     }
     loop {
@@ -909,21 +938,18 @@ mod test {
         );
         assert_eq!(
             trans.warnings().map(|x| x.kind.clone()).collect::<Vec<_>>(),
-            [error::ParseErrorKind::HostSelectorCombination, error::ParseErrorKind::HostSelectorCombination],
+            [
+                error::ParseErrorKind::HostSelectorCombination,
+                error::ParseErrorKind::HostSelectorCombination
+            ],
         );
         let (output, lp) = trans.output_and_low_priority_output();
         let mut s = Vec::new();
         output.write(&mut s).unwrap();
-        assert_eq!(
-            std::str::from_utf8(&s).unwrap(),
-            r#".a{color:green}"#
-        );
+        assert_eq!(std::str::from_utf8(&s).unwrap(), r#".a{color:green}"#);
         let mut s = Vec::new();
         lp.write(&mut s).unwrap();
-        assert_eq!(
-            std::str::from_utf8(&s).unwrap(),
-            r#""#
-        );
+        assert_eq!(std::str::from_utf8(&s).unwrap(), r#""#);
     }
 
     #[test]

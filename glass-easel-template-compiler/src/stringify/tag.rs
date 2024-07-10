@@ -232,7 +232,13 @@ impl Stringify for Element {
                         "mark",
                         attr.prefix_location.as_ref().unwrap_or(&attr.name.location),
                     );
-                    write_attr(stringifier, Some(prefix), &attr.name, &attr.value, Some(attr.is_value_unspecified))?;
+                    write_attr(
+                        stringifier,
+                        Some(prefix),
+                        &attr.name,
+                        &attr.value,
+                        Some(attr.is_value_unspecified),
+                    )?;
                 }
                 for ev in event_bindings.iter() {
                     let prefix = if ev.is_catch {
@@ -410,7 +416,13 @@ impl Stringify for Element {
                         "model",
                         attr.prefix_location.as_ref().unwrap_or(&attr.name.location),
                     ));
-                    write_attr(stringifier, prefix, &attr.name, &attr.value, Some(attr.is_value_unspecified))?;
+                    write_attr(
+                        stringifier,
+                        prefix,
+                        &attr.name,
+                        &attr.value,
+                        Some(attr.is_value_unspecified),
+                    )?;
                 }
                 for attr in change_attributes.iter() {
                     let prefix = (
@@ -435,7 +447,13 @@ impl Stringify for Element {
                         "data",
                         attr.prefix_location.as_ref().unwrap_or(&attr.name.location),
                     );
-                    write_attr(stringifier, Some(prefix), &attr.name, &attr.value, Some(attr.is_value_unspecified))?;
+                    write_attr(
+                        stringifier,
+                        Some(prefix),
+                        &attr.name,
+                        &attr.value,
+                        Some(attr.is_value_unspecified),
+                    )?;
                 }
                 for attr in generics.iter() {
                     write_static_attr(
