@@ -3,12 +3,25 @@
 import { promises as fs } from 'node:fs'
 import * as path from 'node:path'
 import { NormalModule, type Compiler, type WebpackPluginInstance } from 'webpack'
+import chalk from 'chalk'
 import { TmplGroup } from 'glass-easel-template-compiler'
 import { escapeJsString } from './helpers'
 
 type VirtualModulePluginType = {
   apply: (compiler: Compiler) => void
   writeModule: (p: string, c: string) => void
+}
+
+type Warning = {
+  isError: boolean
+  level: number
+  code: number
+  message: string
+  path: string
+  startLine: number
+  startColumn: number
+  endLine: number
+  endColumn: number
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -423,7 +436,19 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
                   x.options = {
                     addTemplate(content: string) {
                       wxmlContentMap[compPath] = content
-                      depsTmplGroup.addTmpl(compPath, content)
+                      const warnings = depsTmplGroup.addTmpl(compPath, content) as Warning[]
+                      if (warnings && warnings.length > 0) {
+                        warnings.forEach((warning) => {
+                          const msgKindColored = warning.isError
+                            ? chalk.red('ERROR')
+                            : chalk.yellow('WARN')
+                          const msg = `[glass-easel-template-compiler] ${msgKindColored} ${warning.path}:${warning.startLine}:${warning.startColumn} (#${warning.code}): ${warning.message}`
+                          // eslint-disable-next-line no-console
+                          if (warning.isError) console.error(msg)
+                          // eslint-disable-next-line no-console
+                          else console.warn(msg)
+                        })
+                      }
                       const deps = depsTmplGroup
                         .getDirectDependencies(compPath)
                         .concat(depsTmplGroup.getScriptDependencies(compPath))

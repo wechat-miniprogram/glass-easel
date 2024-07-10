@@ -432,22 +432,28 @@ fn parse_qualified_rule(input: &mut StepParser, ss: &mut StyleSheetTransformer) 
         let quoted_host_is = Token::QuotedString(host_is.clone().into());
         let r = input.try_parse::<_, _, ParseError<()>>(|input| {
             input.expect_colon()?;
-            input.expect_ident_matching("host")?;
-            let mut invalid = false;
+            let Ok(next) = input.next() else { return Ok(()) };
+            let mut invalid = match &*next {
+                Token::Ident(x) if x.as_bytes() == b"host" => None,
+                Token::Function(x) if x.as_bytes() == b"host" => Some(input.position()),
+                _ => { return Err(input.new_custom_error(())) }
+            };
             let next = loop {
                 let Ok(next) = input.next() else { return Ok(()) };
                 if *next != Token::CurlyBracketBlock {
-                    invalid = true;
-                    let pos = input.position();
-                    ss.add_warning(
-                        error::ParseErrorKind::HostSelectorCombination,
-                        pos..pos,
-                    );
+                    if invalid.is_none() {
+                        invalid = Some(input.position());
+                    }
                 } else {
                     break next;
                 }
             };
-            if !invalid {
+            if let Some(pos) = invalid {
+                ss.add_warning(
+                    error::ParseErrorKind::HostSelectorCombination,
+                    pos..pos,
+                );
+            } else {
                 ss.write_in_low_priority(input, |ss, input| {
                     ss.append_token(StepToken::wrap_at(Token::SquareBracketBlock, &next), input, None);
                     ss.append_token(StepToken::wrap_at(Token::Ident("is".into()), &next), input, None);
@@ -880,6 +886,43 @@ mod test {
         assert_eq!(
             std::str::from_utf8(&s).unwrap(),
             r#"[is="TEST"]{color:red;}"#
+        );
+    }
+
+    #[test]
+    fn illegal_host_combination() {
+        let trans = StyleSheetTransformer::from_css(
+            "",
+            r#"
+                :host(.a) {
+                    color: red;
+                }
+                :host .a {
+                    color: red;
+                }
+                .a { color: green }
+            "#,
+            StyleSheetOptions {
+                host_is: Some("TEST".to_string()),
+                ..Default::default()
+            },
+        );
+        assert_eq!(
+            trans.warnings().map(|x| x.kind.clone()).collect::<Vec<_>>(),
+            [error::ParseErrorKind::HostSelectorCombination, error::ParseErrorKind::HostSelectorCombination],
+        );
+        let (output, lp) = trans.output_and_low_priority_output();
+        let mut s = Vec::new();
+        output.write(&mut s).unwrap();
+        assert_eq!(
+            std::str::from_utf8(&s).unwrap(),
+            r#".a{color:green}"#
+        );
+        let mut s = Vec::new();
+        lp.write(&mut s).unwrap();
+        assert_eq!(
+            std::str::from_utf8(&s).unwrap(),
+            r#""#
         );
     }
 
