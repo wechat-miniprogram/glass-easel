@@ -23,7 +23,6 @@ type MethodList = typeUtils.MethodList
 type ChainingFilterType = typeUtils.ChainingFilterType
 type ComponentMethod = typeUtils.ComponentMethod
 type TaggedMethod<Fn extends ComponentMethod> = typeUtils.TaggedMethod<Fn>
-type UnTaggedMethod<M extends TaggedMethod<any>> = typeUtils.UnTaggedMethod<M>
 
 export class BaseBehaviorBuilder<
   TPrevData extends DataList = Empty,
@@ -261,12 +260,7 @@ export class BaseBehaviorBuilder<
       TPrevData,
       TData,
       TProperty,
-      TMethod &
-        (TExport extends void
-          ? Empty
-          : {
-              [K in keyof TExport]: UnTaggedMethod<TExport[K]>
-            }),
+      TMethod,
       TChainingFilter,
       TPendingChainingFilter,
       TComponentExport,
