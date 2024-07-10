@@ -534,7 +534,7 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
             })
             ${addStyleSheet}
             codeSpace.globalComponentEnv(index.globalObject, '${escapeJsString(compPath)}', () => {
-              require('./${escapeJsString(path.basename(compInfo.main))}')
+              module.exports = require('./${escapeJsString(path.basename(compInfo.main))}')
             })
           `,
         )
