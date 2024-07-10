@@ -1,5 +1,6 @@
 /* eslint-disable */
 
+const chalk = require('chalk')
 const { SourceMapGenerator, SourceMapConsumer } = require('source-map')
 const { StyleSheetTransformer } = require('glass-easel-stylesheet-compiler')
 
@@ -8,6 +9,17 @@ module.exports = function (src, prevMap, meta) {
   const { classPrefix, compPath, setLowPriorityStyles } = this.query
   const sst = new StyleSheetTransformer(this.resourcePath, src, classPrefix, 750, compPath)
   setLowPriorityStyles(sst.getLowPriorityContent(), sst.getLowPrioritySourceMap())
+  const warnings = sst.extractWarnings()
+  if (warnings && warnings.length > 0) {
+    warnings.forEach((warning) => {
+      const msgKindColored = warning.isError
+        ? chalk.red('ERROR')
+        : chalk.yellow('WARN')
+      const msg = `[glass-easel-stylesheet-compiler] ${msgKindColored} ${warning.path}:${warning.startLine}:${warning.startColumn} (#${warning.code}): ${warning.message}`
+      if (warning.isError) console.error(msg)
+      else console.warn(msg)
+    })
+  }
   const ss = sst.getContent()
   let map
   if (this.sourceMap) {
