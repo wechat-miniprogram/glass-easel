@@ -2432,6 +2432,14 @@ export class Element implements NodeCast {
       ;(this._$backendElement as backend.Element).setDataset(name, value)
       if (ENV.DEV) performanceMeasureEnd()
     }
+
+    if (this._$mutationObserverTarget) {
+      MutationObserverTarget.callAttrObservers(this, {
+        type: 'properties',
+        target: this,
+        attributeName: `data-${name}`,
+      })
+    }
   }
 
   /** Set a mark on the element */

@@ -1,4 +1,4 @@
-import { domBackend } from '../base/env'
+import { domBackend, tmpl } from '../base/env'
 import * as glassEasel from '../../src'
 
 const componentSpace = new glassEasel.ComponentSpace()
@@ -51,5 +51,34 @@ describe('dynamic add observer', () => {
     })
     expect(actionOrder).toStrictEqual([1])
     actionOrder = []
+  })
+})
+
+describe('listProperties', () => {
+  it('should list properties', () => {
+    const Comp = componentSpace.defineComponent({
+      properties: {
+        a: String,
+        b: String,
+        c: String,
+      },
+    })
+
+    const Root = componentSpace.defineComponent({
+      using: { comp: Comp },
+      template: tmpl(`<comp id="comp" a="a" />`),
+    })
+
+    const root = glassEasel.Component.createWithContext('root', Root, domBackend).general()
+    const comp = (root.$.comp as glassEasel.GeneralComponent).asInstanceOf(Comp)!
+
+    expect(glassEasel.Component.listProperties(comp)).toStrictEqual(['a', 'b', 'c'])
+    expect(glassEasel.Component.listChangedProperties(comp)).toStrictEqual(['a'])
+
+    comp.setData({ b: 'b' })
+    expect(glassEasel.Component.listChangedProperties(comp)).toStrictEqual(['a'])
+
+    comp._$dataGroup.replaceProperty('c', 'c')
+    expect(glassEasel.Component.listChangedProperties(comp)).toStrictEqual(['a', 'c'])
   })
 })

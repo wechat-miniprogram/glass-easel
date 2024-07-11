@@ -60,6 +60,38 @@ describe('dump element', () => {
     )
   })
 
+  test('dump node structure (component)', () => {
+    const compDefA = componentSpace.defineComponent({
+      is: 'comp-a',
+      properties: {
+        prop: String,
+      },
+      externalClasses: ['my-class'],
+      template: tmpl('<div class="my-class" />'),
+    })
+    componentSpace.setGlobalUsingComponent('comp-a', compDefA.general())
+    const compDef = componentSpace.defineComponent({
+      is: 'comp-b',
+      template: tmpl(
+        '<comp-a prop="p" data-p="p"></comp-a><comp-a prop="pp" my-class="clz"></comp-a>',
+      ),
+    })
+    const elem = glassEasel.Component.createWithContext('root', compDef.general(), domBackend)
+    const composedDump = glassEasel.dumpElementToString(elem, true)
+    expect(composedDump).toBe(
+      [
+        '<root:comp-b>',
+        '  <(virtual):shadow>',
+        '    <comp-a:comp-a data-p="p" prop="p">',
+        '      <(virtual):shadow>',
+        '        <div class="my-class">',
+        '    <comp-a:comp-a prop="pp" my-class="clz">',
+        '      <(virtual):shadow>',
+        '        <div class="my-class">',
+      ].join('\n'),
+    )
+  })
+
   test('dump node structure (external component)', () => {
     const def = componentSpace.defineComponent({
       options: { externalComponent: true },

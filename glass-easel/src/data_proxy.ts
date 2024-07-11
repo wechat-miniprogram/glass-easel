@@ -501,6 +501,7 @@ export class DataGroup<
   private _$propertyPassingDeepCopy: DeepCopyStrategy
   private _$reflectToAttributes: boolean
   private _$propFields: { [name: string]: PropertyDefinition }
+  private _$propChanged: Record<string, true> = {}
   /** @internal */
   _$observerTree: DataGroupObserverTree
   private _$observerStatus: boolean[]
@@ -606,6 +607,27 @@ export class DataGroup<
   }
 
   /**
+   * Check if a property exists with the given name
+   */
+  hasProperty(propName: string): boolean {
+    return this._$propFields[propName] !== undefined
+  }
+
+  /**
+   * List all property names
+   */
+  listProperties(): string[] {
+    return Object.keys(this._$propFields)
+  }
+
+  /**
+   * List all changed property names
+   */
+  listChangedProperties(): string[] {
+    return Object.keys(this._$propFields).filter((name) => this._$propChanged[name])
+  }
+
+  /**
    * Add a new property change to queue
    *
    * (Generally designed for template engines.)
@@ -615,8 +637,8 @@ export class DataGroup<
    */
   replaceProperty(propName: string, newData: DataValue): boolean {
     let data = newData
-    const prop = this._$propFields[propName]
-    if (!prop) return false
+    if (!this.hasProperty(propName)) return false
+    this._$propChanged[propName] = true
     if (this._$propertyPassingDeepCopy !== DeepCopyStrategy.None) {
       if (this._$propertyPassingDeepCopy === DeepCopyStrategy.SimpleWithRecursion) {
         data = deepCopy(newData, true)

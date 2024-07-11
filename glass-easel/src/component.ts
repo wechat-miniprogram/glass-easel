@@ -62,6 +62,7 @@ import {
   normalizeComponentOptions,
   type NormalizedComponentOptions,
 } from './global_options'
+import { MutationObserverTarget } from './mutation_observer'
 import { type Node } from './node'
 import {
   Relation,
@@ -1077,20 +1078,16 @@ export class Component<
     return this._$external
   }
 
-  static listProperties<
-    TData extends DataList,
-    TProperty extends PropertyList,
-    TMethod extends MethodList,
-  >(comp: ComponentInstance<TData, TProperty, TMethod>): string[] {
-    return Object.keys(comp._$behavior._$propertyMap)
+  static listProperties(comp: GeneralComponent): string[] {
+    return comp._$dataGroup.listProperties()
   }
 
-  static hasProperty<
-    TData extends DataList,
-    TProperty extends PropertyList,
-    TMethod extends MethodList,
-  >(comp: Component<TData, TProperty, TMethod>, propName: string): boolean {
-    return !!comp._$behavior._$propertyMap[propName]
+  static listChangedProperties(comp: GeneralComponent): string[] {
+    return comp._$dataGroup.listChangedProperties()
+  }
+
+  static hasProperty(comp: GeneralComponent, propName: string): boolean {
+    return comp._$dataGroup.hasProperty(propName)
   }
 
   /** List methods by the component definition (backward compatibility) */
@@ -1332,10 +1329,17 @@ export class Component<
   setExternalClass(name: string, target: string | string[]) {
     this.scheduleExternalClassChange(name, target)
     this.applyExternalClassChanges()
+    if (this._$mutationObserverTarget) {
+      MutationObserverTarget.callAttrObservers(this, {
+        type: 'properties',
+        target: this,
+        attributeName: name,
+      })
+    }
   }
 
   /** Get all external classes */
-  getExternalClasses(): string[] | undefined {
+  getExternalClasses(): Record<string, string[] | undefined> {
     return this.classList!._$getAlias()
   }
 

@@ -69,12 +69,25 @@ const dumpAttributesToString = (elem: Element): string => {
     if (nodeClass) ret += ` class="${nodeClass}"`
     const style = elem.style
     if (style) ret += ` style="${elem.style}"`
+    const dataset = elem.dataset
+    if (dataset) {
+      Object.keys(dataset).forEach((name) => {
+        ret += ` data-${name}="${String(dataset[name])}"`
+      })
+    }
   }
   if (isVirtualNode(elem)) {
     // empty
   } else if (isComponent(elem)) {
-    Object.keys(elem._$behavior._$propertyMap).forEach((propName) => {
+    elem._$dataGroup.listProperties().forEach((propName) => {
       ret += ` ${propName}="${String((elem.data as DataList)[propName])}"`
+    })
+    const externalClasses = elem.getExternalClasses()
+    Object.keys(externalClasses).forEach((externalClassName) => {
+      const alias = externalClasses[externalClassName]
+      if (alias) {
+        ret += ` ${externalClassName}="${alias.join(' ')}"`
+      }
     })
   } else {
     elem.attributes.forEach((attr) => {

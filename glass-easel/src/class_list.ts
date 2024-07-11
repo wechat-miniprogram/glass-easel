@@ -166,8 +166,12 @@ export class ClassList {
   }
 
   /** @internal */
-  _$getAlias(): string[] | undefined {
-    return this._$externalNames
+  _$getAlias(): Record<string, string[] | undefined> {
+    const result = Object.create(null) as Record<string, string[] | undefined>
+    this._$externalNames?.forEach((externalName, index) => {
+      result[externalName] = this._$externalRawAlias![index]
+    })
+    return result
   }
 
   /** @internal */
