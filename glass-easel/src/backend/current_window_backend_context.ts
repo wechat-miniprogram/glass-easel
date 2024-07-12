@@ -24,6 +24,8 @@ const DELEGATE_EVENTS = [
   'mouseout',
   'mouseover',
   'mouseup',
+  'mouseenter',
+  'mouseleave',
   'click',
 ]
 

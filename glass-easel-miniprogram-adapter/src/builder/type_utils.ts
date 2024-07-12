@@ -56,15 +56,21 @@ export interface BuilderContext<
 > extends ThisType<TMethodCaller> {
   self: TMethodCaller
   data: typeUtils.Merge<typeUtils.DataWithPropertyValues<TPrevData, TProperty>>
-  setData: (newData: Partial<typeUtils.SetDataSetter<TPrevData>>, callback?: () => void) => void
+  setData: (
+    this: void,
+    newData: Partial<typeUtils.SetDataSetter<TPrevData>>,
+    callback?: () => void,
+  ) => void
   implement: <TIn extends { [x: string]: any }>(
+    this: void,
     traitBehavior: TraitBehavior<TIn, any>,
     impl: TIn,
   ) => void
   relation<TOut extends { [key: string]: any }>(
+    this: void,
     def: TraitRelationParams<TOut> & ThisType<TMethodCaller>,
   ): RelationHandler<any, TOut>
-  relation(def: RelationParams & ThisType<TMethodCaller>): RelationHandler<any, never>
+  relation(this: void, def: RelationParams & ThisType<TMethodCaller>): RelationHandler<any, never>
   observer<
     P extends typeUtils.ObserverDataPathStrings<
       typeUtils.DataWithPropertyValues<TPrevData, TProperty>
@@ -74,6 +80,7 @@ export interface BuilderContext<
       P
     >,
   >(
+    this: void,
     paths: P,
     func: (newValue: V) => void,
   ): void
@@ -88,11 +95,15 @@ export interface BuilderContext<
       >
     },
   >(
+    this: void,
     paths: readonly [...P],
     func: (...newValues: V extends any[] ? V : never) => void,
   ): void
-  lifetime: <L extends keyof Lifetimes>(name: L, func: Lifetimes[L]) => void
-  pageLifetime: (name: string, func: (...args: any[]) => void) => void
-  method: <Fn extends ComponentMethod>(func: Fn) => TaggedMethod<Fn>
-  listener: <T>(func: glassEasel.EventListener<T>) => TaggedMethod<glassEasel.EventListener<T>>
+  lifetime: <L extends keyof Lifetimes>(this: void, name: L, func: Lifetimes[L]) => void
+  pageLifetime: (this: void, name: string, func: (...args: any[]) => void) => void
+  method: <Fn extends ComponentMethod>(this: void, func: Fn) => TaggedMethod<Fn>
+  listener: <T>(
+    this: void,
+    func: glassEasel.EventListener<T>,
+  ) => TaggedMethod<glassEasel.EventListener<T>>
 }

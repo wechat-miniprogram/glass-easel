@@ -61,6 +61,7 @@ export {
   globalOptions,
 } from './global_options'
 export { MutationObserver, MutationObserver as Observer } from './mutation_observer'
+export * as mutationObserver from './mutation_observer'
 export { NativeNode } from './native_node'
 export { Node, NodeCast, dumpElement, dumpElementToString, dumpSingleElementToString } from './node'
 export { RelationFailedListener, RelationListener, RelationType } from './relation'

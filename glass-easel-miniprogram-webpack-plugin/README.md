@@ -83,10 +83,11 @@ A page can be loaded like this:
 
 ```js
 import * as glassEasel from 'glass-easel'
-import { codeSpace, initWithBackend } from './src' // import the plugin-generated code
+import { codeSpace, initWithBackend, registerGlobalEventListener } from './src' // import the plugin-generated code
 
 // create the backend context
 const backendContext = new glassEasel.CurrentWindowBackendContext() // or another backend context
+registerGlobalEventListener(backendContext)
 const ab = initWithBackend(backendContext)
 
 // create a mini-program page

@@ -40,6 +40,8 @@ export class TextNode implements NodeCast {
   _$inheritSlots: undefined
   /** @internal */
   _$virtual: undefined
+  /** @internal */
+  _$mutationObserverTarget: MutationObserverTarget | null = null
 
   constructor(text: string, owner: ShadowRoot) {
     this._$text = String(text)
@@ -166,10 +168,12 @@ export class TextNode implements NodeCast {
       }
       if (ENV.DEV) performanceMeasureEnd()
     }
-    MutationObserverTarget.callTextObservers(this, {
-      type: 'characterData',
-      target: this,
-    })
+    if (this._$mutationObserverTarget) {
+      MutationObserverTarget.callTextObservers(this, {
+        type: 'characterData',
+        target: this,
+      })
+    }
   }
 }
 
