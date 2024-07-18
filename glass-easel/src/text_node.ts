@@ -93,6 +93,11 @@ export class TextNode implements NodeCast {
   }
 
   // eslint-disable-next-line class-methods-use-this
+  asShadowRoot(): null {
+    return null
+  }
+
+  // eslint-disable-next-line class-methods-use-this
   asGeneralComponent(): null {
     return null
   }

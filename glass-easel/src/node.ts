@@ -43,6 +43,13 @@ export interface NodeCast {
   asVirtualNode(): VirtualNode | null
 
   /**
+   * Cast an element to a shadow root
+   *
+   * Returns `null` if the element is not a shadow root.
+   */
+  asVirtualNode(): VirtualNode | null
+
+  /**
    * Cast an element to a general component
    *
    * Returns `null` if the element is not a component

@@ -77,7 +77,7 @@ type TemplateOptions = {
 }
 
 export const tmpl = (src: string, options?: TemplateOptions) => {
-  const group = new TmplGroup()
+  const group = TmplGroup.newDev()
   group.addTmpl('', src)
   const genObjectSrc = `return ${group.getTmplGenObjectGroups()}`
   group.free()

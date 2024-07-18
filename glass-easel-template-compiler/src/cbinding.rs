@@ -135,6 +135,13 @@ impl TmplGroup {
     }
 
     #[no_mangle]
+    pub unsafe extern "C" fn tmpl_group_new_dev() -> Self {
+        Self {
+            inner: Box::into_raw(Box::new(group::TmplGroup::new_dev())) as *mut (),
+        }
+    }
+
+    #[no_mangle]
     pub unsafe extern "C" fn tmpl_group_free(self) {
         // empty
     }

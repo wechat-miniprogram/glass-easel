@@ -44,7 +44,10 @@ type TmplArgs = {
     }
   }
 }
-export type TmplNode = Node & { _$wxTmplArgs?: TmplArgs }
+export type TmplDevArgs = {
+  A: string[] // active attributes
+}
+export type TmplNode = Node & { _$wxTmplArgs?: TmplArgs; _$wxTmplDevArgs?: TmplDevArgs }
 
 export const getTmplArgs = (elem: Node): TmplArgs => {
   const node = elem as TmplNode

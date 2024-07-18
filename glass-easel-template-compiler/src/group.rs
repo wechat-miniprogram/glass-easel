@@ -149,6 +149,7 @@ pub struct TmplGroup {
     scripts: HashMap<String, String>,
     has_scripts: bool,
     extra_runtime_string: String,
+    dev_mode: bool,
 }
 
 impl TmplGroup {
@@ -159,7 +160,20 @@ impl TmplGroup {
             scripts: HashMap::new(),
             has_scripts: false,
             extra_runtime_string: String::new(),
+            dev_mode: false,
         }
+    }
+
+    /// Create a new template group in dev mode.
+    pub fn new_dev() -> Self {
+        let mut this = Self::new();
+        this.dev_mode = true;
+        this
+    }
+
+    /// Get the dev mode.
+    pub fn dev(&self) -> bool {
+        self.dev_mode
     }
 
     /// import another group.

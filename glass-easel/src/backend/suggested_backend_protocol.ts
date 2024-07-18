@@ -1,3 +1,4 @@
+import { type Element as GlassEaselElement } from '../element'
 import {
   type BoundingClientRect,
   type GetAllComputedStylesResponses,
@@ -49,7 +50,7 @@ export interface Context<Ctx, Elem> {
   ): void
   onThemeChange(cb: (res: { theme: string }) => void): void
 
-  elementFromPoint(left: number, top: number, cb: (node: Elem | null) => void): void
+  elementFromPoint(left: number, top: number, cb: (node: GlassEaselElement | null) => void): void
 
   createMediaQueryObserver(
     status: MediaQueryStatus,

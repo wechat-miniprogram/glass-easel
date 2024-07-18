@@ -514,12 +514,12 @@ export class CurrentWindowBackendContext implements Context {
     })
   }
 
-  elementFromPoint(left: number, top: number, cb: (node: Element | null) => void): void {
+  elementFromPoint(left: number, top: number, cb: (node: GlassEaselElement | null) => void): void {
     let node = document.elementFromPoint(left, top) as Element | null
-    while (!node?.__wxElement) {
+    while (node !== null && !node.__wxElement) {
       node = node?.parentNode || null
     }
-    cb(node)
+    cb(node?.__wxElement ?? null)
   }
 
   getAllComputedStyle(

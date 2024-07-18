@@ -345,6 +345,13 @@ export class Element implements NodeCast {
     return null
   }
 
+  asShadowRoot(): ShadowRoot | null {
+    if (isShadowRoot(this)) {
+      return this
+    }
+    return null
+  }
+
   asGeneralComponent(): GeneralComponent | null {
     if (isComponent(this)) {
       return this
