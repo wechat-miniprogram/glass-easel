@@ -550,11 +550,11 @@ impl Element {
                     w.function_args("N,C", |w| {
                         if group.dev() {
                             w.expr_stmt(|w| {
-                                write!(w, "N._$wxTmplDevArgs=[")?;
+                                write!(w, "N._$wxTmplDevArgs={{A:[")?;
                                 self.collect_active_attribute_names(|str| {
                                     write!(w, "{},", str)
                                 })?;
-                                write!(w, "]")?;
+                                write!(w, "]}}")?;
                                 Ok(())
                             })?;
                         }
@@ -1068,11 +1068,11 @@ impl Element {
                         w.function_args("N", |w| {
                             if group.dev() {
                                 w.expr_stmt(|w| {
-                                    write!(w, "N._$wxTmplDevArgs=[")?;
+                                    write!(w, "N._$wxTmplDevArgs={{A:[")?;
                                     self.collect_active_attribute_names(|str| {
                                         write!(w, "{},", str)
                                     })?;
-                                    write!(w, "]")?;
+                                    write!(w, "]}}")?;
                                     Ok(())
                                 })?;
                             }

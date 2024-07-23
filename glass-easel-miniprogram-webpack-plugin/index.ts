@@ -39,6 +39,7 @@ const CACHE_ETAG = 1
 const HOST_STYLES_MODULE = '__glass_easel_host_styles__.wxss'
 
 type PluginConfig = {
+  dev?: boolean
   path: string
   resourceFilePattern: RegExp
   defaultEntry: string
@@ -176,6 +177,7 @@ class StyleSheetManager {
 }
 
 export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance {
+  dev?: boolean
   path: string
   resourceFilePattern: RegExp
   defaultEntry: string
@@ -185,6 +187,7 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
   virtualModules = new VirtualModulesPlugin() as VirtualModulePluginType
 
   constructor(options: Partial<PluginConfig>) {
+    this.dev = options.dev
     this.path = options.path || './src'
     this.resourceFilePattern = options.resourceFilePattern || /\.(jpg|jpeg|png|gif)$/
     this.defaultEntry = options.defaultEntry || 'pages/index/index'
@@ -193,6 +196,10 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
   }
 
   apply(compiler: Compiler) {
+    const devMode =
+      this.dev === undefined
+        ? compiler.options.mode === 'development' || compiler.options.mode === 'none'
+        : !!this.dev
     const codeRoot = path.resolve(this.path)
     const compInfoMap = Object.create(null) as {
       [compPath: string]: { main: string; taskConfig: unknown; hasWxss: boolean }
@@ -470,7 +477,7 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
       compilation.hooks.finishModules.tapPromise(PLUGIN_NAME, async (modules) => {
         const tasks: Promise<any>[] = []
         let indexModule: NormalModule | undefined
-        const tmplGroup = new TmplGroup()
+        const tmplGroup = devMode ? TmplGroup.newDev() : new TmplGroup()
 
         // collect compilation results
         // eslint-disable-next-line no-restricted-syntax
