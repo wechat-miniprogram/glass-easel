@@ -28,6 +28,12 @@ type TmplArgs = {
 }
 export type TmplNode = Node & { _$wxTmplArgs?: TmplArgs; _$wxTmplDevArgs?: TmplDevArgs }
 
+export const getTmplDevArgs = (elem: HTMLElement): TmplDevArgs => {
+  const node = elem as TmplNode
+  // eslint-disable-next-line no-return-assign
+  return (node._$wxTmplDevArgs = node._$wxTmplDevArgs || {})
+}
+
 const noop = () => {
   /* empty */
 }
@@ -217,5 +223,10 @@ export class ProcGenWrapperDom {
   // set filter functions for change properties and event listeners
   setFnFilter() {
     noop()
+  }
+
+  // get dev args object
+  devArgs(elem: HTMLElement): TmplDevArgs {
+    return getTmplDevArgs(elem)
   }
 }
