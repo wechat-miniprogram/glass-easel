@@ -10,6 +10,7 @@ import { type NativeNode } from './native_node'
 import { type TextNode } from './text_node'
 import { isComponent, isElement, isNativeNode, isTextNode, isVirtualNode } from './type_symbol'
 import { type VirtualNode } from './virtual_node'
+import { type ShadowRoot } from './shadow_root'
 
 export type Node = TextNode | Element
 
@@ -47,7 +48,7 @@ export interface NodeCast {
    *
    * Returns `null` if the element is not a shadow root.
    */
-  asVirtualNode(): VirtualNode | null
+  asShadowRoot(): ShadowRoot | null
 
   /**
    * Cast an element to a general component
