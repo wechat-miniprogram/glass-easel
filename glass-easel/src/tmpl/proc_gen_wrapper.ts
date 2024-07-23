@@ -45,7 +45,7 @@ type TmplArgs = {
   }
 }
 export type TmplDevArgs = {
-  A: string[] // active attributes
+  A?: string[] // active attributes
 }
 export type TmplNode = Node & { _$wxTmplArgs?: TmplArgs; _$wxTmplDevArgs?: TmplDevArgs }
 
@@ -53,6 +53,12 @@ export const getTmplArgs = (elem: Node): TmplArgs => {
   const node = elem as TmplNode
   // eslint-disable-next-line no-return-assign
   return (node._$wxTmplArgs = node._$wxTmplArgs || {})
+}
+
+export const getTmplDevArgs = (elem: Node): TmplDevArgs => {
+  const node = elem as TmplNode
+  // eslint-disable-next-line no-return-assign
+  return (node._$wxTmplDevArgs = node._$wxTmplDevArgs || {})
 }
 
 export const dataValueToString = (v: DataValue): string => {
@@ -1113,6 +1119,11 @@ export class ProcGenWrapper {
   setFnFilter(changePropFilter: <T>(v: T) => T, eventListenerFilter: <T>(v: T) => T) {
     this.changePropFilter = changePropFilter
     this.eventListenerFilter = eventListenerFilter
+  }
+
+  // get dev args object
+  devArgs(elem: Element): TmplDevArgs {
+    return getTmplDevArgs(elem)
   }
 }
 
