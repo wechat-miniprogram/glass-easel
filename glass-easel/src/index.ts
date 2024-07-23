@@ -8,6 +8,10 @@ export {
   backend,
   composedBackend,
   domlikeBackend,
+  BoundingClientRect,
+  ScrollOffset,
+  CSSProperty,
+  CSSRule,
 } from './backend'
 export { CurrentWindowBackendContext } from './backend/current_window_backend_context'
 export { EmptyBackendContext } from './backend/empty_backend'
