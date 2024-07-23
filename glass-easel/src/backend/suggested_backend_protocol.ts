@@ -16,6 +16,14 @@ interface GetWrapper<T> {
 export type Element<E> = {
   getAllComputedStyles(cb: (res: GetAllComputedStylesResponses) => void): void
   getBoundingClientRect(cb: (res: BoundingClientRect) => void): void
+  getBoxModel(
+    cb: (res: {
+      margin: BoundingClientRect
+      border: BoundingClientRect
+      padding: BoundingClientRect
+      content: BoundingClientRect
+    }) => void,
+  ): void
   createIntersectionObserver(
     relativeElement: E | null,
     relativeElementMargin: string,

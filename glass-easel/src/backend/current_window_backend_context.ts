@@ -522,17 +522,17 @@ export class CurrentWindowBackendContext implements Context {
     cb(node?.__wxElement ?? null)
   }
 
-  getAllComputedStyle(
+  getAllComputedStyles(
     target: Element,
-    cb: (computedStyle: { name: string; value: string }[]) => void,
+    cb: (computedStyle: { properties: { name: string; value: string }[] }) => void,
   ): void {
     const style = window.getComputedStyle(target as unknown as HTMLElement)
-    const res: { name: string; value: string }[] = []
+    const properties: { name: string; value: string }[] = []
     for (let i = 0; i < style.length; i += 1) {
       const name = style[i]!
-      res.push({ name, value: style.getPropertyValue(name) })
+      properties.push({ name, value: style.getPropertyValue(name) })
     }
-    cb(res)
+    cb({ properties })
   }
 
   getScrollOffset(target: Element, cb: (res: ScrollOffset) => void): void {
