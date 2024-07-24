@@ -419,7 +419,10 @@ impl Node {
 }
 
 impl Element {
-    fn collect_active_attribute_names<E>(&self, mut f: impl FnMut(&str) -> Result<(), E>) -> Result<(), E> {
+    fn collect_active_attribute_names<E>(
+        &self,
+        mut f: impl FnMut(&str) -> Result<(), E>,
+    ) -> Result<(), E> {
         match &self.kind {
             ElementKind::Normal {
                 attributes,
@@ -459,12 +462,20 @@ impl Element {
                     f(&gen_lit_str(&format!("mark:{}", &attr.name.name)))?;
                 }
             }
-            ElementKind::Pure { slot, slot_value_refs: _, .. } => {
+            ElementKind::Pure {
+                slot,
+                slot_value_refs: _,
+                ..
+            } => {
                 if !slot.is_some() {
                     f("\":slot\"")?;
                 }
             }
-            ElementKind::Slot { name, values, common } => {
+            ElementKind::Slot {
+                name,
+                values,
+                common,
+            } => {
                 if common.id.is_some() {
                     f("\":id\"")?;
                 }
@@ -551,9 +562,7 @@ impl Element {
                         if group.dev() {
                             w.expr_stmt(|w| {
                                 write!(w, "R.devArgs(N).A=[")?;
-                                self.collect_active_attribute_names(|str| {
-                                    write!(w, "{},", str)
-                                })?;
+                                self.collect_active_attribute_names(|str| write!(w, "{},", str))?;
                                 write!(w, "]")?;
                                 Ok(())
                             })?;
