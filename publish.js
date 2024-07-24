@@ -154,7 +154,7 @@ if (childProcess.spawnSync('rm', ['-rf', 'dist'], { cwd: 'glass-easel' }).status
 if (
   childProcess.spawnSync('npm', ['run', 'build'], {
     cwd: 'glass-easel',
-    env: { GLASS_EASEL_ARGS: 'all domlike-global', ...process.env },
+    env: { GLASS_EASEL_ARGS: '', ...process.env },
     stdio: 'inherit',
   }).status !== 0
 ) {
