@@ -112,6 +112,8 @@ StrRef tmpl_group_get_wx_gen_object_groups(const TmplGroup *self);
 
 TmplGroup tmpl_group_new();
 
+TmplGroup tmpl_group_new_dev();
+
 void tmpl_group_set_extra_runtime_script(TmplGroup *self,
                                          const uint8_t *content_buf,
                                          size_t content_len);
