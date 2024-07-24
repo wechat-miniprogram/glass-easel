@@ -1,7 +1,7 @@
 {
   "name": "glass-easel-miniprogram-adapter",
   "description": "The MiniProgram interface adapter of the glass-easel project",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "repository": {
     "type": "git",
     "url": "https://github.com/wechat-miniprogram/glass-easel.git"
