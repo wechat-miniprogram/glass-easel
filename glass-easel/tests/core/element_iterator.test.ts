@@ -1,5 +1,4 @@
-/* eslint-disable */
-
+/* eslint-disable no-restricted-syntax */
 import { tmpl, domBackend } from '../base/env'
 import * as glassEasel from '../../src'
 
@@ -51,7 +50,7 @@ describe('Element Iterator', () => {
     const text = h.childNodes[0] as glassEasel.TextNode
 
     let expectResArr: any[] = [text, h, g, elem.shadowRoot]
-    for (let node of glassEasel.ElementIterator.create(
+    for (const node of glassEasel.ElementIterator.create(
       text,
       glassEasel.ElementIteratorType.ShadowAncestors,
       Object,
@@ -73,7 +72,7 @@ describe('Element Iterator', () => {
       elem.shadowRoot,
       elem,
     ]
-    for (let node of glassEasel.ElementIterator.create(
+    for (const node of glassEasel.ElementIterator.create(
       text,
       glassEasel.ElementIteratorType.ComposedAncestors,
       Object,
@@ -83,7 +82,7 @@ describe('Element Iterator', () => {
     expect(expectResArr.length).toBe(0)
 
     expectResArr = [text, h, eslot]
-    for (let node of glassEasel.ElementIterator.create(
+    for (const node of glassEasel.ElementIterator.create(
       text,
       glassEasel.ElementIteratorType.ComposedAncestors,
       Object,
@@ -94,7 +93,7 @@ describe('Element Iterator', () => {
     expect(expectResArr.length).toBe(0)
 
     expectResArr = [elem.shadowRoot, g, h, i]
-    for (let node of glassEasel.ElementIterator.create(
+    for (const node of glassEasel.ElementIterator.create(
       elem.shadowRoot as glassEasel.ShadowRoot,
       glassEasel.ElementIteratorType.ShadowDescendantsRootFirst,
     )) {
@@ -103,7 +102,7 @@ describe('Element Iterator', () => {
     expect(expectResArr.length).toBe(0)
 
     expectResArr = [h, i, g]
-    for (let node of glassEasel.ElementIterator.create(
+    for (const node of glassEasel.ElementIterator.create(
       elem.shadowRoot as glassEasel.ShadowRoot,
       glassEasel.ElementIteratorType.ShadowDescendantsRootLast,
       glassEasel.Component,
@@ -113,7 +112,7 @@ describe('Element Iterator', () => {
     expect(expectResArr.length).toBe(0)
 
     expectResArr = [g]
-    for (let node of glassEasel.ElementIterator.create(
+    for (const node of glassEasel.ElementIterator.create(
       g,
       glassEasel.ElementIteratorType.ShadowDescendantsRootFirst,
       Object,
@@ -124,7 +123,7 @@ describe('Element Iterator', () => {
     expect(expectResArr.length).toBe(0)
 
     expectResArr = [h]
-    for (let node of glassEasel.ElementIterator.create(
+    for (const node of glassEasel.ElementIterator.create(
       g,
       glassEasel.ElementIteratorType.ShadowDescendantsRootLast,
       glassEasel.Component,
@@ -149,7 +148,7 @@ describe('Element Iterator', () => {
       islot,
       f,
     ]
-    for (let node of glassEasel.ElementIterator.create(
+    for (const node of glassEasel.ElementIterator.create(
       g,
       glassEasel.ElementIteratorType.ComposedDescendantsRootFirst,
       Object,
@@ -158,7 +157,7 @@ describe('Element Iterator', () => {
     }
     expect(expectResArr.length).toBe(0)
     expectResArr = [e, eslot, h, text, i, i.shadowRoot, islot]
-    for (let node of glassEasel.ElementIterator.create(
+    for (const node of glassEasel.ElementIterator.create(
       e,
       glassEasel.ElementIteratorType.ComposedDescendantsRootFirst,
       Object,
@@ -168,7 +167,7 @@ describe('Element Iterator', () => {
     expect(expectResArr.length).toBe(0)
 
     expectResArr = [h, i, d, g]
-    for (let node of glassEasel.ElementIterator.create(
+    for (const node of glassEasel.ElementIterator.create(
       g,
       glassEasel.ElementIteratorType.ComposedDescendantsRootLast,
       glassEasel.Component,
@@ -178,7 +177,7 @@ describe('Element Iterator', () => {
     expect(expectResArr.length).toBe(0)
 
     expectResArr = [g, g.shadowRoot]
-    for (let node of glassEasel.ElementIterator.create(
+    for (const node of glassEasel.ElementIterator.create(
       g,
       glassEasel.ElementIteratorType.ComposedDescendantsRootFirst,
       Object,
@@ -189,7 +188,7 @@ describe('Element Iterator', () => {
     expect(expectResArr.length).toBe(0)
 
     expectResArr = [h, i]
-    for (let node of glassEasel.ElementIterator.create(
+    for (const node of glassEasel.ElementIterator.create(
       g,
       glassEasel.ElementIteratorType.ComposedDescendantsRootLast,
       glassEasel.Component,

@@ -61,6 +61,13 @@ impl TmplGroup {
         }
     }
 
+    #[wasm_bindgen(js_name = newDev)]
+    pub fn new_dev() -> Self {
+        Self {
+            group: crate::TmplGroup::new_dev(),
+        }
+    }
+
     /// Compile a template and add it to the group.
     ///
     /// Returns an JavaScript array containing all warnings and errors discovered during the compilation.

@@ -84,19 +84,22 @@ export interface BuilderContext<
 > extends ThisType<TMethodCaller> {
   self: TMethodCaller
   data: Merge<DataWithPropertyValues<TPrevData, TProperty>>
-  setData: (newData: Partial<SetDataSetter<TPrevData>>) => void
+  setData: (this: void, newData: Partial<SetDataSetter<TPrevData>>) => void
   implement: <TIn extends { [x: string]: any }>(
+    this: void,
     traitBehavior: TraitBehavior<TIn, any>,
     impl: TIn,
   ) => void
   relation<TOut extends { [key: string]: any }>(
+    this: void,
     def: TraitRelationParams<TOut>,
   ): RelationHandler<any, TOut>
-  relation(def: RelationParams): RelationHandler<any, never>
+  relation(this: void, def: RelationParams): RelationHandler<any, never>
   observer<
     P extends ObserverDataPathStrings<DataWithPropertyValues<TPrevData, TProperty>>,
     V = Merge<GetFromObserverPathString<DataWithPropertyValues<TPrevData, TProperty>, P>>,
   >(
+    this: void,
     paths: P,
     func: (newValue: V) => void,
   ): void
@@ -108,13 +111,14 @@ export interface BuilderContext<
       >
     },
   >(
+    this: void,
     paths: readonly [...P],
     func: (...newValues: V extends any[] ? V : never) => void,
   ): void
-  lifetime: <L extends keyof Lifetimes>(name: L, func: Lifetimes[L]) => void
-  pageLifetime: (name: string, func: (...args: any[]) => void) => void
-  method: <Fn extends ComponentMethod>(func: Fn) => TaggedMethod<Fn>
-  listener: <T>(func: EventListener<T>) => TaggedMethod<EventListener<T>>
+  lifetime: <L extends keyof Lifetimes>(this: void, name: L, func: Lifetimes[L]) => void
+  pageLifetime: (this: void, name: string, func: (...args: any[]) => void) => void
+  method: <Fn extends ComponentMethod>(this: void, func: Fn) => TaggedMethod<Fn>
+  listener: <T>(this: void, func: EventListener<T>) => TaggedMethod<EventListener<T>>
 }
 
 export type GeneralBehaviorBuilder = BehaviorBuilder<
@@ -1416,6 +1420,35 @@ export class Behavior<
       return this._$flatAncestors.has(b)
     }
     return false
+  }
+
+  /**
+   * List the properties
+   *
+   * Only valid after `prepare` .
+   */
+  listProperties(): string[] {
+    return Object.keys(this._$propertyMap)
+  }
+
+  /**
+   * Get the type of the specified property
+   *
+   * Only valid after `prepare` .
+   * Return `undefined` if the name is not a property.
+   */
+  getPropertyType(name: string): NormalizedPropertyType | undefined {
+    return this._$propertyMap[name]?.type
+  }
+
+  /**
+   * Get the type of the specified property
+   *
+   * Only valid after `prepare` .
+   * Return `undefined` if the name is not a property.
+   */
+  getPropertyOptionalType(name: string): NormalizedPropertyType[] | null | undefined {
+    return this._$propertyMap[name]?.optionalTypes
   }
 
   /**

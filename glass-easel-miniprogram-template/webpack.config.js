@@ -65,6 +65,8 @@ module.exports = [
         resourceFilePattern: /\.(jpg|jpeg|png|gif|html)$/,
         // the default entry
         defaultEntry: 'pages/index/index',
+        // compile with more debug information (unset to follow the webpack mode)
+        // dev: false,
       }),
     ],
   },

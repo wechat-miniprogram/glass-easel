@@ -62,6 +62,7 @@ import {
   normalizeComponentOptions,
   type NormalizedComponentOptions,
 } from './global_options'
+import { MutationObserverTarget } from './mutation_observer'
 import { type Node } from './node'
 import {
   Relation,
@@ -1332,10 +1333,18 @@ export class Component<
   setExternalClass(name: string, target: string | string[]) {
     this.scheduleExternalClassChange(name, target)
     this.applyExternalClassChanges()
+    if (this._$mutationObserverTarget) {
+      MutationObserverTarget.callAttrObservers(this, {
+        type: 'properties',
+        target: this,
+        nameType: 'external-class',
+        attributeName: name,
+      })
+    }
   }
 
   /** Get all external classes */
-  getExternalClasses(): string[] | undefined {
+  getExternalClasses(): { [name: string]: string[] | undefined } {
     return this.classList!._$getAlias()
   }
 

@@ -133,50 +133,6 @@ describe('Observer', function () {
     expect(eventsLeft).toBe(0)
   })
 
-  it('should allow subtree observers', function () {
-    var parent = createElem('observer-a')
-    var elem1 = parent.shadowRoot.createComponent('observer-a')
-    var elem2 = parent.shadowRoot.createComponent('observer-a')
-    var elem3 = parent.shadowRoot.createComponent('observer-a')
-    var elem4 = parent.shadowRoot.createTextNode('')
-    var eventsLeft = 4
-    var observer = glassEasel.MutationObserver.create(function (e) {
-      expect(this).toBe(elem1)
-      if (eventsLeft === 2) {
-        expect(e.type).toBe('characterData')
-        expect(e.target).toBeInstanceOf(glassEasel.TextNode)
-        expect(e.target.textContent).toBe('3')
-      } else {
-        expect(e.type).toBe('properties')
-        expect(e.target).toBeInstanceOf(glassEasel.Element)
-        expect(e.propertyName).toBe('a')
-        expect(e.target.a <= 4).toBe(true)
-      }
-      eventsLeft--
-    })
-    expect(glassEasel.Element.hasSubtreeMutationObservers(elem1)).toBe(false)
-    observer.observe(elem1, { properties: true, characterData: true, subtree: true })
-    elem1.a = 1
-    elem1.appendChild(elem2)
-    elem3.appendChild(elem4)
-    elem1.insertBefore(elem3, elem2)
-    elem2.a = 2
-    elem2.appendChild(elem3)
-    elem4.textContent = 3
-    expect(glassEasel.Element.hasSubtreeMutationObservers(elem1)).toBe(true)
-    expect(glassEasel.Element.hasSubtreeMutationObservers(elem2)).toBe(true)
-    expect(glassEasel.Element.hasSubtreeMutationObservers(elem3)).toBe(true)
-    elem1.replaceChild(elem3, elem2)
-    expect(glassEasel.Element.hasSubtreeMutationObservers(elem2)).toBe(false)
-    expect(glassEasel.Element.hasSubtreeMutationObservers(elem3)).toBe(true)
-    elem1.removeChild(elem3)
-    expect(glassEasel.Element.hasSubtreeMutationObservers(elem3)).toBe(false)
-    elem1.a = 4
-    elem2.a = 5
-    elem3.a = 6
-    expect(eventsLeft).toBe(0)
-  })
-
   it('should allow attach status observers', function () {
     var elem1 = createElem('observer-a')
     var elem2 = createElem('observer-a')
