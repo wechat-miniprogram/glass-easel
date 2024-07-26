@@ -28,6 +28,7 @@ export type ComponentStaticConfig = {
 
 export type ComponentDefinitionOptions = {
   multipleSlots?: boolean
+  dynamicSlots?: boolean
   pureDataPattern?: RegExp
   virtualHost?: boolean
   dataDeepCopy?: DeepCopyKind
