@@ -219,6 +219,16 @@ impl TmplGroup {
         ret
     }
 
+    /// Remove a template from the group.
+    /// 
+    /// This simply removes a template path.
+    /// It is useful when doing hot-update debugging,
+    /// but not suitable for final builds since it does not do cleanups.
+    /// Returns true when a template is actually removed.
+    pub fn remove_tmpl(&mut self, path: &str) -> bool {
+        self.trees.remove(path).is_some()
+    }
+
     /// Regenerate a template content string of the specified template.
     pub fn stringify_tmpl(&mut self, path: &str) -> Option<String> {
         let template = self.trees.get(path)?;
@@ -245,6 +255,16 @@ impl TmplGroup {
     pub fn add_script(&mut self, path: &str, content: &str) {
         self.scripts.insert(path.to_string(), content.to_string());
         self.has_scripts = true;
+    }
+
+    /// Remove a script segment from the group.
+    ///
+    /// This simply removes a script path.
+    /// It is useful when doing hot-update debugging,
+    /// but not suitable for final builds since it does not do cleanups.
+    /// Returns true when a script is actually removed.
+    pub fn remove_script(&mut self, path: &str) -> bool {
+        self.scripts.remove(path).is_some()
     }
 
     /// Set extra runtime JavaScript code as a string.
