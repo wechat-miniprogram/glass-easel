@@ -114,6 +114,10 @@ TmplGroup tmpl_group_new();
 
 TmplGroup tmpl_group_new_dev();
 
+bool tmpl_group_remove_script(TmplGroup *self, const uint8_t *path_buf, size_t path_len);
+
+bool tmpl_group_remove_tmpl(TmplGroup *self, const uint8_t *path_buf, size_t path_len);
+
 void tmpl_group_set_extra_runtime_script(TmplGroup *self,
                                          const uint8_t *content_buf,
                                          size_t content_len);

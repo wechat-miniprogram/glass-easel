@@ -173,6 +173,16 @@ impl TmplGroup {
     }
 
     #[no_mangle]
+    pub unsafe extern "C" fn tmpl_group_remove_tmpl(
+        &mut self,
+        path_buf: &u8,
+        path_len: usize,
+    ) -> bool {
+        let path = String::from_utf8_lossy(slice::from_raw_parts(path_buf, path_len));
+        self.inner_mut().remove_tmpl(&path)
+    }
+
+    #[no_mangle]
     pub unsafe extern "C" fn tmpl_group_add_script(
         &mut self,
         path_buf: &u8,
@@ -183,6 +193,16 @@ impl TmplGroup {
         let path = String::from_utf8_lossy(slice::from_raw_parts(path_buf, path_len));
         let content = String::from_utf8_lossy(slice::from_raw_parts(content_buf, content_len));
         self.inner_mut().add_script(&path, &content);
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn tmpl_group_remove_script(
+        &mut self,
+        path_buf: &u8,
+        path_len: usize,
+    ) -> bool {
+        let path = String::from_utf8_lossy(slice::from_raw_parts(path_buf, path_len));
+        self.inner_mut().remove_script(&path)
     }
 
     #[no_mangle]
