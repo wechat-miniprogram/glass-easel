@@ -6,7 +6,7 @@ import {
 } from '../../src/backend'
 import { getNodeId } from '../../src/message_channel'
 import { getLinearIdGenerator } from '../../src/utils'
-import { ChannelEventType, MessageChannelViewSide, ViewController } from '../../src/view_controller'
+import { MessageChannelViewSide, ViewController } from '../../src/view_controller'
 
 export { execWithWarn, multiTmpl, tmpl } from '../../../glass-easel/tests/base/env'
 ;(['tagName', 'innerHTML', 'nodeType', 'textContent', 'TEXT_NODE'] as (keyof Element)[]).forEach(
@@ -15,7 +15,7 @@ export { execWithWarn, multiTmpl, tmpl } from '../../../glass-easel/tests/base/e
       get(this: ShadowDomElement) {
         return (
           (
-            messageChannelViewSide.getNode(this.id) as glassEasel.Node
+            messageChannelViewSide.getNode(this._id) as glassEasel.Node
           ).getBackendElement() as unknown as Element
         )[key]
       },
@@ -27,7 +27,7 @@ Object.defineProperties(ShadowDomElement.prototype, {
   getAttribute: {
     get(this: ShadowDomElement) {
       const nodeOnView = (
-        messageChannelViewSide.getNode(this.id) as glassEasel.Node
+        messageChannelViewSide.getNode(this._id) as glassEasel.Node
       ).getBackendElement() as unknown as Element
       return nodeOnView.getAttribute.bind(nodeOnView)
     },
@@ -36,7 +36,7 @@ Object.defineProperties(ShadowDomElement.prototype, {
     get(this: ShadowDomElement) {
       const parentNodeOnView = (
         (
-          messageChannelViewSide.getNode(this.id) as glassEasel.Node
+          messageChannelViewSide.getNode(this._id) as glassEasel.Node
         ).getBackendElement() as glassEasel.domlikeBackend.Element
       ).parentNode?.__wxElement
       if (!parentNodeOnView) return undefined
@@ -46,7 +46,7 @@ Object.defineProperties(ShadowDomElement.prototype, {
   childNodes: {
     get(this: ShadowDomElement) {
       const childNodes: ShadowDomElement[] = []
-      const elementOnView = messageChannelViewSide.getNode(this.id) as glassEasel.Element
+      const elementOnView = messageChannelViewSide.getNode(this._id) as glassEasel.Element
       elementOnView.forEachNonVirtualComposedChild((node) => {
         childNodes.push(shadowDomBackend._getElementId(getNodeId(node)!)!)
       })
@@ -192,5 +192,5 @@ shadowDomBackend.onEvent(
 export function getViewNode<T extends glassEasel.Node>(elem: T): T {
   const shadowDomNode = elem.getBackendElement() as ShadowDomElement
 
-  return messageChannelViewSide.getNode(shadowDomNode.id) as glassEasel.Node as T
+  return messageChannelViewSide.getNode(shadowDomNode._id) as glassEasel.Node as T
 }

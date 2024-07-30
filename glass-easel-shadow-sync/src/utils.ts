@@ -27,19 +27,27 @@ export const getLinearIdGenerator = (): IDGenerator => {
 }
 
 export const getRandomIdGenerator = (): IDGenerator => {
-  const usedIds = new Set<number>()
+  let nextId = 1
+  const releasedIds: number[] = []
 
   const gen = (): number => {
-    let id
-    do {
-      id = Math.floor((1 + Math.random()) * 0x100000000)
-    } while (usedIds.has(id))
-    usedIds.add(id)
-    return id
+    const randomId = Math.floor(Math.random() * 16)
+    if (randomId < releasedIds.length) {
+      const targetId = releasedIds[randomId]!
+      releasedIds.splice(randomId, 1)
+      return targetId
+    }
+    const targetId = nextId + randomId - releasedIds.length
+    while (nextId < targetId) {
+      releasedIds.push(nextId)
+      nextId += 1
+    }
+    nextId += 1
+    return targetId
   }
 
   const release = (id: number) => {
-    usedIds.delete(id)
+    releasedIds.push(id)
   }
 
   return {

@@ -16,6 +16,7 @@ import type {
 } from 'glass-easel'
 import { type Channel } from './message_channel'
 import { type IDGenerator } from './utils'
+import { replayShadowBackend } from './replay'
 
 export const enum ShadowDomElementType {
   Fragment,
@@ -27,10 +28,22 @@ export const enum ShadowDomElementType {
 }
 
 export class ShadowDomElement implements GlassEaselBackend.Element {
-  public id: number
+  public _id: number
 
   public __wxElement: Node | undefined
   public shadowRoot: ShadowDomShadowRoot | undefined
+
+  /** @internal */
+  static _prepareElement(
+    context: ShadowDomBackendContext,
+    elem: ShadowDomElement,
+    logicalName: string,
+    stylingName: string,
+    ownerShadowRoot: ShadowDomShadowRoot,
+  ): ShadowDomElement {
+    context.channel.createElement(elem._id, logicalName, stylingName, ownerShadowRoot._id)
+    return elem
+  }
 
   static createElement(
     context: ShadowDomBackendContext,
@@ -38,9 +51,43 @@ export class ShadowDomElement implements GlassEaselBackend.Element {
     stylingName: string,
     ownerShadowRoot: ShadowDomShadowRoot,
   ): ShadowDomElement {
-    const elem = new ShadowDomElement(context, ShadowDomElementType.Element, ownerShadowRoot)
-    context.channel.createElement(elem.id, logicalName, stylingName, ownerShadowRoot.id)
-    return elem
+    return ShadowDomElement._prepareElement(
+      context,
+      new ShadowDomElement(context, ShadowDomElementType.Element, ownerShadowRoot),
+      logicalName,
+      stylingName,
+      ownerShadowRoot,
+    )
+  }
+
+  /** @internal */
+  static _prepareComponent(
+    context: ShadowDomBackendContext,
+    componentElement: ShadowDomElement,
+    shadowRoot: ShadowDomShadowRoot,
+    tagName: string,
+    external: boolean,
+    virtualHost: boolean,
+    styleScope: number,
+    extraStyleScope: number | null,
+    externalClasses: string[] | undefined,
+    ownerShadowRoot: ShadowDomShadowRoot,
+  ): ShadowDomElement {
+    context._checkStyleScope(styleScope)
+    context._checkStyleScope(extraStyleScope)
+    componentElement.shadowRoot = shadowRoot
+    context.channel.createComponent(
+      componentElement._id,
+      shadowRoot._id,
+      tagName,
+      external,
+      virtualHost,
+      styleScope,
+      extraStyleScope,
+      externalClasses,
+      ownerShadowRoot._id,
+    )
+    return componentElement
   }
 
   static createComponent(
@@ -53,27 +100,29 @@ export class ShadowDomElement implements GlassEaselBackend.Element {
     externalClasses: string[] | undefined,
     ownerShadowRoot: ShadowDomShadowRoot,
   ): ShadowDomElement {
-    context._checkStyleScope(styleScope)
-    context._checkStyleScope(extraStyleScope)
-    const componentElement = new ShadowDomElement(
+    return ShadowDomElement._prepareComponent(
       context,
-      ShadowDomElementType.Component,
-      ownerShadowRoot,
-    )
-    const shadowRoot = new ShadowDomShadowRoot(context)
-    componentElement.shadowRoot = shadowRoot
-    context.channel.createComponent(
-      componentElement.id,
-      shadowRoot.id,
+      new ShadowDomElement(context, ShadowDomElementType.Component, ownerShadowRoot),
+      new ShadowDomShadowRoot(context),
       tagName,
       external,
       virtualHost,
       styleScope,
       extraStyleScope,
       externalClasses,
-      ownerShadowRoot.id,
+      ownerShadowRoot,
     )
-    return componentElement
+  }
+
+  /** @internal */
+  static _prepareTextNode(
+    context: ShadowDomBackendContext,
+    elem: ShadowDomElement,
+    textContent: string,
+    ownerShadowRoot: ShadowDomShadowRoot,
+  ): ShadowDomElement {
+    context.channel.createTextNode(elem._id, textContent, ownerShadowRoot._id)
+    return elem
   }
 
   static createTextNode(
@@ -81,8 +130,22 @@ export class ShadowDomElement implements GlassEaselBackend.Element {
     textContent: string,
     ownerShadowRoot: ShadowDomShadowRoot,
   ): ShadowDomElement {
-    const elem = new ShadowDomElement(context, ShadowDomElementType.TextNode, ownerShadowRoot)
-    context.channel.createTextNode(elem.id, textContent, ownerShadowRoot.id)
+    return ShadowDomElement._prepareTextNode(
+      context,
+      new ShadowDomElement(context, ShadowDomElementType.TextNode, ownerShadowRoot),
+      textContent,
+      ownerShadowRoot,
+    )
+  }
+
+  /** @internal */
+  static _prepareVirtualNode(
+    context: ShadowDomBackendContext,
+    elem: ShadowDomElement,
+    virtualName: string,
+    ownerShadowRoot: ShadowDomShadowRoot,
+  ): ShadowDomElement {
+    context.channel.createVirtualNode(elem._id, virtualName, ownerShadowRoot._id)
     return elem
   }
 
@@ -91,34 +154,37 @@ export class ShadowDomElement implements GlassEaselBackend.Element {
     virtualName: string,
     ownerShadowRoot: ShadowDomShadowRoot,
   ): ShadowDomElement {
-    const elem = new ShadowDomElement(context, ShadowDomElementType.VirtualNode, ownerShadowRoot)
-    context.channel.createVirtualNode(elem.id, virtualName, ownerShadowRoot.id)
-    return elem
+    return ShadowDomElement._prepareVirtualNode(
+      context,
+      new ShadowDomElement(context, ShadowDomElementType.VirtualNode, ownerShadowRoot),
+      virtualName,
+      ownerShadowRoot,
+    )
   }
 
   static createFragment(context: ShadowDomBackendContext): ShadowDomElement {
     const elem = new ShadowDomElement(context, ShadowDomElementType.Fragment, null)
-    context.channel.createFragment(elem.id)
+    context.channel.createFragment(elem._id)
     return elem
   }
 
-  constructor(
+  protected constructor(
     protected _context: ShadowDomBackendContext,
     public type: ShadowDomElementType,
     public ownerShadowRoot: ShadowDomShadowRoot | null,
   ) {
-    const id = (this.id = _context._genElementId())
+    const id = (this._id = _context._genElementId())
     _context._setElementId(id, this)
   }
 
   release(): void {
-    this._context._removeElementId(this.id)
-    this._context.channel.release(this.id)
+    this._context._removeElementId(this._id)
+    this._context.channel.release(this._id)
   }
 
   associateValue(v: Node): void {
     this.__wxElement = v
-    this._context.channel.associateValue(this.id, this._context.getAssociateValueInfo(v))
+    this._context.channel.associateValue(this._id, this._context.getAssociateValueInfo(v))
   }
 
   getShadowRoot(): ShadowDomShadowRoot | undefined {
@@ -126,109 +192,109 @@ export class ShadowDomElement implements GlassEaselBackend.Element {
   }
 
   appendChild(child: ShadowDomElement): void {
-    this._context.channel.appendChild(this.id, child.id)
+    this._context.channel.appendChild(this._id, child._id)
   }
 
   removeChild(child: ShadowDomElement): void {
-    this._context.channel.removeChild(this.id, child.id)
+    this._context.channel.removeChild(this._id, child._id)
   }
 
   insertBefore(child: ShadowDomElement, before: ShadowDomElement): void {
-    this._context.channel.insertBefore(this.id, child.id, before.id)
+    this._context.channel.insertBefore(this._id, child._id, before._id)
   }
 
   replaceChild(child: ShadowDomElement, oldChild: ShadowDomElement): void {
-    this._context.channel.replaceChild(this.id, child.id, oldChild.id)
+    this._context.channel.replaceChild(this._id, child._id, oldChild._id)
   }
 
   spliceBefore(before: ShadowDomElement, deleteCount: number, list: ShadowDomElement): void {
-    this._context.channel.spliceBefore(this.id, before.id, deleteCount, list.id)
+    this._context.channel.spliceBefore(this._id, before._id, deleteCount, list._id)
   }
 
   spliceAppend(list: ShadowDomElement): void {
-    this._context.channel.spliceAppend(this.id, list.id)
+    this._context.channel.spliceAppend(this._id, list._id)
   }
 
   spliceRemove(start: ShadowDomElement, deleteCount: number): void {
-    this._context.channel.spliceRemove(this.id, start.id, deleteCount)
+    this._context.channel.spliceRemove(this._id, start._id, deleteCount)
   }
 
   setId(id: string): void {
-    this._context.channel.setId(this.id, id)
+    this._context.channel.setId(this._id, id)
   }
 
   setSlotName(name: string): void {
-    this._context.channel.setSlotName(this.id, name)
+    this._context.channel.setSlotName(this._id, name)
   }
 
   setContainingSlot(slot: ShadowDomElement | undefined | null): void {
-    this._context.channel.setContainingSlot(this.id, slot ? slot.id : slot)
+    this._context.channel.setContainingSlot(this._id, slot ? slot._id : slot)
   }
 
   reassignContainingSlot(oldSlot: ShadowDomElement | null, newSlot: ShadowDomElement | null): void {
     this._context.channel.reassignContainingSlot(
-      this.id,
-      oldSlot ? oldSlot.id : oldSlot,
-      newSlot ? newSlot.id : newSlot,
+      this._id,
+      oldSlot ? oldSlot._id : oldSlot,
+      newSlot ? newSlot._id : newSlot,
     )
   }
 
   spliceBeforeSlotNodes(before: number, deleteCount: number, list: ShadowDomElement): void {
-    this._context.channel.spliceBeforeSlotNodes(this.id, before, deleteCount, list.id)
+    this._context.channel.spliceBeforeSlotNodes(this._id, before, deleteCount, list._id)
   }
 
   spliceAppendSlotNodes(list: ShadowDomElement): void {
-    this._context.channel.spliceAppendSlotNodes(this.id, list.id)
+    this._context.channel.spliceAppendSlotNodes(this._id, list._id)
   }
 
   spliceRemoveSlotNodes(before: number, deleteCount: number): void {
-    this._context.channel.spliceRemoveSlotNodes(this.id, before, deleteCount)
+    this._context.channel.spliceRemoveSlotNodes(this._id, before, deleteCount)
   }
 
   setInheritSlots(): void {
-    this._context.channel.setInheritSlots(this.id)
+    this._context.channel.setInheritSlots(this._id)
   }
 
   setStyle(_styleText: string): void {
-    this._context.channel.setStyle(this.id, _styleText)
+    this._context.channel.setStyle(this._id, _styleText)
   }
 
   addClass(className: string): void {
-    this._context.channel.addClass(this.id, className)
+    this._context.channel.addClass(this._id, className)
   }
 
   removeClass(className: string): void {
-    this._context.channel.removeClass(this.id, className)
+    this._context.channel.removeClass(this._id, className)
   }
 
   clearClasses(): void {
-    this._context.channel.clearClasses(this.id)
+    this._context.channel.clearClasses(this._id)
   }
 
   setClassAlias(className: string, target: string[]): void {
-    this._context.channel.setClassAlias(this.id, className, target)
+    this._context.channel.setClassAlias(this._id, className, target)
   }
 
   setAttribute(name: string, value: any): void {
-    this._context.channel.setAttribute(this.id, name, value)
+    this._context.channel.setAttribute(this._id, name, value)
   }
 
   removeAttribute(name: string): void {
-    this._context.channel.removeAttribute(this.id, name)
+    this._context.channel.removeAttribute(this._id, name)
   }
 
   setDataset(name: string, value: unknown): void {
-    this._context.channel.setDataset(this.id, name, value)
+    this._context.channel.setDataset(this._id, name, value)
   }
 
   setText(content: string): void {
-    this._context.channel.setText(this.id, content)
+    this._context.channel.setText(this._id, content)
   }
 
   getBoundingClientRect(
     cb: (res: { left: number; top: number; width: number; height: number }) => void,
   ): void {
-    this._context.channel.getBoundingClientRect(this.id, cb)
+    this._context.channel.getBoundingClientRect(this._id, cb)
   }
 
   getScrollOffset(
@@ -239,32 +305,39 @@ export class ShadowDomElement implements GlassEaselBackend.Element {
       scrollHeight: number
     }) => void,
   ): void {
-    this._context.channel.getScrollOffset(this.id, cb)
+    this._context.channel.getScrollOffset(this._id, cb)
   }
 
   setModelBindingStat(attributeName: string, listener: ((newValue: unknown) => void) | null): void {
-    this._context.channel.setModelBindingStat(this.id, attributeName, listener)
+    this._context.channel.setModelBindingStat(this._id, attributeName, listener)
   }
 
   setListenerStats(type: string, capture: boolean, mutLevel: number): void {
-    this._context.channel.setListenerStats(this.id, type, capture, mutLevel)
+    this._context.channel.setListenerStats(this._id, type, capture, mutLevel)
   }
 
   createIntersectionObserver(
-    relativeElement: GlassEaselBackend.Element | null,
+    relativeElement: ShadowDomElement | null,
     relativeElementMargin: string,
     thresholds: number[],
     listener: (res: GlassEaselBackend.IntersectionStatus) => void,
   ): GlassEaselBackend.Observer {
+    const id = this._context.channel.createIntersectionObserver(
+      this._id,
+      relativeElement ? relativeElement._id : null,
+      relativeElementMargin,
+      thresholds,
+      listener,
+    )
     return {
-      disconnect() {
-        // TODO
+      disconnect: () => {
+        this._context.channel.disconnectObserver(id)
       },
     }
   }
 
   getContext(cb: (res: any) => void): void {
-    this._context.channel.getContext(this.id, cb)
+    this._context.channel.getContext(this._id, cb)
   }
 }
 
@@ -272,6 +345,7 @@ export class ShadowDomShadowRoot
   extends ShadowDomElement
   implements GlassEaselBackend.ShadowRootContext
 {
+  /** @internal */
   constructor(context: ShadowDomBackendContext) {
     super(context, ShadowDomElementType.ShadowRoot, null)
     this.ownerShadowRoot = this
@@ -315,8 +389,10 @@ export class ShadowDomBackendContext implements GlassEaselBackend.Context {
 
   private _shadowRoot: ShadowDomShadowRoot
 
+  private _$registeredStyleSheets = [] as [string, unknown][]
+  private _$appendedStyleSheets = [] as [number, string, number | undefined][]
   private _$styleSheetIdInc = 1
-  private _styleScopeMap = Object.create(null) as Record<number, string | undefined>
+  private _$styleScopeMap = new Map<number, string | undefined>()
   private _windowInfo = {
     width: 0,
     height: 0,
@@ -415,17 +491,14 @@ export class ShadowDomBackendContext implements GlassEaselBackend.Context {
   }
 
   registerStyleSheetContent(path: string, content: any): void {
+    this._$registeredStyleSheets.push([path, content])
     this.channel.registerStyleSheetContent(path, content)
   }
 
   _checkStyleScope(styleScope: number | null | undefined) {
-    if (
-      styleScope !== null &&
-      styleScope !== undefined &&
-      !Object.prototype.hasOwnProperty.call(this._styleScopeMap, styleScope)
-    ) {
+    if (styleScope !== null && styleScope !== undefined && !this._$styleScopeMap.has(styleScope)) {
       const stylePrefix = this.styleScopeManager.queryName(styleScope)
-      this._styleScopeMap[styleScope] = stylePrefix
+      this._$styleScopeMap.set(styleScope, stylePrefix)
       this.channel.registerStyleScope(styleScope, stylePrefix)
     }
   }
@@ -434,6 +507,7 @@ export class ShadowDomBackendContext implements GlassEaselBackend.Context {
     this._checkStyleScope(styleScope)
     const id = this._$styleSheetIdInc
     this._$styleSheetIdInc += 1
+    this._$appendedStyleSheets.push([id, path, styleScope])
     this.channel.appendStyleSheetPath(id, path, styleScope)
     return id
   }
@@ -472,9 +546,10 @@ export class ShadowDomBackendContext implements GlassEaselBackend.Context {
     status: GlassEaselBackend.MediaQueryStatus,
     listener: (res: { matches: boolean }) => void,
   ): GlassEaselBackend.Observer {
+    const id = this.channel.createMediaQueryObserver(status, listener)
     return {
-      disconnect() {
-        //
+      disconnect: () => {
+        this.channel.disconnectObserver(id)
       },
     }
   }
@@ -508,6 +583,75 @@ export class ShadowDomBackendContext implements GlassEaselBackend.Context {
   ): void {
     this._traceIdGen.release(id)
     this.channel.performanceEndTrace(id, cb)
+  }
+
+  reInitContext() {
+    this.initContext()
+    this._$registeredStyleSheets.forEach(([path, content]) => {
+      this.channel.registerStyleSheetContent(path, content)
+    })
+    this._$styleScopeMap.forEach((stylePrefix, styleScope) => {
+      this.channel.registerStyleScope(styleScope, stylePrefix)
+    })
+    this._$appendedStyleSheets.forEach(([id, path, styleScope]) => {
+      this.channel.appendStyleSheetPath(id, path, styleScope)
+    })
+  }
+
+  replay(
+    glassEasel: typeof import('glass-easel'),
+    roots: Node[],
+    getShadowDomElement: (elem: Node) => ShadowDomElement,
+  ) {
+    roots.forEach((root) => {
+      replayShadowBackend(glassEasel, this, root, {
+        createElement: (ownerShadowRoot: ShadowDomShadowRoot, elem) => {
+          let be
+          if (glassEasel.TextNode.isTextNode(elem)) {
+            be = ShadowDomElement._prepareTextNode(
+              this,
+              getShadowDomElement(elem),
+              elem.textContent,
+              ownerShadowRoot,
+            )
+          } else if (glassEasel.NativeNode.isNativeNode(elem)) {
+            be = ShadowDomElement._prepareElement(
+              this,
+              getShadowDomElement(elem),
+              elem.is,
+              elem.stylingName,
+              ownerShadowRoot,
+            )
+          } else if (glassEasel.VirtualNode.isVirtualNode(elem)) {
+            // shadowRoot is created by createComponent, ignore it
+            be = ShadowDomElement._prepareVirtualNode(
+              this,
+              getShadowDomElement(elem),
+              elem.is,
+              ownerShadowRoot,
+            )
+          } else if (glassEasel.Component.isComponent(elem)) {
+            const options = elem.getComponentOptions()
+            be = ShadowDomElement._prepareComponent(
+              this,
+              getShadowDomElement(elem),
+              getShadowDomElement(elem.getShadowRoot()!) as ShadowDomShadowRoot,
+              elem.tagName,
+              elem.isExternal(),
+              elem.isVirtual(),
+              options.styleScope ?? glassEasel.StyleScopeManager.globalScope(),
+              options.extraStyleScope,
+              elem.getExternalClassNames(),
+              ownerShadowRoot,
+            )
+          } else {
+            throw new Error(`Unknown elem type ${elem.constructor.name}`)
+          }
+          return be
+        },
+      })
+      this._shadowRoot.appendChild(getShadowDomElement(root))
+    })
   }
 }
 
@@ -553,10 +697,10 @@ export class SyncTemplateEngine implements templateEngine.Template {
     const instance: templateEngine.TemplateInstance = {
       shadowRoot,
       initValues: (data) => {
-        channel.initValues(backendElement.id, data)
+        channel.initValues(backendElement._id, data)
       },
       updateValues: (data, changes) => {
-        channel.updateValues(backendElement.id, changes)
+        channel.updateValues(backendElement._id, changes)
       },
     }
 
@@ -575,7 +719,7 @@ export const SyncBehavior = <TBehaviorBuilder extends GeneralBehaviorBuilder>(
   builder.lifetime('created', function () {
     const { context, backendElement } = getContextFromMethodCaller(this)
     context.channel.initValues(
-      backendElement.id,
+      backendElement._id,
       properties.reduce((initValues, property) => {
         initValues[property] = this.data[property]
         return initValues
@@ -585,7 +729,7 @@ export const SyncBehavior = <TBehaviorBuilder extends GeneralBehaviorBuilder>(
   properties.forEach((property) => {
     builder.observer(property, function (newValue) {
       const { context, backendElement } = getContextFromMethodCaller(this)
-      context.channel.updateValues(backendElement.id, [
+      context.channel.updateValues(backendElement._id, [
         [[property], newValue, undefined, undefined],
       ])
     })
@@ -594,6 +738,8 @@ export const SyncBehavior = <TBehaviorBuilder extends GeneralBehaviorBuilder>(
 }
 
 export const getNodeId = (node: Node) =>
-  (node.getBackendElement() as unknown as ShadowDomElement).id
+  (node.getBackendElement() as unknown as ShadowDomElement)._id
 
 export { Channel, ChannelEventType, MessageChannelDataSide } from './message_channel'
+export { getLinearIdGenerator, getRandomIdGenerator } from './utils'
+export { replayShadowBackend, ReplayHandler } from './replay'

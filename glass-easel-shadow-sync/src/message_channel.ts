@@ -4,15 +4,15 @@ import type {
   Element,
   Event,
   EventOptions,
-  ExternalShadowRoot,
   GeneralComponent,
   NativeNode,
   Node,
   ShadowRoot,
   TextNode,
+  backend as GlassEaselBackend,
 } from 'glass-easel'
-import { IDGenerator } from './utils'
-import { Fragment, ViewController } from './view_controller'
+import { type IDGenerator } from './utils'
+import { type Fragment, type ViewController } from './view_controller'
 
 export const enum ChannelEventType {
   CREATE = 1,
@@ -26,10 +26,11 @@ export const enum ChannelEventType {
   ON_THEME_CHANGE_CALLBACK,
   RENDER,
   RENDER_CALLBACK,
-  // CREATE_MEDIA_QUERY_OBSERVER,
-  // MEDIA_QUERY_OBSERVER_CALLBACK,
-  // CREATE_INTERSECTION_OBSERVER,
-  // INTERSECTION_OBSERVER_CALLBACK,
+  CREATE_MEDIA_QUERY_OBSERVER,
+  MEDIA_QUERY_OBSERVER_CALLBACK,
+  CREATE_INTERSECTION_OBSERVER,
+  INTERSECTION_OBSERVER_CALLBACK,
+  DISCONNECT_OBSERVER,
 
   CREATE_ELEMENT,
   CREATE_COMPONENT,
@@ -98,8 +99,8 @@ export type ChannelEventTypeViewSide =
   | ChannelEventType.ON_WINDOW_RESIZE_CALLBACK
   | ChannelEventType.ON_THEME_CHANGE_CALLBACK
   | ChannelEventType.RENDER_CALLBACK
-  // | ChannelEventType.MEDIA_QUERY_OBSERVER_CALLBACK
-  // | ChannelEventType.INTERSECTION_OBSERVER_CALLBACK
+  | ChannelEventType.MEDIA_QUERY_OBSERVER_CALLBACK
+  | ChannelEventType.INTERSECTION_OBSERVER_CALLBACK
   | ChannelEventType.SET_MODEL_BINDING_STAT_CALLBACK
   | ChannelEventType.GET_BOUNDING_CLIENT_RECT_CALLBACK
   | ChannelEventType.GET_SCROLL_OFFSET_CALLBACK
@@ -125,10 +126,11 @@ export type ChannelArgs = ExhaustiveChannelEvent<{
   [ChannelEventType.ON_THEME_CHANGE_CALLBACK]: [number, string]
   [ChannelEventType.RENDER]: [number]
   [ChannelEventType.RENDER_CALLBACK]: [number, string | null]
-  // [ChannelEventType.CREATE_MEDIA_QUERY_OBSERVER]: [number]
-  // [ChannelEventType.MEDIA_QUERY_OBSERVER_CALLBACK]: [number]
-  // [ChannelEventType.CREATE_INTERSECTION_OBSERVER]: [number]
-  // [ChannelEventType.INTERSECTION_OBSERVER_CALLBACK]: [number]
+  [ChannelEventType.CREATE_MEDIA_QUERY_OBSERVER]: [string, number]
+  [ChannelEventType.MEDIA_QUERY_OBSERVER_CALLBACK]: [number, string]
+  [ChannelEventType.CREATE_INTERSECTION_OBSERVER]: [number, number | null, string, number[], number]
+  [ChannelEventType.INTERSECTION_OBSERVER_CALLBACK]: [number, string]
+  [ChannelEventType.DISCONNECT_OBSERVER]: [number]
 
   [ChannelEventType.CREATE_ELEMENT]: [number, string, string, number]
   [ChannelEventType.CREATE_COMPONENT]: [
@@ -262,9 +264,10 @@ export const MessageChannelDataSide = (
 
   const id2callback = <F extends (...args: any[]) => void>(
     id: number,
+    release = true,
   ): ((...args: GetCallback<Parameters<F>>) => void) => {
     const cb = callbacks[id]!
-    callbackIdGen.release(id)
+    if (release) callbackIdGen.release(id)
     return cb
   }
 
@@ -285,19 +288,31 @@ export const MessageChannelDataSide = (
         })
         break
       case ChannelEventType.ON_WINDOW_RESIZE_CALLBACK:
-        id2callback<Channel['onWindowResize']>(arg[1])({
+        id2callback<Channel['onWindowResize']>(
+          arg[1],
+          false,
+        )({
           width: arg[2],
           height: arg[3],
           devicePixelRatio: arg[4],
         })
         break
       case ChannelEventType.ON_THEME_CHANGE_CALLBACK:
-        id2callback<Channel['onThemeChange']>(arg[1])({
+        id2callback<Channel['onThemeChange']>(
+          arg[1],
+          false,
+        )({
           theme: arg[2],
         })
         break
       case ChannelEventType.RENDER_CALLBACK:
         id2callback<Channel['render']>(arg[1])(arg[2] !== null ? new Error(arg[2]) : null)
+        break
+      case ChannelEventType.MEDIA_QUERY_OBSERVER_CALLBACK:
+        id2callback<Channel['createMediaQueryObserver']>(arg[1], false)(JSON.parse(arg[2]))
+        break
+      case ChannelEventType.INTERSECTION_OBSERVER_CALLBACK:
+        id2callback<Channel['createMediaQueryObserver']>(arg[1], false)(JSON.parse(arg[2]))
         break
       case ChannelEventType.SET_MODEL_BINDING_STAT_CALLBACK:
         id2callback<Channel['setModelBindingStat']>(arg[1])(JSON.parse(arg[2]))
@@ -392,6 +407,29 @@ export const MessageChannelDataSide = (
         isCapture: boolean,
       ) => void,
     ) => { createEvent = _createEvent; triggerEvent = _triggerEvent },
+    createMediaQueryObserver: (
+      status: GlassEaselBackend.MediaQueryStatus,
+      listener: (res: { matches: boolean }) => void,
+    ) => {
+      const id = callback2id(listener)
+      publish([ChannelEventType.CREATE_MEDIA_QUERY_OBSERVER, JSON.stringify(status), callback2id(listener)])
+      return id
+    },
+    createIntersectionObserver: (
+      target: number,
+      relativeElement: number | null,
+      relativeElementMargin: string,
+      thresholds: number[],
+      listener: (res: GlassEaselBackend.IntersectionStatus) => void,
+    ) => {
+      const id = callback2id(listener)
+      publish([ChannelEventType.CREATE_INTERSECTION_OBSERVER, target, relativeElement, relativeElementMargin, thresholds, id])
+      return id
+    },
+    disconnectObserver: (id: number) => {
+      publish([ChannelEventType.DISCONNECT_OBSERVER, id])
+      id2callback(id) // release callback
+    },
 
     createElement: (id: number, logicalName: string, stylingName: string, ownerShadowRootId: number) => publish([ChannelEventType.CREATE_ELEMENT, id, logicalName, stylingName, ownerShadowRootId]),
     createComponent: (id: number, shadowRootId: number, tagName: string, external: boolean, virtualHost: boolean, styleScope: number, extraStyleScope: number | null, externalClasses: string[] | undefined, ownerShadowRootId: number) => publish([ChannelEventType.CREATE_COMPONENT, id, shadowRootId, tagName, external, virtualHost, styleScope, extraStyleScope, externalClasses, ownerShadowRootId]),
@@ -496,6 +534,8 @@ export const MessageChannelViewSide = (
   const eventIdGen = idGenerator()
   const eventIdMap = new WeakMap<Event<unknown>, number>()
 
+  const observersMap: Record<number, { disconnect(): void } | undefined> = []
+
   // eslint-disable-next-line consistent-return
   subscribe((arg) => {
     switch (arg[0]) {
@@ -541,6 +581,44 @@ export const MessageChannelViewSide = (
         return controller.render((err) => {
           publish([ChannelEventType.RENDER_CALLBACK, callbackId, err ? err.message : null])
         })
+      }
+      case ChannelEventType.CREATE_MEDIA_QUERY_OBSERVER: {
+        const [, status, callbackId] = arg
+        const observer = controller.createMediaQueryObserver(JSON.parse(status), (res) => {
+          publish([ChannelEventType.MEDIA_QUERY_OBSERVER_CALLBACK, callbackId, JSON.stringify(res)])
+        })
+        observersMap[callbackId] = observer
+        break
+      }
+      case ChannelEventType.CREATE_INTERSECTION_OBSERVER: {
+        const [, targetId, relativeElementId, relativeElementMargin, thresholds, callbackId] = arg
+        const target = nodeMap[targetId] as Element
+        const relativeElement =
+          typeof relativeElementId === 'number' ? (nodeMap[relativeElementId] as Element) : null
+        const observer = controller.createIntersectionObserver(
+          target,
+          relativeElement,
+          relativeElementMargin,
+          thresholds,
+          (res) => {
+            publish([
+              ChannelEventType.INTERSECTION_OBSERVER_CALLBACK,
+              callbackId,
+              JSON.stringify(res),
+            ])
+          },
+        )
+        observersMap[callbackId] = observer
+        break
+      }
+      case ChannelEventType.DISCONNECT_OBSERVER: {
+        const [, callbackId] = arg
+        const observer = observersMap[callbackId]
+        if (observer) {
+          observer.disconnect()
+          observersMap[callbackId] = undefined
+        }
+        break
       }
       case ChannelEventType.CREATE_ELEMENT: {
         const [, id, logicalName, stylingName, ownerShadowRootId] = arg

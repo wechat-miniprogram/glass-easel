@@ -6,7 +6,6 @@ import type {
   Element,
   EventListener,
   EventMutLevel,
-  ExternalShadowRoot,
   GeneralBackendContext,
   GeneralBackendElement,
   GeneralComponent,
@@ -17,7 +16,7 @@ import type {
   VirtualNode,
   templateEngine,
   BehaviorBuilder,
-  typeUtils,
+  backend as GlassEaselBackend,
 } from 'glass-easel'
 
 const dashToCamelCase = (dash: string): string =>
@@ -143,6 +142,31 @@ export class ViewController {
   render(cb: (err: Error | null) => void): void {
     const { _backendContext } = this
     _backendContext.render(cb)
+  }
+
+  createMediaQueryObserver(
+    status: GlassEaselBackend.MediaQueryStatus,
+    listener: (res: { matches: boolean }) => void,
+  ): GlassEaselBackend.Observer | undefined {
+    const { _backendContext } = this
+    return _backendContext.createMediaQueryObserver?.(status, listener)
+  }
+
+  createIntersectionObserver(
+    target: Element,
+    relativeElement: Element | null,
+    relativeElementMargin: string,
+    threshold: number[],
+    listener: (res: GlassEaselBackend.IntersectionStatus) => void,
+  ): GlassEaselBackend.Observer | undefined {
+    return (
+      target.createIntersectionObserver(
+        relativeElement,
+        relativeElementMargin,
+        threshold,
+        listener,
+      ) ?? undefined
+    )
   }
 
   createElement(logicalName: string, stylingName: string, ownerShadowRoot: ShadowRoot): Element {
@@ -554,37 +578,5 @@ export class ViewController {
     cb({ startTimestamp, endTimestamp })
   }
 }
-
-// class EmptyTemplateEngine implements templateEngine.Template {
-//   static create(rootBehavior: GeneralBehavior, options: NormalizedComponentOptions) {
-//     return new EmptyTemplateEngine()
-//   }
-
-//   createInstance(
-//     elem: typeUtils.GeneralComponentInstance,
-//     createShadowRoot: (comp: typeUtils.GeneralComponentInstance) => ShadowRoot,
-//   ): templateEngine.TemplateInstance {
-//     return new EmptyTemplateInstance(elem, createShadowRoot)
-//   }
-// }
-
-// class EmptyTemplateInstance implements templateEngine.TemplateInstance {
-//   shadowRoot: ShadowRoot
-
-//   constructor(
-//     component: typeUtils.GeneralComponentInstance,
-//     createShadowRoot: (comp: typeUtils.GeneralComponentInstance) => ShadowRoot,
-//   ) {
-//     this.shadowRoot = createShadowRoot(component)
-//   }
-
-//   initValues(data: DataValue) {
-//     // 组件被创建，初始数据是 data
-//   }
-
-//   updateValues(data: DataValue, changes: DataChange[]) {
-//     // 组件更新，新的数据是 data ，变更内容描述在 changes 中
-//   }
-// }
 
 export { ChannelEventType, MessageChannelViewSide, getNodeId } from './message_channel'
