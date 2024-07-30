@@ -123,7 +123,7 @@ export function replayShadowBackend(
           elem.isVirtual(),
           options.styleScope ?? glassEasel.StyleScopeManager.globalScope(),
           options.extraStyleScope,
-          elem.getExternalClassNames(),
+          Object.keys(elem.getExternalClasses()),
         )
       be.associateValue(elem)
       setAttributes(elem, be)

@@ -30,7 +30,7 @@ export const enum ShadowDomElementType {
 export class ShadowDomElement implements GlassEaselBackend.Element {
   public _id: number
 
-  public __wxElement: Node | undefined
+  public __wxElement: Element | undefined
   public shadowRoot: ShadowDomShadowRoot | undefined
 
   /** @internal */
@@ -182,8 +182,7 @@ export class ShadowDomElement implements GlassEaselBackend.Element {
     this._context.channel.release(this._id)
   }
 
-  associateValue(v: Node): void {
-    this.__wxElement = v
+  associateValue(v: Element): void {
     this._context.channel.associateValue(this._id, this._context.getAssociateValueInfo(v))
   }
 
@@ -641,7 +640,7 @@ export class ShadowDomBackendContext implements GlassEaselBackend.Context {
               elem.isVirtual(),
               options.styleScope ?? glassEasel.StyleScopeManager.globalScope(),
               options.extraStyleScope,
-              elem.getExternalClassNames(),
+              Object.keys(elem.getExternalClasses()),
               ownerShadowRoot,
             )
           } else {
