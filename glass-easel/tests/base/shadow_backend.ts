@@ -398,6 +398,8 @@ abstract class Node implements glassEasel.backend.Element {
       })
       const tagName = this.tagName.toLowerCase()
       ret.push(`<${tagName}`)
+      const is = this.__wxElement?.asGeneralComponent()?.is
+      if (typeof is === 'string') props.is = is
       if (this.id) props.id = this.getAttribute('id')!
       if (this._$style) props.style = this.getAttribute('style')!
       if (this._$classes) props.class = this.getAttribute('class')!
@@ -865,8 +867,17 @@ export class ShadowRoot extends VirtualNode implements glassEasel.backend.Shadow
     styleScope: number,
     extraStyleScope: number | null,
     externalClasses: string[] | undefined,
-  ): Component {
-    const comp = new Component(this._$ownerContext, this, tagName, external)
+  ): glassEasel.backend.Element {
+    const comp = new Component(
+      this._$ownerContext,
+      this,
+      tagName,
+      external,
+      virtualHost,
+      styleScope,
+      extraStyleScope,
+      externalClasses,
+    )
     const shadowRoot = new ShadowRoot(this._$ownerContext)
     comp.shadowRoot = shadowRoot
     shadowRoot.hostNode = comp
@@ -893,11 +904,29 @@ export class ShadowRoot extends VirtualNode implements glassEasel.backend.Shadow
 export class Component extends Element {
   public override nodeType = NODE_TYPE.ELEMENT_NODE
   public shadowRoot: ShadowRoot | undefined
-  public external = false
 
-  constructor(ownerContext: Context, shadowRoot: ShadowRoot, tagName: string, _external: boolean) {
+  constructor(
+    ownerContext: Context,
+    shadowRoot: ShadowRoot,
+    tagName: string,
+    public external: boolean = false,
+    virtualHost: boolean,
+    styleScope: number,
+    extraStyleScope: number | null,
+    public externalClasses: string[] | undefined,
+  ) {
     super(ownerContext, shadowRoot, tagName, undefined)
-    this.external = _external
+    if (virtualHost) this._$virtual = true
+    this.assertStyleScope(styleScope)
+    this.assertStyleScope(extraStyleScope)
+    this._$styleScope = styleScope
+    this._$extraStyleScope = extraStyleScope
+    if (externalClasses) {
+      this._$externalClasses = externalClasses
+      externalClasses.forEach((className) => {
+        this._$classAlias[className] = []
+      })
+    }
   }
 }
 

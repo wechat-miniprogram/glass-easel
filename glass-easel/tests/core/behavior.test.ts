@@ -135,7 +135,7 @@ describe('chaining-form interface', () => {
       )
       .registerComponent()
     const elem = glassEasel.Component.createWithContext('root', compDef, domBackend)
-    expect(domHtml(elem)).toBe('<child><div class="invalid a b"></div></child>')
+    expect(domHtml(elem)).toBe('<child is=""><div class="invalid a b"></div></child>')
   })
 
   test('chaining data and observers', () => {
@@ -579,7 +579,9 @@ describe('chaining-form interface', () => {
     const comp = glassEasel.Component.createWithContext('root', compDef, domBackend)
     glassEasel.Element.pretendAttached(comp)
     expect(eventArr).toStrictEqual([1, 2, 1, 2, 1, 2])
-    expect(domHtml(comp)).toBe('<parent><child>A</child><child>B</child><child>C</child></parent>')
+    expect(domHtml(comp)).toBe(
+      '<parent is="parent-comp"><child is="child-comp">A</child><child is="child-comp">B</child><child is="child-comp">C</child></parent>',
+    )
   })
 
   test('chaining filter', () => {

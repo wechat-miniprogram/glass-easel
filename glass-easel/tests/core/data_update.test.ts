@@ -92,7 +92,7 @@ describe('partial update', () => {
     })
     const elem = glassEasel.Component.createWithContext('root', def, domBackend)
     glassEasel.Element.pretendAttached(elem)
-    expect(domHtml(elem)).toBe('<x-c>10</x-c><x-c>20</x-c>')
+    expect(domHtml(elem)).toBe('<x-c is="">10</x-c><x-c is="">20</x-c>')
     expect(execArr).toStrictEqual(['B', 'A', 'B', 'A'])
     execArr = []
     ;(elem.data.list[0]!.v as any) = 30
@@ -100,7 +100,7 @@ describe('partial update', () => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       list: elem.data.list as any,
     })
-    expect(domHtml(elem)).toBe('<x-c>30</x-c><x-c>20</x-c>')
+    expect(domHtml(elem)).toBe('<x-c is="">30</x-c><x-c is="">20</x-c>')
     expect(execArr).toStrictEqual(['D', 'B', 'A', 'B'])
     execArr = []
     elem.setData({ list: [] })

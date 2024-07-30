@@ -62,6 +62,7 @@ import {
   normalizeComponentOptions,
   type NormalizedComponentOptions,
 } from './global_options'
+import { MutationObserverTarget } from './mutation_observer'
 import { type Node } from './node'
 import {
   Relation,
@@ -213,6 +214,7 @@ export type Lifetimes = {
   moved: () => void
   detached: () => void
   ready: () => void
+  error: (err: unknown) => void
   listenerChange: (
     isAdd: boolean,
     name: string,
@@ -509,12 +511,10 @@ export class Component<
     return taggedMethod
   }
 
-  /** @internal */
-  static _$isTaggedMethod(func: unknown): func is TaggedMethod<ComponentMethod> {
+  static isTaggedMethod(func: unknown): func is TaggedMethod<ComponentMethod> {
     return typeof func === 'function' && !!(func as unknown as { [tag: symbol]: true })[METHOD_TAG]
   }
 
-  /** @internal */
   static _$advancedCreate<
     TData extends DataList,
     TProperty extends PropertyList,
@@ -537,7 +537,7 @@ export class Component<
       def._$detail!
     const options = def._$options
     const behavior = def.behavior
-    const nodeTreeContext: GeneralBackendContext | null = owner
+    const nodeTreeContext = owner
       ? owner.getBackendContext()
       : backendContext || globalOptions.backendContext || getDefaultBackendContext()
     const external = options.externalComponent
@@ -564,6 +564,7 @@ export class Component<
           backendElement = (nodeTreeContext as domlikeBackend.Context).document.createElement(
             tagName,
           )
+          backendElement.setAttribute('is', def.is)
           if (ENV.DEV) performanceMeasureEnd()
         }
       } else if (BM.COMPOSED || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Composed)) {
@@ -577,9 +578,10 @@ export class Component<
         }
       } else if (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Shadow)) {
         if (ENV.DEV) performanceMeasureStart('component.createComponent')
-        const be = (
-          owner ? owner._$backendShadowRoot! : (nodeTreeContext as backend.Context).getRootNode()
-        ).createComponent(
+        const sr = owner
+          ? owner._$backendShadowRoot!
+          : (nodeTreeContext as backend.Context).getRootNode()
+        const be = sr.createComponent(
           tagName,
           external,
           virtualHost,
@@ -587,15 +589,15 @@ export class Component<
           options.extraStyleScope,
           behavior._$externalClasses,
         )
-        if (ENV.DEV) performanceMeasureEnd()
         backendElement = be
+        if (ENV.DEV) performanceMeasureEnd()
       }
     }
     comp._$initialize(
       virtualHost,
       backendElement,
       owner,
-      owner ? owner._$nodeTreeContext : nodeTreeContext!,
+      owner?._$nodeTreeContext ?? nodeTreeContext!,
     )
 
     const ownerHost = owner ? owner.getHostNode() : undefined
@@ -633,20 +635,15 @@ export class Component<
       }
     }
 
-    // create template engine
-    const tmplInst = template.createInstance(
-      comp as GeneralComponent,
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      ShadowRoot.createShadowRoot,
-    )
-
     // associate in backend
     if (backendElement) {
       if (ENV.DEV) performanceMeasureStart('backend.associateValue')
       backendElement.__wxElement = comp
-      if (!(BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext!.mode === BackendMode.Domlike))) {
-        // ;(backendElement as backend.Element | composedBackend.Element).associateValue?.(comp)
-        ;(backendElement as unknown as { __wxElement: typeof comp }).__wxElement = comp
+      if (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext!.mode === BackendMode.Shadow)) {
+        ;(backendElement as backend.Element).associateValue(comp)
+      } else if (BM.COMPOSED || (BM.DYNAMIC && nodeTreeContext!.mode === BackendMode.Composed)) {
+        // FIXME temp for skyline
+        // ;(backendElement as composedBackend.Element).associateValue?.(comp)
       } else {
         ;(nodeTreeContext as domlikeBackend.Context).associateValue(
           backendElement as domlikeBackend.Element,
@@ -655,6 +652,13 @@ export class Component<
       }
       if (ENV.DEV) performanceMeasureEnd()
     }
+
+    // create template engine
+    const tmplInst = template.createInstance(
+      comp as GeneralComponent,
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      ShadowRoot.createShadowRoot,
+    )
 
     // write attr
     if (writeExtraInfoToAttr && backendElement) {
@@ -825,7 +829,7 @@ export class Component<
           for (let j = 0; j < exportedKeys.length; j += 1) {
             const exportedKey = exportedKeys[j]!
             const exportItem: unknown = exported[exportedKey]
-            if (Component._$isTaggedMethod(exportItem)) {
+            if (Component.isTaggedMethod(exportItem)) {
               if (cowMethodMap) {
                 cowMethodMap = false
                 comp._$methodMap = Object.create(comp._$methodMap) as MethodList
@@ -1239,7 +1243,7 @@ export class Component<
    * Most cases should take a common method instead.
    */
   triggerLifetime(name: string, args: Parameters<GeneralFuncType>) {
-    const f = this._$lifetimeFuncs[name]
+    const f = this._$lifetimeFuncs?.[name]
     if (f) f.call(this._$methodCaller as any, args, this)
   }
 
@@ -1343,10 +1347,18 @@ export class Component<
   setExternalClass(name: string, target: string | string[]) {
     this.scheduleExternalClassChange(name, target)
     this.applyExternalClassChanges()
+    if (this._$mutationObserverTarget) {
+      MutationObserverTarget.callAttrObservers(this, {
+        type: 'properties',
+        target: this,
+        nameType: 'external-class',
+        attributeName: name,
+      })
+    }
   }
 
   /** Get all external classes */
-  getExternalClasses(): string[] | undefined {
+  getExternalClasses(): { [name: string]: string[] | undefined } {
     return this.classList!._$getAlias()
   }
 

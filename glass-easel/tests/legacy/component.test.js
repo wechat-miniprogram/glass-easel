@@ -1,8 +1,14 @@
 /* eslint-disable */
 
-const { tmpl, domBackend, shadowBackend, execWithWarn, composedBackend, getCustomExternalTemplateEngine } = require('../base/env')
+const {
+  tmpl,
+  domBackend,
+  shadowBackend,
+  execWithWarn,
+  composedBackend,
+  getCustomExternalTemplateEngine,
+} = require('../base/env')
 const glassEasel = require('../../src')
-
 
 const testCases = function (testBackend) {
   const componentSpace = new glassEasel.ComponentSpace(
@@ -370,7 +376,9 @@ const testCases = function (testBackend) {
           },
           f: {
             type: Function,
-            value: function() { return 1 },
+            value: function () {
+              return 1
+            },
             default: function () {
               return f
             },
@@ -618,7 +626,7 @@ const testCases = function (testBackend) {
           <component-template-boolean-child id="b" prop-string="{{d}}" prop-boolean="{{d}}" />
         `,
         data: {
-          d: false
+          d: false,
         },
       })
       var elem = createElem('component-template-boolean')
@@ -791,7 +799,6 @@ const testCases = function (testBackend) {
       var root = createElem('root')
       root.appendChild(elem)
       expect(callOrder).toStrictEqual(['c'])
-      root.$$.id = 'root'
       glassEasel.Element.pretendAttached(root)
       expect(callOrder).toStrictEqual(['c', 'a'])
       root.removeChild(elem)
@@ -1202,13 +1209,17 @@ const testCases = function (testBackend) {
       expect(elem.$.c.class).toBe('c-c')
       expect(elem.$.c.classList.contains('cc')).toBe(false)
       expect(elem.$.c.classList.contains('c-c')).toBe(true)
-      expect(elem.$.c.$$.getAttribute('class')).toBe('component-class-cc--c-c component-class-c--c-c')
+      expect(elem.$.c.$$.getAttribute('class')).toBe(
+        'component-class-cc--c-c component-class-c--c-c',
+      )
       elem.$.c.classList.toggle('cc', false)
       elem.$.c.classList.toggle('c-c', true)
       expect(elem.$.c.class).toBe('c-c')
       expect(elem.$.c.classList.contains('cc')).toBe(false)
       expect(elem.$.c.classList.contains('c-c')).toBe(true)
-      expect(elem.$.c.$$.getAttribute('class')).toBe('component-class-cc--c-c component-class-c--c-c')
+      expect(elem.$.c.$$.getAttribute('class')).toBe(
+        'component-class-cc--c-c component-class-c--c-c',
+      )
     })
 
     it('should be able to disable class prefix', function () {
@@ -1343,15 +1354,7 @@ const testCases = function (testBackend) {
               ? undefined
               : getCustomExternalTemplateEngine((comp) => {
                   var root = comp.getBackendElement()
-                  var slot
-                  if (testBackend === shadowBackend) {
-                    var shadowRoot = root.getShadowRoot()
-                    slot = shadowRoot.createElement('div', 'div')
-                    slot.setSlotName('')
-                    shadowRoot.appendChild(slot)
-                  } else {
-                    slot = root
-                  }
+                  var slot = root
                   return {
                     root,
                     slot,

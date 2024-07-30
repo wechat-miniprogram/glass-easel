@@ -226,6 +226,7 @@ export class Element implements NodeCast {
       MutationObserverTarget.callAttrObservers(this, {
         type: 'properties',
         target: this,
+        nameType: 'basic',
         attributeName: 'id',
       })
     }
@@ -283,6 +284,7 @@ export class Element implements NodeCast {
       MutationObserverTarget.callAttrObservers(this, {
         type: 'properties',
         target: this,
+        nameType: 'basic',
         attributeName: 'slot',
       })
     }
@@ -338,6 +340,13 @@ export class Element implements NodeCast {
 
   asVirtualNode(): VirtualNode | null {
     if (isVirtualNode(this)) {
+      return this
+    }
+    return null
+  }
+
+  asShadowRoot(): ShadowRoot | null {
+    if (isShadowRoot(this)) {
       return this
     }
     return null
@@ -431,6 +440,7 @@ export class Element implements NodeCast {
       MutationObserverTarget.callAttrObservers(this, {
         type: 'properties',
         target: this,
+        nameType: 'basic',
         attributeName: 'class',
       })
     }
@@ -449,6 +459,7 @@ export class Element implements NodeCast {
       MutationObserverTarget.callAttrObservers(this, {
         type: 'properties',
         target: this,
+        nameType: 'basic',
         attributeName: 'class',
       })
     }
@@ -472,6 +483,7 @@ export class Element implements NodeCast {
       MutationObserverTarget.callAttrObservers(this, {
         type: 'properties',
         target: this,
+        nameType: 'basic',
         attributeName: 'style',
       })
     }
@@ -1663,7 +1675,7 @@ export class Element implements NodeCast {
         containingSlotUpdater?.updateContainingSlot()
       }
       newChild.parentNode = parent
-      if (isElement(newChild) && oldParent !== parent) {
+      if (oldParent !== parent) {
         if (oldParent) oldParent._$mutationObserverTarget?.detachChild(newChild)
         parent._$mutationObserverTarget?.attachChild(newChild)
       }
@@ -1958,9 +1970,7 @@ export class Element implements NodeCast {
         throw new Error('Cannot batch-insert the node which already has a parent.')
       }
       newChild.parentNode = parent
-      if (isElement(newChild)) {
-        parent._$mutationObserverTarget?.attachChild(newChild)
-      }
+      parent._$mutationObserverTarget?.attachChild(newChild)
       if ((BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) && frag) {
         const be = newChild._$backendElement as backend.Element
         if (ENV.DEV) performanceMeasureStart('backend.appendChild')
@@ -2146,10 +2156,8 @@ export class Element implements NodeCast {
         Element.insertChildComposed(placeholder, null, child, true, i)
       }
       child.parentNode = replacer
-      if (isElement(child)) {
-        placeholder._$mutationObserverTarget?.detachChild(child)
-        parent._$mutationObserverTarget?.attachChild(child)
-      }
+      placeholder._$mutationObserverTarget?.detachChild(child)
+      parent._$mutationObserverTarget?.attachChild(child)
     }
 
     // handling child nodes list for placeholder
@@ -2396,6 +2404,10 @@ export class Element implements NodeCast {
     }
   }
 
+  getListeners(): Record<string, (EventListenerOptions & { listener: EventListener<unknown> })[]> {
+    return this._$eventTarget.getListeners()
+  }
+
   /** Get an attribute value ( `null` if not set or removed) */
   getAttribute(name: string): unknown {
     if (!this._$nodeAttributes) return null
@@ -2435,6 +2447,14 @@ export class Element implements NodeCast {
       }
       if (ENV.DEV) performanceMeasureEnd()
     }
+    if (this._$mutationObserverTarget) {
+      MutationObserverTarget.callAttrObservers(this, {
+        type: 'properties',
+        target: this,
+        nameType: 'attribute',
+        attributeName: name,
+      })
+    }
   }
 
   /** Remove an attribute */
@@ -2448,16 +2468,31 @@ export class Element implements NodeCast {
       be.removeAttribute(name)
       if (ENV.DEV) performanceMeasureEnd()
     }
+    if (this._$mutationObserverTarget) {
+      MutationObserverTarget.callAttrObservers(this, {
+        type: 'properties',
+        target: this,
+        nameType: 'attribute',
+        attributeName: name,
+      })
+    }
   }
 
   /** Set a dataset on the element */
   setDataset(name: string, value: unknown) {
     this.dataset[name] = value
-
     if (BM.SHADOW || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Shadow)) {
       if (ENV.DEV) performanceMeasureStart('backend.setDataset')
       ;(this._$backendElement as backend.Element).setDataset(name, value)
       if (ENV.DEV) performanceMeasureEnd()
+    }
+    if (this._$mutationObserverTarget) {
+      MutationObserverTarget.callAttrObservers(this, {
+        type: 'properties',
+        target: this,
+        nameType: 'dataset',
+        attributeName: `data:${name}`,
+      })
     }
   }
 
@@ -2469,6 +2504,14 @@ export class Element implements NodeCast {
       this._$marks = marks
     } else {
       this._$marks[name] = value
+    }
+    if (this._$mutationObserverTarget) {
+      MutationObserverTarget.callAttrObservers(this, {
+        type: 'properties',
+        target: this,
+        nameType: 'mark',
+        attributeName: `mark:${name}`,
+      })
     }
   }
 
@@ -2604,6 +2647,14 @@ export class Element implements NodeCast {
       } else {
         if (owner.isConnected(element)) owner._$applySlotRename(element, slotName, oldSlotName)
       }
+    }
+    if (element._$mutationObserverTarget) {
+      MutationObserverTarget.callAttrObservers(element, {
+        type: 'properties',
+        target: element,
+        nameType: 'basic',
+        attributeName: 'name',
+      })
     }
   }
 

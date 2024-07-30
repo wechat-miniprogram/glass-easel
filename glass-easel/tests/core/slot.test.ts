@@ -49,7 +49,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           .usingComponents({ child, comp })
           .definition({
             template: tmpl(`
-              <child>
+              <child is="">
                 <comp slot="a" s="A">A</comp>
                 <comp slot="b" s="B">B</comp>
                 <comp slot="c" s="C">C</comp>
@@ -82,13 +82,15 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         glassEasel.Element.pretendAttached(parentElem)
         expect(childElem.childNodes.length).toBe(0)
         expect(ops).toEqual([])
-        expect(domHtml(parentElem)).toBe('<child><span id="a"></span></child>')
+        expect(domHtml(parentElem)).toBe('<child is=""><span id="a"></span></child>')
         matchElementWithDom(parentElem)
 
         a.appendChild(slotA1)
         expect(childElem.childNodes.length).toBe(4)
         expect(slotA1.getComposedChildren()).toEqual(childElem.childNodes)
-        expect(domHtml(parentElem)).toBe('<child><span id="a"><comp>A</comp></span></child>')
+        expect(domHtml(parentElem)).toBe(
+          '<child is=""><span id="a"><comp is="">A</comp></span></child>',
+        )
         expect(ops).toEqual([[-1, 'A']])
         matchElementWithDom(parentElem)
 
@@ -97,7 +99,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         expect(slotA1.getComposedChildren()).toEqual(childElem.childNodes.slice(0, 4))
         expect(slotA2.getComposedChildren()).toEqual(childElem.childNodes.slice(4, 8))
         expect(domHtml(parentElem)).toBe(
-          '<child><span id="a"><comp>A</comp><comp>A</comp></span></child>',
+          '<child is=""><span id="a"><comp is="">A</comp><comp is="">A</comp></span></child>',
         )
         expect(ops).toEqual([
           [-1, 'A'],
@@ -111,7 +113,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         expect(slotA2.getComposedChildren()).toEqual(childElem.childNodes.slice(4, 8))
         expect(slotB.getComposedChildren()).toEqual(childElem.childNodes.slice(8, 12))
         expect(domHtml(parentElem)).toBe(
-          '<child><span id="a"><comp>A</comp><comp>B</comp><comp>A</comp></span></child>',
+          '<child is=""><span id="a"><comp is="">A</comp><comp is="">B</comp><comp is="">A</comp></span></child>',
         )
         expect(ops).toEqual([
           [-1, 'A'],
@@ -125,7 +127,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         expect(slotA2.getComposedChildren()).toEqual(childElem.childNodes.slice(0, 4))
         expect(slotB.getComposedChildren()).toEqual(childElem.childNodes.slice(4, 8))
         expect(domHtml(parentElem)).toBe(
-          '<child><span id="a"><comp>B</comp><comp>A</comp></span></child>',
+          '<child is=""><span id="a"><comp is="">B</comp><comp is="">A</comp></span></child>',
         )
         expect(ops).toEqual([
           [-1, 'A'],
@@ -141,7 +143,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         expect(slotB.getComposedChildren()).toEqual(childElem.childNodes.slice(4, 8))
         expect(slotA1.getComposedChildren()).toEqual(childElem.childNodes.slice(8, 12))
         expect(domHtml(parentElem)).toBe(
-          '<child><span id="a"><comp>B</comp><comp>A</comp><comp>A</comp></span></child>',
+          '<child is=""><span id="a"><comp is="">B</comp><comp is="">A</comp><comp is="">A</comp></span></child>',
         )
         expect(ops).toEqual([
           [-1, 'A'],
@@ -159,7 +161,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         expect(slotA1.getComposedChildren()).toEqual(childElem.childNodes.slice(8, 12))
         expect(slot1.getComposedChildren()).toEqual(childElem.childNodes.slice(12, 16))
         expect(domHtml(parentElem)).toBe(
-          '<child><span id="a"><comp>B</comp><comp>A</comp><comp>A</comp><comp>D</comp></span></child>',
+          '<child is=""><span id="a"><comp is="">B</comp><comp is="">A</comp><comp is="">A</comp><comp is="">D</comp></span></child>',
         )
         expect(ops).toEqual([
           [-1, 'A'],
@@ -185,7 +187,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           .define()
           .usingComponents({ child })
           .definition({
-            template: tmpl('<child></child>'),
+            template: tmpl('<child is=""></child>'),
           })
           .registerComponent()
 
@@ -213,7 +215,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         expect(slotA.getComposedChildren()).toEqual([])
         expect(slotB.getComposedChildren()).toEqual([])
         expect(slotC.getComposedChildren()).toEqual([])
-        expect(domHtml(parentElem)).toBe('<child><span></span></child>')
+        expect(domHtml(parentElem)).toBe('<child is=""><span></span></child>')
         matchElementWithDom(parentElem)
 
         childElem.appendChild(contentA)
@@ -221,7 +223,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         expect(slotA.getComposedChildren()).toEqual([])
         expect(slotB.getComposedChildren()).toEqual([])
         expect(slotC.getComposedChildren()).toEqual([])
-        expect(domHtml(parentElem)).toBe('<child><span></span></child>')
+        expect(domHtml(parentElem)).toBe('<child is=""><span></span></child>')
         matchElementWithDom(parentElem)
 
         glassEasel.Element.setSlotElement(contentA, slotA)
@@ -229,7 +231,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         expect(slotA.getComposedChildren()).toEqual([contentA])
         expect(slotB.getComposedChildren()).toEqual([])
         expect(slotC.getComposedChildren()).toEqual([])
-        expect(domHtml(parentElem)).toBe('<child>A<span></span></child>')
+        expect(domHtml(parentElem)).toBe('<child is="">A<span></span></child>')
         matchElementWithDom(parentElem)
 
         glassEasel.Element.setSlotElement(contentA, slotB)
@@ -237,7 +239,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         expect(slotA.getComposedChildren()).toEqual([])
         expect(slotB.getComposedChildren()).toEqual([contentA])
         expect(slotC.getComposedChildren()).toEqual([])
-        expect(domHtml(parentElem)).toBe('<child><span>A</span></child>')
+        expect(domHtml(parentElem)).toBe('<child is=""><span>A</span></child>')
         matchElementWithDom(parentElem)
 
         childElem.removeChild(contentA)
@@ -245,7 +247,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         expect(slotA.getComposedChildren()).toEqual([])
         expect(slotB.getComposedChildren()).toEqual([])
         expect(slotC.getComposedChildren()).toEqual([])
-        expect(domHtml(parentElem)).toBe('<child><span></span></child>')
+        expect(domHtml(parentElem)).toBe('<child is=""><span></span></child>')
         matchElementWithDom(parentElem)
 
         glassEasel.Element.setSlotElement(contentA, slotC)
@@ -254,7 +256,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         expect(slotA.getComposedChildren()).toEqual([])
         expect(slotB.getComposedChildren()).toEqual([])
         expect(slotC.getComposedChildren()).toEqual([contentA])
-        expect(domHtml(parentElem)).toBe('<child><span></span>A</child>')
+        expect(domHtml(parentElem)).toBe('<child is=""><span></span>A</child>')
         matchElementWithDom(parentElem)
 
         childElem.appendChild(contentB)
@@ -264,7 +266,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         expect(slotA.getComposedChildren()).toEqual([])
         expect(slotB.getComposedChildren()).toEqual([])
         expect(slotC.getComposedChildren()).toEqual([contentA])
-        expect(domHtml(parentElem)).toBe('<child><span></span>A</child>')
+        expect(domHtml(parentElem)).toBe('<child is=""><span></span>A</child>')
         matchElementWithDom(parentElem)
 
         glassEasel.Element.setSlotElement(contentB, slotC)
@@ -274,7 +276,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         expect(slotA.getComposedChildren()).toEqual([])
         expect(slotB.getComposedChildren()).toEqual([])
         expect(slotC.getComposedChildren()).toEqual([contentA, contentB, textB])
-        expect(domHtml(parentElem)).toBe('<child><span></span>AB</child>')
+        expect(domHtml(parentElem)).toBe('<child is=""><span></span>AB</child>')
         matchElementWithDom(parentElem)
 
         childElem.appendChild(contentA)
@@ -284,7 +286,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         expect(slotA.getComposedChildren()).toEqual([])
         expect(slotB.getComposedChildren()).toEqual([])
         expect(slotC.getComposedChildren()).toEqual([contentB, textB, contentA])
-        expect(domHtml(parentElem)).toBe('<child><span></span>BA</child>')
+        expect(domHtml(parentElem)).toBe('<child is=""><span></span>BA</child>')
         matchElementWithDom(parentElem)
 
         glassEasel.Element.setSlotElement(contentB, slotB)
@@ -294,7 +296,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         expect(slotA.getComposedChildren()).toEqual([])
         expect(slotB.getComposedChildren()).toEqual([contentB, textB])
         expect(slotC.getComposedChildren()).toEqual([contentA])
-        expect(domHtml(parentElem)).toBe('<child><span>B</span>A</child>')
+        expect(domHtml(parentElem)).toBe('<child is=""><span>B</span>A</child>')
         matchElementWithDom(parentElem)
 
         childElem.removeChild(contentB)
@@ -304,7 +306,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         expect(slotA.getComposedChildren()).toEqual([])
         expect(slotB.getComposedChildren()).toEqual([])
         expect(slotC.getComposedChildren()).toEqual([contentA])
-        expect(domHtml(parentElem)).toBe('<child><span></span>A</child>')
+        expect(domHtml(parentElem)).toBe('<child is=""><span></span>A</child>')
         matchElementWithDom(parentElem)
 
         glassEasel.Element.setSlotElement(contentB, slotA)
@@ -315,7 +317,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         expect(slotA.getComposedChildren()).toEqual([contentB, textB])
         expect(slotB.getComposedChildren()).toEqual([])
         expect(slotC.getComposedChildren()).toEqual([contentA])
-        expect(domHtml(parentElem)).toBe('<child>B<span></span>A</child>')
+        expect(domHtml(parentElem)).toBe('<child is="">B<span></span>A</child>')
         matchElementWithDom(parentElem)
 
         childElem.removeChild(contentA)
@@ -325,7 +327,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         expect(slotA.getComposedChildren()).toEqual([contentB, textB])
         expect(slotB.getComposedChildren()).toEqual([])
         expect(slotC.getComposedChildren()).toEqual([])
-        expect(domHtml(parentElem)).toBe('<child>B<span></span></child>')
+        expect(domHtml(parentElem)).toBe('<child is="">B<span></span></child>')
         matchElementWithDom(parentElem)
 
         childElem.removeChild(contentB)
@@ -335,7 +337,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         expect(slotA.getComposedChildren()).toEqual([])
         expect(slotB.getComposedChildren()).toEqual([])
         expect(slotC.getComposedChildren()).toEqual([])
-        expect(domHtml(parentElem)).toBe('<child><span></span></child>')
+        expect(domHtml(parentElem)).toBe('<child is=""><span></span></child>')
         matchElementWithDom(parentElem)
       })
     })
@@ -367,7 +369,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           }))
           .definition({
             template: tmpl(`
-              <child>
+              <child is="">
                 <block slot="{{slotName1}}">{{slotContent1}}</block>
                 <block slot="{{slotName2}}">{{slotContent2}}</block>
               </child>
@@ -383,37 +385,37 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         const childElem = parentElem.getShadowRoot()!.childNodes[0]!.asInstanceOf(child)!
 
         expect(childElem.childNodes.length).toBe(6)
-        expect(domHtml(parentElem)).toBe('<child>AB<span>AB</span>AB</child>')
+        expect(domHtml(parentElem)).toBe('<child is="">AB<span>AB</span>AB</child>')
         matchElementWithDom(parentElem)
 
         parentElem.setData({ slotContent1: 'AA' })
         expect(childElem.childNodes.length).toBe(6)
-        expect(domHtml(parentElem)).toBe('<child>AAB<span>AAB</span>AAB</child>')
+        expect(domHtml(parentElem)).toBe('<child is="">AAB<span>AAB</span>AAB</child>')
         matchElementWithDom(parentElem)
 
         parentElem.setData({ slotName1: 'b' })
         expect(childElem.childNodes.length).toBe(6)
-        expect(domHtml(parentElem)).toBe('<child>B<span>B</span>B</child>')
+        expect(domHtml(parentElem)).toBe('<child is="">B<span>B</span>B</child>')
         matchElementWithDom(parentElem)
 
         parentElem.setData({ slotContent1: 'C', slotName1: 'a' })
         expect(childElem.childNodes.length).toBe(6)
-        expect(domHtml(parentElem)).toBe('<child>CB<span>CB</span>CB</child>')
+        expect(domHtml(parentElem)).toBe('<child is="">CB<span>CB</span>CB</child>')
         matchElementWithDom(parentElem)
 
         parentElem.setData({ slotContent2: 'D' })
         expect(childElem.childNodes.length).toBe(6)
-        expect(domHtml(parentElem)).toBe('<child>CD<span>CD</span>CD</child>')
+        expect(domHtml(parentElem)).toBe('<child is="">CD<span>CD</span>CD</child>')
         matchElementWithDom(parentElem)
 
         parentElem.setData({ slotName2: 'c' })
         expect(childElem.childNodes.length).toBe(6)
-        expect(domHtml(parentElem)).toBe('<child>C<span>C</span>C</child>')
+        expect(domHtml(parentElem)).toBe('<child is="">C<span>C</span>C</child>')
         matchElementWithDom(parentElem)
 
         parentElem.setData({ slotName1: 'b', slotName2: 'c' })
         expect(childElem.childNodes.length).toBe(6)
-        expect(domHtml(parentElem)).toBe('<child><span></span></child>')
+        expect(domHtml(parentElem)).toBe('<child is=""><span></span></child>')
         matchElementWithDom(parentElem)
       })
 
@@ -436,7 +438,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           .usingComponents({ child })
           .definition({
             template: tmpl(`
-              <child>
+              <child is="">
                 <span>456</span>
                 <div slot="abc" slot:some-text>{{someText}}</div>
               </child>
@@ -451,19 +453,19 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         )
         const childElem = parentElem.getShadowRoot()!.childNodes[0]!.asInstanceOf(child)!
 
-        expect(domHtml(parentElem)).toBe('<child><div>123</div></child>')
+        expect(domHtml(parentElem)).toBe('<child is=""><div>123</div></child>')
         matchElementWithDom(parentElem)
 
         childElem.setData({ sn: '' })
-        expect(domHtml(parentElem)).toBe('<child><span>456</span></child>')
+        expect(domHtml(parentElem)).toBe('<child is=""><span>456</span></child>')
         matchElementWithDom(parentElem)
 
         childElem.setData({ sn: 'def' })
-        expect(domHtml(parentElem)).toBe('<child></child>')
+        expect(domHtml(parentElem)).toBe('<child is=""></child>')
         matchElementWithDom(parentElem)
 
         childElem.setData({ sn: 'abc' })
-        expect(domHtml(parentElem)).toBe('<child><div>123</div></child>')
+        expect(domHtml(parentElem)).toBe('<child is=""><div>123</div></child>')
         matchElementWithDom(parentElem)
       })
 
@@ -588,7 +590,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
 
         glassEasel.Element.pretendAttached(parentElem)
         expect(domHtml(parentElem)).toBe(
-          '<child><c1><a></a></c1><c2><a></a></c2><c3><a></a></c3></child>',
+          '<child is=""><c1 is=""><a></a></c1><c2 is=""><a></a></c2><c3 is=""><a></a></c3></child>',
         )
         expect(ops).toEqual([
           [-1, '1:A'],
@@ -601,7 +603,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         ops = []
         parentElem.setData({ enableA1: true })
         expect(domHtml(parentElem)).toBe(
-          '<child><c1><x>A</x><x>B</x><a></a></c1><c2><x>A</x><x>B</x><a></a></c2><c3><x>A</x><x>B</x><a></a></c3></child>',
+          '<child is=""><c1 is=""><x is="">A</x><x is="">B</x><a></a></c1><c2 is=""><x is="">A</x><x is="">B</x><a></a></c2><c3 is=""><x is="">A</x><x is="">B</x><a></a></c3></child>',
         )
         expect(ops).toEqual([
           [-1, '3:A'],
@@ -612,7 +614,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         ops = []
         parentElem.setData({ slotName2: 'a2' })
         expect(domHtml(parentElem)).toBe(
-          '<child><c1><x>A</x><x>B</x><a></a></c1><c2><x>A</x><a></a></c2><c3><x>A</x><a></a></c3></child>',
+          '<child is=""><c1 is=""><x is="">A</x><x is="">B</x><a></a></c1><c2 is=""><x is="">A</x><a></a></c2><c3 is=""><x is="">A</x><a></a></c3></child>',
         )
         expect(ops).toEqual([[-2, '3:B']])
         matchElementWithDom(parentElem)
@@ -620,7 +622,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         ops = []
         parentElem.setData({ enableA2: true })
         expect(domHtml(parentElem)).toBe(
-          '<child><c1><x>A</x><x>B</x><a></a></c1><c2><x>A</x><a><x>B</x></a></c2><c3><x>A</x><a><x>B</x><x>B</x></a></c3></child>',
+          '<child is=""><c1 is=""><x is="">A</x><x is="">B</x><a></a></c1><c2 is=""><x is="">A</x><a><x is="">B</x></a></c2><c3 is=""><x is="">A</x><a><x is="">B</x><x is="">B</x></a></c3></child>',
         )
         expect(ops).toEqual([
           [-1, '3:B'],
@@ -631,7 +633,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         ops = []
         parentElem.setData({ enableA1: false })
         expect(domHtml(parentElem)).toBe(
-          '<child><c1><a><x>A</x><x>B</x></a></c1><c2><a><x>B</x></a></c2><c3><a><x>B</x><x>B</x></a></c3></child>',
+          '<child is=""><c1 is=""><a><x is="">A</x><x is="">B</x></a></c1><c2 is=""><a><x is="">B</x></a></c2><c3 is=""><a><x is="">B</x><x is="">B</x></a></c3></child>',
         )
         expect(ops).toEqual([[-2, '3:A']])
         matchElementWithDom(parentElem)
@@ -639,7 +641,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         ops = []
         parentElem.setData({ duplicateSlots: true })
         expect(domHtml(parentElem)).toBe(
-          '<child><c1><a><x>A</x><x>B</x></a></c1><c2><a><x>B</x></a></c2><c3><a><x>B</x><x>B</x></a></c3><c1><a><x>A</x><x>B</x></a></c1><c2><a><x>B</x></a></c2><c3><a><x>B</x><x>B</x></a></c3></child>',
+          '<child is=""><c1 is=""><a><x is="">A</x><x is="">B</x></a></c1><c2 is=""><a><x is="">B</x></a></c2><c3 is=""><a><x is="">B</x><x is="">B</x></a></c3><c1 is=""><a><x is="">A</x><x is="">B</x></a></c1><c2 is=""><a><x is="">B</x></a></c2><c3 is=""><a><x is="">B</x><x is="">B</x></a></c3></child>',
         )
         expect(ops).toEqual([
           [-1, '1:A'],
@@ -654,7 +656,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         ops = []
         parentElem.setData({ slotName1: 'a2' })
         expect(domHtml(parentElem)).toBe(
-          '<child><c1><a><x>A</x><x>B</x></a></c1><c2><a><x>A</x><x>B</x></a></c2><c3><a><x>A</x><x>B</x><x>A</x><x>B</x></a></c3><c1><a><x>A</x><x>B</x></a></c1><c2><a><x>A</x><x>B</x></a></c2><c3><a><x>A</x><x>B</x><x>A</x><x>B</x></a></c3></child>',
+          '<child is=""><c1 is=""><a><x is="">A</x><x is="">B</x></a></c1><c2 is=""><a><x is="">A</x><x is="">B</x></a></c2><c3 is=""><a><x is="">A</x><x is="">B</x><x is="">A</x><x is="">B</x></a></c3><c1 is=""><a><x is="">A</x><x is="">B</x></a></c1><c2 is=""><a><x is="">A</x><x is="">B</x></a></c2><c3 is=""><a><x is="">A</x><x is="">B</x><x is="">A</x><x is="">B</x></a></c3></child>',
         )
         expect(ops).toEqual([
           [-1, '3:A'],
@@ -667,7 +669,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         ops = []
         parentElem.setData({ enableA2: false })
         expect(domHtml(parentElem)).toBe(
-          '<child><c1><a></a></c1><c2><a></a></c2><c3><a></a></c3><c1><a></a></c1><c2><a></a></c2><c3><a></a></c3></child>',
+          '<child is=""><c1 is=""><a></a></c1><c2 is=""><a></a></c2><c3 is=""><a></a></c3><c1 is=""><a></a></c1><c2 is=""><a></a></c2><c3 is=""><a></a></c3></child>',
         )
         expect(ops).toEqual([
           [-2, '3:A'],
@@ -684,7 +686,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         ops = []
         parentElem.setData({ enableA1: true })
         expect(domHtml(parentElem)).toBe(
-          '<child><c1><x>A</x><x>B</x><a></a></c1><c2><a></a></c2><c3><a></a></c3><c1><x>A</x><x>B</x><a></a></c1><c2><a></a></c2><c3><a></a></c3></child>',
+          '<child is=""><c1 is=""><x is="">A</x><x is="">B</x><a></a></c1><c2 is=""><a></a></c2><c3 is=""><a></a></c3><c1 is=""><x is="">A</x><x is="">B</x><a></a></c1><c2 is=""><a></a></c2><c3 is=""><a></a></c3></child>',
         )
         expect(ops).toEqual([])
         matchElementWithDom(parentElem)
@@ -692,7 +694,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         ops = []
         parentElem.setData({ slotName1: 'a1' })
         expect(domHtml(parentElem)).toBe(
-          '<child><c1><x>A</x><x>B</x><a></a></c1><c2><x>A</x><a></a></c2><c3><x>A</x><a></a></c3><c1><x>A</x><x>B</x><a></a></c1><c2><x>A</x><a></a></c2><c3><x>A</x><a></a></c3></child>',
+          '<child is=""><c1 is=""><x is="">A</x><x is="">B</x><a></a></c1><c2 is=""><x is="">A</x><a></a></c2><c3 is=""><x is="">A</x><a></a></c3><c1 is=""><x is="">A</x><x is="">B</x><a></a></c1><c2 is=""><x is="">A</x><a></a></c2><c3 is=""><x is="">A</x><a></a></c3></child>',
         )
         expect(ops).toEqual([
           [-1, '3:A'],
@@ -703,7 +705,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         ops = []
         parentElem.setData({ slotContent1: 'C' })
         expect(domHtml(parentElem)).toBe(
-          '<child><c1><x>C</x><x>B</x><a></a></c1><c2><x>C</x><a></a></c2><c3><x>C</x><a></a></c3><c1><x>C</x><x>B</x><a></a></c1><c2><x>C</x><a></a></c2><c3><x>C</x><a></a></c3></child>',
+          '<child is=""><c1 is=""><x is="">C</x><x is="">B</x><a></a></c1><c2 is=""><x is="">C</x><a></a></c2><c3 is=""><x is="">C</x><a></a></c3><c1 is=""><x is="">C</x><x is="">B</x><a></a></c1><c2 is=""><x is="">C</x><a></a></c2><c3 is=""><x is="">C</x><a></a></c3></child>',
         )
         expect(ops).toEqual([])
         matchElementWithDom(parentElem)
@@ -711,7 +713,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         ops = []
         parentElem.setData({ duplicateSlots: false })
         expect(domHtml(parentElem)).toBe(
-          '<child><c1><x>C</x><x>B</x><a></a></c1><c2><x>C</x><a></a></c2><c3><x>C</x><a></a></c3></child>',
+          '<child is=""><c1 is=""><x is="">C</x><x is="">B</x><a></a></c1><c2 is=""><x is="">C</x><a></a></c2><c3 is=""><x is="">C</x><a></a></c3></child>',
         )
         expect(ops).toEqual([
           [-2, '1:C'],
@@ -847,7 +849,9 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         ).asInstanceOf(parent)!
 
         glassEasel.Element.pretendAttached(parentElem)
-        expect(domHtml(parentElem)).toBe('<c1><a></a></c1><c2><a></a></c2><c3><a></a></c3>')
+        expect(domHtml(parentElem)).toBe(
+          '<c1 is=""><a></a></c1><c2 is=""><a></a></c2><c3 is=""><a></a></c3>',
+        )
         expect(ops).toEqual([
           [-1, '1:A'],
           [-1, '1:B'],
@@ -859,7 +863,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         ops = []
         parentElem.setData({ enableA1: true })
         expect(domHtml(parentElem)).toBe(
-          '<c1><child><x>A</x><x>B</x></child><a></a></c1><c2><child><x>A</x><x>B</x></child><a></a></c2><c3><child><x>A</x><x>B</x></child><a></a></c3>',
+          '<c1 is=""><child is=""><x is="">A</x><x is="">B</x></child><a></a></c1><c2 is=""><child is=""><x is="">A</x><x is="">B</x></child><a></a></c2><c3 is=""><child is=""><x is="">A</x><x is="">B</x></child><a></a></c3>',
         )
         expect(ops).toEqual([
           [-1, '3:A'],
@@ -870,7 +874,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         ops = []
         parentElem.setData({ slotName2: 'b2' })
         expect(domHtml(parentElem)).toBe(
-          '<c1><child><x>A</x><x>B</x><x>B</x></child><a></a></c1><c2><child><x>A</x><x>B</x><x>B</x></child><a></a></c2><c3><child><x>A</x><x>B</x><x>B</x></child><a></a></c3>',
+          '<c1 is=""><child is=""><x is="">A</x><x is="">B</x><x is="">B</x></child><a></a></c1><c2 is=""><child is=""><x is="">A</x><x is="">B</x><x is="">B</x></child><a></a></c2><c3 is=""><child is=""><x is="">A</x><x is="">B</x><x is="">B</x></child><a></a></c3>',
         )
         expect(ops).toEqual([
           [-2, '1:B'],
@@ -888,7 +892,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         ops = []
         parentElem.setData({ enableA2: true })
         expect(domHtml(parentElem)).toBe(
-          '<c1><child><x>A</x><x>B</x><x>B</x></child><a></a></c1><c2><child><x>A</x><x>B</x><x>B</x></child><a></a></c2><c3><child><x>A</x><x>B</x><x>B</x></child><a></a></c3>',
+          '<c1 is=""><child is=""><x is="">A</x><x is="">B</x><x is="">B</x></child><a></a></c1><c2 is=""><child is=""><x is="">A</x><x is="">B</x><x is="">B</x></child><a></a></c2><c3 is=""><child is=""><x is="">A</x><x is="">B</x><x is="">B</x></child><a></a></c3>',
         )
         expect(ops).toEqual([])
         matchElementWithDom(parentElem)
@@ -896,7 +900,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         ops = []
         parentElem.setData({ childSlotName: 'a2' })
         expect(domHtml(parentElem)).toBe(
-          '<c1><child><x>A</x><x>B</x><x>B</x></child><a></a></c1><c2><a><child><x>A</x><x>B</x><x>B</x></child></a></c2><c3><a><child><x>A</x><x>B</x><x>B</x></child><child><x>A</x><x>B</x><x>B</x></child></a></c3>',
+          '<c1 is=""><child is=""><x is="">A</x><x is="">B</x><x is="">B</x></child><a></a></c1><c2 is=""><a><child is=""><x is="">A</x><x is="">B</x><x is="">B</x></child></a></c2><c3 is=""><a><child is=""><x is="">A</x><x is="">B</x><x is="">B</x></child><child is=""><x is="">A</x><x is="">B</x><x is="">B</x></child></a></c3>',
         )
         expect(ops).toEqual([
           [-2, '3:A'],
@@ -914,7 +918,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         ops = []
         parentElem.setData({ slotName1: 'b2' })
         expect(domHtml(parentElem)).toBe(
-          '<c1><child><x>A</x><x>B</x><x>A</x><x>B</x></child><a></a></c1><c2><a><child><x>A</x><x>B</x><x>A</x><x>B</x></child></a></c2><c3><a><child><x>A</x><x>B</x><x>A</x><x>B</x></child><child><x>A</x><x>B</x><x>A</x><x>B</x></child></a></c3>',
+          '<c1 is=""><child is=""><x is="">A</x><x is="">B</x><x is="">A</x><x is="">B</x></child><a></a></c1><c2 is=""><a><child is=""><x is="">A</x><x is="">B</x><x is="">A</x><x is="">B</x></child></a></c2><c3 is=""><a><child is=""><x is="">A</x><x is="">B</x><x is="">A</x><x is="">B</x></child><child is=""><x is="">A</x><x is="">B</x><x is="">A</x><x is="">B</x></child></a></c3>',
         )
         expect(ops).toEqual([
           [-2, '1:A'],
@@ -935,7 +939,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         ops = []
         parentElem.setData({ slotContent1: 'C' })
         expect(domHtml(parentElem)).toBe(
-          '<c1><child><x>C</x><x>B</x><x>C</x><x>B</x></child><a></a></c1><c2><a><child><x>C</x><x>B</x><x>C</x><x>B</x></child></a></c2><c3><a><child><x>C</x><x>B</x><x>C</x><x>B</x></child><child><x>C</x><x>B</x><x>C</x><x>B</x></child></a></c3>',
+          '<c1 is=""><child is=""><x is="">C</x><x is="">B</x><x is="">C</x><x is="">B</x></child><a></a></c1><c2 is=""><a><child is=""><x is="">C</x><x is="">B</x><x is="">C</x><x is="">B</x></child></a></c2><c3 is=""><a><child is=""><x is="">C</x><x is="">B</x><x is="">C</x><x is="">B</x></child><child is=""><x is="">C</x><x is="">B</x><x is="">C</x><x is="">B</x></child></a></c3>',
         )
         expect(ops).toEqual([])
         matchElementWithDom(parentElem)
@@ -943,7 +947,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         ops = []
         parentElem.setData({ enableA2: false, childSlotName: 'a1' })
         expect(domHtml(parentElem)).toBe(
-          '<c1><child><x>C</x><x>B</x><x>C</x><x>B</x></child><a></a></c1><c2><child><x>C</x><x>B</x><x>C</x><x>B</x></child><a></a></c2><c3><child><x>C</x><x>B</x><x>C</x><x>B</x></child><a></a></c3>',
+          '<c1 is=""><child is=""><x is="">C</x><x is="">B</x><x is="">C</x><x is="">B</x></child><a></a></c1><c2 is=""><child is=""><x is="">C</x><x is="">B</x><x is="">C</x><x is="">B</x></child><a></a></c2><c3 is=""><child is=""><x is="">C</x><x is="">B</x><x is="">C</x><x is="">B</x></child><a></a></c3>',
         )
         expect(ops).toEqual([
           [-1, '3:C'],
@@ -963,7 +967,9 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
 
         ops = []
         parentElem.setData({ enableA1: false })
-        expect(domHtml(parentElem)).toBe('<c1><a></a></c1><c2><a></a></c2><c3><a></a></c3>')
+        expect(domHtml(parentElem)).toBe(
+          '<c1 is=""><a></a></c1><c2 is=""><a></a></c2><c3 is=""><a></a></c3>',
+        )
         expect(ops).toEqual([
           [-2, '3:C'],
           [-2, '3:B'],
@@ -1005,7 +1011,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           .usingComponents({ child, 'x-c': subComp })
           .definition({
             template: tmpl(`
-              <child>
+              <child is="">
                 <block slot:a="foo" slot:c="bar">
                   <x-c prop-a="{{ foo.b[bar] }}">{{ foo.b[bar] }}</x-c>
                 </block>
@@ -1023,7 +1029,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         const childElem = parentElem.getShadowRoot()!.childNodes[0]!.asInstanceOf(child)!
 
         expect(domHtml(parentElem)).toBe(
-          '<child><x-c>10</x-c><span>0</span><x-c>20</x-c><span>0</span></child>',
+          '<child is=""><x-c is="">10</x-c><span>0</span><x-c is="">20</x-c><span>0</span></child>',
         )
         expect(updateCount).toBe(2)
         matchElementWithDom(parentElem)
@@ -1031,7 +1037,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         childElem.replaceDataOnPath(['a1', 'b', 0], 11)
         childElem.applyDataUpdates()
         expect(domHtml(parentElem)).toBe(
-          '<child><x-c>11</x-c><span>0</span><x-c>20</x-c><span>0</span></child>',
+          '<child is=""><x-c is="">11</x-c><span>0</span><x-c is="">20</x-c><span>0</span></child>',
         )
         expect(updateCount).toBe(3)
         matchElementWithDom(parentElem)
@@ -1040,7 +1046,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         childElem.replaceDataOnPath(['a2', 'b', 0], 21)
         childElem.applyDataUpdates()
         expect(domHtml(parentElem)).toBe(
-          '<child><x-c>12</x-c><span>0</span><x-c>21</x-c><span>0</span></child>',
+          '<child is=""><x-c is="">12</x-c><span>0</span><x-c is="">21</x-c><span>0</span></child>',
         )
         expect(updateCount).toBe(5)
         matchElementWithDom(parentElem)
@@ -1048,14 +1054,14 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         childElem.replaceDataOnPath(['a2', 'b', 1], 201)
         childElem.applyDataUpdates()
         expect(domHtml(parentElem)).toBe(
-          '<child><x-c>12</x-c><span>0</span><x-c>21</x-c><span>0</span></child>',
+          '<child is=""><x-c is="">12</x-c><span>0</span><x-c is="">21</x-c><span>0</span></child>',
         )
         expect(updateCount).toBe(6)
         matchElementWithDom(parentElem)
 
         childElem.setData({ c: 1 })
         expect(domHtml(parentElem)).toBe(
-          '<child><x-c>100</x-c><span>1</span><x-c>201</x-c><span>1</span></child>',
+          '<child is=""><x-c is="">100</x-c><span>1</span><x-c is="">201</x-c><span>1</span></child>',
         )
         expect(updateCount).toBe(8)
         matchElementWithDom(parentElem)
@@ -1106,7 +1112,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           .definition({
             template: tmpl(`
               <x-c s="{{a.foo}}" />
-              <child>
+              <child is="">
                 <x-c slot:item slot:index s="{{index}}:{{item}}">{{index}}:{{item}}</x-c>
               </child>
             `),
@@ -1119,7 +1125,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
 
         parentElem.replaceDataOnPath(['a', 'foo'], 'oops')
 
-        expect(domHtml(parentElem)).toBe('<x-c></x-c><child></child>')
+        expect(domHtml(parentElem)).toBe('<x-c is=""></x-c><child is=""></child>')
         expect(ops).toEqual([
           [0, 'foo'],
           [-1, 'foo'],
@@ -1129,7 +1135,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         ops = []
         childElem.setData({ items: [1, 2, 3] })
         expect(domHtml(parentElem)).toBe(
-          '<x-c></x-c><child><x-c>0:1</x-c><x-c>1:2</x-c><x-c>2:3</x-c></child>',
+          '<x-c is=""></x-c><child is=""><x-c is="">0:1</x-c><x-c is="">1:2</x-c><x-c is="">2:3</x-c></child>',
         )
         expect(ops).toEqual([
           [0, '0:1'],
@@ -1155,7 +1161,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           [-1, '2:6'],
         ])
         expect(domHtml(parentElem)).toBe(
-          '<x-c></x-c><child><x-c>0:4</x-c><x-c>1:5</x-c><x-c>2:6</x-c></child>',
+          '<x-c is=""></x-c><child is=""><x-c is="">0:4</x-c><x-c is="">1:5</x-c><x-c is="">2:6</x-c></child>',
         )
         matchElementWithDom(parentElem)
 
@@ -1172,7 +1178,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           [-1, '5:2'],
         ])
         expect(domHtml(parentElem)).toBe(
-          '<x-c></x-c><child><x-c>0:1</x-c><x-c>1:4</x-c><x-c>2:6</x-c><x-c>3:3</x-c><x-c>4:5</x-c><x-c>5:2</x-c></child>',
+          '<x-c is=""></x-c><child is=""><x-c is="">0:1</x-c><x-c is="">1:4</x-c><x-c is="">2:6</x-c><x-c is="">3:3</x-c><x-c is="">4:5</x-c><x-c is="">5:2</x-c></child>',
         )
         matchElementWithDom(parentElem)
 
@@ -1187,7 +1193,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           [0, '5:3'],
         ])
         expect(domHtml(parentElem)).toBe(
-          '<x-c></x-c><child><x-c>0:2</x-c><x-c>1:5</x-c><x-c>2:1</x-c><x-c>3:4</x-c><x-c>4:6</x-c><x-c>5:3</x-c></child>',
+          '<x-c is=""></x-c><child is=""><x-c is="">0:2</x-c><x-c is="">1:5</x-c><x-c is="">2:1</x-c><x-c is="">3:4</x-c><x-c is="">4:6</x-c><x-c is="">5:3</x-c></child>',
         )
         matchElementWithDom(parentElem)
 
@@ -1202,7 +1208,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           [0, '5:2'],
         ])
         expect(domHtml(parentElem)).toBe(
-          '<x-c></x-c><child><x-c>0:1</x-c><x-c>1:4</x-c><x-c>2:6</x-c><x-c>3:3</x-c><x-c>4:5</x-c><x-c>5:2</x-c></child>',
+          '<x-c is=""></x-c><child is=""><x-c is="">0:1</x-c><x-c is="">1:4</x-c><x-c is="">2:6</x-c><x-c is="">3:3</x-c><x-c is="">4:5</x-c><x-c is="">5:2</x-c></child>',
         )
         matchElementWithDom(parentElem)
 
@@ -1216,7 +1222,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           [0, '4:2'],
         ])
         expect(domHtml(parentElem)).toBe(
-          '<x-c></x-c><child><x-c>0:1</x-c><x-c>1:4</x-c><x-c>2:3</x-c><x-c>3:5</x-c><x-c>4:2</x-c></child>',
+          '<x-c is=""></x-c><child is=""><x-c is="">0:1</x-c><x-c is="">1:4</x-c><x-c is="">2:3</x-c><x-c is="">3:5</x-c><x-c is="">4:2</x-c></child>',
         )
         matchElementWithDom(parentElem)
 
@@ -1231,7 +1237,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           [0, '5:2'],
         ])
         expect(domHtml(parentElem)).toBe(
-          '<x-c></x-c><child><x-c>0:1</x-c><x-c>1:4</x-c><x-c>2:6</x-c><x-c>3:3</x-c><x-c>4:5</x-c><x-c>5:2</x-c></child>',
+          '<x-c is=""></x-c><child is=""><x-c is="">0:1</x-c><x-c is="">1:4</x-c><x-c is="">2:6</x-c><x-c is="">3:3</x-c><x-c is="">4:5</x-c><x-c is="">5:2</x-c></child>',
         )
         matchElementWithDom(parentElem)
 
@@ -1245,7 +1251,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           [-2, '5:2'],
           [-2, '2:6'],
         ])
-        expect(domHtml(parentElem)).toBe('<x-c></x-c><child></child>')
+        expect(domHtml(parentElem)).toBe('<x-c is=""></x-c><child is=""></child>')
         matchElementWithDom(parentElem)
 
         ops = []
@@ -1313,21 +1319,29 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         const noneElem = parentElem.getShadowRoot()!.childNodes[0]!.asInstanceOf(none)!
         const recElem = parentElem.getShadowRoot()!.childNodes[1]!.asInstanceOf(rec)!
 
-        expect(domHtml(parentElem)).toBe('<none><div>123</div></none><rec><div>abc</div></rec>')
+        expect(domHtml(parentElem)).toBe(
+          '<none is=""><div>123</div></none><rec is=""><div>abc</div></rec>',
+        )
         matchElementWithDom(parentElem)
 
         noneElem.setData({ 'sp.text': 456 })
-        expect(domHtml(parentElem)).toBe('<none><div>123</div></none><rec><div>abc</div></rec>')
+        expect(domHtml(parentElem)).toBe(
+          '<none is=""><div>123</div></none><rec is=""><div>abc</div></rec>',
+        )
         matchElementWithDom(parentElem)
 
         noneElem.setData({ sp: { text: 789 } })
-        expect(domHtml(parentElem)).toBe('<none><div>789</div></none><rec><div>abc</div></rec>')
+        expect(domHtml(parentElem)).toBe(
+          '<none is=""><div>789</div></none><rec is=""><div>abc</div></rec>',
+        )
         matchElementWithDom(parentElem)
 
         const recObj = {} as { r: any }
         recObj.r = recObj
         recElem.setData({ sp: { text: 'def' }, recObj })
-        expect(domHtml(parentElem)).toBe('<none><div>789</div></none><rec><div>def</div></rec>')
+        expect(domHtml(parentElem)).toBe(
+          '<none is=""><div>789</div></none><rec is=""><div>def</div></rec>',
+        )
         matchElementWithDom(parentElem)
       })
 
@@ -1371,7 +1385,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           testBackend,
         )
 
-        expect(domHtml(parentElem)).toBe('<impl><div><div>123</div></div></impl>')
+        expect(domHtml(parentElem)).toBe('<impl is=""><div><div>123</div></div></impl>')
         matchElementWithDom(parentElem)
 
         componentSpace
@@ -1391,7 +1405,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           }))
           .registerComponent()
 
-        expect(domHtml(parentElem)).toBe('<impl><span><div>456</div></span></impl>')
+        expect(domHtml(parentElem)).toBe('<impl is="impl"><span><div>456</div></span></impl>')
         matchElementWithDom(parentElem)
       })
 
@@ -1417,7 +1431,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           .usingComponents({ comp })
           .template(
             tmpl(`
-              <comp>
+              <comp is="">
                 <div>child</div>
                 <slot name="child-slot" slot="{{s}}" />
               </comp>
@@ -1446,19 +1460,19 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           parent.general(),
           testBackend,
         )
-        expect(domHtml(parentElem)).toBe('<child><comp><div>comp</div></comp></child>')
+        expect(domHtml(parentElem)).toBe('<child is=""><comp is=""><div>comp</div></comp></child>')
 
         parentElem.setData({
           s: 'comp-slot',
         })
         expect(domHtml(parentElem)).toBe(
-          '<child><comp><div>comp</div><div>content</div></comp></child>',
+          '<child is=""><comp is=""><div>comp</div><div>content</div></comp></child>',
         )
 
         parentElem.setData({
           s: 'invalid',
         })
-        expect(domHtml(parentElem)).toBe('<child><comp><div>comp</div></comp></child>')
+        expect(domHtml(parentElem)).toBe('<child is=""><comp is=""><div>comp</div></comp></child>')
       })
 
       test('should support slot as slot content with virtual host and placeholder', () => {
@@ -1486,7 +1500,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           .placeholders({ comp: 'placeholder' })
           .template(
             tmpl(`
-              <comp>
+              <comp is="">
                 <div>child</div>
                 <slot name="content" slot="content" />
               </comp>
@@ -1499,7 +1513,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           .usingComponents({ child })
           .template(
             tmpl(`
-              <child>
+              <child is="">
                 <div slot="content">content</div>
               </child>
             `),
@@ -1526,7 +1540,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           )
           .registerComponent()
 
-        expect(domHtml(parentElem)).toBe('<comp><div>comp</div><div>content</div></comp>')
+        expect(domHtml(parentElem)).toBe('<comp is="comp"><div>comp</div><div>content</div></comp>')
       })
     })
   })

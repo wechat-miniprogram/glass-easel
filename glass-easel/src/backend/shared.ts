@@ -28,8 +28,9 @@ export type ScrollOffset = {
 export type CSSProperty = {
   name: string
   value: string
-  disabled: boolean
-  invalid: boolean
+  disabled?: boolean
+  invalid?: boolean
+  important?: boolean
 }
 export type CSSRule = {
   sheetIndex: number
@@ -37,12 +38,15 @@ export type CSSRule = {
   mediaQueries: string[]
   selector: string
   properties: CSSProperty[]
-  weightHighBits: number
-  weightLowBits: number
+  propertyText?: string
+  weightHighBits?: number // the priority value of the layer level (0 by default)
+  weightLowBits?: number // the priority value of the selector level (calculated from selector by default)
+  inactive?: boolean
 }
 
 export type GetMatchedRulesResponses = {
   inline: CSSProperty[]
+  inlineText?: string
   rules: CSSRule[]
 }
 

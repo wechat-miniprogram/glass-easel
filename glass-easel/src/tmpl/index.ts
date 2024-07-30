@@ -17,6 +17,8 @@ import {
   type UpdatePathTreeNode,
 } from './proc_gen_wrapper'
 
+export { type TmplDevArgs } from './proc_gen_wrapper'
+
 const DEFAULT_PROC_GEN: ProcGen = () => ({
   C: (isCreation, defineTextNode, defineElement, defineIfGroup, defineForLoop, defineSlot) => {
     defineSlot('')

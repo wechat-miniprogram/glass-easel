@@ -3,8 +3,26 @@
 import { promises as fs } from 'node:fs'
 import * as path from 'node:path'
 import { NormalModule, type Compiler, type WebpackPluginInstance } from 'webpack'
+import chalk from 'chalk'
 import { TmplGroup } from 'glass-easel-template-compiler'
 import { escapeJsString } from './helpers'
+
+type VirtualModulePluginType = {
+  apply: (compiler: Compiler) => void
+  writeModule: (p: string, c: string) => void
+}
+
+type Warning = {
+  isError: boolean
+  level: number
+  code: number
+  message: string
+  path: string
+  startLine: number
+  startColumn: number
+  endLine: number
+  endColumn: number
+}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const chokidar = require('chokidar')
@@ -18,8 +36,10 @@ export const GlassEaselMiniprogramWxssLoader = path.join(__dirname, 'wxss_loader
 
 const PLUGIN_NAME = 'GlassEaselMiniprogramWebpackPlugin'
 const CACHE_ETAG = 1
+const HOST_STYLES_MODULE = '__glass_easel_host_styles__.wxss'
 
 type PluginConfig = {
+  dev?: boolean
   path: string
   resourceFilePattern: RegExp
   defaultEntry: string
@@ -66,13 +86,24 @@ const writeCache = <T>(compiler: Compiler, key: string, value: T): Promise<void>
   })
 
 class StyleSheetManager {
-  map = Object.create(null) as { [path: string]: { scopeName: string; srcPath: string } }
+  map = Object.create(null) as {
+    [path: string]: { scopeName: string; srcPath: string; lowPriority: string }
+  }
   enableStyleScope = Object.create(null) as { [path: string]: boolean }
   scopeNameInc = 0
   disableClassPrefix: boolean
+  codeRoot: string
+  virtualModules: VirtualModulePluginType
+  hostStylesReady = false
 
-  constructor(disableClassPrefix: boolean) {
+  constructor(
+    disableClassPrefix: boolean,
+    codeRoot: string,
+    virtualModules: VirtualModulePluginType,
+  ) {
     this.disableClassPrefix = disableClassPrefix
+    this.codeRoot = codeRoot
+    this.virtualModules = virtualModules
   }
 
   add(compPath: string, srcPath: string) {
@@ -93,6 +124,7 @@ class StyleSheetManager {
     this.map[compPath] = {
       srcPath,
       scopeName,
+      lowPriority: '',
     }
   }
 
@@ -111,16 +143,33 @@ class StyleSheetManager {
     return undefined
   }
 
+  setLowPriorityStyles(compPath: string, source: string, _map: string) {
+    const meta = this.map[compPath]
+    if (meta && meta.lowPriority !== source) {
+      meta.lowPriority = source
+    }
+  }
+
+  prepareHostStyles() {
+    const lowPriorityContent = Object.values(this.map)
+      .map(({ lowPriority }) => lowPriority)
+      .join('\n')
+    const fullPath = path.join(this.codeRoot, HOST_STYLES_MODULE)
+    this.virtualModules.writeModule(fullPath, lowPriorityContent)
+    this.hostStylesReady = true
+  }
+
   toCodeString() {
     const arr = Object.entries(this.map).map(([compPath, { srcPath }]) => {
       const s = `backend.registerStyleSheetContent('${escapeJsString(
         compPath,
-      )}', require('${escapeJsString(srcPath)}'));`
+      )}', (require('${escapeJsString(srcPath)}').default||''));`
       return s
     })
+    const req = this.hostStylesReady ? `(require('./${HOST_STYLES_MODULE}').default||'')` : "''"
     return `
       function (backend) {
-        backend.registerStyleSheetContent('app', require('./app.wxss'))
+        backend.registerStyleSheetContent('app', ${req} + (require('./app.wxss').default||''))
         ${arr.join('')}
       }
     `
@@ -128,18 +177,17 @@ class StyleSheetManager {
 }
 
 export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance {
+  dev?: boolean
   path: string
   resourceFilePattern: RegExp
   defaultEntry: string
   customBootstrap: boolean
   disableClassPrefix: boolean
   // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-  virtualModules = new VirtualModulesPlugin() as {
-    apply: (compiler: Compiler) => void
-    writeModule: (p: string, c: string) => void
-  }
+  virtualModules = new VirtualModulesPlugin() as VirtualModulePluginType
 
   constructor(options: Partial<PluginConfig>) {
+    this.dev = options.dev
     this.path = options.path || './src'
     this.resourceFilePattern = options.resourceFilePattern || /\.(jpg|jpeg|png|gif)$/
     this.defaultEntry = options.defaultEntry || 'pages/index/index'
@@ -148,6 +196,10 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
   }
 
   apply(compiler: Compiler) {
+    const devMode =
+      this.dev === undefined
+        ? compiler.options.mode === 'development' || compiler.options.mode === 'none'
+        : !!this.dev
     const codeRoot = path.resolve(this.path)
     const compInfoMap = Object.create(null) as {
       [compPath: string]: { main: string; taskConfig: unknown; hasWxss: boolean }
@@ -157,7 +209,15 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
     let globalStaticConfig = {} as GlobalStaticConfig
     let appEntry: 'app.js' | 'app.ts' | null = null
     const depsTmplGroup = new TmplGroup()
-    const styleSheetManager = new StyleSheetManager(this.disableClassPrefix)
+
+    // init style sheet manager
+    const virtualModules = this.virtualModules
+    virtualModules.apply(compiler)
+    const styleSheetManager = new StyleSheetManager(
+      this.disableClassPrefix,
+      codeRoot,
+      this.virtualModules,
+    )
 
     // cleanup wasm modules
     compiler.hooks.shutdown.tap(PLUGIN_NAME, () => {
@@ -351,8 +411,6 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
     })
 
     // collect virtual files
-    const virtualModules = this.virtualModules
-    virtualModules.apply(compiler)
     compiler.hooks.compilation.tap(PLUGIN_NAME, (compilation) => {
       // add loaders
       NormalModule.getCompilationHooks(compilation).beforeLoaders.tap(
@@ -364,11 +422,18 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
             const relPath = path.relative(codeRoot, absPath).split(path.sep).join('/')
             const compPath = relPath.slice(0, -extName.length)
             if (extName === '.wxss') {
-              loaders.forEach((x) => {
+              loaders.forEach((x, i) => {
                 if (x.loader === GlassEaselMiniprogramWxssLoader) {
-                  x.options = {
-                    classPrefix: styleSheetManager.getScopeName(compPath),
-                    relPath,
+                  if (relPath === HOST_STYLES_MODULE) {
+                    loaders.splice(i, loaders.length - i)
+                  } else {
+                    x.options = {
+                      classPrefix: styleSheetManager.getScopeName(compPath),
+                      compPath,
+                      setLowPriorityStyles: (s: string, map: string) => {
+                        styleSheetManager.setLowPriorityStyles(compPath, s, map)
+                      },
+                    }
                   }
                 }
               })
@@ -378,7 +443,19 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
                   x.options = {
                     addTemplate(content: string) {
                       wxmlContentMap[compPath] = content
-                      depsTmplGroup.addTmpl(compPath, content)
+                      const warnings = depsTmplGroup.addTmpl(compPath, content) as Warning[]
+                      if (warnings && warnings.length > 0) {
+                        warnings.forEach((warning) => {
+                          const msgKindColored = warning.isError
+                            ? chalk.red('ERROR')
+                            : chalk.yellow('WARN')
+                          const msg = `[glass-easel-template-compiler] ${msgKindColored} ${warning.path}:${warning.startLine}:${warning.startColumn} (#${warning.code}): ${warning.message}`
+                          // eslint-disable-next-line no-console
+                          if (warning.isError) console.error(msg)
+                          // eslint-disable-next-line no-console
+                          else console.warn(msg)
+                        })
+                      }
                       const deps = depsTmplGroup
                         .getDirectDependencies(compPath)
                         .concat(depsTmplGroup.getScriptDependencies(compPath))
@@ -400,7 +477,7 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
       compilation.hooks.finishModules.tapPromise(PLUGIN_NAME, async (modules) => {
         const tasks: Promise<any>[] = []
         let indexModule: NormalModule | undefined
-        const tmplGroup = new TmplGroup()
+        const tmplGroup = devMode ? TmplGroup.newDev() : new TmplGroup()
 
         // collect compilation results
         // eslint-disable-next-line no-restricted-syntax
@@ -446,6 +523,7 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
         // write index module
         await Promise.all(tasks)
         await new Promise<void>((resolve) => {
+          styleSheetManager.prepareHostStyles()
           updateVirtualIndexFile(tmplGroup)
           tmplGroup.free()
           compilation.rebuildModule(indexModule!, () => resolve())
@@ -488,7 +566,7 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
             })
             ${addStyleSheet}
             codeSpace.globalComponentEnv(index.globalObject, '${escapeJsString(compPath)}', () => {
-              require('./${escapeJsString(path.basename(compInfo.main))}')
+              module.exports = require('./${escapeJsString(path.basename(compInfo.main))}')
             })
           `,
         )
@@ -515,14 +593,14 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
             if (typeof global !== 'undefined') { return global }
             throw new Error('The global object cannot be recognized')
           })()
-        `
-        const entryFooter = `
           var initWithBackend = function (backend) {
             var ab = env.associateBackend(backend)
             ;(${styleSheetManager.toCodeString()})(ab)
             return ab
           }
           exports.initWithBackend = initWithBackend
+        `
+        const entryFooter = `
           var registerGlobalEventListener = function (backend) {
             backend.onEvent((target, type, detail, options) => {
               glassEasel.triggerEvent(target, type, detail, options)

@@ -32,6 +32,7 @@ module.exports = {
         '@typescript-eslint/no-unsafe-argument': 'off',
         '@typescript-eslint/no-this-alias': 'off',
         '@typescript-eslint/no-unsafe-enum-comparison': 'off',
+        '@typescript-eslint/unbound-method': ['error', { ignoreStatic: true }],
       },
     },
   ],
@@ -76,5 +77,6 @@ module.exports = {
         fixStyle: 'inline-type-imports',
       },
     ],
+    yoda: ['warn', 'never', { onlyEquality: true }],
   },
 }

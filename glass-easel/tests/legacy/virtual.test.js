@@ -1,6 +1,12 @@
 /* eslint-disable */
 
-const { tmpl, domBackend, shadowBackend, composedBackend, getCustomExternalTemplateEngine } = require('../base/env')
+const {
+  tmpl,
+  domBackend,
+  shadowBackend,
+  composedBackend,
+  getCustomExternalTemplateEngine,
+} = require('../base/env')
 const glassEasel = require('../../src')
 
 const componentSpace = new glassEasel.ComponentSpace()
@@ -39,7 +45,6 @@ const testCases = function (testBackend) {
       is: 'virtual-a',
     })
     root = createElem('virtual-a')
-    root.$$.id = 'root'
     var backendRoot = testBackend.getRootNode()
     if (testBackend === shadowBackend) {
       backendRoot.appendChild(root.getBackendElement())
@@ -120,7 +125,7 @@ const testCases = function (testBackend) {
           templateEngine:
             testBackend === domBackend
               ? undefined
-              : getCustomExternalTemplateEngine(comp => {
+              : getCustomExternalTemplateEngine((comp) => {
                   var root = comp.getBackendElement()
                   var slot
                   if (testBackend === shadowBackend) {
@@ -607,14 +612,20 @@ const testCases = function (testBackend) {
 
     it('should trigger lifetimes correctly', function () {
       const lifetimeCalls = []
-      const createElement = name => {
+      const createElement = (name) => {
         const def = componentSpace.defineComponent({
           is: `self-replace-with-${name}`,
           lifetimes: {
-            attached() { lifetimeCalls.push(`${name}#attached`) },
-            moved() { lifetimeCalls.push(`${name}#moved`) },
-            detached() { lifetimeCalls.push(`${name}#detached`) },
-          }
+            attached() {
+              lifetimeCalls.push(`${name}#attached`)
+            },
+            moved() {
+              lifetimeCalls.push(`${name}#moved`)
+            },
+            detached() {
+              lifetimeCalls.push(`${name}#detached`)
+            },
+          },
         })
         return glassEasel.Component.createWithContext(name, def, testBackend)
       }
@@ -644,7 +655,7 @@ const testCases = function (testBackend) {
 
       const replacer = createElement('replacer')
       elem.selfReplaceWith(replacer)
-      
+
       matchElementWithDom(parent)
       expect(lifetimeCalls).toEqual([
         'elem#detached',

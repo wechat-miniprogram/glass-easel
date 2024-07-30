@@ -8,30 +8,60 @@ import { isElement } from './type_symbol'
  * What the observer will listen
  */
 export type MutationObserverOptions = {
-  /** Attribute changes, including property, id, slot, and class changes */
-  properties: boolean
+  /**
+   * Changes of element parameters
+   *
+   * If set to `true` , the non-data changes will be returned,
+   * including attributes, component properties, external classes, id, class, style, slot, and slot names.
+   * If set to `all` , all changes will be returned.
+   */
+  properties: boolean | 'all'
   /** Child nodes changes */
   childList: boolean
   /** Text content changes */
   characterData: boolean
   /** Enable property, childList, and characterData changes in subtree */
   subtree: boolean
-  /** Attached status changes */
+  /** Attached status changes (does not support subtree listening) */
   attachStatus: boolean
 }
 
+/**
+ * The event for element parameter changes
+ *
+ * This includes most changes to an element except for its children changes.
+ * If the change is a property change for an element or slot value change for a slot node,
+ * the `propertyName` field is provided as the normalized property name;
+ * otherwise the `attributeName` is provided.
+ * For dataset and mark changes, the `data:` and `mark:` are preserved in `attributeName` .
+ * Note that attribute, dataset, mark, and external class events are dispatched whenever they are set (may not changed).
+ */
 export type MutationObserverAttrEvent = {
   type: 'properties'
   target: Element
+  nameType:
+    | 'basic'
+    | 'attribute'
+    | 'component-property'
+    | 'slot-value'
+    | 'dataset'
+    | 'mark'
+    | 'external-class'
   propertyName?: string
   attributeName?: string
 }
 
+/**
+ * The event for the text content changes of a text node
+ */
 export type MutationObserverTextEvent = {
   type: 'characterData'
   target: TextNode
 }
 
+/**
+ * The event for some child nodes added or removed
+ */
 export type MutationObserverChildEvent = {
   type: 'childList'
   target: Element
@@ -39,6 +69,9 @@ export type MutationObserverChildEvent = {
   removedNodes?: Node[]
 }
 
+/**
+ * The event for the element attaches or detaches
+ */
 export type MutationObserverAttachEvent = {
   type: 'attachStatus'
   target: Element
@@ -51,21 +84,24 @@ export type MutationObserverEvent =
   | MutationObserverChildEvent
   | MutationObserverAttachEvent
 
-export type MutationObserverListener<T> = (this: Element, ev: T) => void
+export type MutationObserverListener<T> = (this: Node, ev: T) => void
 
 export class MutationObserverTarget {
-  private _$boundElement: Element
+  /* @internal */
+  private _$bound: Node
+  /* @internal */
   private _$subtreeObserversCount = 0
   attrObservers: FuncArr<MutationObserverListener<MutationObserverAttrEvent>> | null = null
+  allAttrObservers: FuncArr<MutationObserverListener<MutationObserverAttrEvent>> | null = null
   textObservers: FuncArr<MutationObserverListener<MutationObserverTextEvent>> | null = null
   childObservers: FuncArr<MutationObserverListener<MutationObserverChildEvent>> | null = null
   attachObservers: FuncArr<MutationObserverListener<MutationObserverAttachEvent>> | null = null
 
-  constructor(boundElement: Element) {
-    this._$boundElement = boundElement
+  constructor(bound: Node) {
+    this._$bound = bound
   }
 
-  attachChild(child: Element) {
+  attachChild(child: Node) {
     if (!child._$mutationObserverTarget) {
       child._$mutationObserverTarget = new MutationObserverTarget(child)
     }
@@ -74,7 +110,7 @@ export class MutationObserverTarget {
     }
   }
 
-  detachChild(child: Element) {
+  detachChild(child: Node) {
     if (child._$mutationObserverTarget) {
       child._$mutationObserverTarget.updateSubtreeCount(-this._$subtreeObserversCount)
     }
@@ -82,14 +118,14 @@ export class MutationObserverTarget {
 
   updateSubtreeCount(diff: number) {
     this._$subtreeObserversCount += diff
-    const children = this._$boundElement.childNodes
+    const elem = this._$bound
+    if (!isElement(elem)) return
+    const children = elem.childNodes
     children.forEach((child) => {
-      if (isElement(child)) {
-        if (!child._$mutationObserverTarget) {
-          child._$mutationObserverTarget = new MutationObserverTarget(child)
-        }
-        child._$mutationObserverTarget.updateSubtreeCount(diff)
+      if (!child._$mutationObserverTarget) {
+        child._$mutationObserverTarget = new MutationObserverTarget(child)
       }
+      child._$mutationObserverTarget.updateSubtreeCount(diff)
     })
   }
 
@@ -101,7 +137,15 @@ export class MutationObserverTarget {
     let cur = node
     do {
       const target = cur._$mutationObserverTarget
-      target?.attrObservers?.call(cur, [eventObj])
+      target?.allAttrObservers?.call(cur, [eventObj])
+      if (
+        target?.attrObservers &&
+        (eventObj.nameType === 'basic' ||
+          eventObj.nameType === 'attribute' ||
+          eventObj.nameType === 'component-property')
+      ) {
+        target.attrObservers.call(cur, [eventObj])
+      }
       const next = cur.parentNode
       if (!next) break
       cur = next
@@ -110,13 +154,15 @@ export class MutationObserverTarget {
   }
 
   static callTextObservers(textNode: TextNode, eventObj: MutationObserverTextEvent) {
-    let cur = textNode.parentNode
-    while (cur) {
+    let cur: Node = textNode
+    do {
       const target = cur._$mutationObserverTarget
-      if (!target || target._$subtreeObserversCount === 0) break
-      target.textObservers?.call(cur, [eventObj])
-      cur = cur.parentNode
-    }
+      target?.textObservers?.call(cur, [eventObj])
+      const next: Element | null = cur.parentNode
+      if (!next) break
+      cur = next
+      if (!cur._$mutationObserverTarget) break
+    } while (cur._$mutationObserverTarget._$subtreeObserversCount > 0)
   }
 
   static callChildObservers(node: Element, eventObj: MutationObserverChildEvent) {
@@ -146,10 +192,15 @@ export class MutationObserverTarget {
  * Further more, it can listen attached/detached events on an element.
  */
 export class MutationObserver {
+  /* @internal */
   private _$listener: MutationObserverListener<MutationObserverEvent> | null
+  /* @internal */
   private _$normalizedListener: MutationObserverListener<MutationObserverEvent> | null
+  /* @internal */
   private _$subtreeListenersCount = 0
+  /* @internal */
   private _$boundFuncArrs: FuncArr<MutationObserverListener<MutationObserverEvent>>[] = []
+  /* @internal */
   private _$boundTarget: MutationObserverTarget | null = null
 
   constructor(listener: (ev: MutationObserverEvent) => void) {
@@ -163,7 +214,7 @@ export class MutationObserver {
 
   /** Start observation */
   observe(
-    targetElement: Element,
+    targetNode: Node,
     options: Partial<MutationObserverOptions> = {
       properties: false,
       childList: false,
@@ -177,11 +228,11 @@ export class MutationObserver {
       throw new Error('A MutationObserver can only observe once')
     }
     let target: MutationObserverTarget
-    if (targetElement._$mutationObserverTarget) {
-      target = targetElement._$mutationObserverTarget
+    if (targetNode._$mutationObserverTarget) {
+      target = targetNode._$mutationObserverTarget
     } else {
-      target = new MutationObserverTarget(targetElement)
-      targetElement._$mutationObserverTarget = target
+      target = new MutationObserverTarget(targetNode)
+      targetNode._$mutationObserverTarget = target
     }
     this._$listener = null
     const cb = options.subtree
@@ -192,7 +243,14 @@ export class MutationObserver {
         }
     this._$normalizedListener = cb
     this._$boundTarget = target
-    if (options.properties) {
+    if (options.properties === 'all') {
+      if (!target.allAttrObservers) target.allAttrObservers = new FuncArr('attributeObserver')
+      target.allAttrObservers.add(cb)
+      this._$boundFuncArrs.push(
+        target.allAttrObservers as FuncArr<MutationObserverListener<MutationObserverEvent>>,
+      )
+      this._$subtreeListenersCount += 1
+    } else if (options.properties) {
       if (!target.attrObservers) target.attrObservers = new FuncArr('attributeObserver')
       target.attrObservers.add(cb)
       this._$boundFuncArrs.push(

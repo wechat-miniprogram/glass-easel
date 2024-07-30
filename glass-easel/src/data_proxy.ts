@@ -495,18 +495,29 @@ export class DataGroup<
 > {
   data: DataWithPropertyValues<TData, TProperty>
   innerData: { [key: string]: DataValue } | null
+  /* @internal */
   private _$comp: ComponentInstance<TData, TProperty, TMethod> | null
+  /* @internal */
   private _$pureDataPattern: RegExp | null
+  /* @internal */
   private _$dataDeepCopy: DeepCopyStrategy
+  /* @internal */
   private _$propertyPassingDeepCopy: DeepCopyStrategy
+  /* @internal */
   private _$reflectToAttributes: boolean
+  /* @internal */
   private _$propFields: { [name: string]: PropertyDefinition }
   /** @internal */
   _$observerTree: DataGroupObserverTree
+  /* @internal */
   private _$observerStatus: boolean[]
+  /* @internal */
   private _$modelBindingListener: { [name: string]: ModelBindingListener } | null = null
+  /* @internal */
   private _$updateListener?: DataUpdateCallback
+  /* @internal */
   private _$pendingChanges: DataChange[] = []
+  /* @internal */
   private _$doingUpdates: {
     prop: PropertyChange[]
     combined: DataChange[]
@@ -514,6 +525,7 @@ export class DataGroup<
   } | null = null
   private _$recUpdateLevel = 0
 
+  /* @internal */
   private _$generateInnerData(data: { [key: string]: DataValue }) {
     const pureDataPattern = this._$pureDataPattern
     const dataDeepCopy = this._$dataDeepCopy
@@ -1016,6 +1028,7 @@ export class DataGroup<
           MutationObserverTarget.callAttrObservers(comp, {
             type: 'properties',
             target: comp,
+            nameType: 'component-property',
             propertyName: propName,
           })
         }

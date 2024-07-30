@@ -262,6 +262,7 @@ export class CodeSpace {
     const ret: glassEasel.ComponentOptions = {
       idPrefixGenerator: guid,
       multipleSlots: options?.multipleSlots,
+      dynamicSlots: options?.dynamicSlots,
       pureDataPattern,
       virtualHost: options?.virtualHost,
       styleScope,

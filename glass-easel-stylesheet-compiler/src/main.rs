@@ -22,6 +22,14 @@ struct CmdArgs {
     #[arg(short, long)]
     sourcemap_output: Option<PathBuf>,
 
+    /// The output file for low-priority output (i.e. converted `:host` output)
+    #[arg(long)]
+    low_priority_output: Option<PathBuf>,
+
+    /// The output source-map file for low-priority output (i.e. converted `:host` output)
+    #[arg(long)]
+    low_priority_sourcemap_output: Option<PathBuf>,
+
     /// The class prefix that should be added to class names (`--` not included)
     #[arg(short, long)]
     class_prefix: Option<String>,
@@ -37,6 +45,10 @@ struct CmdArgs {
     /// A comment message inserted in where the import content should be added
     #[arg(long)]
     import_sign: Option<String>,
+
+    /// Convert `:host` into an attribute selector
+    #[arg(long)]
+    host_is: Option<String>,
 }
 
 fn main() {
@@ -47,7 +59,9 @@ fn main() {
         class_prefix_sign: args.class_prefix_sign.clone(),
         rpx_ratio: args.rpx_ratio,
         import_sign: args.import_sign.clone(),
+        host_is: args.host_is.clone(),
     };
+
     let sst = if args.interactive {
         use std::io::Read;
         let mut s = String::new();
@@ -69,17 +83,35 @@ fn main() {
             options,
         )
     };
-    if let Some(output) = args.output {
-        let output = fs::File::create(output).expect("Failed to open or create output file");
-        sst.write_content(output).unwrap();
+    let (output, low_priority_output) = sst.output_and_low_priority_output();
+
+    if let Some(output_file) = args.low_priority_output {
+        let output_file =
+            fs::File::create(output_file).expect("Failed to open or create output file");
+        low_priority_output.write(output_file).unwrap();
     } else {
         let mut s = Vec::new();
-        sst.write_content(&mut s).unwrap();
+        low_priority_output.write(&mut s).unwrap();
+        println!("{}", String::from_utf8(s).unwrap());
+    }
+    if let Some(sourcemap_output) = args.low_priority_sourcemap_output {
+        let output_file = fs::File::create(sourcemap_output)
+            .expect("Failed to open or create sourcemap output file");
+        low_priority_output.write_source_map(output_file).unwrap();
+    }
+
+    if let Some(output_file) = args.output {
+        let output_file =
+            fs::File::create(output_file).expect("Failed to open or create output file");
+        output.write(output_file).unwrap();
+    } else {
+        let mut s = Vec::new();
+        output.write(&mut s).unwrap();
         println!("{}", String::from_utf8(s).unwrap());
     }
     if let Some(sourcemap_output) = args.sourcemap_output {
-        let output = fs::File::create(sourcemap_output)
+        let output_file = fs::File::create(sourcemap_output)
             .expect("Failed to open or create sourcemap output file");
-        sst.write_source_map(output).unwrap();
+        output.write_source_map(output_file).unwrap();
     }
 }

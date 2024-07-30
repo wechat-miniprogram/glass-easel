@@ -12,6 +12,7 @@ import {
   type ProcGen,
   type ProcGenWrapper,
   type UpdatePathTreeRoot,
+  type TmplDevArgs,
 } from './proc_gen_wrapper'
 import { type RangeListManager } from './range_list_diff'
 
@@ -25,7 +26,13 @@ type TmplArgs = {
   slotProps?: Record<string, [DataValue, DataPath | null, boolean]>
   slotPropsUpdatePathTree?: Record<string, UpdatePathTreeRoot>
 }
-export type TmplNode = Node & { _$wxTmplArgs?: TmplArgs }
+export type TmplNode = Node & { _$wxTmplArgs?: TmplArgs; _$wxTmplDevArgs?: TmplDevArgs }
+
+export const getTmplDevArgs = (elem: HTMLElement): TmplDevArgs => {
+  const node = elem as TmplNode
+  // eslint-disable-next-line no-return-assign
+  return (node._$wxTmplDevArgs = node._$wxTmplDevArgs || {})
+}
 
 const noop = () => {
   /* empty */
@@ -216,5 +223,10 @@ export class ProcGenWrapperDom {
   // set filter functions for change properties and event listeners
   setFnFilter() {
     noop()
+  }
+
+  // get dev args object
+  devArgs(elem: HTMLElement): TmplDevArgs {
+    return getTmplDevArgs(elem)
   }
 }

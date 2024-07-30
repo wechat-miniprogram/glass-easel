@@ -13,6 +13,7 @@ import {
   type MediaQueryStatus,
   type Observer,
 } from './shared'
+import type * as shared from './shared'
 
 const DELEGATE_EVENTS = [
   'touchstart',
@@ -24,6 +25,8 @@ const DELEGATE_EVENTS = [
   'mouseout',
   'mouseover',
   'mouseup',
+  'mouseenter',
+  'mouseleave',
   'click',
 ]
 
@@ -35,7 +38,7 @@ export class CurrentWindowBackendContext implements Context {
     createDocumentFragment(): Element
   }
   /* @internal */
-  private _$styleSheets: HTMLElement[] = []
+  private _$styleSheets: (HTMLElement | undefined)[] = []
   /* @internal */
   private _$styleSheetRegistry = Object.create(null) as { [path: string]: string }
   /* @internal */
@@ -81,6 +84,11 @@ export class CurrentWindowBackendContext implements Context {
   appendStyleSheetPath(path: string, styleScope?: number): number {
     const styleText = this._$styleSheetRegistry[path]
     if (styleText === undefined) throw new Error(`No style sheet registry "${path}"`)
+    if (styleText === '') {
+      const id = this._$styleSheets.length
+      this._$styleSheets.push(undefined)
+      return id
+    }
     const s = document.createElement('style')
     s.type = 'text/css'
     s.innerHTML = styleText
@@ -507,25 +515,21 @@ export class CurrentWindowBackendContext implements Context {
     })
   }
 
-  elementFromPoint(left: number, top: number, cb: (node: Element | null) => void): void {
+  elementFromPoint(left: number, top: number, cb: (node: GlassEaselElement | null) => void): void {
     let node = document.elementFromPoint(left, top) as Element | null
-    while (!node?.__wxElement) {
+    while (node !== null && !node.__wxElement) {
       node = node?.parentNode || null
     }
-    cb(node)
+    cb(node?.__wxElement ?? null)
   }
 
-  getAllComputedStyle(
+  getAllComputedStyles(
     target: Element,
-    cb: (computedStyle: { name: string; value: string }[]) => void,
+    cb: (computedStyle: { properties: { name: string; value: string }[] }) => void,
   ): void {
     const style = window.getComputedStyle(target as unknown as HTMLElement)
-    const res: { name: string; value: string }[] = []
-    for (let i = 0; i < style.length; i += 1) {
-      const name = style[i]!
-      res.push({ name, value: style.getPropertyValue(name) })
-    }
-    cb(res)
+    const properties = collectStyleSheetProperties(style)
+    cb({ properties })
   }
 
   getScrollOffset(target: Element, cb: (res: ScrollOffset) => void): void {
@@ -556,4 +560,90 @@ export class CurrentWindowBackendContext implements Context {
       })
     }
   }
+
+  getMatchedRules(target: Element, cb: (res: shared.GetMatchedRulesResponses) => void): void {
+    const elem = target as unknown as HTMLElement
+    const sheets = document.styleSheets
+    const rules: shared.CSSRule[] = []
+    for (let i = 0; i < sheets.length; i += 1) {
+      const sheet = sheets[i]!
+      rules.push(...queryMatchedRules(i, sheet, elem))
+    }
+    const inlineText = elem.style.cssText
+    const inline = collectStyleSheetProperties(elem.style)
+    cb({ inline, inlineText, rules })
+  }
+}
+
+const collectStyleSheetProperties = (style: CSSStyleDeclaration) => {
+  const properties: shared.CSSProperty[] = []
+  for (let i = 0; i < style.length; i += 1) {
+    const name = style[i]!
+    const important = style.getPropertyPriority(name) === 'important'
+    properties.push({ name, value: style.getPropertyValue(name), important })
+  }
+  return properties
+}
+
+const forEachStyleSheetRule = (
+  sheet: CSSStyleSheet,
+  f: (ruleIndex: number, cssRule: CSSRule, ancestors: CSSGroupingRule[]) => void,
+) => {
+  let ruleIndex = 0
+  const ancestors: CSSGroupingRule[] = []
+  const rec = (rules: CSSRuleList) => {
+    for (let i = 0; i < rules.length; i += 1) {
+      const cssRule = rules[i]!
+      if (cssRule instanceof CSSConditionRule || cssRule instanceof CSSLayerBlockRule) {
+        ancestors.push(cssRule)
+        rec(cssRule.cssRules)
+        ancestors.pop()
+      } else {
+        f(ruleIndex, cssRule, ancestors)
+        ruleIndex += 1
+      }
+    }
+  }
+  rec(sheet.cssRules)
+}
+
+const queryMatchedRules = (
+  sheetIndex: number,
+  sheet: CSSStyleSheet,
+  elem: HTMLElement,
+): shared.CSSRule[] => {
+  const rules: shared.CSSRule[] = []
+  forEachStyleSheetRule(sheet, (ruleIndex, cssRule, ancestors) => {
+    if (cssRule instanceof CSSStyleRule) {
+      let inactive = false
+      const mediaQueries: string[] = []
+      for (let i = 0; i < ancestors.length; i += 1) {
+        const cssRule = ancestors[i]!
+        if (cssRule instanceof CSSMediaRule) {
+          if (!matchMedia(cssRule.conditionText).matches) {
+            inactive = true
+          }
+          mediaQueries.push(`@media ${cssRule.conditionText}`)
+        } else if (cssRule instanceof CSSLayerBlockRule) {
+          mediaQueries.push(`@layer ${cssRule.name}`)
+        }
+      }
+      const selector = cssRule.selectorText
+      if (elem.matches(selector)) {
+        const propertyText = cssRule.style.cssText
+        const properties = collectStyleSheetProperties(cssRule.style)
+        rules.push({
+          sheetIndex,
+          ruleIndex,
+          mediaQueries,
+          selector,
+          properties,
+          propertyText,
+          weightHighBits: 0, // FIXME infer priority values
+          inactive,
+        })
+      }
+    }
+  })
+  return rules
 }

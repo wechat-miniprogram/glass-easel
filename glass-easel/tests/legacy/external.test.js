@@ -31,7 +31,6 @@ describe('Element', function () {
 
   beforeAll(function () {
     root = createElem('root')
-    root.$$.id = 'root'
     var placeholder = document.createElement('div')
     document.body.appendChild(placeholder)
     glassEasel.Element.replaceDocumentElement(root, document.body, placeholder)

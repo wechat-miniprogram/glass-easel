@@ -84,19 +84,22 @@ export interface BuilderContext<
 > extends ThisType<TMethodCaller> {
   self: TMethodCaller
   data: Merge<DataWithPropertyValues<TPrevData, TProperty>>
-  setData: (newData: Partial<SetDataSetter<TPrevData>>) => void
+  setData: (this: void, newData: Partial<SetDataSetter<TPrevData>>) => void
   implement: <TIn extends { [x: string]: any }>(
+    this: void,
     traitBehavior: TraitBehavior<TIn, any>,
     impl: TIn,
   ) => void
   relation<TOut extends { [key: string]: any }>(
+    this: void,
     def: TraitRelationParams<TOut>,
   ): RelationHandler<any, TOut>
-  relation(def: RelationParams): RelationHandler<any, never>
+  relation(this: void, def: RelationParams): RelationHandler<any, never>
   observer<
     P extends ObserverDataPathStrings<DataWithPropertyValues<TPrevData, TProperty>>,
     V = Merge<GetFromObserverPathString<DataWithPropertyValues<TPrevData, TProperty>, P>>,
   >(
+    this: void,
     paths: P,
     func: (newValue: V) => void,
   ): void
@@ -108,13 +111,14 @@ export interface BuilderContext<
       >
     },
   >(
+    this: void,
     paths: readonly [...P],
     func: (...newValues: V extends any[] ? V : never) => void,
   ): void
-  lifetime: <L extends keyof Lifetimes>(name: L, func: Lifetimes[L]) => void
-  pageLifetime: (name: string, func: (...args: any[]) => void) => void
-  method: <Fn extends ComponentMethod>(func: Fn) => TaggedMethod<Fn>
-  listener: <T>(func: EventListener<T>) => TaggedMethod<EventListener<T>>
+  lifetime: <L extends keyof Lifetimes>(this: void, name: L, func: Lifetimes[L]) => void
+  pageLifetime: (this: void, name: string, func: (...args: any[]) => void) => void
+  method: <Fn extends ComponentMethod>(this: void, func: Fn) => TaggedMethod<Fn>
+  listener: <T>(this: void, func: EventListener<T>) => TaggedMethod<EventListener<T>>
 }
 
 export type GeneralBehaviorBuilder = BehaviorBuilder<
@@ -136,10 +140,9 @@ export class BehaviorBuilder<
   TPendingChainingFilter extends ChainingFilterType = never,
   TExtraThisFields extends DataList = Empty,
 > {
+  public is: string | undefined
   /** @internal */
   _$ownerSpace: ComponentSpace
-  /** @internal */
-  _$is: string | undefined
   /** @internal */
   _$behaviors: (string | GeneralBehavior)[] = []
   /** @internal */
@@ -189,7 +192,7 @@ export class BehaviorBuilder<
 
   /** @internal */
   constructor(is: string | undefined, ownerSpace: ComponentSpace) {
-    this._$is = is
+    this.is = is
     this._$ownerSpace = ownerSpace
   }
 
@@ -366,7 +369,7 @@ export class BehaviorBuilder<
     >,
     TChainingFilter
   > {
-    this._$data.push(() => safeCallback('Data Generator', gen, null, [], this._$is) ?? {})
+    this._$data.push(() => safeCallback('Data Generator', gen, null, [], this.is) ?? {})
     return this as any
   }
 
@@ -490,7 +493,7 @@ export class BehaviorBuilder<
       this._$observers.push({ dataPaths: parseMultiPaths(paths as string | string[]), func, once })
     } catch (e) {
       // parse multi paths my throw errors
-      dispatchError(e, `observer`, this._$is)
+      dispatchError(e, `observer`, this.is)
     }
     return this as any
   }
@@ -615,7 +618,7 @@ export class BehaviorBuilder<
     const rawData = def.data
     if (rawData !== undefined) {
       if (typeof rawData === 'function') {
-        this._$data.push(() => safeCallback('Data Generator', rawData, null, [], this._$is) ?? {})
+        this._$data.push(() => safeCallback('Data Generator', rawData, null, [], this.is) ?? {})
       } else {
         this._$staticData = rawData
       }
@@ -653,7 +656,7 @@ export class BehaviorBuilder<
             })
           } catch (e) {
             // parse multi paths may throw errors
-            dispatchError(e, `definition`, this._$is)
+            dispatchError(e, `definition`, this.is)
           }
         }
       } else {
@@ -669,7 +672,7 @@ export class BehaviorBuilder<
             })
           } catch (e) {
             // parse multi paths may throw errors
-            dispatchError(e, `definition`, this._$is)
+            dispatchError(e, `definition`, this.is)
           }
         }
       }
@@ -732,7 +735,7 @@ export class BehaviorBuilder<
     TPendingChainingFilter,
     TExtraThisFields
   > {
-    const is = this._$is
+    const is = this.is
     const behavior = new Behavior(this)
     if (is !== undefined) {
       this._$ownerSpace._$registerBehavior(is, behavior as unknown as GeneralBehavior)
@@ -759,7 +762,7 @@ export class BehaviorBuilder<
    * Finish build, generate a component definition, and register it in the component space
    */
   registerComponent(): ComponentDefinition<TData, TProperty, TMethod> {
-    const is = this._$is
+    const is = this.is
     const behavior = new Behavior(this)
     const compDef = new ComponentDefinition(behavior)
     if (is !== undefined) {
@@ -865,7 +868,7 @@ export class Behavior<
     >,
   ) {
     this._$unprepared = true
-    this.is = builder._$is || ''
+    this.is = builder.is || ''
     this.ownerSpace = builder._$ownerSpace
     this._$builder = builder
     this._$flatAncestors = new Set()
@@ -1416,6 +1419,35 @@ export class Behavior<
       return this._$flatAncestors.has(b)
     }
     return false
+  }
+
+  /**
+   * List the properties
+   *
+   * Only valid after `prepare` .
+   */
+  listProperties(): string[] {
+    return Object.keys(this._$propertyMap)
+  }
+
+  /**
+   * Get the type of the specified property
+   *
+   * Only valid after `prepare` .
+   * Return `undefined` if the name is not a property.
+   */
+  getPropertyType(name: string): NormalizedPropertyType | undefined {
+    return this._$propertyMap[name]?.type
+  }
+
+  /**
+   * Get the type of the specified property
+   *
+   * Only valid after `prepare` .
+   * Return `undefined` if the name is not a property.
+   */
+  getPropertyOptionalType(name: string): NormalizedPropertyType[] | null | undefined {
+    return this._$propertyMap[name]?.optionalTypes
   }
 
   /**

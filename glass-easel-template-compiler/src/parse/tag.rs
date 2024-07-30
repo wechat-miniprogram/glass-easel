@@ -52,10 +52,7 @@ impl Template {
             if ps.peek_str("</") {
                 let pos = ps.position();
                 ps.skip_until_after(">");
-                ps.add_warning(
-                    ParseErrorKind::InvalidEndTag,
-                    pos..ps.position(),
-                );
+                ps.add_warning(ParseErrorKind::InvalidEndTag, pos..ps.position());
             }
         }
 
@@ -2017,13 +2014,15 @@ impl Element {
                     x
                 } else {
                     let location = end_tag_start_location.start..close_location.end;
-                    ps.add_warning(
-                        ParseErrorKind::InvalidEndTag,
-                        location.clone(),
-                    );
-                    Ident { name: CompactString::new(""), location }
+                    ps.add_warning(ParseErrorKind::InvalidEndTag, location.clone());
+                    Ident {
+                        name: CompactString::new(""),
+                        location,
+                    }
                 };
-                if end_tag_name.name.len() > 0 && end_tag_name.name != tag_name.name.to_ascii_lowercase() {
+                if end_tag_name.name.len() > 0
+                    && end_tag_name.name != tag_name.name.to_ascii_lowercase()
+                {
                     return None;
                 }
                 ps.skip_whitespace();
@@ -3280,12 +3279,7 @@ mod test {
             ParseErrorKind::UnexpectedCharacter,
             12..16
         );
-        case!(
-            "<div></>",
-            r#"<div/>"#,
-            ParseErrorKind::InvalidEndTag,
-            5..7
-        );
+        case!("<div></>", r#"<div/>"#, ParseErrorKind::InvalidEndTag, 5..7);
     }
 
     #[test]
