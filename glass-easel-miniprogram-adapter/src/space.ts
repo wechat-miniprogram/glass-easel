@@ -78,7 +78,9 @@ export class CodeSpace {
   private space: glassEasel.ComponentSpace
   private styleScopeManager: glassEasel.StyleScopeManager
   private staticConfigMap: { [path: string]: ComponentStaticConfig }
-  private styleSheetMap: { [path: string]: { url: string; styleScopeName: string | undefined } }
+  private styleSheetMap: {
+    [path: string]: { url: string | undefined; styleScopeName: string | undefined }
+  }
   private compiledTemplateMap: { [path: string]: glassEasel.template.ComponentTemplate }
   private waitingAliasMap: { [is: string]: string[] }
   /** @internal */
@@ -102,6 +104,8 @@ export class CodeSpace {
       globalCodeSpace?.space,
       globalCodeSpace?.space.styleScopeManager,
     )
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    ;(this.space as any).__wxCodeSpace = this
     this.styleScopeManager = this.space.styleScopeManager
     this.staticConfigMap = Object.create(null) as { [path: string]: ComponentStaticConfig }
     this.styleSheetMap = Object.create(null) as {
@@ -164,7 +168,7 @@ export class CodeSpace {
    * The URL should be recognized by the target backend.
    * The `path` should not contain the `.wxss` suffix.
    */
-  addStyleSheet(path: string, styleSheetUrl: string, styleScopeName?: string) {
+  addStyleSheet(path: string, styleSheetUrl?: string, styleScopeName?: string) {
     this.styleSheetMap[path] = { url: styleSheetUrl, styleScopeName }
   }
 
