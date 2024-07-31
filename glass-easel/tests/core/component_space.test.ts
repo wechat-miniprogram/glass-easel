@@ -136,6 +136,32 @@ describe('Component Space', () => {
     expect(mainCs.getComponentByUrlWithoutDefault('space://comp', '')).toBe(extraComp)
   })
 
+  test('shared style scope applied to components', () => {
+    const cs = new glassEasel.ComponentSpace()
+    const sharedStyleScope = cs.styleScopeManager.register('aBc')
+    const styleScope = cs.styleScopeManager.register('aBc')
+    cs.setSharedStyleScope(sharedStyleScope)
+
+    const compDef = cs.defineComponent({
+      options: {
+        styleScope: sharedStyleScope,
+      },
+    })
+    const elem = glassEasel.Component.createWithContext('root', compDef, domBackend)
+    const domElem = elem.$$ as unknown as HTMLElement
+    expect(domElem.getAttribute('wx-host')).toBe(null)
+
+    const compDef2 = cs.defineComponent({
+      options: {
+        styleScope,
+        extraStyleScope: sharedStyleScope,
+      },
+    })
+    const elem2 = glassEasel.Component.createWithContext('root', compDef2, domBackend)
+    const domElem2 = elem2.$$ as unknown as HTMLElement
+    expect(domElem2.getAttribute('wx-host')).toBe('aBc')
+  })
+
   test('create component with URL params (without generics)', () => {
     const cs = new glassEasel.ComponentSpace()
     const compDef = cs.defineComponent({

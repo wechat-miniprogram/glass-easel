@@ -59,15 +59,15 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       })
       const elem = glassEasel.Component.createWithContext('root', def, testBackend)
       const comp = elem.getShadowRoot()!.getElementById('comp') as glassEasel.GeneralComponent
-      expect(domHtml(elem)).toBe('<comp is=""><div>123</div>B</comp>')
+      expect(domHtml(elem)).toBe('<comp><div>123</div>B</comp>')
       comp.setData({ propA: 789 })
-      expect(domHtml(elem)).toBe('<comp is=""><div>789</div>B</comp>')
+      expect(domHtml(elem)).toBe('<comp><div>789</div>B</comp>')
       expect(elem.data.list).toEqual([{ a: 789 }, { a: 456 }])
       elem.setData({ index: 1 })
-      expect(domHtml(elem)).toBe('<comp is=""><div>456</div>C</comp>')
+      expect(domHtml(elem)).toBe('<comp><div>456</div>C</comp>')
       expect(elem.data.list).toEqual([{ a: 789 }, { a: 456 }])
       comp.setData({ propA: 123 })
-      expect(domHtml(elem)).toBe('<comp is=""><div>123</div>C</comp>')
+      expect(domHtml(elem)).toBe('<comp><div>123</div>C</comp>')
       expect(elem.data.list).toEqual([{ a: 789 }, { a: 123 }])
     })
   })
@@ -102,9 +102,9 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       const child = (
         elem.getShadowRoot()!.childNodes[0] as glassEasel.GeneralComponent
       ).asInstanceOf(subComp)!
-      expect(domHtml(elem)).toBe('<sub-comp is=""><div>abc</div></sub-comp>')
+      expect(domHtml(elem)).toBe('<sub-comp><div>abc</div></sub-comp>')
       elem.setData({ c: 'def' })
-      expect(domHtml(elem)).toBe('<sub-comp is=""><div>def</div></sub-comp>')
+      expect(domHtml(elem)).toBe('<sub-comp><div>def</div></sub-comp>')
       child.setData({ propA: 456 })
       expect(elem.data.a).toBe(456)
       child.setData({ propA: 789 })

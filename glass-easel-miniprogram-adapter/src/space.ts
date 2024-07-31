@@ -117,6 +117,7 @@ export class CodeSpace {
       else this.waitingAliasMap[is] = [alias]
     })
     this._$sharedStyleScope = this.styleScopeManager.register('')
+    this.space.setSharedStyleScope(this._$sharedStyleScope)
     this._$styleIsolationMap = Object.create(null) as { [path: string]: StyleIsolation }
   }
 
