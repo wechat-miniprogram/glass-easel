@@ -95,11 +95,13 @@ describe('env', () => {
     expect(codeSpace.isMainSpace()).toBe(true)
 
     pluginCodeSpace1.addCompiledTemplate('inner-comp-1', tmpl('A'))
+    pluginCodeSpace1.addStyleSheet('inner-comp-1', undefined, 'c1')
     pluginCodeSpace1.componentEnv('inner-comp-1', ({ Component }) => {
       Component().register()
     })
 
     pluginCodeSpace2.addCompiledTemplate('inner-comp-2', tmpl('B'))
+    pluginCodeSpace2.addStyleSheet('inner-comp-2', undefined, 'c2')
     pluginCodeSpace2.componentEnv('inner-comp-2', ({ Component }) => {
       Component().register()
     })
@@ -135,7 +137,7 @@ describe('env', () => {
     const ab = env.associateBackend(backend)
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     expect(domHtml(root.getComponent())).toBe(
-      '<c-a is="inner-comp-1">A</c-a><c-aa is="inner-comp-1">A</c-aa><i-a></i-a><i-b></i-b><c-b is="inner-comp-2">B</c-b>',
+      '<c-a wx-host="c1">A</c-a><c-aa wx-host="c1">A</c-aa><i-a></i-a><i-b></i-b><c-b wx-host="c2">B</c-b>',
     )
   })
 })

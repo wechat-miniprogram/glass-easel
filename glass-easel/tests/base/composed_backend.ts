@@ -286,8 +286,12 @@ abstract class Node implements glassEasel.composedBackend.Element {
       })
       const tagName = this.tagName.toLowerCase()
       ret.push(`<${tagName}`)
-      const is = this.__wxElement?.asGeneralComponent()?.is
-      if (typeof is === 'string') props.is = is
+      if (this._$hostStyleScope !== undefined) {
+        const def = this.__wxElement?.asGeneralComponent()!.getComponentDefinition()
+        props['wx-host'] = def!.behavior.ownerSpace.styleScopeManager.queryName(
+          this._$hostStyleScope,
+        )!
+      }
       if (this.id) props.id = this.getAttribute('id')!
       if (this._$style) props.style = this.getAttribute('style')!
       if (this._$classes) props.class = this.getAttribute('class')!

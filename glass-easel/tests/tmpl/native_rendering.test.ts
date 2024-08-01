@@ -58,11 +58,11 @@ describe('native rendering mode', () => {
       },
     })
     const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
-    expect(domHtml(elem)).toBe('<comp is=""><div>2<span>1</span></div></comp>')
+    expect(domHtml(elem)).toBe('<comp><div>2<span>1</span></div></comp>')
     elem.setData({
       c: 10,
     })
-    expect(domHtml(elem)).toBe('<comp is=""><div>11<span>10</span></div></comp>')
+    expect(domHtml(elem)).toBe('<comp><div>11<span>10</span></div></comp>')
   })
 
   test('slot appending', () => {
@@ -87,11 +87,11 @@ describe('native rendering mode', () => {
       },
     })
     const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
-    expect(domHtml(elem)).toBe('<comp is=""><div>cA<span></span></div><virtual>A</virtual></comp>')
+    expect(domHtml(elem)).toBe('<comp><div>cA<span></span></div><virtual>A</virtual></comp>')
     elem.setData({
       c: 'B',
     })
-    expect(domHtml(elem)).toBe('<comp is=""><div>cB<span></span></div><virtual>B</virtual></comp>')
+    expect(domHtml(elem)).toBe('<comp><div>cB<span></span></div><virtual>B</virtual></comp>')
   })
 
   test('default template', () => {
@@ -110,11 +110,11 @@ describe('native rendering mode', () => {
       },
     })
     const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
-    expect(domHtml(elem)).toBe('<comp is="">123</comp>')
+    expect(domHtml(elem)).toBe('<comp>123</comp>')
     elem.setData({
       c: 'ABC',
     })
-    expect(domHtml(elem)).toBe('<comp is="">ABC</comp>')
+    expect(domHtml(elem)).toBe('<comp>ABC</comp>')
   })
 
   test('event handling', () => {

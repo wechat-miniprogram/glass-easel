@@ -1,6 +1,7 @@
 import * as glassEasel from 'glass-easel'
 import { tmpl } from './base/env'
 import { MiniProgramEnv } from '../src'
+import { StyleIsolation } from '../src/types'
 
 const domHtml = (elem: glassEasel.Element): string => {
   const domElem = elem.getBackendElement() as unknown as Element
@@ -14,6 +15,7 @@ describe('selector query', () => {
 
     codeSpace.addComponentStaticConfig('child/comp', {
       component: true,
+      styleIsolation: StyleIsolation.Shared,
     })
     codeSpace.addCompiledTemplate('child/comp', tmpl('{{a}}'))
     // eslint-disable-next-line arrow-body-style
@@ -72,17 +74,18 @@ describe('selector query', () => {
     const ab = env.associateBackend()
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
-    expect(domHtml(root.getComponent())).toBe(
-      '<div><child is="child/comp">456</child><child is="child/comp">789</child></div>',
-    )
+    expect(domHtml(root.getComponent())).toBe('<div><child>456</child><child>789</child></div>')
   })
 
   test('select single component (with custom export)', () => {
     const env = new MiniProgramEnv()
     const codeSpace = env.createCodeSpace('', true)
 
-    codeSpace.addComponentStaticConfig('child1/comp', { component: true })
-    codeSpace.addComponentStaticConfig('child2/comp', { component: true })
+    codeSpace.addComponentStaticConfig('child1/comp', {
+      component: true,
+      styleIsolation: StyleIsolation.Shared,
+    })
+    codeSpace.addComponentStaticConfig('child2/comp', { component: false })
     codeSpace.addCompiledTemplate('child1/comp', tmpl('{{a}}'))
     codeSpace.addCompiledTemplate('child2/comp', tmpl('{{a}}'))
 
@@ -161,17 +164,18 @@ describe('selector query', () => {
     const ab = env.associateBackend()
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
-    expect(domHtml(root.getComponent())).toBe(
-      '<div><child1 is="child1/comp">456</child1><child2 is="child2/comp">789</child2></div>',
-    )
+    expect(domHtml(root.getComponent())).toBe('<div><child1>456</child1><child2>789</child2></div>')
   })
 
   test('select single component (with custom export on behavior)', () => {
     const env = new MiniProgramEnv()
     const codeSpace = env.createCodeSpace('', true)
 
-    codeSpace.addComponentStaticConfig('child1/comp', { component: true })
-    codeSpace.addComponentStaticConfig('child2/comp', { component: true })
+    codeSpace.addComponentStaticConfig('child1/comp', {
+      component: true,
+      styleIsolation: StyleIsolation.Shared,
+    })
+    codeSpace.addComponentStaticConfig('child2/comp', { component: false })
     codeSpace.addCompiledTemplate('child1/comp', tmpl('{{a}}'))
     codeSpace.addCompiledTemplate('child2/comp', tmpl('{{a}}'))
 
@@ -255,9 +259,7 @@ describe('selector query', () => {
     const ab = env.associateBackend()
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
-    expect(domHtml(root.getComponent())).toBe(
-      '<div><child1 is="child1/comp">456</child1><child2 is="child2/comp">789</child2></div>',
-    )
+    expect(domHtml(root.getComponent())).toBe('<div><child1>456</child1><child2>789</child2></div>')
   })
 
   test('select all components', () => {
@@ -266,6 +268,7 @@ describe('selector query', () => {
 
     codeSpace.addComponentStaticConfig('child/comp', {
       component: true,
+      styleIsolation: StyleIsolation.Shared,
     })
     codeSpace.addCompiledTemplate('child/comp', tmpl('{{a}}'))
     // eslint-disable-next-line arrow-body-style
@@ -279,6 +282,7 @@ describe('selector query', () => {
 
     codeSpace.addComponentStaticConfig('child/comp2', {
       component: true,
+      styleIsolation: StyleIsolation.Shared,
     })
     codeSpace.addCompiledTemplate('child/comp2', tmpl('{{a}}'))
     // eslint-disable-next-line arrow-body-style
@@ -322,7 +326,7 @@ describe('selector query', () => {
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
     expect(domHtml(root.getComponent())).toBe(
-      '<div><child is="child/comp" class="c">0</child><child is="child/comp" class="c">1</child><child-b is="child/comp2" class="c">2</child-b></div>',
+      '<div><child class="c">0</child><child class="c">1</child><child-b class="c">2</child-b></div>',
     )
   })
 

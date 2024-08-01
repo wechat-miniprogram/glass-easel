@@ -78,7 +78,9 @@ export class Root {
     }
     const addStyleSheet = (comp: glassEasel.GeneralComponentDefinition) => {
       const { styleScope } = comp.getComponentOptions()
-      const path = codeSpace.getStyleSheet(comp.is)
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const codeSpace = (comp.behavior.ownerSpace as any).__wxCodeSpace as CodeSpace | undefined
+      const path = codeSpace?.getStyleSheet(comp.is)
       if (path !== undefined) {
         backendContext.appendStyleSheetPath(
           path,

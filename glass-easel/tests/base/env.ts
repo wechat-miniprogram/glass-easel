@@ -1,6 +1,7 @@
 /* eslint-disable no-new-func */
 /* eslint-disable @typescript-eslint/no-implied-eval */
 
+// eslint-disable-next-line import/no-extraneous-dependencies
 import { TmplGroup } from 'glass-easel-template-compiler'
 import * as glassEasel from '../../src'
 import * as ComposedBackend from './composed_backend'
