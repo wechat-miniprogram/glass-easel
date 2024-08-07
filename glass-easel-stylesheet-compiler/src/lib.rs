@@ -473,26 +473,34 @@ fn parse_qualified_rule(input: &mut StepParser, ss: &mut StyleSheetTransformer) 
                 ss.add_warning(error::ParseErrorKind::HostSelectorCombination, pos..pos);
             } else {
                 ss.write_in_low_priority(input, |ss, input| {
-                    let write_attr_selector = |ss: &mut StyleSheetTransformer, input: &mut StepParser, name: &str, value: &str| {
-                        ss.append_token(
-                            StepToken::wrap_at(Token::SquareBracketBlock, &next),
-                            input,
-                            None,
-                        );
-                        ss.append_token(
-                            StepToken::wrap_at(Token::Ident(name.into()), &next),
-                            input,
-                            None,
-                        );
-                        ss.append_token(StepToken::wrap_at(Token::Delim('='), &next), input, None);
-                        let quoted_value = Token::QuotedString(value.into());
-                        ss.append_token(StepToken::wrap_at(quoted_value, &next), input, None);
-                        ss.append_token(
-                            StepToken::wrap_at(Token::CloseSquareBracket, &next),
-                            input,
-                            None,
-                        );
-                    };
+                    let write_attr_selector =
+                        |ss: &mut StyleSheetTransformer,
+                         input: &mut StepParser,
+                         name: &str,
+                         value: &str| {
+                            ss.append_token(
+                                StepToken::wrap_at(Token::SquareBracketBlock, &next),
+                                input,
+                                None,
+                            );
+                            ss.append_token(
+                                StepToken::wrap_at(Token::Ident(name.into()), &next),
+                                input,
+                                None,
+                            );
+                            ss.append_token(
+                                StepToken::wrap_at(Token::Delim('='), &next),
+                                input,
+                                None,
+                            );
+                            let quoted_value = Token::QuotedString(value.into());
+                            ss.append_token(StepToken::wrap_at(quoted_value, &next), input, None);
+                            ss.append_token(
+                                StepToken::wrap_at(Token::CloseSquareBracket, &next),
+                                input,
+                                None,
+                            );
+                        };
                     let p = ss.options.class_prefix.clone().unwrap_or_default();
                     write_attr_selector(ss, input, "wx-host", &p);
                     if let Some(host_is) = ss.options.host_is.clone() {

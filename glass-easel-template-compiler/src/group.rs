@@ -220,7 +220,7 @@ impl TmplGroup {
     }
 
     /// Remove a template from the group.
-    /// 
+    ///
     /// This simply removes a template path.
     /// It is useful when doing hot-update debugging,
     /// but not suitable for final builds since it does not do cleanups.
