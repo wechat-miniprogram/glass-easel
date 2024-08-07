@@ -19,6 +19,7 @@ import {
   type MethodList,
   type PropertyList,
 } from './component_params'
+import { AutoDestroyState } from './data_utils'
 import {
   attachInspector,
   detachInspector,
@@ -96,7 +97,7 @@ export class Element implements NodeCast {
   /** @internal */
   _$backendElement: GeneralBackendElement | null
   /** @internal */
-  _$destroyOnDetach: boolean
+  _$destroyOnRemoval: AutoDestroyState
   /** @internal */
   _$nodeTreeContext: GeneralBackendContext | DestroyedBackendContext
   /** @internal */
@@ -162,7 +163,7 @@ export class Element implements NodeCast {
     nodeTreeContext: GeneralBackendContext | DestroyedBackendContext,
   ) {
     this._$backendElement = backendElement
-    this._$destroyOnDetach = false
+    this._$destroyOnRemoval = AutoDestroyState.Disabled
     this._$nodeTreeContext = nodeTreeContext
     this._$nodeId = ''
     this._$nodeAttributes = null
@@ -397,7 +398,11 @@ export class Element implements NodeCast {
     return this._$backendElement
   }
 
-  /** Destroy the backend element */
+  /**
+   * Destroy the backend element
+   *
+   * It only destroy the backend element of the element itself.
+   */
   destroyBackendElement() {
     if (this._$backendElement) {
       if (!(BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike))) {
@@ -416,14 +421,59 @@ export class Element implements NodeCast {
     }
   }
 
-  /** Destroy the backend element on next detach */
-  destroyBackendElementOnDetach() {
-    this._$destroyOnDetach = true
+  /**
+   * Destroy backend element for the whole subtree.
+   *
+   * It will destroy backend elements for the whole subtree (shadow tree) recursively.
+   * If a backend element for a component is destroyed,
+   * any backend element in the shadow tree of the component will also be destroyed.
+   */
+  destroyBackendElementOnSubtree() {
+    const rec = function (elem: Element) {
+      for (let i = 0; i < elem.childNodes.length; i += 1) {
+        const node = elem.childNodes[i]!
+        if (isElement(node)) rec(node)
+        else node.destroyBackendElement()
+      }
+      if (isComponent(elem)) {
+        const shadowRoot = elem.getShadowRoot()
+        if (shadowRoot) rec(shadowRoot)
+      }
+      elem.destroyBackendElement()
+    }
+    rec(this)
   }
 
-  /** Cancel destroying backend element on detach */
+  /**
+   * Destroy the backend element when removed from any parent element
+   */
+  destroyBackendElementOnRemoval() {
+    this._$destroyOnRemoval = AutoDestroyState.Enabled
+  }
+
+  /**
+   * Cancel the destroy scheduling of the backend element
+   */
+  cancelDestroyBackendElementOnRemoval() {
+    this._$destroyOnRemoval = AutoDestroyState.Disabled
+  }
+
+  /**
+   * Destroy the backend element when removed from any parent element
+   *
+   * @deprecated Use `destroyBackendElementOnRemoval` instead.
+   */
+  destroyBackendElementOnDetach() {
+    this._$destroyOnRemoval = AutoDestroyState.Enabled
+  }
+
+  /**
+   * Cancel the destroy scheduling of the backend element
+   *
+   * @deprecated Use `cancelDestroyBackendElementOnRemoval` instead.
+   */
   cancelDestroyBackendElementOnDetach() {
-    this._$destroyOnDetach = false
+    this._$destroyOnRemoval = AutoDestroyState.Disabled
   }
 
   /** Get whether the node is virtual or not */
@@ -520,13 +570,8 @@ export class Element implements NodeCast {
   }
 
   private static checkAndCallDetached(node: Node) {
-    const destroyQueue: Node[] = []
-
+    // check and call detached lifetime recursively
     const callFunc = function callFunc(node: Node) {
-      if (node._$destroyOnDetach) {
-        // Destroy later to avoid missing backend elements
-        destroyQueue.push(node)
-      }
       if (isElement(node) && node._$attached) {
         if (isComponent(node)) {
           node.triggerLifetime('beforeDetach', [])
@@ -558,8 +603,32 @@ export class Element implements NodeCast {
     }
     callFunc(node)
 
-    for (let i = 0; i < destroyQueue.length; i += 1) {
-      destroyQueue[i]!.destroyBackendElement()
+    // check destroy on removal recursively
+    if (isElement(node)) {
+      const rec = function (elem: Element) {
+        if (node._$destroyOnRemoval === AutoDestroyState.Destroyed) return
+        for (let i = 0; i < elem.childNodes.length; i += 1) {
+          const node = elem.childNodes[i]!
+          if (isElement(node)) {
+            rec(node)
+          } else if (node._$destroyOnRemoval === AutoDestroyState.Enabled) {
+            node._$destroyOnRemoval = AutoDestroyState.Destroyed
+            node.destroyBackendElement()
+          }
+        }
+        if (isComponent(elem)) {
+          const shadowRoot = elem.getShadowRoot()
+          if (shadowRoot) rec(shadowRoot)
+        }
+        if (elem._$destroyOnRemoval === AutoDestroyState.Enabled) {
+          elem._$destroyOnRemoval = AutoDestroyState.Destroyed
+          elem.destroyBackendElement()
+        }
+      }
+      rec(node)
+    } else if (node._$destroyOnRemoval === AutoDestroyState.Enabled) {
+      node._$destroyOnRemoval = AutoDestroyState.Destroyed
+      node.destroyBackendElement()
     }
   }
 

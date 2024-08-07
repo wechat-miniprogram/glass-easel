@@ -48,3 +48,9 @@ export const deepCopy = <T>(src: T, withRecursion: boolean): T => {
   if (withRecursion) return deepCopyWithRecursion(src, new WeakMap())
   return simpleDeepCopy(src)
 }
+
+export const enum AutoDestroyState {
+  Disabled,
+  Enabled,
+  Destroyed,
+}

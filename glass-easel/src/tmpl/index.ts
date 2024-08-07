@@ -110,7 +110,7 @@ class GlassEaselTemplateInstance implements TemplateInstance {
   constructor(template: GlassEaselTemplate, comp: GeneralComponent, shadowRoot: ShadowRoot) {
     this.comp = comp
     this.shadowRoot = shadowRoot
-    this.shadowRoot.destroyBackendElementOnDetach()
+    this.shadowRoot.destroyBackendElementOnRemoval()
     this._$applyTemplate(template)
   }
 
