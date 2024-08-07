@@ -243,7 +243,7 @@ export class ProcGenWrapper {
           return
         }
         const elem = this.shadowRoot.createTextNode(textContent)
-        elem.destroyBackendElementOnDetach()
+        elem.destroyBackendElementOnRemoval()
         if (slotElement) Element.setSlotElement(elem, slotElement)
         if (textInit) textInit(elem)
         childNodes.push(elem)
@@ -283,7 +283,7 @@ export class ProcGenWrapper {
       // wx:if node or template-is node
       (branchKey: number | string, branchFunc: DefineChildren) => {
         const elem = this.shadowRoot.createVirtualNode('wx:if')
-        elem.destroyBackendElementOnDetach()
+        elem.destroyBackendElementOnRemoval()
         Element.setInheritSlots(elem)
         if (slotElement) Element.setSlotElement(elem, slotElement)
         const tmplArgs = getTmplArgs(elem)
@@ -315,7 +315,7 @@ export class ProcGenWrapper {
       ) => {
         const shadowRoot = this.shadowRoot
         const elem = shadowRoot.createVirtualNode('wx:for')
-        elem.destroyBackendElementOnDetach()
+        elem.destroyBackendElementOnRemoval()
         Element.setInheritSlots(elem)
         if (slotElement) Element.setSlotElement(elem, slotElement)
         const tmplArgs = getTmplArgs(elem)
@@ -326,7 +326,7 @@ export class ProcGenWrapper {
           shadowRoot,
           (item: DataValue, index: number | string): VirtualNode => {
             const childNode = shadowRoot.createVirtualNode('wx:for-item')
-            childNode.destroyBackendElementOnDetach()
+            childNode.destroyBackendElementOnRemoval()
             Element.setInheritSlots(childNode)
             if (slotElement) Element.setSlotElement(elem, slotElement)
             this.handleChildrenCreationAndInsert(
@@ -367,7 +367,7 @@ export class ProcGenWrapper {
       // slot node
       (slotName: string | undefined, slotValueInit?: (elem: Element) => void, slot?: string) => {
         const elem = this.shadowRoot.createVirtualNode('slot')
-        elem.destroyBackendElementOnDetach()
+        elem.destroyBackendElementOnRemoval()
         Element.setSlotName(elem, dataValueToString(slotName))
         if (slotElement) {
           Element.setSlotElement(elem, slotElement)
@@ -384,7 +384,7 @@ export class ProcGenWrapper {
           if (slotElement) {
             if (dynamicSlotName! === slot) {
               const elem = this.shadowRoot.createVirtualNode('virtual')
-              elem.destroyBackendElementOnDetach()
+              elem.destroyBackendElementOnRemoval()
               Element.setSlotElement(elem, slotElement)
               const tmplArgs = getTmplArgs(elem)
               tmplArgs.dynamicSlotNameMatched = true
@@ -396,14 +396,14 @@ export class ProcGenWrapper {
             }
           } else {
             const elem = this.shadowRoot.createVirtualNode('virtual')
-            elem.destroyBackendElementOnDetach()
+            elem.destroyBackendElementOnRemoval()
             elem.slot = slot
             this.handleChildrenCreationAndInsert(children, elem, undefined, undefined)
             childNodes.push(elem)
           }
         } else {
           const elem = this.shadowRoot.createVirtualNode('virtual')
-          elem.destroyBackendElementOnDetach()
+          elem.destroyBackendElementOnRemoval()
           Element.setInheritSlots(elem)
           if (slotElement) Element.setSlotElement(elem, slotElement)
           this.handleChildrenCreationAndInsert(children, elem, slotElement, dynamicSlotName)
@@ -521,7 +521,7 @@ export class ProcGenWrapper {
           this.handleChildrenUpdate(branchFunc, elem, slotElement, dynamicSlotName)
         } else {
           const newElem = this.shadowRoot.createVirtualNode('wx:if')
-          newElem.destroyBackendElementOnDetach()
+          newElem.destroyBackendElementOnRemoval()
           Element.setInheritSlots(newElem)
           if (slotElement) Element.setSlotElement(newElem, slotElement)
           const tmplArgs = getTmplArgs(newElem)
@@ -564,7 +564,7 @@ export class ProcGenWrapper {
           elem,
           (item: DataValue, index: number | string): VirtualNode => {
             const childNode = this.shadowRoot.createVirtualNode('wx:for-item')
-            childNode.destroyBackendElementOnDetach()
+            childNode.destroyBackendElementOnRemoval()
             Element.setInheritSlots(childNode)
             if (slotElement) Element.setSlotElement(elem, slotElement)
             this.handleChildrenCreationAndInsert(
@@ -667,7 +667,7 @@ export class ProcGenWrapper {
                 this.handleChildrenUpdate(children, elem, undefined, undefined)
               } else {
                 const newElem = this.shadowRoot.createVirtualNode('virtual')
-                newElem.destroyBackendElementOnDetach()
+                newElem.destroyBackendElementOnRemoval()
                 Element.setSlotElement(newElem, slotElement)
                 const newTmplArgs = getTmplArgs(newElem)
                 newTmplArgs.dynamicSlotNameMatched = true
@@ -794,7 +794,7 @@ export class ProcGenWrapper {
 
   createDynamicPlaceholder(slotElement: Element): Element {
     const elem = this.shadowRoot.createVirtualNode('virtual')
-    elem.destroyBackendElementOnDetach()
+    elem.destroyBackendElementOnRemoval()
     Element.setSlotElement(elem, slotElement)
     const tmplArgs = getTmplArgs(elem)
     tmplArgs.dynamicSlotNameMatched = false
@@ -831,7 +831,7 @@ export class ProcGenWrapper {
         undefined,
         initPropValues,
       )
-      replacer.destroyBackendElementOnDetach()
+      replacer.destroyBackendElementOnRemoval()
       const replacerShadowRoot = (replacer as GeneralComponent).getShadowRoot()
       const elemShadowRoot = isComponent(elem) ? elem.getShadowRoot() : null
       const isElemDynamicSlots = elemShadowRoot?.getSlotMode() === SlotMode.Dynamic
@@ -857,7 +857,7 @@ export class ProcGenWrapper {
       placeholderCallback,
       initPropValues,
     )
-    elem.destroyBackendElementOnDetach()
+    elem.destroyBackendElementOnRemoval()
     if (dynSlot) {
       this.bindingMapDisabled = true // IDEA better binding map disable detection
     } else {
