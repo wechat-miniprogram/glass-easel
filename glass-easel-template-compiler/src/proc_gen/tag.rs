@@ -1107,6 +1107,12 @@ impl Element {
                                             p.lvalue_state_expr(w, scopes)?;
                                             write!(w, ")R.l(N,{},", gen_lit_str(name))?;
                                             p.value_expr(w)?;
+                                            if attr_name_maybe_event_binding(name) {
+                                                if p.has_script_lvalue_path(scopes) {
+                                                    write!(w, ",")?;
+                                                    p.lvalue_path(w, scopes, Some(false))?;
+                                                }
+                                            }
                                             write!(w, ")")?;
                                             Ok(())
                                         })?;
@@ -1289,13 +1295,7 @@ impl Attribute {
                 double_brace_location: _,
                 binding_map_keys,
             } => {
-                let maybe_event_binding = !self.is_model && {
-                    attr_name.starts_with("bind")
-                        || attr_name.starts_with("capture-bind")
-                        || attr_name.starts_with("catch")
-                        || attr_name.starts_with("capture-catch")
-                        || attr_name.starts_with("on")
-                };
+                let maybe_event_binding = !self.is_model && attr_name_maybe_event_binding(&attr_name);
                 let p = expression.to_proc_gen_prepare(w, scopes)?;
                 w.expr_stmt(|w| {
                     write!(w, "if(C||K||")?;
@@ -1563,4 +1563,12 @@ impl<'a> StaticStrOrProcGen<'a> {
         };
         Ok(this)
     }
+}
+
+fn attr_name_maybe_event_binding(attr_name: &str) -> bool {
+    attr_name.starts_with("bind")
+        || attr_name.starts_with("capture-bind")
+        || attr_name.starts_with("catch")
+        || attr_name.starts_with("capture-catch")
+        || attr_name.starts_with("on")
 }
