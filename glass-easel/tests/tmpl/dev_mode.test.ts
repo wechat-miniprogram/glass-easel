@@ -7,6 +7,9 @@ const getTmplDevArgs = (n: glassEasel.Node) =>
 const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
   test('attribute list', () => {
     const def = glassEasel.registerElement({
+      options: {
+        dynamicSlots: true,
+      },
       template: tmpl(`
         <div id="a" slot="b" class="c" style="" hidden>
           <slot name="n" v="v"></slot>

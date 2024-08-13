@@ -13,7 +13,7 @@ import { type TextNode } from '../text_node'
 import { type ProcGenGroupList } from '../tmpl'
 import { isComponent, isNativeNode } from '../type_symbol'
 import { type VirtualNode } from '../virtual_node'
-import { dispatchError } from '../warning'
+import { dispatchError, triggerWarning } from '../warning'
 import { RangeListManager } from './range_list_diff'
 
 export type UpdatePathTreeNode = true | { [key: string]: UpdatePathTreeNode } | UpdatePathTreeNode[]
@@ -416,7 +416,7 @@ export class ProcGenWrapper {
     return childNodes
   }
 
-  handleChildrenCreationAndInsert(
+  private handleChildrenCreationAndInsert(
     children: DefineChildren,
     parentNode: Element,
     slotElement: Element | undefined,
@@ -693,7 +693,7 @@ export class ProcGenWrapper {
     )
   }
 
-  dynamicSlotUpdate(
+  private dynamicSlotUpdate(
     elem: GeneralComponent,
     dynamicSlotValueNames: string[] | undefined,
     children: DefineChildren,
@@ -792,7 +792,7 @@ export class ProcGenWrapper {
     return null
   }
 
-  createDynamicPlaceholder(slotElement: Element): Element {
+  private createDynamicPlaceholder(slotElement: Element): Element {
     const elem = this.shadowRoot.createVirtualNode('virtual')
     elem.destroyBackendElementOnRemoval()
     Element.setSlotElement(elem, slotElement)
@@ -801,7 +801,74 @@ export class ProcGenWrapper {
     return elem
   }
 
-  createCommonElement(
+  private checkFallbackEventListener(
+    elem: Element,
+    camelName: string,
+    value: unknown,
+    generalLvaluePath?: DataPath | null,
+  ): boolean {
+    if (camelName.startsWith('bind')) {
+      this.v(
+        elem,
+        camelName.slice('bind'.length),
+        value,
+        false,
+        false,
+        false,
+        true,
+        generalLvaluePath,
+      )
+    } else if (camelName.startsWith('captureBind')) {
+      this.v(
+        elem,
+        camelName.slice('captureBind'.length),
+        value,
+        false,
+        false,
+        true,
+        true,
+        generalLvaluePath,
+      )
+    } else if (camelName.startsWith('catch')) {
+      this.v(
+        elem,
+        camelName.slice('catch'.length),
+        value,
+        true,
+        false,
+        false,
+        true,
+        generalLvaluePath,
+      )
+    } else if (camelName.startsWith('captureCatch')) {
+      this.v(
+        elem,
+        camelName.slice('captureCatch'.length),
+        value,
+        true,
+        false,
+        true,
+        true,
+        generalLvaluePath,
+      )
+    } else if (camelName.startsWith('on')) {
+      this.v(
+        elem,
+        camelName.slice('on'.length),
+        value,
+        false,
+        false,
+        false,
+        true,
+        generalLvaluePath,
+      )
+    } else {
+      return false
+    }
+    return true
+  }
+
+  private createCommonElement(
     tagName: string,
     genericImpls: { [key: string]: string },
     propertyInit: (elem: Element, isCreation: boolean) => void,
@@ -873,8 +940,19 @@ export class ProcGenWrapper {
   }
 
   // set slot value
-  l(elem: Element, name: string, value: unknown) {
-    this.shadowRoot.replaceSlotValue(elem, name, value)
+  l(elem: Element, name: string, value: unknown, generalLvaluePath?: DataPath | null) {
+    if (this.shadowRoot.getSlotMode() === SlotMode.Dynamic) {
+      this.shadowRoot.replaceSlotValue(elem, name, value)
+    } else {
+      // compatibilities for legacy event binding syntax
+      if (!this.checkFallbackEventListener(elem, name, value, generalLvaluePath)) {
+        triggerWarning(
+          `"${name}" is not a valid event binding or slot value`,
+          elem.ownerShadowRoot?.getHostNode(),
+          elem,
+        )
+      }
+    }
   }
 
   // set id
@@ -919,7 +997,7 @@ export class ProcGenWrapper {
   v(
     elem: Element,
     evName: string,
-    v: string | ((ev: ShadowedEvent<unknown>) => void) | undefined,
+    v: unknown,
     final: boolean,
     mutated: boolean,
     capture: boolean,
@@ -971,67 +1049,6 @@ export class ProcGenWrapper {
     modelLvaluePath?: DataPath | null,
     generalLvaluePath?: DataPath | null,
   ) => {
-    const checkFallbackEventListener = (camelName: string) => {
-      if (camelName.startsWith('bind')) {
-        this.v(
-          elem,
-          camelName.slice('bind'.length),
-          dataValueToString(v),
-          false,
-          false,
-          false,
-          true,
-          generalLvaluePath,
-        )
-      } else if (camelName.startsWith('captureBind')) {
-        this.v(
-          elem,
-          camelName.slice('captureBind'.length),
-          dataValueToString(v),
-          false,
-          false,
-          true,
-          true,
-          generalLvaluePath,
-        )
-      } else if (camelName.startsWith('catch')) {
-        this.v(
-          elem,
-          camelName.slice('catch'.length),
-          dataValueToString(v),
-          true,
-          false,
-          false,
-          true,
-          generalLvaluePath,
-        )
-      } else if (camelName.startsWith('captureCatch')) {
-        this.v(
-          elem,
-          camelName.slice('captureCatch'.length),
-          dataValueToString(v),
-          true,
-          false,
-          true,
-          true,
-          generalLvaluePath,
-        )
-      } else if (camelName.startsWith('on')) {
-        this.v(
-          elem,
-          camelName.slice('on'.length),
-          dataValueToString(v),
-          false,
-          false,
-          false,
-          true,
-          generalLvaluePath,
-        )
-      } else {
-        return false
-      }
-      return true
-    }
     if (isComponent(elem)) {
       const nodeDataProxy = Component.getDataProxy(elem)
       const camelName = dashToCamelCase(name)
@@ -1062,13 +1079,19 @@ export class ProcGenWrapper {
         elem.setExternalClass(name, v as string)
       } else {
         // compatibilities for legacy event binding syntax
-        checkFallbackEventListener(camelName)
+        if (!this.checkFallbackEventListener(elem, camelName, v, generalLvaluePath)) {
+          triggerWarning(
+            `"${camelName}" is not a valid property`,
+            elem.ownerShadowRoot?.getHostNode(),
+            elem,
+          )
+        }
       }
     } else if (isNativeNode(elem)) {
       if (this.fallbackListenerOnNativeNode) {
         // compatibilities for legacy event binding syntax
         const camelName = dashToCamelCase(name)
-        if (!checkFallbackEventListener(camelName)) {
+        if (!this.checkFallbackEventListener(elem, camelName, v, generalLvaluePath)) {
           elem.updateAttribute(name, v)
         }
       } else {
