@@ -10,6 +10,7 @@ import {
 import { DeepCopyStrategy, getDeepCopyStrategy } from './data_proxy'
 import { deepCopy, simpleDeepCopy } from './data_utils'
 import { Element, type DoubleLinkedList } from './element'
+import { MutationObserverTarget } from './mutation_observer'
 import { NativeNode } from './native_node'
 import { type Node } from './node'
 import { TextNode } from './text_node'
@@ -796,6 +797,14 @@ export class ShadowRoot extends VirtualNode {
     }
     if (oldValue === newValue) return
     slotValues[name] = newValue
+    if (slot._$mutationObserverTarget) {
+      MutationObserverTarget.callAttrObservers(slot, {
+        type: 'properties',
+        target: slot,
+        nameType: 'slot-value',
+        propertyName: name,
+      })
+    }
     if (this._$requiredSlotValueNames!.indexOf(name) < 0) return
     const slotMeta = this._$dynamicSlots?.get(slot)
     if (!slotMeta) return

@@ -119,8 +119,8 @@ describe('chaining-form interface', () => {
       .externalClasses(['a-class', 'b-class'])
       .template(
         tmpl(`
-        <div class="invalid a-class b-class"></div>
-      `),
+          <div class="invalid a-class b-class"></div>
+        `),
       )
       .registerComponent()
     const compDef = componentSpace
@@ -130,11 +130,13 @@ describe('chaining-form interface', () => {
       })
       .template(
         tmpl(`
-        <child invalid="i" a-class="a" b-class="b" />
-      `),
+          <child invalid="i" a-class="a" b-class="b" />
+        `),
       )
       .registerComponent()
-    const elem = glassEasel.Component.createWithContext('root', compDef, domBackend)
+    const elem = execWithWarn(1, () =>
+      glassEasel.Component.createWithContext('root', compDef, domBackend),
+    )
     expect(domHtml(elem)).toBe('<child><div class="invalid a b"></div></child>')
   })
 

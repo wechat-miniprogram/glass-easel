@@ -8,6 +8,10 @@ export {
   backend,
   composedBackend,
   domlikeBackend,
+  BoundingClientRect,
+  ScrollOffset,
+  CSSProperty,
+  CSSRule,
 } from './backend'
 export { CurrentWindowBackendContext } from './backend/current_window_backend_context'
 export { EmptyBackendContext } from './backend/empty_backend'
@@ -61,6 +65,7 @@ export {
   globalOptions,
 } from './global_options'
 export { MutationObserver, MutationObserver as Observer } from './mutation_observer'
+export * as mutationObserver from './mutation_observer'
 export { NativeNode, NativeNodeAttributeFilter, ExtendedNativeNodeDefinition } from './native_node'
 export { Node, NodeCast, dumpElement, dumpElementToString, dumpSingleElementToString } from './node'
 export { RelationFailedListener, RelationListener, RelationType } from './relation'

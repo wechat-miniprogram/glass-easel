@@ -1,6 +1,7 @@
 import * as glassEasel from 'glass-easel'
 import { tmpl } from './base/env'
 import { MiniProgramEnv } from '../src'
+import { StyleIsolation } from '../src/types'
 
 const domHtml = (elem: glassEasel.Element): string => {
   const domElem = elem.getBackendElement() as unknown as Element
@@ -14,6 +15,7 @@ describe('selector query', () => {
 
     codeSpace.addComponentStaticConfig('child/comp', {
       component: true,
+      styleIsolation: StyleIsolation.Shared,
     })
     codeSpace.addCompiledTemplate('child/comp', tmpl('{{a}}'))
     // eslint-disable-next-line arrow-body-style
@@ -79,8 +81,11 @@ describe('selector query', () => {
     const env = new MiniProgramEnv()
     const codeSpace = env.createCodeSpace('', true)
 
-    codeSpace.addComponentStaticConfig('child1/comp', { component: true })
-    codeSpace.addComponentStaticConfig('child2/comp', { component: true })
+    codeSpace.addComponentStaticConfig('child1/comp', {
+      component: true,
+      styleIsolation: StyleIsolation.Shared,
+    })
+    codeSpace.addComponentStaticConfig('child2/comp', { component: false })
     codeSpace.addCompiledTemplate('child1/comp', tmpl('{{a}}'))
     codeSpace.addCompiledTemplate('child2/comp', tmpl('{{a}}'))
 
@@ -166,8 +171,11 @@ describe('selector query', () => {
     const env = new MiniProgramEnv()
     const codeSpace = env.createCodeSpace('', true)
 
-    codeSpace.addComponentStaticConfig('child1/comp', { component: true })
-    codeSpace.addComponentStaticConfig('child2/comp', { component: true })
+    codeSpace.addComponentStaticConfig('child1/comp', {
+      component: true,
+      styleIsolation: StyleIsolation.Shared,
+    })
+    codeSpace.addComponentStaticConfig('child2/comp', { component: false })
     codeSpace.addCompiledTemplate('child1/comp', tmpl('{{a}}'))
     codeSpace.addCompiledTemplate('child2/comp', tmpl('{{a}}'))
 
@@ -260,6 +268,7 @@ describe('selector query', () => {
 
     codeSpace.addComponentStaticConfig('child/comp', {
       component: true,
+      styleIsolation: StyleIsolation.Shared,
     })
     codeSpace.addCompiledTemplate('child/comp', tmpl('{{a}}'))
     // eslint-disable-next-line arrow-body-style
@@ -273,6 +282,7 @@ describe('selector query', () => {
 
     codeSpace.addComponentStaticConfig('child/comp2', {
       component: true,
+      styleIsolation: StyleIsolation.Shared,
     })
     codeSpace.addCompiledTemplate('child/comp2', tmpl('{{a}}'))
     // eslint-disable-next-line arrow-body-style

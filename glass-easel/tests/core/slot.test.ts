@@ -1,4 +1,4 @@
-import { tmpl, domBackend, composedBackend, shadowBackend } from '../base/env'
+import { tmpl, domBackend, composedBackend, shadowBackend, execWithWarn } from '../base/env'
 import { virtual as matchElementWithDom } from '../base/match'
 import * as glassEasel from '../../src'
 
@@ -1687,6 +1687,70 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           dynamicElem.childNodes[1]!,
         ],
       )
+    })
+
+    test('fallback to possible event bindings', () => {
+      const callOrder: number[] = []
+
+      const single = componentSpace
+        .define()
+        .definition({
+          template: tmpl('<div><slot binda-bc="fAbc" abc="fAbc" /></div>'),
+          methods: {
+            fAbc() {
+              callOrder.push(1)
+            },
+          },
+        })
+        .registerComponent()
+
+      const parent = componentSpace
+        .define()
+        .usingComponents({ single })
+        .definition({
+          template: tmpl(`
+            <single><div id="a" /></single>
+          `),
+        })
+        .registerComponent()
+
+      const parentElem = execWithWarn(1, () =>
+        glassEasel.Component.createWithContext('root', parent, testBackend),
+      )
+      const a = parentElem.getShadowRoot()!.getElementById('a')!
+      a.triggerEvent('aBc', null, { bubbles: true, composed: true })
+      expect(callOrder).toStrictEqual([1])
+    })
+
+    test('fallback to possible event bindings (template script)', () => {
+      const single = componentSpace
+        .define()
+        .definition({
+          template: tmpl(`
+            <wxs module="modA">
+              exports.fA = function (ev) {
+                ev.target._test = 123
+              }
+            </wxs>
+            <div><slot binda-bc="{{ modA.fA }}" /></div>
+          `),
+        })
+        .registerComponent()
+
+      const parent = componentSpace
+        .define()
+        .usingComponents({ single })
+        .definition({
+          template: tmpl(`
+            <single><div id="a" /></single>
+          `),
+        })
+        .registerComponent()
+
+      const parentElem = glassEasel.Component.createWithContext('root', parent, testBackend)
+      const a = parentElem.getShadowRoot()!.getElementById('a')!
+      a.triggerEvent('aBc', null, { bubbles: true, composed: true })
+      expect((a.getComposedParent() as unknown as { _test: number })._test).toStrictEqual(123)
     })
   })
 }

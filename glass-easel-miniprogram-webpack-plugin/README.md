@@ -40,6 +40,7 @@ plugins: [
 
 | Options | Explanation |
 | ------- | ----------- |
+| dev | compile with more debug information (default to `false` if the webpack is in `production` mode) |
 | path | the mini-program-like directory to be compiled (default to `src` ) |
 | resourceFilePattern | the filename pattern (in the mini-program-like directory) to be copied into the webpack output path |
 | defaultEntry | the mini-program page to be loaded on startup |
@@ -83,10 +84,11 @@ A page can be loaded like this:
 
 ```js
 import * as glassEasel from 'glass-easel'
-import { codeSpace, initWithBackend } from './src' // import the plugin-generated code
+import { codeSpace, initWithBackend, registerGlobalEventListener } from './src' // import the plugin-generated code
 
 // create the backend context
 const backendContext = new glassEasel.CurrentWindowBackendContext() // or another backend context
+registerGlobalEventListener(backendContext)
 const ab = initWithBackend(backendContext)
 
 // create a mini-program page

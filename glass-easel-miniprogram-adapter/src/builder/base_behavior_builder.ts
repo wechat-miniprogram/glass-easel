@@ -23,6 +23,7 @@ type MethodList = typeUtils.MethodList
 type ChainingFilterType = typeUtils.ChainingFilterType
 type ComponentMethod = typeUtils.ComponentMethod
 type TaggedMethod<Fn extends ComponentMethod> = typeUtils.TaggedMethod<Fn>
+type UnTaggedMethod<M extends TaggedMethod<any>> = typeUtils.UnTaggedMethod<M>
 
 export class BaseBehaviorBuilder<
   TPrevData extends DataList = Empty,
@@ -260,7 +261,12 @@ export class BaseBehaviorBuilder<
       TPrevData,
       TData,
       TProperty,
-      TMethod,
+      TMethod &
+        (TExport extends void
+          ? Empty
+          : {
+              [K in keyof TExport]: UnTaggedMethod<TExport[K]>
+            }),
       TChainingFilter,
       TPendingChainingFilter,
       TComponentExport,
@@ -316,7 +322,7 @@ export class BaseBehaviorBuilder<
         TExtraThisFields
       >
 
-      return func.call(methodCaller, {
+      const exported = func.call(methodCaller, {
         self: methodCaller,
         data,
         setData: (newData, callback) => {
@@ -335,6 +341,18 @@ export class BaseBehaviorBuilder<
         method,
         listener,
       })
+
+      if (exported) {
+        const exportedKeys = Object.keys(exported)
+        for (let j = 0; j < exportedKeys.length; j += 1) {
+          const exportedKey = exportedKeys[j]!
+          const exportItem: unknown = exported[exportedKey]
+          if (glassEasel.Component.isTaggedMethod(exportItem)) {
+            ;(methodCaller as { [key: string]: unknown })[exportedKey] = exportItem
+          }
+        }
+      }
+      return exported
     })
     return this as any
   }

@@ -13,7 +13,7 @@ import { type TextNode } from '../text_node'
 import { type ProcGenGroupList } from '../tmpl'
 import { isComponent, isNativeNode } from '../type_symbol'
 import { type VirtualNode } from '../virtual_node'
-import { dispatchError } from '../warning'
+import { dispatchError, triggerWarning } from '../warning'
 import { RangeListManager } from './range_list_diff'
 
 export type UpdatePathTreeNode = true | { [key: string]: UpdatePathTreeNode } | UpdatePathTreeNode[]
@@ -44,12 +44,21 @@ type TmplArgs = {
     }
   }
 }
-export type TmplNode = Node & { _$wxTmplArgs?: TmplArgs }
+export type TmplDevArgs = {
+  A?: string[] // active attributes
+}
+export type TmplNode = Node & { _$wxTmplArgs?: TmplArgs; _$wxTmplDevArgs?: TmplDevArgs }
 
 export const getTmplArgs = (elem: Node): TmplArgs => {
   const node = elem as TmplNode
   // eslint-disable-next-line no-return-assign
   return (node._$wxTmplArgs = node._$wxTmplArgs || {})
+}
+
+export const getTmplDevArgs = (elem: Node): TmplDevArgs => {
+  const node = elem as TmplNode
+  // eslint-disable-next-line no-return-assign
+  return (node._$wxTmplDevArgs = node._$wxTmplDevArgs || {})
 }
 
 export const dataValueToString = (v: DataValue): string => {
@@ -234,7 +243,7 @@ export class ProcGenWrapper {
           return
         }
         const elem = this.shadowRoot.createTextNode(textContent)
-        elem.destroyBackendElementOnDetach()
+        elem.destroyBackendElementOnRemoval()
         if (slotElement) Element.setSlotElement(elem, slotElement)
         if (textInit) textInit(elem)
         childNodes.push(elem)
@@ -274,7 +283,7 @@ export class ProcGenWrapper {
       // wx:if node or template-is node
       (branchKey: number | string, branchFunc: DefineChildren) => {
         const elem = this.shadowRoot.createVirtualNode('wx:if')
-        elem.destroyBackendElementOnDetach()
+        elem.destroyBackendElementOnRemoval()
         Element.setInheritSlots(elem)
         if (slotElement) Element.setSlotElement(elem, slotElement)
         const tmplArgs = getTmplArgs(elem)
@@ -306,7 +315,7 @@ export class ProcGenWrapper {
       ) => {
         const shadowRoot = this.shadowRoot
         const elem = shadowRoot.createVirtualNode('wx:for')
-        elem.destroyBackendElementOnDetach()
+        elem.destroyBackendElementOnRemoval()
         Element.setInheritSlots(elem)
         if (slotElement) Element.setSlotElement(elem, slotElement)
         const tmplArgs = getTmplArgs(elem)
@@ -317,7 +326,7 @@ export class ProcGenWrapper {
           shadowRoot,
           (item: DataValue, index: number | string): VirtualNode => {
             const childNode = shadowRoot.createVirtualNode('wx:for-item')
-            childNode.destroyBackendElementOnDetach()
+            childNode.destroyBackendElementOnRemoval()
             Element.setInheritSlots(childNode)
             if (slotElement) Element.setSlotElement(elem, slotElement)
             this.handleChildrenCreationAndInsert(
@@ -358,7 +367,7 @@ export class ProcGenWrapper {
       // slot node
       (slotName: string | undefined, slotValueInit?: (elem: Element) => void, slot?: string) => {
         const elem = this.shadowRoot.createVirtualNode('slot')
-        elem.destroyBackendElementOnDetach()
+        elem.destroyBackendElementOnRemoval()
         Element.setSlotName(elem, dataValueToString(slotName))
         if (slotElement) {
           Element.setSlotElement(elem, slotElement)
@@ -375,7 +384,7 @@ export class ProcGenWrapper {
           if (slotElement) {
             if (dynamicSlotName! === slot) {
               const elem = this.shadowRoot.createVirtualNode('virtual')
-              elem.destroyBackendElementOnDetach()
+              elem.destroyBackendElementOnRemoval()
               Element.setSlotElement(elem, slotElement)
               const tmplArgs = getTmplArgs(elem)
               tmplArgs.dynamicSlotNameMatched = true
@@ -387,14 +396,14 @@ export class ProcGenWrapper {
             }
           } else {
             const elem = this.shadowRoot.createVirtualNode('virtual')
-            elem.destroyBackendElementOnDetach()
+            elem.destroyBackendElementOnRemoval()
             elem.slot = slot
             this.handleChildrenCreationAndInsert(children, elem, undefined, undefined)
             childNodes.push(elem)
           }
         } else {
           const elem = this.shadowRoot.createVirtualNode('virtual')
-          elem.destroyBackendElementOnDetach()
+          elem.destroyBackendElementOnRemoval()
           Element.setInheritSlots(elem)
           if (slotElement) Element.setSlotElement(elem, slotElement)
           this.handleChildrenCreationAndInsert(children, elem, slotElement, dynamicSlotName)
@@ -407,7 +416,7 @@ export class ProcGenWrapper {
     return childNodes
   }
 
-  handleChildrenCreationAndInsert(
+  private handleChildrenCreationAndInsert(
     children: DefineChildren,
     parentNode: Element,
     slotElement: Element | undefined,
@@ -512,7 +521,7 @@ export class ProcGenWrapper {
           this.handleChildrenUpdate(branchFunc, elem, slotElement, dynamicSlotName)
         } else {
           const newElem = this.shadowRoot.createVirtualNode('wx:if')
-          newElem.destroyBackendElementOnDetach()
+          newElem.destroyBackendElementOnRemoval()
           Element.setInheritSlots(newElem)
           if (slotElement) Element.setSlotElement(newElem, slotElement)
           const tmplArgs = getTmplArgs(newElem)
@@ -555,7 +564,7 @@ export class ProcGenWrapper {
           elem,
           (item: DataValue, index: number | string): VirtualNode => {
             const childNode = this.shadowRoot.createVirtualNode('wx:for-item')
-            childNode.destroyBackendElementOnDetach()
+            childNode.destroyBackendElementOnRemoval()
             Element.setInheritSlots(childNode)
             if (slotElement) Element.setSlotElement(elem, slotElement)
             this.handleChildrenCreationAndInsert(
@@ -658,7 +667,7 @@ export class ProcGenWrapper {
                 this.handleChildrenUpdate(children, elem, undefined, undefined)
               } else {
                 const newElem = this.shadowRoot.createVirtualNode('virtual')
-                newElem.destroyBackendElementOnDetach()
+                newElem.destroyBackendElementOnRemoval()
                 Element.setSlotElement(newElem, slotElement)
                 const newTmplArgs = getTmplArgs(newElem)
                 newTmplArgs.dynamicSlotNameMatched = true
@@ -684,7 +693,7 @@ export class ProcGenWrapper {
     )
   }
 
-  dynamicSlotUpdate(
+  private dynamicSlotUpdate(
     elem: GeneralComponent,
     dynamicSlotValueNames: string[] | undefined,
     children: DefineChildren,
@@ -783,16 +792,83 @@ export class ProcGenWrapper {
     return null
   }
 
-  createDynamicPlaceholder(slotElement: Element): Element {
+  private createDynamicPlaceholder(slotElement: Element): Element {
     const elem = this.shadowRoot.createVirtualNode('virtual')
-    elem.destroyBackendElementOnDetach()
+    elem.destroyBackendElementOnRemoval()
     Element.setSlotElement(elem, slotElement)
     const tmplArgs = getTmplArgs(elem)
     tmplArgs.dynamicSlotNameMatched = false
     return elem
   }
 
-  createCommonElement(
+  private checkFallbackEventListener(
+    elem: Element,
+    camelName: string,
+    value: unknown,
+    generalLvaluePath?: DataPath | null,
+  ): boolean {
+    if (camelName.startsWith('bind')) {
+      this.v(
+        elem,
+        camelName.slice('bind'.length),
+        value,
+        false,
+        false,
+        false,
+        true,
+        generalLvaluePath,
+      )
+    } else if (camelName.startsWith('captureBind')) {
+      this.v(
+        elem,
+        camelName.slice('captureBind'.length),
+        value,
+        false,
+        false,
+        true,
+        true,
+        generalLvaluePath,
+      )
+    } else if (camelName.startsWith('catch')) {
+      this.v(
+        elem,
+        camelName.slice('catch'.length),
+        value,
+        true,
+        false,
+        false,
+        true,
+        generalLvaluePath,
+      )
+    } else if (camelName.startsWith('captureCatch')) {
+      this.v(
+        elem,
+        camelName.slice('captureCatch'.length),
+        value,
+        true,
+        false,
+        true,
+        true,
+        generalLvaluePath,
+      )
+    } else if (camelName.startsWith('on')) {
+      this.v(
+        elem,
+        camelName.slice('on'.length),
+        value,
+        false,
+        false,
+        false,
+        true,
+        generalLvaluePath,
+      )
+    } else {
+      return false
+    }
+    return true
+  }
+
+  private createCommonElement(
     tagName: string,
     genericImpls: { [key: string]: string },
     propertyInit: (elem: Element, isCreation: boolean) => void,
@@ -822,7 +898,7 @@ export class ProcGenWrapper {
         undefined,
         initPropValues,
       )
-      replacer.destroyBackendElementOnDetach()
+      replacer.destroyBackendElementOnRemoval()
       const replacerShadowRoot = (replacer as GeneralComponent).getShadowRoot()
       const elemShadowRoot = isComponent(elem) ? elem.getShadowRoot() : null
       const isElemDynamicSlots = elemShadowRoot?.getSlotMode() === SlotMode.Dynamic
@@ -848,7 +924,7 @@ export class ProcGenWrapper {
       placeholderCallback,
       initPropValues,
     )
-    elem.destroyBackendElementOnDetach()
+    elem.destroyBackendElementOnRemoval()
     if (dynSlot) {
       this.bindingMapDisabled = true // IDEA better binding map disable detection
     } else {
@@ -864,8 +940,19 @@ export class ProcGenWrapper {
   }
 
   // set slot value
-  l(elem: Element, name: string, value: unknown) {
-    this.shadowRoot.replaceSlotValue(elem, name, value)
+  l(elem: Element, name: string, value: unknown, generalLvaluePath?: DataPath | null) {
+    if (this.shadowRoot.getSlotMode() === SlotMode.Dynamic) {
+      this.shadowRoot.replaceSlotValue(elem, name, value)
+    } else {
+      // compatibilities for legacy event binding syntax
+      if (!this.checkFallbackEventListener(elem, name, value, generalLvaluePath)) {
+        triggerWarning(
+          `"${name}" is not a valid event binding or slot value`,
+          elem.ownerShadowRoot?.getHostNode(),
+          elem,
+        )
+      }
+    }
   }
 
   // set id
@@ -910,7 +997,7 @@ export class ProcGenWrapper {
   v(
     elem: Element,
     evName: string,
-    v: string | ((ev: ShadowedEvent<unknown>) => void) | undefined,
+    v: unknown,
     final: boolean,
     mutated: boolean,
     capture: boolean,
@@ -963,67 +1050,6 @@ export class ProcGenWrapper {
     modelLvaluePath?: DataPath | null,
     generalLvaluePath?: DataPath | null,
   ) => {
-    const checkFallbackEventListener = (camelName: string) => {
-      if (camelName.startsWith('bind')) {
-        this.v(
-          elem,
-          camelName.slice('bind'.length),
-          typeof v === 'function' ? (v as any) : dataValueToString(v),
-          false,
-          false,
-          false,
-          true,
-          generalLvaluePath,
-        )
-      } else if (camelName.startsWith('captureBind')) {
-        this.v(
-          elem,
-          camelName.slice('captureBind'.length),
-          typeof v === 'function' ? (v as any) : dataValueToString(v),
-          false,
-          false,
-          true,
-          true,
-          generalLvaluePath,
-        )
-      } else if (camelName.startsWith('catch')) {
-        this.v(
-          elem,
-          camelName.slice('catch'.length),
-          typeof v === 'function' ? (v as any) : dataValueToString(v),
-          true,
-          false,
-          false,
-          true,
-          generalLvaluePath,
-        )
-      } else if (camelName.startsWith('captureCatch')) {
-        this.v(
-          elem,
-          camelName.slice('captureCatch'.length),
-          typeof v === 'function' ? (v as any) : dataValueToString(v),
-          true,
-          false,
-          true,
-          true,
-          generalLvaluePath,
-        )
-      } else if (camelName.startsWith('on')) {
-        this.v(
-          elem,
-          camelName.slice('on'.length),
-          typeof v === 'function' ? (v as any) : dataValueToString(v),
-          false,
-          false,
-          false,
-          true,
-          generalLvaluePath,
-        )
-      } else {
-        return false
-      }
-      return true
-    }
     if (isComponent(elem)) {
       const nodeDataProxy = Component.getDataProxy(elem)
       const camelName = dashToCamelCase(name)
@@ -1054,13 +1080,19 @@ export class ProcGenWrapper {
         elem.setExternalClass(name, v as string)
       } else {
         // compatibilities for legacy event binding syntax
-        checkFallbackEventListener(camelName)
+        if (!this.checkFallbackEventListener(elem, camelName, v, generalLvaluePath)) {
+          triggerWarning(
+            `"${camelName}" is not a valid property`,
+            elem.ownerShadowRoot?.getHostNode(),
+            elem,
+          )
+        }
       }
     } else if (isNativeNode(elem)) {
       const camelName = dashToCamelCase(name)
       if (this.fallbackListenerOnNativeNode) {
         // compatibilities for legacy event binding syntax
-        if (!checkFallbackEventListener(camelName)) {
+        if (!this.checkFallbackEventListener(elem, camelName, v, generalLvaluePath)) {
           elem.callAttributeFilter(camelName, v, (newPropValue) => {
             elem.updateAttribute(camelName, newPropValue)
           })
@@ -1115,6 +1147,11 @@ export class ProcGenWrapper {
   setFnFilter(changePropFilter: <T>(v: T) => T, eventListenerFilter: <T>(v: T) => T) {
     this.changePropFilter = changePropFilter
     this.eventListenerFilter = eventListenerFilter
+  }
+
+  // get dev args object
+  devArgs(elem: Element): TmplDevArgs {
+    return getTmplDevArgs(elem)
   }
 }
 

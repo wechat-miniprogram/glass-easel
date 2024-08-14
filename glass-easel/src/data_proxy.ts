@@ -1016,6 +1016,7 @@ export class DataGroup<
           MutationObserverTarget.callAttrObservers(comp, {
             type: 'properties',
             target: comp,
+            nameType: 'component-property',
             propertyName: propName,
           })
         }

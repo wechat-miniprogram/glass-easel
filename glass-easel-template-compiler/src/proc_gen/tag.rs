@@ -419,6 +419,84 @@ impl Node {
 }
 
 impl Element {
+    fn collect_active_attribute_names<E>(
+        &self,
+        mut f: impl FnMut(&str) -> Result<(), E>,
+    ) -> Result<(), E> {
+        match &self.kind {
+            ElementKind::Normal {
+                attributes,
+                class,
+                style,
+                change_attributes,
+                data,
+                common,
+                ..
+            } => {
+                if common.id.is_some() {
+                    f("\":id\"")?;
+                }
+                if common.slot.is_some() {
+                    f("\":slot\"")?;
+                }
+                if let ClassAttribute::None = class {
+                    // empty
+                } else {
+                    f("\":class\"")?;
+                }
+                if let StyleAttribute::None = style {
+                    // empty
+                } else {
+                    f("\":style\"")?
+                }
+                for attr in attributes {
+                    f(&gen_lit_str(&attr.name.name))?;
+                }
+                for attr in change_attributes {
+                    f(&gen_lit_str(&attr.name.name))?;
+                }
+                for attr in data {
+                    f(&gen_lit_str(&format!("data:{}", &attr.name.name)))?;
+                }
+                for attr in common.marks.iter() {
+                    f(&gen_lit_str(&format!("mark:{}", &attr.name.name)))?;
+                }
+            }
+            ElementKind::Pure {
+                slot,
+                slot_value_refs: _,
+                ..
+            } => {
+                if !slot.is_some() {
+                    f("\":slot\"")?;
+                }
+            }
+            ElementKind::Slot {
+                name,
+                values,
+                common,
+            } => {
+                if common.id.is_some() {
+                    f("\":id\"")?;
+                }
+                if common.slot.is_some() {
+                    f("\":slot\"")?;
+                }
+                if !name.1.is_empty() {
+                    f("\":name\"")?;
+                }
+                for attr in values {
+                    f(&gen_lit_str(&attr.name.name))?;
+                }
+                for attr in common.marks.iter() {
+                    f(&gen_lit_str(&format!("mark:{}", &attr.name.name)))?;
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
     pub(crate) fn to_proc_gen<W: std::fmt::Write>(
         &self,
         w: &mut JsFunctionScopeWriter<W>,
@@ -481,6 +559,14 @@ impl Element {
                     }
                     write!(w, "}},")?;
                     w.function_args("N,C", |w| {
+                        if group.dev() {
+                            w.expr_stmt(|w| {
+                                write!(w, "R.devArgs(N).A=[")?;
+                                self.collect_active_attribute_names(|str| write!(w, "{},", str))?;
+                                write!(w, "]")?;
+                                Ok(())
+                            })?;
+                        }
                         if extra_attr.len() > 0 {
                             for attr in extra_attr.iter() {
                                 w.expr_stmt(|w| {
@@ -989,6 +1075,16 @@ impl Element {
                     if values.len() > 0 || !common.is_empty() {
                         write!(w, r#","#)?;
                         w.function_args("N", |w| {
+                            if group.dev() {
+                                w.expr_stmt(|w| {
+                                    write!(w, "R.devArgs(N).A=[")?;
+                                    self.collect_active_attribute_names(|str| {
+                                        write!(w, "{},", str)
+                                    })?;
+                                    write!(w, "]")?;
+                                    Ok(())
+                                })?;
+                            }
                             common.to_proc_gen_without_slot(w, scopes, bmc)?;
                             for attr in values {
                                 let name = attr.name.name.as_str();
@@ -1011,6 +1107,12 @@ impl Element {
                                             p.lvalue_state_expr(w, scopes)?;
                                             write!(w, ")R.l(N,{},", gen_lit_str(name))?;
                                             p.value_expr(w)?;
+                                            if attr_name_maybe_event_binding(name) {
+                                                if p.has_script_lvalue_path(scopes) {
+                                                    write!(w, ",")?;
+                                                    p.lvalue_path(w, scopes, Some(false))?;
+                                                }
+                                            }
                                             write!(w, ")")?;
                                             Ok(())
                                         })?;
@@ -1193,13 +1295,7 @@ impl Attribute {
                 double_brace_location: _,
                 binding_map_keys,
             } => {
-                let maybe_event_binding = !self.is_model && {
-                    attr_name.starts_with("bind")
-                        || attr_name.starts_with("capture-bind")
-                        || attr_name.starts_with("catch")
-                        || attr_name.starts_with("capture-catch")
-                        || attr_name.starts_with("on")
-                };
+                let maybe_event_binding = !self.is_model && attr_name_maybe_event_binding(&attr_name);
                 let p = expression.to_proc_gen_prepare(w, scopes)?;
                 w.expr_stmt(|w| {
                     write!(w, "if(C||K||")?;
@@ -1467,4 +1563,12 @@ impl<'a> StaticStrOrProcGen<'a> {
         };
         Ok(this)
     }
+}
+
+fn attr_name_maybe_event_binding(attr_name: &str) -> bool {
+    attr_name.starts_with("bind")
+        || attr_name.starts_with("capture-bind")
+        || attr_name.starts_with("catch")
+        || attr_name.starts_with("capture-catch")
+        || attr_name.starts_with("on")
 }

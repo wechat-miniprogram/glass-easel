@@ -62,6 +62,7 @@ import {
   normalizeComponentOptions,
   type NormalizedComponentOptions,
 } from './global_options'
+import { MutationObserverTarget } from './mutation_observer'
 import { type Node } from './node'
 import {
   Relation,
@@ -509,8 +510,7 @@ export class Component<
     return taggedMethod
   }
 
-  /** @internal */
-  static _$isTaggedMethod(func: unknown): func is TaggedMethod<ComponentMethod> {
+  static isTaggedMethod(func: unknown): func is TaggedMethod<ComponentMethod> {
     return typeof func === 'function' && !!(func as unknown as { [tag: symbol]: true })[METHOD_TAG]
   }
 
@@ -555,6 +555,11 @@ export class Component<
     comp._$methodCaller = comp
     comp._$virtual = virtualHost
 
+    // check shared style scope
+    const ownerSpace = behavior.ownerSpace
+    const sharedStyleScope = ownerSpace._$sharedStyleScope
+    const isDedicatedStyleScope = options.styleScope && options.styleScope !== sharedStyleScope
+
     // create backend element
     let backendElement: GeneralBackendElement | null = null
     if (nodeTreeContext) {
@@ -564,6 +569,12 @@ export class Component<
           backendElement = (nodeTreeContext as domlikeBackend.Context).document.createElement(
             tagName,
           )
+          if (isDedicatedStyleScope) {
+            backendElement.setAttribute(
+              'wx-host',
+              ownerSpace.styleScopeManager.queryName(options.styleScope!),
+            )
+          }
           if (ENV.DEV) performanceMeasureEnd()
         }
       } else if (BM.COMPOSED || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Composed)) {
@@ -621,7 +632,9 @@ export class Component<
           ;(backendElement as composedBackend.Element).setStyleScope(
             ownerStyleScope,
             extraStyleScope,
-            options.styleScope ?? StyleScopeManager.globalScope(),
+            isDedicatedStyleScope
+              ? options.styleScope ?? StyleScopeManager.globalScope()
+              : undefined,
           )
         }
       }
@@ -825,7 +838,7 @@ export class Component<
           for (let j = 0; j < exportedKeys.length; j += 1) {
             const exportedKey = exportedKeys[j]!
             const exportItem: unknown = exported[exportedKey]
-            if (Component._$isTaggedMethod(exportItem)) {
+            if (Component.isTaggedMethod(exportItem)) {
               if (cowMethodMap) {
                 cowMethodMap = false
                 comp._$methodMap = Object.create(comp._$methodMap) as MethodList
@@ -1343,10 +1356,18 @@ export class Component<
   setExternalClass(name: string, target: string | string[]) {
     this.scheduleExternalClassChange(name, target)
     this.applyExternalClassChanges()
+    if (this._$mutationObserverTarget) {
+      MutationObserverTarget.callAttrObservers(this, {
+        type: 'properties',
+        target: this,
+        nameType: 'external-class',
+        attributeName: name,
+      })
+    }
   }
 
   /** Get all external classes */
-  getExternalClasses(): string[] | undefined {
+  getExternalClasses(): { [name: string]: string[] | undefined } {
     return this.classList!._$getAlias()
   }
 

@@ -398,6 +398,14 @@ abstract class Node implements glassEasel.backend.Element {
       })
       const tagName = this.tagName.toLowerCase()
       ret.push(`<${tagName}`)
+      const comp = this.__wxElement?.asGeneralComponent()
+      if (comp) {
+        const def = comp.getComponentDefinition()
+        const scope = def.getComponentOptions().styleScope
+        if (scope && scope !== def.behavior.ownerSpace._$sharedStyleScope) {
+          props['wx-host'] = def.behavior.ownerSpace.styleScopeManager.queryName(scope)!
+        }
+      }
       if (this.id) props.id = this.getAttribute('id')!
       if (this._$style) props.style = this.getAttribute('style')!
       if (this._$classes) props.class = this.getAttribute('class')!

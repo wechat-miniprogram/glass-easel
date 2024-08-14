@@ -2,6 +2,8 @@ import { type AnyComponent, type GeneralComponent } from './component'
 import type { Element } from './element'
 import { ENV, globalOptions } from './global_options'
 
+export { TmplDevArgs } from './tmpl/proc_gen_wrapper'
+
 export interface DevTools {
   inspector?: InspectorDevTools
   performance?: PerformanceDevTools

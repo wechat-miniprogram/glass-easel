@@ -175,8 +175,12 @@ export class ClassList {
   }
 
   /** @internal */
-  _$getAlias(): string[] | undefined {
-    return this._$externalNames
+  _$getAlias(): { [name: string]: string[] | undefined } {
+    const result = Object.create(null) as { [name: string]: string[] | undefined }
+    this._$externalNames?.forEach((externalName, index) => {
+      result[externalName] = this._$externalRawAlias![index]
+    })
+    return result
   }
 
   /** @internal */
@@ -271,7 +275,7 @@ export class ClassList {
           let found = false
           for (let i = 0; i < newBackendNames.length; i += 1) {
             if (rawName === newBackendNames[i]) {
-              newBackendNamesCount[i] += 1
+              newBackendNamesCount[i]! += 1
               found = true
               break
             }
@@ -293,7 +297,7 @@ export class ClassList {
             if (this._$hasAliasNames) {
               for (let i = 0; i < newBackendNames.length; i += 1) {
                 if (className === newBackendNames[i] && scopeId === newBackendNameScopes[i]) {
-                  newBackendNamesCount[i] += 1
+                  newBackendNamesCount[i]! += 1
                   return
                 }
               }
@@ -394,7 +398,7 @@ export class ClassList {
       for (let j = 0; j < oldClassNames.length; j += 1) {
         if (name === oldClassNames[j] && scopeId === oldScopeIds[j]) {
           found = true
-          classNamesCount[j] += 1
+          classNamesCount[j]! += 1
           break
         }
       }
@@ -428,7 +432,7 @@ export class ClassList {
       classNamesCount.splice(index, 1)
       this._$removeClassFromBackend(name, scopeId, backendElement)
     } else {
-      classNamesCount[index] -= 1
+      classNamesCount[index]! -= 1
     }
   }
 

@@ -1875,14 +1875,14 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     const elem = glassEasel.Component.createWithContext('root', parent, testBackend)
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe(
-      '<def><sub class="p--static"><div class="p--static root pp--root"></div></sub></def>',
+      '<def wx-host="p"><sub class="p--static"><div class="p--static root pp--root"></div></sub></def>',
     )
     matchElementWithDom(elem)
     elem.setData({
       dynamic1: 'dynamic',
     })
     expect(domHtml(elem)).toBe(
-      '<def><sub class="p--static p--dynamic"><div class="p--static root pp--root p--dynamic"></div></sub></def>',
+      '<def wx-host="p"><sub class="p--static p--dynamic"><div class="p--static root pp--root p--dynamic"></div></sub></def>',
     )
     matchElementWithDom(elem)
     elem.setData({
@@ -1890,7 +1890,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       dynamic2: 'dynamic',
     })
     expect(domHtml(elem)).toBe(
-      '<def><sub class="p--static"><div class="p--static root pp--root dynamic pp--dynamic"></div></sub></def>',
+      '<def wx-host="p"><sub class="p--static"><div class="p--static root pp--root dynamic pp--dynamic"></div></sub></def>',
     )
     matchElementWithDom(elem)
   })

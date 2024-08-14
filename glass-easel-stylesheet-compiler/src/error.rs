@@ -1,5 +1,7 @@
 use std::ops::Range;
 
+use serde::{Deserialize, Serialize};
+
 /// A location in source code.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Position {
@@ -60,6 +62,7 @@ impl ParseError {
 pub enum ParseErrorKind {
     UnexpectedCharacter = 0x10001,
     IllegalImportPosition,
+    HostSelectorCombination,
 }
 
 impl ParseErrorKind {
@@ -67,6 +70,7 @@ impl ParseErrorKind {
         match self {
             Self::UnexpectedCharacter => "unexpected character",
             Self::IllegalImportPosition => "`@import` should be placed at the start of the stylesheet (according to CSS standard)",
+            Self::HostSelectorCombination => "`:host` selector combined with other selectors are not supported",
         }
     }
 
@@ -74,6 +78,7 @@ impl ParseErrorKind {
         match self {
             Self::UnexpectedCharacter => ParseErrorLevel::Fatal,
             Self::IllegalImportPosition => ParseErrorLevel::Note,
+            Self::HostSelectorCombination => ParseErrorLevel::Warn,
         }
     }
 }
@@ -91,7 +96,7 @@ impl std::fmt::Display for ParseErrorKind {
 }
 
 #[repr(u8)]
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum ParseErrorLevel {
     /// Likely to be an mistake and should be noticed.
     ///

@@ -61,6 +61,13 @@ impl TmplGroup {
         }
     }
 
+    #[wasm_bindgen(js_name = newDev)]
+    pub fn new_dev() -> Self {
+        Self {
+            group: crate::TmplGroup::new_dev(),
+        }
+    }
+
     /// Compile a template and add it to the group.
     ///
     /// Returns an JavaScript array containing all warnings and errors discovered during the compilation.
@@ -77,6 +84,12 @@ impl TmplGroup {
         serde_wasm_bindgen::to_value(&ret).unwrap()
     }
 
+    #[wasm_bindgen(js_name = removeTmpl)]
+    pub fn remove_tmpl(&mut self, path: &str) -> bool {
+        let path = crate::path::normalize(path);
+        self.group.remove_tmpl(&path)
+    }
+
     /// Regenerate a template content string for the specified template.
     #[wasm_bindgen(js_name = stringifyTmpl)]
     pub fn stringify_tmpl(&mut self, path: &str) -> Option<String> {
@@ -88,6 +101,12 @@ impl TmplGroup {
     pub fn add_script(&mut self, path: &str, tmpl_str: &str) {
         let path = crate::path::normalize(path);
         self.group.add_script(&path, tmpl_str);
+    }
+
+    #[wasm_bindgen(js_name = removeScript)]
+    pub fn remove_script(&mut self, path: &str) -> bool {
+        let path = crate::path::normalize(path);
+        self.group.remove_script(&path)
     }
 
     #[wasm_bindgen(js_name = "getDirectDependencies")]
