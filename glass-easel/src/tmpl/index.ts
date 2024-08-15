@@ -3,7 +3,6 @@
 import { type GeneralBehavior } from '../behavior'
 import { type GeneralComponent } from '../component'
 import { type DataChange, type DataValue } from '../data_proxy'
-import { type ShadowedEvent } from '../event'
 import { type ExternalShadowRoot } from '../external_shadow_tree'
 import { type NormalizedComponentOptions } from '../global_options'
 import { type ShadowRoot } from '../shadow_root'
@@ -17,7 +16,7 @@ import {
   type UpdatePathTreeNode,
 } from './proc_gen_wrapper'
 
-export { type TmplDevArgs } from './proc_gen_wrapper'
+export { type TmplDevArgs, type EventListenerFilter } from './proc_gen_wrapper'
 
 const DEFAULT_PROC_GEN: ProcGen = () => ({
   C: (isCreation, defineTextNode, defineElement, defineIfGroup, defineForLoop, defineSlot) => {
@@ -36,9 +35,10 @@ export type ComponentTemplate = {
   content: (name: string) => ProcGen
   updateMode?: string
   fallbackListenerOnNativeNode?: boolean
-  eventObjectFilter?: (x: ShadowedEvent<unknown>) => ShadowedEvent<unknown>
   procGenWrapperType?: typeof ProcGenWrapper
 }
+
+export { GeneralLvaluePathPrefix } from './proc_gen_wrapper'
 
 const enum BindingMapUpdateEnabled {
   Disabled,
@@ -62,7 +62,6 @@ class GlassEaselTemplate implements Template {
   genObjectGroupEnv!: ProcGenEnv
   updateMode!: string
   fallbackListenerOnNativeNode!: boolean
-  eventObjectFilter?: (x: ShadowedEvent<unknown>) => ShadowedEvent<unknown>
 
   constructor(behavior: GeneralBehavior) {
     this.updateTemplate(behavior)
@@ -89,7 +88,6 @@ class GlassEaselTemplate implements Template {
     }
     this.updateMode = c.updateMode || ''
     this.fallbackListenerOnNativeNode = c.fallbackListenerOnNativeNode || false
-    this.eventObjectFilter = c.eventObjectFilter
   }
 
   createInstance(
@@ -133,7 +131,6 @@ class GlassEaselTemplateInstance implements TemplateInstance {
       this.shadowRoot,
       procGen,
       template.fallbackListenerOnNativeNode,
-      template.eventObjectFilter,
     )
     this.bindingMapGen = undefined
   }

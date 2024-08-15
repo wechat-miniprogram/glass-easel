@@ -1,19 +1,62 @@
+// eslint-disable-next-line import/no-extraneous-dependencies
+import { TmplGroup } from 'glass-easel-template-compiler'
 import { tmpl, domBackend, composedBackend, shadowBackend } from '../base/env'
 import * as glassEasel from '../../src'
 
+const tmplWithReplacedEventListenerFilter = (
+  src: string,
+  eventListenerFilter: glassEasel.template.EventListenerFilter,
+) => {
+  const group = TmplGroup.newDev()
+  group.addTmpl('', src)
+  const genObjectSrc = `return ${group.getTmplGenObjectGroups()}`.replace(
+    'var Q={A:(x)=>x,B:(x)=>x}',
+    `var Q={A:(x)=>x,B:${eventListenerFilter.toString()}}`,
+  )
+  group.free()
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
+  const genObjectGroupList = new Function(genObjectSrc)() as { [key: string]: any }
+  return {
+    groupList: genObjectGroupList,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    content: genObjectGroupList[''],
+  }
+}
+
 const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
-  test('event object', () => {
-    const template = Object.assign(
-      tmpl(`
-        <div id="a" bind:customEv="f"></div>
-      `),
-      {
-        eventObjectFilter: (x: glassEasel.ShadowedEvent<unknown>) => {
-          x.target = Object.assign(x.target, { id: 'b' })
-          return x
-        },
+  test('event listener filter', () => {
+    const customHandler = (a: number, b: number) => a + b
+    const template = tmplWithReplacedEventListenerFilter(
+      `
+        <wxs module="w">module.exports = { customHandler: ${customHandler.toString()} }</wxs>
+        <div
+          id="a"
+          bind:customEv="f"
+          bind:dropEvent="shouldBeDropped"
+          bind:customHandler="{{ w.customHandler }}"
+        ></div>
+      `,
+      (listener, elem, evName) => {
+        switch (evName) {
+          case 'customEv':
+            return (ev) => {
+              ev.target = Object.assign(ev.target, { id: 'b' })
+              return listener(ev)
+            }
+          case 'dropEvent':
+            return () => {}
+          case 'customHandler':
+            return (ev) => {
+              const ret = (listener as any as typeof customHandler)(ev.detail as number, 2)
+              expect(ret).toBe(3)
+            }
+          default:
+            return listener
+        }
       },
     )
+
+    let droppedEventCalled = false
     const eventOrder: number[] = []
     const def = glassEasel.registerElement({
       template,
@@ -22,11 +65,21 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           expect(ev.target.id).toBe('b')
           eventOrder.push(1)
         },
+        shouldBeDropped() {
+          droppedEventCalled = true
+        },
       },
     })
     const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
-    elem.getShadowRoot()!.getElementById('a')!.triggerEvent('customEv')
+    const div = elem.getShadowRoot()!.getElementById('a')!
+
+    div.triggerEvent('customEv')
     expect(eventOrder).toStrictEqual([1])
+
+    div.triggerEvent('dropEvent')
+    expect(droppedEventCalled).toBe(false)
+
+    div.triggerEvent('customHandler', 1)
   })
 
   test('catch bindings', () => {

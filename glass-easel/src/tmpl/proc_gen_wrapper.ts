@@ -4,7 +4,7 @@ import { Component, type GeneralComponent } from '../component'
 import { type DataPath } from '../data_path'
 import { type DataValue } from '../data_proxy'
 import { Element, StyleSegmentIndex } from '../element'
-import { type ShadowedEvent } from '../event'
+import { type ShadowedEvent, type EventListener } from '../event'
 import { ENV } from '../global_options'
 import { type NativeNode } from '../native_node'
 import { type Node } from '../node'
@@ -34,7 +34,7 @@ type TmplArgs = {
   key?: number | string
   keyList?: RangeListManager
   dynEvListeners?: {
-    [name: string]: (ev: ShadowedEvent<unknown>) => boolean | undefined
+    [name: string]: EventListener<unknown>
   }
   dynamicSlotNameMatched?: boolean
   changeProp?: {
@@ -148,27 +148,29 @@ type DefineSlot = (
 
 type DefinePureVirtualNode = (children: DefineChildren, slot: string | undefined) => void
 
+export type EventListenerFilter = <T>(
+  listener: EventListener<T>,
+  elem: Element,
+  evName: string,
+  final: boolean,
+  mutated: boolean,
+  capture: boolean,
+  isDynamic: boolean,
+  generalLvaluePath?: DataPath | null,
+) => EventListener<T>
+
 export class ProcGenWrapper {
   shadowRoot: ShadowRoot
   procGen: ProcGen
   fallbackListenerOnNativeNode: boolean
   bindingMapDisabled = false
-  eventObjectFilter: (x: ShadowedEvent<unknown>) => ShadowedEvent<unknown> = emptyFilter
   changePropFilter = emptyFilter
-  eventListenerFilter = emptyFilter
+  eventListenerFilter: EventListenerFilter = emptyFilter
 
-  constructor(
-    shadowRoot: ShadowRoot,
-    procGen: ProcGen,
-    fallbackListenerOnNativeNode: boolean,
-    eventObjectFilter?: (x: ShadowedEvent<unknown>) => ShadowedEvent<unknown>,
-  ) {
+  constructor(shadowRoot: ShadowRoot, procGen: ProcGen, fallbackListenerOnNativeNode: boolean) {
     this.shadowRoot = shadowRoot
     this.procGen = procGen
     this.fallbackListenerOnNativeNode = fallbackListenerOnNativeNode
-    if (eventObjectFilter) {
-      this.eventObjectFilter = eventObjectFilter
-    }
   }
 
   create(data: DataValue): { [field: string]: BindingMapGen[] } | undefined {
@@ -1002,22 +1004,27 @@ export class ProcGenWrapper {
     mutated: boolean,
     capture: boolean,
     isDynamic: boolean,
-    _generalLvaluePath?: DataPath | null,
+    generalLvaluePath?: DataPath | null,
   ) {
-    const handler = typeof v === 'function' ? this.eventListenerFilter(v) : dataValueToString(v)
-    const listener = (ev: ShadowedEvent<unknown>) => {
-      const host = elem.ownerShadowRoot!.getHostNode()
-      let ret: boolean | undefined
-      const methodCaller = host.getMethodCaller() as { [key: string]: unknown }
-      const f = typeof handler === 'function' ? handler : Component.getMethod(host, handler)
-      if (typeof f === 'function') {
-        const filteredEv = this.eventObjectFilter(ev)
-        ret = (f as (ev: ShadowedEvent<unknown>) => boolean | undefined).call(
-          methodCaller,
-          filteredEv,
-        )
+    const handler = typeof v === 'function' ? v : dataValueToString(v)
+    const host = elem.ownerShadowRoot!.getHostNode()
+    const methodCaller = host.getMethodCaller() as { [key: string]: unknown }
+    const f = typeof handler === 'function' ? handler : Component.getMethod(host, handler)
+    let listener: EventListener<unknown> = () => undefined
+    if (typeof f === 'function') {
+      const filteredListener = this.eventListenerFilter(
+        f as EventListener<unknown>,
+        elem,
+        evName,
+        final,
+        mutated,
+        capture,
+        isDynamic,
+        generalLvaluePath,
+      )
+      if (typeof filteredListener === 'function') {
+        listener = filteredListener.bind(methodCaller)
       }
-      return ret
     }
     if (ENV.DEV) {
       Object.defineProperty(listener, 'name', {
