@@ -1295,7 +1295,7 @@ impl Attribute {
                 double_brace_location: _,
                 binding_map_keys,
             } => {
-                let maybe_event_binding = !self.is_model && attr_name_maybe_event_binding(&attr_name);
+                let maybe_event_binding = !self.is_model && attr_name_maybe_event_binding(&self.name.name);
                 let p = expression.to_proc_gen_prepare(w, scopes)?;
                 w.expr_stmt(|w| {
                     write!(w, "if(C||K||")?;
