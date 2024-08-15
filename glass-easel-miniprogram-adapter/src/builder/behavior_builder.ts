@@ -43,6 +43,7 @@ export class BehaviorBuilder<
   TExtraThisFields
 > {
   private _$definitionFilter: DefinitionFilter | undefined
+  private _$chainingFilter?: ChainingFilterFunc<any, any>
 
   /** @internal */
   static create(codeSpace: CodeSpace): BehaviorBuilder {
@@ -74,7 +75,7 @@ export class BehaviorBuilder<
     >,
     TChainingFilter
   > {
-    this._$.chainingFilter(func as any)
+    this._$chainingFilter = func
     return this as any
   }
 
@@ -103,6 +104,9 @@ export class BehaviorBuilder<
     this._$parents.push(behavior as GeneralBehavior)
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     this._$ = this._$.behavior(behavior._$)
+    if (behavior._$chainingFilter) {
+      return behavior._$chainingFilter(this as any)
+    }
     return this as any
   }
 
@@ -284,6 +288,7 @@ export class BehaviorBuilder<
       this._$.registerBehavior(),
       this._$parents,
       this._$definitionFilter,
+      this._$chainingFilter,
       this._$export,
     )
   }
