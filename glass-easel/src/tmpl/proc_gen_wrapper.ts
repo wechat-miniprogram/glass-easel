@@ -1007,24 +1007,28 @@ export class ProcGenWrapper {
     generalLvaluePath?: DataPath | null,
   ) {
     const handler = typeof v === 'function' ? v : dataValueToString(v)
-    const host = elem.ownerShadowRoot!.getHostNode()
-    const methodCaller = host.getMethodCaller() as { [key: string]: unknown }
-    const f = typeof handler === 'function' ? handler : Component.getMethod(host, handler)
-    let listener: EventListener<unknown> = () => undefined
-    if (typeof f === 'function') {
-      const filteredListener = this.eventListenerFilter(
-        f as EventListener<unknown>,
-        elem,
-        evName,
-        final,
-        mutated,
-        capture,
-        isDynamic,
-        generalLvaluePath,
-      )
-      if (typeof filteredListener === 'function') {
-        listener = filteredListener.bind(methodCaller)
+    let filteredListener: EventListener<unknown> = () => {}
+    let listenerInitialized = false
+    const listener: EventListener<unknown> = (ev) => {
+      const host = elem.ownerShadowRoot!.getHostNode()
+      const methodCaller = host.getMethodCaller() as { [key: string]: unknown }
+      if (!listenerInitialized) {
+        listenerInitialized = true
+        const f = typeof handler === 'function' ? handler : Component.getMethod(host, handler)
+        if (typeof f === 'function') {
+          filteredListener = this.eventListenerFilter(
+            f as EventListener<unknown>,
+            elem,
+            evName,
+            final,
+            mutated,
+            capture,
+            isDynamic,
+            generalLvaluePath,
+          )
+        }
       }
+      return filteredListener.apply(methodCaller, [ev])
     }
     if (ENV.DEV) {
       Object.defineProperty(listener, 'name', {
