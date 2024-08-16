@@ -77,8 +77,18 @@ type TemplateOptions = {
   fallbackListenerOnNativeNode?: boolean
 }
 
-export const tmpl = (src: string, options?: TemplateOptions) => {
+type FilterFuncs = {
+  A?: glassEasel.template.ChangePropFilter
+  B?: glassEasel.template.EventListenerWrapper
+}
+
+export const tmpl = (src: string, options?: TemplateOptions, filterFuncs?: FilterFuncs) => {
   const group = TmplGroup.newDev()
+  if (filterFuncs !== undefined) {
+    const A = filterFuncs.A || (() => {})
+    const B = filterFuncs.B || (() => {})
+    group.setFilterFuncs(`{A:${A.toString()},B:${B.toString()}}`)
+  }
   group.addTmpl('', src)
   const genObjectSrc = `return ${group.getTmplGenObjectGroups()}`
   group.free()

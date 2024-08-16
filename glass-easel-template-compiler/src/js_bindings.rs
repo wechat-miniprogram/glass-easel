@@ -145,6 +145,11 @@ impl TmplGroup {
         Ok(())
     }
 
+    #[wasm_bindgen(js_name = "setFilterFuncs")]
+    pub fn set_filter_funcs(&mut self, s: &str) {
+        self.group.set_filter_funcs(s)
+    }
+
     #[wasm_bindgen(js_name = "getRuntimeString")]
     pub fn get_runtime_string(&self) -> String {
         self.group.get_runtime_string()

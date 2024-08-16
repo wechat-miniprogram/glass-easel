@@ -1,32 +1,11 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { TmplGroup } from 'glass-easel-template-compiler'
 import { tmpl, domBackend, composedBackend, shadowBackend } from '../base/env'
 import * as glassEasel from '../../src'
-
-const tmplWithReplacedEventListenerFilter = (
-  src: string,
-  eventListenerFilter: glassEasel.template.EventListenerFilter,
-) => {
-  const group = TmplGroup.newDev()
-  group.addTmpl('', src)
-  const genObjectSrc = `return ${group.getTmplGenObjectGroups()}`.replace(
-    'var Q={A:(x)=>x,B:(x)=>x}',
-    `var Q={A:(x)=>x,B:${eventListenerFilter.toString()}}`,
-  )
-  group.free()
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
-  const genObjectGroupList = new Function(genObjectSrc)() as { [key: string]: any }
-  return {
-    groupList: genObjectGroupList,
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    content: genObjectGroupList[''],
-  }
-}
 
 const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
   test('event listener filter', () => {
     const customHandler = (a: number, b: number) => a + b
-    const template = tmplWithReplacedEventListenerFilter(
+    const template = tmpl(
       `
         <wxs module="w">module.exports = { customHandler: ${customHandler.toString()} }</wxs>
         <div
@@ -36,23 +15,27 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           bind:customHandler="{{ w.customHandler }}"
         ></div>
       `,
-      (listener, elem, evName) => {
-        switch (evName) {
-          case 'customEv':
-            return (ev) => {
-              ev.target = Object.assign(ev.target, { id: 'b' })
-              return listener(ev)
+      {},
+      {
+        B: (elem, event, listener) => {
+          switch (event.getEventName()) {
+            case 'customEv': {
+              event.target = Object.assign(event.target, { id: 'b' })
+              return listener.apply(elem, [event])
             }
-          case 'dropEvent':
-            return () => {}
-          case 'customHandler':
-            return (ev) => {
-              const ret = (listener as any as typeof customHandler)(ev.detail as number, 2)
+            case 'dropEvent': {
+              return undefined
+            }
+            case 'customHandler': {
+              const ret = (listener as any as typeof customHandler)(event.detail as number, 2)
               expect(ret).toBe(3)
+              return undefined
             }
-          default:
-            return listener
-        }
+            default: {
+              return listener.apply(elem, [event])
+            }
+          }
+        },
       },
     )
 

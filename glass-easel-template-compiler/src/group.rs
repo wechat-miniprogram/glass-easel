@@ -88,29 +88,6 @@ var D = (() => {
 })()
 "#;
 
-fn runtime_fns<W: std::fmt::Write>(
-    w: &mut JsFunctionScopeWriter<W>,
-    need_wxs_runtime: bool,
-) -> Result<(), TmplError> {
-    for (k, v) in RUNTIME_ITEMS.iter() {
-        w.expr_stmt(|w| {
-            write!(w, "var {}={}", k, v)?;
-            Ok(())
-        })?;
-    }
-    if need_wxs_runtime {
-        w.expr_stmt(|w| {
-            write!(w, "{}", WXS_RUNTIME)?;
-            Ok(())
-        })?;
-        w.expr_stmt(|w| {
-            write!(w, "var Q={{A:(x)=>x,B:(x)=>x}}")?;
-            Ok(())
-        })?;
-    }
-    Ok(())
-}
-
 fn runtime_var_list() -> Vec<&'static str> {
     RUNTIME_ITEMS.iter().map(|(k, _)| *k).collect()
 }
@@ -150,6 +127,7 @@ pub struct TmplGroup {
     has_scripts: bool,
     extra_runtime_string: String,
     dev_mode: bool,
+    filter_funcs: Option<String>,
 }
 
 impl TmplGroup {
@@ -161,6 +139,7 @@ impl TmplGroup {
             has_scripts: false,
             extra_runtime_string: String::new(),
             dev_mode: false,
+            filter_funcs: None,
         }
     }
 
@@ -278,7 +257,7 @@ impl TmplGroup {
     pub fn get_runtime_string(&self) -> String {
         let mut w = JsTopScopeWriter::new(String::new());
         w.function_scope(|w| {
-            runtime_fns(w, self.has_scripts)?;
+            self.runtime_fns(w)?;
             Ok(())
         })
         .unwrap();
@@ -361,11 +340,48 @@ impl TmplGroup {
         Ok(w.finish())
     }
 
+    pub fn set_filter_funcs(&mut self, funcs: &str) {
+        self.filter_funcs = Some(funcs.to_string())
+    }
+
+    pub fn clear_filter_funcs(&mut self) {
+        self.filter_funcs = None
+    }
+
+    pub fn has_filter_funcs(&self) -> bool {
+        self.filter_funcs.is_some()
+    }
+
+    fn runtime_fns<W: std::fmt::Write>(
+        &self,
+        w: &mut JsFunctionScopeWriter<W>,
+    ) -> Result<(), TmplError> {
+        for (k, v) in RUNTIME_ITEMS.iter() {
+            w.expr_stmt(|w| {
+                write!(w, "var {}={}", k, v)?;
+                Ok(())
+            })?;
+        }
+        if self.has_scripts {
+            w.expr_stmt(|w| {
+                write!(w, "{}", WXS_RUNTIME)?;
+                Ok(())
+            })?;
+            if let Some(filter_funcs) = &self.filter_funcs {
+                w.expr_stmt(|w| {
+                    write!(w, "var Q={}", filter_funcs)?;
+                    Ok(())
+                })?;
+            }
+        }
+        Ok(())
+    }
+
     fn write_group_global_content(
         &self,
         w: &mut JsFunctionScopeWriter<String>,
     ) -> Result<(), TmplError> {
-        runtime_fns(w, self.has_scripts)?;
+        self.runtime_fns(w)?;
         if self.extra_runtime_string.len() > 0 {
             w.custom_stmt_str(&self.extra_runtime_string)?;
         }
@@ -460,7 +476,7 @@ impl TmplGroup {
     pub fn export_globals(&self) -> Result<String, TmplError> {
         let mut w = JsTopScopeWriter::new(String::new());
         w.function_scope(|w| {
-            runtime_fns(w, self.has_scripts)?;
+            self.runtime_fns(w)?;
             if self.extra_runtime_string.len() > 0 {
                 w.custom_stmt_str(&self.extra_runtime_string)?;
             }

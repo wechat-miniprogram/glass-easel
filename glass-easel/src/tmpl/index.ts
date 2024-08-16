@@ -16,7 +16,11 @@ import {
   type UpdatePathTreeNode,
 } from './proc_gen_wrapper'
 
-export { type TmplDevArgs, type EventListenerFilter } from './proc_gen_wrapper'
+export {
+  type TmplDevArgs,
+  type EventListenerWrapper,
+  type ChangePropFilter,
+} from './proc_gen_wrapper'
 
 const DEFAULT_PROC_GEN: ProcGen = () => ({
   C: (isCreation, defineTextNode, defineElement, defineIfGroup, defineForLoop, defineSlot) => {
