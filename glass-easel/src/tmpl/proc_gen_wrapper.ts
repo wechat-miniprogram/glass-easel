@@ -5,6 +5,7 @@ import { type DataPath } from '../data_path'
 import { type DataValue } from '../data_proxy'
 import { Element, StyleSegmentIndex } from '../element'
 import { type ShadowedEvent, type EventListener } from '../event'
+import { safeCallback } from '../func_arr'
 import { ENV } from '../global_options'
 import { type NativeNode } from '../native_node'
 import { type Node } from '../node'
@@ -20,14 +21,15 @@ export type UpdatePathTreeNode = true | { [key: string]: UpdatePathTreeNode } | 
 
 export type UpdatePathTreeRoot = UpdatePathTreeNode | undefined
 
-type ChangePropListener = (
-  this: unknown,
-  newValue: unknown,
-  oldValue: unknown,
-  host: unknown,
-  elem: unknown,
-) => void
-
+export interface ChangePropListener {
+  <T>(
+    this: GeneralComponent,
+    newValue: T,
+    oldValue: T,
+    host: GeneralComponent,
+    elem: GeneralComponent,
+  ): void
+}
 export type ChangePropFilter = (listener: ChangePropListener) => ChangePropListener
 
 export interface EventListenerWrapper {
@@ -1077,7 +1079,13 @@ export class ProcGenWrapper {
           if (oldValue !== v) {
             lv.oldValue = v
             const host = elem.ownerShadowRoot!.getHostNode()
-            lv.listener.call(host.getMethodCaller(), v, oldValue, host, elem)
+            safeCallback(
+              'Property Change Observer',
+              lv.listener,
+              host.getMethodCaller(),
+              [v, oldValue, host, elem],
+              elem,
+            )
           }
         }
       } else if (elem.hasExternalClass(name)) {
