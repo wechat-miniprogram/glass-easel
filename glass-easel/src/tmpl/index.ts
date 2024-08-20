@@ -19,6 +19,7 @@ import {
 export {
   type TmplDevArgs,
   type EventListenerWrapper,
+  type ChangePropListener,
   type ChangePropFilter,
 } from './proc_gen_wrapper'
 

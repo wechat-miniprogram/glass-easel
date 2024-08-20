@@ -21,16 +21,18 @@ export type UpdatePathTreeNode = true | { [key: string]: UpdatePathTreeNode } | 
 
 export type UpdatePathTreeRoot = UpdatePathTreeNode | undefined
 
-export interface ChangePropListener {
-  <T>(
-    this: GeneralComponent,
-    newValue: T,
-    oldValue: T,
-    host: GeneralComponent,
-    elem: GeneralComponent,
-  ): void
-}
-export type ChangePropFilter = (listener: ChangePropListener) => ChangePropListener
+export type ChangePropListener<T> = (
+  this: GeneralComponent,
+  newValue: T,
+  oldValue: T,
+  host: GeneralComponent,
+  elem: GeneralComponent,
+) => void
+
+export type ChangePropFilter = <T>(
+  listener: ChangePropListener<T>,
+  generalLvaluePath?: DataPath | null,
+) => ChangePropListener<T>
 
 export interface EventListenerWrapper {
   <T>(
@@ -55,7 +57,7 @@ type TmplArgs = {
   dynamicSlotNameMatched?: boolean
   changeProp?: {
     [name: string]: {
-      listener: ChangePropListener
+      listener: ChangePropListener<unknown>
       oldValue: unknown
     }
   }
@@ -1136,7 +1138,7 @@ export class ProcGenWrapper {
   }
 
   // add a change property binding
-  p(elem: Element, name: string, v: ChangePropListener, _generalLvaluePath?: DataPath | null) {
+  p(elem: Element, name: string, v: ChangePropListener, generalLvaluePath?: DataPath | null) {
     if (isComponent(elem)) {
       if (Component.hasProperty(elem, name)) {
         const tmplArgs = getTmplArgs(elem)
@@ -1144,18 +1146,15 @@ export class ProcGenWrapper {
           tmplArgs.changeProp = Object.create(null) as typeof tmplArgs.changeProp
         }
         tmplArgs.changeProp![name] = {
-          listener: this.changePropFilter(v),
+          listener: this.changePropFilter(v, generalLvaluePath),
           oldValue: (elem.data as { [k: string]: DataValue })[name],
         }
       }
     }
   }
 
-  // set change properties filter and event listeners wrapper
-  setFnFilter(changePropFilter: ChangePropFilter, eventListenerWrapper: EventListenerWrapper) {
-    this.changePropFilter = changePropFilter
-    this.eventListenerWrapper = eventListenerWrapper
-  }
+  /** @deprecated */
+  setFnFilter() {}
 
   // get dev args object
   devArgs(elem: Element): TmplDevArgs {
