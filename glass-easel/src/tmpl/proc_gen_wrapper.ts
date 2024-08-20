@@ -1066,17 +1066,17 @@ export class ProcGenWrapper {
         checkFallbackEventListener(camelName)
       }
     } else if (isNativeNode(elem)) {
-      const camelName = dashToCamelCase(name)
       if (this.fallbackListenerOnNativeNode) {
         // compatibilities for legacy event binding syntax
+        const camelName = dashToCamelCase(name)
         if (!checkFallbackEventListener(camelName)) {
-          elem.callAttributeFilter(camelName, v, (newPropValue) => {
-            elem.updateAttribute(camelName, newPropValue)
+          elem.callAttributeFilter(camelName, v, (propName, newPropValue) => {
+            elem.updateAttribute(propName, newPropValue)
           })
         }
       } else {
-        elem.callAttributeFilter(camelName, v, (newPropValue) => {
-          elem.updateAttribute(camelName, newPropValue)
+        elem.callAttributeFilter(name, v, (propName, newPropValue) => {
+          elem.updateAttribute(propName, newPropValue)
         })
       }
       if (modelLvaluePath) {

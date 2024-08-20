@@ -162,12 +162,21 @@ export class NativeNode extends Element {
     return node
   }
 
-  callAttributeFilter(propName: string, propValue: any, callback: (newPropValue: any) => void) {
-    if (typeof this._$attributeFilters[propName] !== 'function') {
-      callback(propValue)
+  callAttributeFilter(
+    propName: string,
+    propValue: any,
+    callback: (newName: any, newPropValue: any) => void,
+  ) {
+    const dashToCamelCase = (dash: string): string =>
+      dash.replace(/-(.|$)/g, (s) => (s[1] ? s[1].toUpperCase() : ''))
+    const camelCase = dashToCamelCase(propName)
+    if (typeof this._$attributeFilters[camelCase] !== 'function') {
+      callback(propName, propValue)
       return
     }
-    this._$attributeFilters[propName]!(this, propName, propValue, callback)
+    this._$attributeFilters[camelCase]!(this, camelCase, propValue, (newPropValue) =>
+      callback(camelCase, newPropValue),
+    )
   }
 
   setModelBindingListener(propName: string, listener: ModelBindingListener) {
