@@ -122,8 +122,6 @@ void tmpl_group_set_extra_runtime_script(TmplGroup *self,
                                          const uint8_t *content_buf,
                                          size_t content_len);
 
-void tmpl_group_set_filter_funcs(TmplGroup *self, const uint8_t *content_buf, size_t content_len);
-
 int32_t tmpl_group_set_inline_script(TmplGroup *self,
                                      const uint8_t *path_buf,
                                      size_t path_len,

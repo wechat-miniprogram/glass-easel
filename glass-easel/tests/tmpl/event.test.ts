@@ -17,7 +17,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       `,
       {},
       {
-        B: (elem, event, listener) => {
+        C: (elem, event, listener) => {
           switch (event.getEventName()) {
             case 'customEv': {
               event.target = Object.assign(event.target, { id: 'b' })

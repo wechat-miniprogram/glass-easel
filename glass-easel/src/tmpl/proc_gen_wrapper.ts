@@ -1158,8 +1158,17 @@ export class ProcGenWrapper {
     }
   }
 
-  /** @deprecated */
-  setFnFilter() {}
+  // set change properties filter
+  setFnFilter(changePropFilter: ChangePropFilter) {
+    this.changePropFilter = changePropFilter
+  }
+
+  // set event listener wrapper
+  setEventListenerWrapper(eventListenerWrapper?: EventListenerWrapper) {
+    if (typeof eventListenerWrapper === 'function') {
+      this.eventListenerWrapper = eventListenerWrapper
+    }
+  }
 
   // get dev args object
   devArgs(elem: Element): TmplDevArgs {

@@ -308,16 +308,6 @@ impl TmplGroup {
     }
 
     #[no_mangle]
-    pub unsafe extern "C" fn tmpl_group_set_filter_funcs(
-        &mut self,
-        content_buf: &u8,
-        content_len: usize,
-    )  {
-        let content = String::from_utf8_lossy(slice::from_raw_parts(content_buf, content_len));
-        self.inner_mut().set_filter_funcs(&content);
-    }
-
-    #[no_mangle]
     pub unsafe extern "C" fn tmpl_group_get_runtime_string(&self) -> StrRef {
         self.inner().get_runtime_string().into()
     }

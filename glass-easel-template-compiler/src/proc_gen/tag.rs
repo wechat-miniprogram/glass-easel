@@ -61,9 +61,13 @@ impl Template {
                         w.expr_stmt(|w| {
                             write!(w, "H[{key}]=", key = gen_lit_str(key))?;
                             w.function_args("R,C,D,U", |w| {
-                                if has_scripts && group.has_filter_funcs() {
+                                if has_scripts {
                                     w.expr_stmt(|w| {
                                         write!(w, "R.setFnFilter(Q.A,Q.B)")?;
+                                        Ok(())
+                                    })?;
+                                    w.expr_stmt(|w| {
+                                        write!(w, "R.setEventListenerWrapper(Q.C)")?;
                                         Ok(())
                                     })?;
                                 }
