@@ -1138,7 +1138,12 @@ export class ProcGenWrapper {
   }
 
   // add a change property binding
-  p(elem: Element, name: string, v: ChangePropListener, generalLvaluePath?: DataPath | null) {
+  p(
+    elem: Element,
+    name: string,
+    v: ChangePropListener<unknown>,
+    generalLvaluePath?: DataPath | null,
+  ) {
     if (isComponent(elem)) {
       if (Component.hasProperty(elem, name)) {
         const tmplArgs = getTmplArgs(elem)
