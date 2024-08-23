@@ -88,12 +88,8 @@ export const tmpl = (src: string, options?: TemplateOptions, filterFuncs?: Filte
   let genObjectSrc = `return ${group.getTmplGenObjectGroups()}`
   group.free()
   if (filterFuncs !== undefined) {
-    const A = filterFuncs.A || ((x) => x)
     const C = filterFuncs.C || 'undefined'
-    genObjectSrc = genObjectSrc.replace(
-      'var Q={A:(x)=>x,B:(x)=>x}',
-      `var Q={A:${A.toString()},C:${C.toString()}}`,
-    )
+    genObjectSrc = genObjectSrc.replace('var Q={', `var Q={C:${C.toString()},`)
   }
   // console.info(genObjectSrc)
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment

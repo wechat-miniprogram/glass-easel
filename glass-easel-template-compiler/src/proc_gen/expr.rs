@@ -37,6 +37,7 @@ impl PathSliceList {
         list: &Vec<Self>,
         w: &mut W,
         scopes: &Vec<ScopeVar>,
+        is_template_data: bool,
     ) -> Result<(), TmplError> {
         if list.len() > 0 {
             let need_paren = list.len() > 1;
@@ -48,7 +49,7 @@ impl PathSliceList {
                 if i > 0 {
                     write!(w, "||")?;
                 }
-                write!(w, "{}", this.to_path_analysis_str(scopes)?)?;
+                write!(w, "{}", this.to_path_analysis_str(scopes, is_template_data)?)?;
             }
             if need_paren {
                 write!(w, ")")?;
@@ -209,7 +210,7 @@ impl PathSliceList {
         Ok(())
     }
 
-    fn to_path_analysis_str(&self, scopes: &Vec<ScopeVar>) -> Result<String, TmplError> {
+    fn to_path_analysis_str(&self, scopes: &Vec<ScopeVar>, is_template_data: bool) -> Result<String, TmplError> {
         let mut ret = String::new();
         for path_slice in self.0.iter() {
             match path_slice {
@@ -235,7 +236,7 @@ impl PathSliceList {
                     for (key, sub_pas_str, sub_p) in v.iter() {
                         let mut sub_s = String::new();
                         let sub_pas_str =
-                            sub_pas_str.to_path_analysis_str(sub_p, &mut sub_s, scopes)?;
+                            sub_pas_str.to_path_analysis_str(sub_p, &mut sub_s, scopes, is_template_data)?;
                         if let Some(_) = sub_pas_str {
                             match key {
                                 Some(key) => {
@@ -254,47 +255,55 @@ impl PathSliceList {
                             }
                         }
                     }
-                    if need_object_assign {
-                        write!(ret, "{}Object.assign({{{}}})", prepend, s)?;
+                    if is_template_data {
+                        if need_object_assign {
+                            write!(ret, "{}Object.assign({{{}}})", prepend, s)?;
+                        } else {
+                            write!(ret, "{}{{{}}}", prepend, s)?;
+                        }
                     } else {
-                        write!(ret, "{}{{{}}}", prepend, s)?;
+                        if need_object_assign {
+                            write!(ret, "{}Q.b(Object.assign({{{}}}))", prepend, s)?;
+                        } else {
+                            write!(ret, "{}Q.b({{{}}})", prepend, s)?;
+                        }
                     }
                 }
                 PathSlice::CombineArr(v, spread) => {
                     for (sub_pas, sub_p) in spread.iter() {
                         let mut sub_s = String::new();
                         let sub_pas_str =
-                            sub_pas.to_path_analysis_str(sub_p, &mut sub_s, scopes)?;
+                            sub_pas.to_path_analysis_str(sub_p, &mut sub_s, scopes, is_template_data)?;
                         if let Some(_) = sub_pas_str {
-                            write!(ret, "({})===true||", sub_s)?;
+                            write!(ret, "({})!==undefined||", sub_s)?;
                         }
                     }
-                    write!(ret, "[")?;
+                    write!(ret, "Q.a([")?;
                     let mut next_need_comma_sep = false;
                     for (sub_pas, sub_p) in v.iter() {
                         if next_need_comma_sep {
                             write!(ret, ",")?;
                         }
                         let mut s = String::new();
-                        let sub_pas_str = sub_pas.to_path_analysis_str(sub_p, &mut s, scopes)?;
+                        let sub_pas_str = sub_pas.to_path_analysis_str(sub_p, &mut s, scopes, is_template_data)?;
                         if let Some(_) = sub_pas_str {
                             write!(ret, "{}", s)?;
                             next_need_comma_sep = true;
                         }
                     }
-                    write!(ret, "]")?;
+                    write!(ret, "])")?;
                 }
                 PathSlice::Condition(cond, (true_pas, true_p), (false_pas, false_p)) => {
-                    write!(ret, "({}?", cond)?;
+                    write!(ret, "({}?", cond)?; // FIXME `cond` itself should calc its path slices?
                     if true_pas
-                        .to_path_analysis_str(true_p, &mut ret, scopes)?
+                        .to_path_analysis_str(true_p, &mut ret, scopes, is_template_data)?
                         .is_none()
                     {
                         write!(ret, "undefined")?;
                     }
                     write!(ret, ":")?;
                     if false_pas
-                        .to_path_analysis_str(false_p, &mut ret, scopes)?
+                        .to_path_analysis_str(false_p, &mut ret, scopes, is_template_data)?
                         .is_none()
                     {
                         write!(ret, "undefined")?;
@@ -319,11 +328,12 @@ impl PathAnalysisState {
         sub_p: &Vec<PathSliceList>,
         w: &mut W,
         scopes: &Vec<ScopeVar>,
+        is_template_data: bool,
     ) -> Result<Option<()>, TmplError> {
-        PathSliceList::to_path_analysis_str_group_prefix(&sub_p, w, scopes)?;
+        PathSliceList::to_path_analysis_str_group_prefix(&sub_p, w, scopes, is_template_data)?;
         let ret = match self {
             PathAnalysisState::InPath(path_slices) => {
-                let s = path_slices.to_path_analysis_str(scopes)?;
+                let s = path_slices.to_path_analysis_str(scopes, is_template_data)?;
                 write!(w, "{}", s)?;
                 Some(())
             }
@@ -1228,8 +1238,9 @@ impl ExpressionProcGen {
         &self,
         w: &mut JsExprWriter<W>,
         scopes: &Vec<ScopeVar>,
+        is_template_data: bool,
     ) -> Result<(), TmplError> {
-        let pas_str = self.pas.to_path_analysis_str(&self.sub_p, w, scopes)?;
+        let pas_str = self.pas.to_path_analysis_str(&self.sub_p, w, scopes, is_template_data)?;
         if let Some(_) = pas_str {
             // empty
         } else {

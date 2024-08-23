@@ -51,6 +51,17 @@ const RUNTIME_ITEMS: [(&'static str, &'static str); 4] = [
     ("P", "function(a){return typeof a==='function'?a:()=>{}}"),
 ];
 
+const EXTRA_RUNTIME_ITEMS: [(&'static str, &'static str); 2] = [
+    ("a", "function(a){for(var i=0;i<a.length;i++)if(a[i])return a}"),
+    ("b", "function(b){var a=Object.values(b);for(var i=0;i<a.length;i++)if(a[i])return a}"),
+];
+
+const WXS_RUNTIME_ITEMS: [(&'static str, &'static str); 2] = [
+    ("A", "function(a){return a}"),
+    ("B", "function(a){return a}"),
+    // "C" is preserved
+];
+
 const WXS_RUNTIME: &'static str = r#"
 var D = (() => {
     var modules = Object.create(null);
@@ -98,13 +109,25 @@ fn runtime_fns<W: std::fmt::Write>(
             Ok(())
         })?;
     }
+    w.expr_stmt(|w| {
+        write!(w, "var Q={{")?;
+        for (i, (k, v)) in EXTRA_RUNTIME_ITEMS.iter().enumerate() {
+            if i > 0 {
+                write!(w, ",")?;
+            }
+            write!(w, "{}:{}", k, v)?;
+        }
+        if need_wxs_runtime {
+            for (k, v) in WXS_RUNTIME_ITEMS.iter() {
+                write!(w, ",{}:{}", k, v)?;
+            }
+        }
+        write!(w, "}}")?;
+        Ok(())
+    })?;
     if need_wxs_runtime {
         w.expr_stmt(|w| {
             write!(w, "{}", WXS_RUNTIME)?;
-            Ok(())
-        })?;
-        w.expr_stmt(|w| {
-            write!(w, "var Q={{A:(x)=>x,B:(x)=>x}}")?;
             Ok(())
         })?;
     }
@@ -112,7 +135,9 @@ fn runtime_fns<W: std::fmt::Write>(
 }
 
 fn runtime_var_list() -> Vec<&'static str> {
-    RUNTIME_ITEMS.iter().map(|(k, _)| *k).collect()
+    let mut ret: Vec<_> = RUNTIME_ITEMS.iter().map(|(k, _)| *k).collect();
+    ret.push("Q");
+    ret
 }
 
 /// A general template error.
