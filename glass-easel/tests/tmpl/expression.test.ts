@@ -301,16 +301,17 @@ describe('binding expression', () => {
   test('object literal path analysis', () => {
     const onTChanged = jest.fn()
     const onUChanged = jest.fn()
+    const onAChanged = jest.fn()
     const subComp = glassEasel.registerElement({
       template: tmpl(''),
-      properties: { t: String, u: String },
-      observers: { t: onTChanged, u: onUChanged },
+      properties: { t: String, u: String, a: Array },
+      observers: { t: onTChanged, u: onUChanged, a: onAChanged },
     })
     const comp = glassEasel.registerElement({
       using: { sub: subComp.general() },
       template: tmpl(`
         <template name="test">
-          <sub t="{{ arr[0] || '' }}" u="{{ arr[1] || '' }}" />
+          <sub t="{{ arr[0] || '' }}" u="{{ arr[1] || '' }}" a="{{ [arr[1]] }}" />
         </template>
         <template is="test" data="{{ arr: [a[b], a[c]] }}" />
       `),
@@ -318,28 +319,58 @@ describe('binding expression', () => {
     const elem = glassEasel.Component.createWithContext('comp', comp.general(), domBackend)
     expect(onTChanged).toBeCalledTimes(1)
     expect(onUChanged).toBeCalledTimes(1)
+    expect(onAChanged).toBeCalledTimes(1)
     elem.setData({ a: [0, 1], b: 0, c: 1 })
     expect(onTChanged).toBeCalledTimes(2)
     expect(onUChanged).toBeCalledTimes(2)
+    expect(onAChanged).toBeCalledTimes(2)
     elem.setData({ b: 1 })
     expect(onTChanged).toBeCalledTimes(3)
     expect(onUChanged).toBeCalledTimes(2)
+    expect(onAChanged).toBeCalledTimes(2)
+  })
+
+  test('object literal path analysis (spread)', () => {
+    const onAChanged = jest.fn()
+    const subComp = glassEasel.registerElement({
+      template: tmpl(''),
+      properties: { a: Object },
+      observers: { a: onAChanged },
+    })
+    const comp = glassEasel.registerElement({
+      using: { sub: subComp.general() },
+      data: { a: 1, b: { c: 2 }, d: 3 },
+      template: tmpl(`
+        <sub a="{{ { a, ...b } }}" />
+      `),
+    })
+    const elem = glassEasel.Component.createWithContext('comp', comp.general(), domBackend)
+    expect(onAChanged).toBeCalledTimes(1)
+    elem.setData({ a: 1 })
+    expect(onAChanged).toBeCalledTimes(2)
+    elem.setData({ b: { c: 3 } })
+    expect(onAChanged).toBeCalledTimes(3)
+    elem.setData({ 'b.c': 3 })
+    expect(onAChanged).toBeCalledTimes(4)
+    elem.setData({ d: 4 })
+    expect(onAChanged).toBeCalledTimes(4)
   })
 
   test('array literal path analysis', () => {
     const onTChanged = jest.fn()
     const onUChanged = jest.fn()
+    const onAChanged = jest.fn()
     const subComp = glassEasel.registerElement({
       template: tmpl(''),
-      properties: { t: String, u: String },
-      observers: { t: onTChanged, u: onUChanged },
+      properties: { t: String, u: String, a: Object },
+      observers: { t: onTChanged, u: onUChanged, a: onAChanged },
     })
     const comp = glassEasel.registerElement({
       using: { sub: subComp.general() },
       template: tmpl(
         [
           '<template name="test">',
-          '  <sub t="{{ t || \'\' }}" u="{{ u || \'\' }}"/>',
+          '  <sub t="{{ t || \'\' }}" u="{{ u || \'\' }}" a="{{ {u} }}" />',
           '</template>',
           '<template is="test" data={{ t: a[b], u: a[c] }} />',
         ].join(''),
@@ -348,12 +379,41 @@ describe('binding expression', () => {
     const elem = glassEasel.Component.createWithContext('comp', comp.general(), domBackend)
     expect(onTChanged).toBeCalledTimes(1)
     expect(onUChanged).toBeCalledTimes(1)
+    expect(onAChanged).toBeCalledTimes(1)
     elem.setData({ a: [0, 1], b: 0, c: 1 })
     expect(onTChanged).toBeCalledTimes(2)
     expect(onUChanged).toBeCalledTimes(2)
+    expect(onAChanged).toBeCalledTimes(2)
     elem.setData({ b: 1 })
     expect(onTChanged).toBeCalledTimes(3)
     expect(onUChanged).toBeCalledTimes(2)
+    expect(onAChanged).toBeCalledTimes(2)
+  })
+
+  test('array literal path analysis (spread)', () => {
+    const onAChanged = jest.fn()
+    const subComp = glassEasel.registerElement({
+      template: tmpl(''),
+      properties: { a: Array },
+      observers: { a: onAChanged },
+    })
+    const comp = glassEasel.registerElement({
+      using: { sub: subComp.general() },
+      data: { a: 1, b: [], c: 2 },
+      template: tmpl(`
+        <sub a="{{ [a, ...b] }}" />
+      `),
+    })
+    const elem = glassEasel.Component.createWithContext('comp', comp.general(), domBackend)
+    expect(onAChanged).toBeCalledTimes(1)
+    elem.setData({ a: 1 })
+    expect(onAChanged).toBeCalledTimes(2)
+    elem.setData({ b: [1] })
+    expect(onAChanged).toBeCalledTimes(3)
+    elem.setData({ 'b.0': 2 })
+    expect(onAChanged).toBeCalledTimes(4)
+    elem.setData({ c: 3 })
+    expect(onAChanged).toBeCalledTimes(4)
   })
 
   test('static member visit and update', () => {
