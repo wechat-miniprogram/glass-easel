@@ -56,10 +56,9 @@ const EXTRA_RUNTIME_ITEMS: [(&'static str, &'static str); 2] = [
     ("b", "function(b){var a=Object.values(b);for(var i=0;i<a.length;i++)if(a[i])return a}"),
 ];
 
-const WXS_RUNTIME_ITEMS: [(&'static str, &'static str); 2] = [
+const WXS_RUNTIME_ITEMS: [(&'static str, &'static str); 1] = [
     ("A", "function(a){return a}"),
-    ("B", "function(a){return a}"),
-    // "C" is preserved
+    // "B" "C" are preserved
 ];
 
 const WXS_RUNTIME: &'static str = r#"
