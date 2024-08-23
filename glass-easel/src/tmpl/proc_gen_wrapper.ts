@@ -4,7 +4,8 @@ import { Component, type GeneralComponent } from '../component'
 import { type DataPath } from '../data_path'
 import { type DataValue } from '../data_proxy'
 import { Element, StyleSegmentIndex } from '../element'
-import { type ShadowedEvent } from '../event'
+import { type ShadowedEvent, type EventListener } from '../event'
+import { safeCallback } from '../func_arr'
 import { ENV } from '../global_options'
 import { type NativeNode } from '../native_node'
 import { type Node } from '../node'
@@ -20,26 +21,43 @@ export type UpdatePathTreeNode = true | { [key: string]: UpdatePathTreeNode } | 
 
 export type UpdatePathTreeRoot = UpdatePathTreeNode | undefined
 
-type ChangePropListener = (
-  this: unknown,
-  newValue: unknown,
-  oldValue: unknown,
-  host: unknown,
-  elem: unknown,
+export type ChangePropListener<T> = (
+  this: GeneralComponent,
+  newValue: T,
+  oldValue: T,
+  host: GeneralComponent,
+  elem: GeneralComponent,
 ) => void
 
+export type ChangePropFilter = <T>(
+  listener: ChangePropListener<T>,
+  generalLvaluePath?: DataPath | null,
+) => ChangePropListener<T>
+
+export interface EventListenerWrapper {
+  <T>(
+    elem: GeneralComponent,
+    event: ShadowedEvent<T>,
+    listener: EventListener<T>,
+    generalLvaluePath?: DataPath | null,
+  ): boolean | void
+}
+
 const emptyFilter = <T>(x: T) => x
+
+const defaultEventListenerWrapper: EventListenerWrapper = (elem, event, listener) =>
+  listener.apply(elem, [event])
 
 type TmplArgs = {
   key?: number | string
   keyList?: RangeListManager
   dynEvListeners?: {
-    [name: string]: (ev: ShadowedEvent<unknown>) => boolean | undefined
+    [name: string]: EventListener<unknown>
   }
   dynamicSlotNameMatched?: boolean
   changeProp?: {
     [name: string]: {
-      listener: ChangePropListener
+      listener: ChangePropListener<unknown>
       oldValue: unknown
     }
   }
@@ -153,22 +171,13 @@ export class ProcGenWrapper {
   procGen: ProcGen
   fallbackListenerOnNativeNode: boolean
   bindingMapDisabled = false
-  eventObjectFilter: (x: ShadowedEvent<unknown>) => ShadowedEvent<unknown> = emptyFilter
-  changePropFilter = emptyFilter
-  eventListenerFilter = emptyFilter
+  changePropFilter: ChangePropFilter = emptyFilter
+  eventListenerWrapper: EventListenerWrapper = defaultEventListenerWrapper
 
-  constructor(
-    shadowRoot: ShadowRoot,
-    procGen: ProcGen,
-    fallbackListenerOnNativeNode: boolean,
-    eventObjectFilter?: (x: ShadowedEvent<unknown>) => ShadowedEvent<unknown>,
-  ) {
+  constructor(shadowRoot: ShadowRoot, procGen: ProcGen, fallbackListenerOnNativeNode: boolean) {
     this.shadowRoot = shadowRoot
     this.procGen = procGen
     this.fallbackListenerOnNativeNode = fallbackListenerOnNativeNode
-    if (eventObjectFilter) {
-      this.eventObjectFilter = eventObjectFilter
-    }
   }
 
   create(data: DataValue): { [field: string]: BindingMapGen[] } | undefined {
@@ -1002,22 +1011,22 @@ export class ProcGenWrapper {
     mutated: boolean,
     capture: boolean,
     isDynamic: boolean,
-    _generalLvaluePath?: DataPath | null,
+    generalLvaluePath?: DataPath | null,
   ) {
-    const handler = typeof v === 'function' ? this.eventListenerFilter(v) : dataValueToString(v)
-    const listener = (ev: ShadowedEvent<unknown>) => {
+    const handler = typeof v === 'function' ? v : dataValueToString(v)
+    const listener: EventListener<unknown> = (ev) => {
       const host = elem.ownerShadowRoot!.getHostNode()
-      let ret: boolean | undefined
-      const methodCaller = host.getMethodCaller() as { [key: string]: unknown }
+      const methodCaller = host.getMethodCaller()
       const f = typeof handler === 'function' ? handler : Component.getMethod(host, handler)
       if (typeof f === 'function') {
-        const filteredEv = this.eventObjectFilter(ev)
-        ret = (f as (ev: ShadowedEvent<unknown>) => boolean | undefined).call(
+        return this.eventListenerWrapper(
           methodCaller,
-          filteredEv,
+          ev,
+          f as EventListener<unknown>,
+          generalLvaluePath,
         )
       }
-      return ret
+      return undefined
     }
     if (ENV.DEV) {
       Object.defineProperty(listener, 'name', {
@@ -1072,7 +1081,13 @@ export class ProcGenWrapper {
           if (oldValue !== v) {
             lv.oldValue = v
             const host = elem.ownerShadowRoot!.getHostNode()
-            lv.listener.call(host.getMethodCaller(), v, oldValue, host, elem)
+            safeCallback(
+              'Property Change Observer',
+              lv.listener,
+              host.getMethodCaller(),
+              [v, oldValue, host, elem],
+              elem,
+            )
           }
         }
       } else if (elem.hasExternalClass(name)) {
@@ -1123,7 +1138,12 @@ export class ProcGenWrapper {
   }
 
   // add a change property binding
-  p(elem: Element, name: string, v: ChangePropListener, _generalLvaluePath?: DataPath | null) {
+  p(
+    elem: Element,
+    name: string,
+    v: ChangePropListener<unknown>,
+    generalLvaluePath?: DataPath | null,
+  ) {
     if (isComponent(elem)) {
       if (Component.hasProperty(elem, name)) {
         const tmplArgs = getTmplArgs(elem)
@@ -1131,17 +1151,23 @@ export class ProcGenWrapper {
           tmplArgs.changeProp = Object.create(null) as typeof tmplArgs.changeProp
         }
         tmplArgs.changeProp![name] = {
-          listener: this.changePropFilter(v),
+          listener: this.changePropFilter(v, generalLvaluePath),
           oldValue: (elem.data as { [k: string]: DataValue })[name],
         }
       }
     }
   }
 
-  // set filter functions for change properties and event listeners
-  setFnFilter(changePropFilter: <T>(v: T) => T, eventListenerFilter: <T>(v: T) => T) {
+  // set change properties filter
+  setFnFilter(changePropFilter: ChangePropFilter) {
     this.changePropFilter = changePropFilter
-    this.eventListenerFilter = eventListenerFilter
+  }
+
+  // set event listener wrapper
+  setEventListenerWrapper(eventListenerWrapper?: EventListenerWrapper) {
+    if (typeof eventListenerWrapper === 'function') {
+      this.eventListenerWrapper = eventListenerWrapper
+    }
   }
 
   // get dev args object

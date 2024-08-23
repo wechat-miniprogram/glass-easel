@@ -77,11 +77,24 @@ type TemplateOptions = {
   fallbackListenerOnNativeNode?: boolean
 }
 
-export const tmpl = (src: string, options?: TemplateOptions) => {
+type FilterFuncs = {
+  A?: glassEasel.template.ChangePropFilter
+  C?: glassEasel.template.EventListenerWrapper
+}
+
+export const tmpl = (src: string, options?: TemplateOptions, filterFuncs?: FilterFuncs) => {
   const group = TmplGroup.newDev()
   group.addTmpl('', src)
-  const genObjectSrc = `return ${group.getTmplGenObjectGroups()}`
+  let genObjectSrc = `return ${group.getTmplGenObjectGroups()}`
   group.free()
+  if (filterFuncs !== undefined) {
+    const A = filterFuncs.A || ((x) => x)
+    const C = filterFuncs.C || 'undefined'
+    genObjectSrc = genObjectSrc.replace(
+      'var Q={A:(x)=>x,B:(x)=>x}',
+      `var Q={A:${A.toString()},C:${C.toString()}}`,
+    )
+  }
   // console.info(genObjectSrc)
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const genObjectGroupList = new Function(genObjectSrc)() as { [key: string]: any }

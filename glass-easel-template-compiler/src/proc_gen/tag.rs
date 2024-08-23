@@ -66,6 +66,10 @@ impl Template {
                                         write!(w, "R.setFnFilter(Q.A,Q.B)")?;
                                         Ok(())
                                     })?;
+                                    w.expr_stmt(|w| {
+                                        write!(w, "R.setEventListenerWrapper(Q.C)")?;
+                                        Ok(())
+                                    })?;
                                 }
                                 let mut writer = JsTopScopeWriter::new(String::new());
                                 writer.align(w);
