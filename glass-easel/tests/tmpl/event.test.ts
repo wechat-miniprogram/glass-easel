@@ -1,19 +1,45 @@
+// eslint-disable-next-line import/no-extraneous-dependencies
 import { tmpl, domBackend, composedBackend, shadowBackend } from '../base/env'
 import * as glassEasel from '../../src'
 
 const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
-  test('event object', () => {
-    const template = Object.assign(
-      tmpl(`
-        <div id="a" bind:customEv="f"></div>
-      `),
+  test('event listener filter', () => {
+    const customHandler = (a: number, b: number) => a + b
+    const template = tmpl(
+      `
+        <wxs module="w">module.exports = { customHandler: ${customHandler.toString()} }</wxs>
+        <div
+          id="a"
+          bind:customEv="f"
+          bind:dropEvent="shouldBeDropped"
+          bind:customHandler="{{ w.customHandler }}"
+        ></div>
+      `,
+      {},
       {
-        eventObjectFilter: (x: glassEasel.ShadowedEvent<unknown>) => {
-          x.target = Object.assign(x.target, { id: 'b' })
-          return x
+        C: (elem, event, listener) => {
+          switch (event.getEventName()) {
+            case 'customEv': {
+              event.target = Object.assign(event.target, { id: 'b' })
+              return listener.apply(elem, [event])
+            }
+            case 'dropEvent': {
+              return undefined
+            }
+            case 'customHandler': {
+              const ret = (listener as any as typeof customHandler)(event.detail as number, 2)
+              expect(ret).toBe(3)
+              return undefined
+            }
+            default: {
+              return listener.apply(elem, [event])
+            }
+          }
         },
       },
     )
+
+    let droppedEventCalled = false
     const eventOrder: number[] = []
     const def = glassEasel.registerElement({
       template,
@@ -22,11 +48,21 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           expect(ev.target.id).toBe('b')
           eventOrder.push(1)
         },
+        shouldBeDropped() {
+          droppedEventCalled = true
+        },
       },
     })
     const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
-    elem.getShadowRoot()!.getElementById('a')!.triggerEvent('customEv')
+    const div = elem.getShadowRoot()!.getElementById('a')!
+
+    div.triggerEvent('customEv')
     expect(eventOrder).toStrictEqual([1])
+
+    div.triggerEvent('dropEvent')
+    expect(droppedEventCalled).toBe(false)
+
+    div.triggerEvent('customHandler', 1)
   })
 
   test('catch bindings', () => {

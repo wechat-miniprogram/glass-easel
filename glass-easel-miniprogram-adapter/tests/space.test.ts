@@ -753,7 +753,7 @@ describe('define', () => {
       .chainingFilter<TAdd, TRemove>((chain) => {
         const oldData = chain.data.bind(chain)
         const newData = function () {
-          oldData(() => ({
+          return oldData(() => ({
             a: 123,
           }))
         }

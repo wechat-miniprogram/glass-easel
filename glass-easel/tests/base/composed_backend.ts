@@ -340,10 +340,12 @@ abstract class Node implements glassEasel.composedBackend.Element {
 
   associateValue(v: glassEasel.Element): void {
     this.__wxElement = v
-    if (v.ownerShadowRoot) {
-      const ownerSpace = v.ownerShadowRoot.getHostNode()._$behavior.ownerSpace
-      this._$styleScopeManager = ownerSpace.styleScopeManager
-    }
+    if (!v.ownerShadowRoot && !glassEasel.Component.isComponent(v))
+      throw new Error('associate non-component on root node')
+    const ownerSpace = v.ownerShadowRoot
+      ? v.ownerShadowRoot.getHostNode()._$behavior.ownerSpace
+      : v.asGeneralComponent()!._$behavior.ownerSpace
+    this._$styleScopeManager = ownerSpace.styleScopeManager
   }
 
   appendChild(child: Node): void {

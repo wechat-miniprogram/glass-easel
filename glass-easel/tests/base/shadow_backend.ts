@@ -523,10 +523,12 @@ abstract class Node implements glassEasel.backend.Element {
     if (this._$wxElement) throw new Error(`associate value multiple times`)
     if (v !== this.__wxElement) throw new Error(`wrong associate value`)
     this._$wxElement = v
-    if (v.ownerShadowRoot) {
-      const ownerSpace = v.ownerShadowRoot.getHostNode()._$behavior.ownerSpace
-      this._$styleScopeManager = ownerSpace.styleScopeManager
-    }
+    if (!v.ownerShadowRoot && !glassEasel.Component.isComponent(v))
+      throw new Error('associate non-component on root node')
+    const ownerSpace = v.ownerShadowRoot
+      ? v.ownerShadowRoot.getHostNode()._$behavior.ownerSpace
+      : v.asGeneralComponent()!._$behavior.ownerSpace
+    this._$styleScopeManager = ownerSpace.styleScopeManager
   }
 
   getShadowRoot(): ShadowRoot | undefined {

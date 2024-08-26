@@ -243,9 +243,13 @@ export class ClassList {
       if (!names) continue
       for (let j = 0, ll = names.length; j < ll; j += 1) {
         const rawName = names[j]!
-        this._$resolvePrefixes(rawName, (scopeId, className) => {
-          this._$addClass(className, scopeId, backendElement)
-        })
+        if (BM.SHADOW || (BM.DYNAMIC && this._$element.getBackendMode() === BackendMode.Shadow)) {
+          this._$addClass(rawName, undefined, backendElement)
+        } else {
+          this._$resolvePrefixes(rawName, (scopeId, className) => {
+            this._$addClass(className, scopeId, backendElement)
+          })
+        }
       }
     }
     return true

@@ -66,6 +66,10 @@ impl Template {
                                         write!(w, "R.setFnFilter(Q.A,Q.B)")?;
                                         Ok(())
                                     })?;
+                                    w.expr_stmt(|w| {
+                                        write!(w, "R.setEventListenerWrapper(Q.C)")?;
+                                        Ok(())
+                                    })?;
                                 }
                                 let mut writer = JsTopScopeWriter::new(String::new());
                                 writer.align(w);
@@ -280,7 +284,7 @@ impl Node {
                         let p = expression.to_proc_gen_prepare(w, scopes)?;
                         w.expr_stmt(|w| {
                             write!(w, r#"C||K||"#)?;
-                            p.lvalue_state_expr(w, scopes)?;
+                            p.lvalue_state_expr(w, scopes, false)?;
                             write!(w, r#"?T(Y("#)?;
                             p.value_expr(w)?;
                             write!(w, r#")"#)?;
@@ -948,7 +952,7 @@ impl Element {
                                     key => gen_lit_str(key),
                                 }
                             )?;
-                            p.lvalue_state_expr(w, scopes)?;
+                            p.lvalue_state_expr(w, scopes, false)?;
                             write!(w, ":undefined,")?;
                             if lvalue_path_from_data_scope.is_some() {
                                 p.lvalue_path(w, scopes, None)?;
@@ -1009,7 +1013,7 @@ impl Element {
                                     )?;
                                     p.value_expr(w)?;
                                     write!(w, ",K||(U?")?;
-                                    p.lvalue_state_expr(w, scopes)?;
+                                    p.lvalue_state_expr(w, scopes, true)?;
                                     write!(w, ":undefined)).C(C,T,E,B,F,S,J)")?;
                                     Ok(())
                                 })
@@ -1066,7 +1070,7 @@ impl Element {
                         }
                         StaticStrOrProcGen::Dynamic(p) => {
                             write!(w, r#"C||K||"#)?;
-                            p.lvalue_state_expr(w, scopes)?;
+                            p.lvalue_state_expr(w, scopes, false)?;
                             write!(w, r#"?Y("#)?;
                             p.value_expr(w)?;
                             write!(w, "):undefined")?;
@@ -1104,7 +1108,7 @@ impl Element {
                                         let p = expression.to_proc_gen_prepare(w, scopes)?;
                                         w.expr_stmt(|w| {
                                             write!(w, "if(C||K||")?;
-                                            p.lvalue_state_expr(w, scopes)?;
+                                            p.lvalue_state_expr(w, scopes, false)?;
                                             write!(w, ")R.l(N,{},", gen_lit_str(name))?;
                                             p.value_expr(w)?;
                                             if attr_name_maybe_event_binding(name) {
@@ -1157,7 +1161,7 @@ fn write_attribute_value<W: Write>(
             let p = expression.to_proc_gen_prepare(w, scopes)?;
             w.expr_stmt(|w| {
                 write!(w, "if(C||K||")?;
-                p.lvalue_state_expr(w, scopes)?;
+                p.lvalue_state_expr(w, scopes, false)?;
                 write!(w, "){}(N,", method_name)?;
                 p.value_expr(w)?;
                 write!(w, ")")?;
@@ -1243,7 +1247,7 @@ impl Attribute {
                 let p = expression.to_proc_gen_prepare(w, scopes)?;
                 w.expr_stmt(|w| {
                     write!(w, "if(C||K||")?;
-                    p.lvalue_state_expr(w, scopes)?;
+                    p.lvalue_state_expr(w, scopes, false)?;
                     write!(w, "){}(N,{},", method_name, gen_lit_str(&self.name.name))?;
                     p.value_expr(w)?;
                     write!(w, ")")?;
@@ -1295,11 +1299,11 @@ impl Attribute {
                 double_brace_location: _,
                 binding_map_keys,
             } => {
-                let maybe_event_binding = !self.is_model && attr_name_maybe_event_binding(&attr_name);
+                let maybe_event_binding = !self.is_model && attr_name_maybe_event_binding(&self.name.name);
                 let p = expression.to_proc_gen_prepare(w, scopes)?;
                 w.expr_stmt(|w| {
                     write!(w, "if(C||K||")?;
-                    p.lvalue_state_expr(w, scopes)?;
+                    p.lvalue_state_expr(w, scopes, false)?;
                     write!(w, ")O(N,{},", attr_name)?;
                     p.value_expr(w)?;
                     if self.is_model {
@@ -1366,7 +1370,7 @@ impl Attribute {
                 let p = expression.to_proc_gen_prepare(w, scopes)?;
                 w.expr_stmt(|w| {
                     write!(w, "if(C||K||")?;
-                    p.lvalue_state_expr(w, scopes)?;
+                    p.lvalue_state_expr(w, scopes, false)?;
                     write!(w, ")R.p(N,{},", attr_name)?;
                     p.value_expr(w)?;
                     if p.has_script_lvalue_path(scopes) {
@@ -1429,7 +1433,7 @@ impl EventBinding {
                 let p = expression.to_proc_gen_prepare(w, scopes)?;
                 w.expr_stmt(|w| {
                     write!(w, "if(C||K||")?;
-                    p.lvalue_state_expr(w, scopes)?;
+                    p.lvalue_state_expr(w, scopes, false)?;
                     write!(w, ")R.v(N,{},", gen_lit_str(&self.name.name),)?;
                     p.value_expr(w)?;
                     write!(
