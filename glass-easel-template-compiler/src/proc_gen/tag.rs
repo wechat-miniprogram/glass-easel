@@ -67,7 +67,7 @@ impl Template {
                                         Ok(())
                                     })?;
                                     w.expr_stmt(|w| {
-                                        write!(w, "P(R.setEventListenerWrapper)(Q.C)")?;
+                                        write!(w, "if(typeof R.setEventListenerWrapper==='function')R.setEventListenerWrapper(Q.C)")?;
                                         Ok(())
                                     })?;
                                 }
