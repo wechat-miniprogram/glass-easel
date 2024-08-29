@@ -1,6 +1,6 @@
 [package]
 name = "glass-easel-stylesheet-compiler"
-version = "0.8.2"
+version = "0.9.0"
 authors = ["LastLeaf <bqfu@163.com>"]
 description = "The stylesheet compiler of the glass-easel project."
 license = "MIT"

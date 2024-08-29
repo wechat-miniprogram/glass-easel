@@ -429,7 +429,6 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
                   } else {
                     x.options = {
                       classPrefix: styleSheetManager.getScopeName(compPath),
-                      compPath,
                       setLowPriorityStyles: (s: string, map: string) => {
                         styleSheetManager.setLowPriorityStyles(compPath, s, map)
                       },

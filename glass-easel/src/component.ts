@@ -548,6 +548,11 @@ export class Component<
     comp._$methodCaller = comp
     comp._$virtual = virtualHost
 
+    // check shared style scope
+    const ownerSpace = behavior.ownerSpace
+    const sharedStyleScope = ownerSpace._$sharedStyleScope
+    const isDedicatedStyleScope = options.styleScope && options.styleScope !== sharedStyleScope
+
     // create backend element
     let backendElement: GeneralBackendElement | null = null
     if (nodeTreeContext) {
@@ -557,7 +562,12 @@ export class Component<
           backendElement = (nodeTreeContext as domlikeBackend.Context).document.createElement(
             tagName,
           )
-          backendElement.setAttribute('is', def.is)
+          if (isDedicatedStyleScope) {
+            backendElement.setAttribute(
+              'wx-host',
+              ownerSpace.styleScopeManager.queryName(options.styleScope!),
+            )
+          }
           if (ENV.DEV) performanceMeasureEnd()
         }
       } else if (BM.COMPOSED || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Composed)) {
@@ -614,7 +624,7 @@ export class Component<
         ;(backendElement as composedBackend.Element).setStyleScope(
           styleScope,
           extraStyleScope,
-          options.styleScope ?? StyleScopeManager.globalScope(),
+          isDedicatedStyleScope ? options.styleScope ?? StyleScopeManager.globalScope() : undefined,
         )
       }
       if (styleScopeManager && writeExtraInfoToAttr) {

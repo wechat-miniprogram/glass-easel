@@ -5,7 +5,7 @@ import {
   type GeneralBehavior,
   type NativeNodeDefinition,
 } from './behavior'
-import { StyleScopeManager } from './class_list'
+import { type StyleScopeId, StyleScopeManager } from './class_list'
 import {
   Component,
   type ComponentDefinition,
@@ -161,6 +161,8 @@ export class ComponentSpace {
     | null = null
   /** @internal */
   _$allowUnusedNativeNode = true
+  /** @internal */
+  _$sharedStyleScope = 0
 
   /**
    * Create a new component space
@@ -199,6 +201,15 @@ export class ComponentSpace {
 
   getComponentOptions(): NormalizedComponentOptions {
     return this._$componentOptions
+  }
+
+  /**
+   * Mark a style scope as shared
+   *
+   * This style scope will not be written to backend as a dedicated style scope for a component.
+   */
+  setSharedStyleScope(styleScopeId: StyleScopeId) {
+    this._$sharedStyleScope = styleScopeId
   }
 
   /**

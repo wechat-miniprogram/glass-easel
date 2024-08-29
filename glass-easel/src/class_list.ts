@@ -8,7 +8,18 @@ import {
 } from './backend'
 import { StyleSegmentIndex, type Element } from './element'
 
-const CLASS_NAME_REG_EXP = /\s+/
+const CLASS_NAME_REG_EXP = /[^\s.,]+/g
+
+const matchClassName = (str: string) => {
+  const result: string[] = []
+  let m: RegExpExecArray | null | undefined
+  CLASS_NAME_REG_EXP.lastIndex = 0
+  // eslint-disable-next-line no-cond-assign
+  while ((m = CLASS_NAME_REG_EXP.exec(str)) !== null) {
+    result.push(String(m[0]))
+  }
+  return result
+}
 
 /**
  * The style scope identifier
@@ -154,9 +165,7 @@ export class ClassList {
         slices[i] = String(target[i])
       }
     } else {
-      slices = String(target)
-        .split(CLASS_NAME_REG_EXP)
-        .filter((s) => s !== '') // split result could be [ '' ]
+      slices = matchClassName(String(target))
     }
     const externalIndex = this._$externalNames.indexOf(name)
     if (externalIndex === -1) return
@@ -220,6 +229,30 @@ export class ClassList {
   /** @internal */
   _$markExternalClassUpdated() {
     this._$dirtyExternalNames = null
+  }
+
+  /** @internal */
+  private _$fasterAddUpdateResolvedNames(): boolean {
+    const backendElement = this._$element._$backendElement
+    if (!backendElement) return false
+    const rawNames = this._$rawNames
+
+    this._$hasAliasNames = false
+    for (let i = 0, l = rawNames.length; i < l; i += 1) {
+      const names = rawNames[i]
+      if (!names) continue
+      for (let j = 0, ll = names.length; j < ll; j += 1) {
+        const rawName = names[j]!
+        if (BM.SHADOW || (BM.DYNAMIC && this._$element.getBackendMode() === BackendMode.Shadow)) {
+          this._$addClass(rawName, undefined, backendElement)
+        } else {
+          this._$resolvePrefixes(rawName, (scopeId, className) => {
+            this._$addClass(className, scopeId, backendElement)
+          })
+        }
+      }
+    }
+    return true
   }
 
   /** @internal */
@@ -407,9 +440,6 @@ export class ClassList {
     force?: boolean,
     segmentIndex: StyleSegmentIndex = StyleSegmentIndex.MAIN,
   ): boolean {
-    /* istanbul ignore if */
-    if (CLASS_NAME_REG_EXP.test(name)) throw new Error('Class name contains space characters.')
-
     const backendElement = this._$element._$backendElement
     const rawClassIndex = this._$rawNames[segmentIndex]
       ? this._$rawNames[segmentIndex]!.indexOf(name)
@@ -482,16 +512,14 @@ export class ClassList {
     if (names === undefined || names === null) {
       n = []
     } else if (Array.isArray(names)) {
-      n = Array<string>(names.length)
-      for (let i = 0, l = names.length; i < l; i += 1) {
-        n[i] = String(names[i])
-      }
+      n = matchClassName(names.join(' '))
     } else {
-      n = String(names)
-        .split(CLASS_NAME_REG_EXP)
-        .filter((s) => s !== '') // split result could be [ '' ]
+      n = matchClassName(String(names))
     }
+    const useFasterAdd = this._$rawNames.length === 0
     this._$rawNames[segmentIndex] = n
+
+    if (useFasterAdd) return this._$fasterAddUpdateResolvedNames()
 
     return this._$updateResolvedNames()
   }
