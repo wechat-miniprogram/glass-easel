@@ -78,6 +78,7 @@ export * as template from './tmpl'
 export { TraitBehavior } from './trait_behaviors'
 export { VirtualNode } from './virtual_node'
 export {
+  dispatchError,
   addGlobalErrorListener,
   addGlobalWarningListener,
   removeGlobalErrorListener,
