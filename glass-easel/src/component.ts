@@ -563,10 +563,13 @@ export class Component<
             tagName,
           )
           if (isDedicatedStyleScope) {
-            backendElement.setAttribute(
-              'wx-host',
-              ownerSpace.styleScopeManager.queryName(options.styleScope!),
-            )
+            const styleScopePrefix = ownerSpace.styleScopeManager.queryName(options.styleScope!)
+            if (styleScopePrefix) {
+              backendElement.setAttribute(
+                'wx-host',
+                ownerSpace.styleScopeManager.queryName(options.styleScope!),
+              )
+            }
           }
           if (ENV.DEV) performanceMeasureEnd()
         }

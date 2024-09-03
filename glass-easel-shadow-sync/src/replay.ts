@@ -40,7 +40,8 @@ export function replayShadowBackend(
       const classNames = elem.classList.getClassNames()
       if (classNames) classNames.split(' ').forEach((className) => be.addClass(className))
     }
-    if (elem.style) be.setStyle(elem.style)
+    const style = elem.getNodeStyleSegments().join(';')
+    if (style) be.setStyle(style)
     elem.attributes.forEach(({ name, value }) => {
       be.setAttribute(name, value)
     })
@@ -91,6 +92,7 @@ export function replayShadowBackend(
       be =
         handlers.createElement?.(ownerShadowRoot, elem) ||
         ownerShadowRoot.createElement(elem.is, elem.stylingName)
+      be.__wxElement = elem
       be.associateValue(elem)
       setAttributes(elem, be)
       const listeners = elem.getModelBindingListeners()
@@ -100,6 +102,7 @@ export function replayShadowBackend(
       insertChildren(be, createChildren(elem, ownerShadowRoot))
     } else if (glassEasel.ShadowRoot.isShadowRoot(elem)) {
       be = ownerShadowRoot
+      be.__wxElement = elem
       be.associateValue(elem)
       setAttributes(elem, be)
       insertChildren(be, createChildren(elem, ownerShadowRoot))
@@ -107,6 +110,7 @@ export function replayShadowBackend(
       be =
         handlers.createElement?.(ownerShadowRoot, elem) ||
         ownerShadowRoot.createVirtualNode(elem.is)
+      be.__wxElement = elem
       be.associateValue(elem)
       if (elem.isInheritSlots()) {
         be.setInheritSlots()
@@ -125,6 +129,7 @@ export function replayShadowBackend(
           options.extraStyleScope,
           Object.keys(elem.getExternalClasses()),
         )
+      be.__wxElement = elem
       be.associateValue(elem)
       setAttributes(elem, be)
       const externalClasses = elem.getExternalClasses()

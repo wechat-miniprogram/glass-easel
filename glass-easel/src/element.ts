@@ -539,6 +539,10 @@ export class Element implements NodeCast {
     }
   }
 
+  getNodeStyleSegments(): string[] {
+    return this._$styleSegments
+  }
+
   private static checkAndCallAttached(node: Node) {
     const callFunc = function callFunc(node: Node) {
       if (isElement(node) && !node._$attached) {

@@ -285,7 +285,7 @@ export class ViewController {
     } else {
       const { _rootNode, _glassEasel } = this
       _rootNode.removeChild(child.getBackendElement() as any)
-      _glassEasel.Element.pretendAttached(child as Element)
+      _glassEasel.Element.pretendDetached(child as Element)
     }
   }
 
@@ -306,7 +306,7 @@ export class ViewController {
       const { _rootNode, _glassEasel } = this
       _rootNode.replaceChild(child.getBackendElement() as any, oldChild.getBackendElement() as any)
       _glassEasel.Element.pretendDetached(oldChild as Element)
-      _glassEasel.Element.pretendDetached(child as Element)
+      _glassEasel.Element.pretendAttached(child as Element)
     }
   }
 
