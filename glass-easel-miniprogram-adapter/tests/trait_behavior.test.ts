@@ -1,6 +1,7 @@
 import * as glassEasel from 'glass-easel'
 import { tmpl } from './base/env'
 import { MiniProgramEnv } from '../src'
+import { StyleIsolation } from '../src/types'
 
 const domHtml = (elem: glassEasel.Element): string => {
   const domElem = elem.getBackendElement() as unknown as Element
@@ -60,6 +61,7 @@ describe('trait behavior', () => {
 
     codeSpace.addComponentStaticConfig('child/list', {
       component: true,
+      styleIsolation: StyleIsolation.Shared,
     })
     codeSpace.addCompiledTemplate(
       'child/list',
@@ -93,6 +95,7 @@ describe('trait behavior', () => {
 
     codeSpace.addComponentStaticConfig('child/item', {
       component: true,
+      styleIsolation: StyleIsolation.Shared,
     })
     codeSpace.addCompiledTemplate('child/item', tmpl('{{a}}'))
     // eslint-disable-next-line arrow-body-style
@@ -138,7 +141,7 @@ describe('trait behavior', () => {
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
     expect(domHtml(root.getComponent())).toBe(
-      '<list is="child/list"><div>2</div><item is="child/item">2</item><item is="child/item">3</item></list>',
+      '<list><div>2</div><item>2</item><item>3</item></list>',
     )
   })
 })

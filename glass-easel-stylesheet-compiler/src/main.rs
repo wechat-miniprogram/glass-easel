@@ -48,6 +48,10 @@ struct CmdArgs {
 
     /// Convert `:host` into an attribute selector
     #[arg(long)]
+    convert_host: bool,
+
+    /// Convert `:host` into an `is` attribute selector with the specified value ( `--convert-host` must be specified)
+    #[arg(long)]
     host_is: Option<String>,
 }
 
@@ -59,6 +63,7 @@ fn main() {
         class_prefix_sign: args.class_prefix_sign.clone(),
         rpx_ratio: args.rpx_ratio,
         import_sign: args.import_sign.clone(),
+        convert_host: args.convert_host,
         host_is: args.host_is.clone(),
     };
 

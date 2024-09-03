@@ -214,6 +214,7 @@ describe('define', () => {
       <c />
     `),
     )
+    codeSpace.addStyleSheet('comp/a', undefined, 'A')
     codeSpace.componentEnv('comp/a', ({ Component }) => {
       Component().register()
     })
@@ -227,6 +228,7 @@ describe('define', () => {
       <span>B</span>
     `),
     )
+    codeSpace.addStyleSheet('comp/b', undefined, 'B')
     codeSpace.componentEnv('comp/b', ({ Component }) => {
       Component().register()
     })
@@ -250,7 +252,7 @@ describe('define', () => {
     const ab = env.associateBackend()
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     expect(domHtml(root.getComponent())).toBe(
-      '<a is="comp/a"><c is="comp/b"><span>B</span></c></a>',
+      '<a wx-host="A"><c wx-host="B"><span>B</span></c></a>',
     )
   })
 
@@ -267,6 +269,7 @@ describe('define', () => {
       <div>A</div>
     `),
     )
+    codeSpace.addStyleSheet('comp/a', undefined, 'A')
     codeSpace.componentEnv('comp/a', ({ Component }) => {
       Component().register()
     })
@@ -286,13 +289,14 @@ describe('define', () => {
       <a />
     `),
     )
+    codeSpace.addStyleSheet('path/to/comp', undefined, 'COMP')
     codeSpace.componentEnv('path/to/comp', ({ Component }) => {
       Component().register()
     })
 
     const ab = env.associateBackend()
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
-    expect(domHtml(root.getComponent())).toBe('<a is="comp/a"><div>A</div></a>')
+    expect(domHtml(root.getComponent())).toBe('<a wx-host="A"><div>A</div></a>')
 
     codeSpace.addComponentStaticConfig('comp/b', {
       component: true,
@@ -303,11 +307,12 @@ describe('define', () => {
       <span>B</span>
     `),
     )
+    codeSpace.addStyleSheet('comp/b', undefined, 'B')
     codeSpace.componentEnv('comp/b', ({ Component }) => {
       Component().register()
     })
 
-    expect(domHtml(root.getComponent())).toBe('<a is="comp/b"><span>B</span></a>')
+    expect(domHtml(root.getComponent())).toBe('<a wx-host="B"><span>B</span></a>')
   })
 
   test('options pureDataPattern (js)', () => {
@@ -748,7 +753,7 @@ describe('define', () => {
       .chainingFilter<TAdd, TRemove>((chain) => {
         const oldData = chain.data.bind(chain)
         const newData = function () {
-          oldData(() => ({
+          return oldData(() => ({
             a: 123,
           }))
         }
@@ -1009,6 +1014,7 @@ describe('define', () => {
       <div>{{count}}</div><slot />
     `),
     )
+    codeSpace.addStyleSheet('child/list', undefined, 'LIST')
     // eslint-disable-next-line arrow-body-style
     const listDef = codeSpace.componentEnv('child/list', ({ Component }) => {
       return Component()
@@ -1031,6 +1037,7 @@ describe('define', () => {
     codeSpace.addComponentStaticConfig('child/item', {
       component: true,
     })
+    codeSpace.addStyleSheet('child/item', undefined, 'ITEM')
     // eslint-disable-next-line arrow-body-style
     const itemDef = codeSpace.componentEnv('child/item', ({ Component }) => {
       return Component()
@@ -1069,7 +1076,7 @@ describe('define', () => {
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
     expect(domHtml(root.getComponent())).toBe(
-      '<list is="child/list"><div>2</div><item is="child/item"></item><item is="child/item"></item></list>',
+      '<list wx-host="LIST"><div>2</div><item wx-host="ITEM"></item><item wx-host="ITEM"></item></list>',
     )
   })
 

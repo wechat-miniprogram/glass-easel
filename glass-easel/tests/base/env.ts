@@ -1,6 +1,7 @@
 /* eslint-disable no-new-func */
 /* eslint-disable @typescript-eslint/no-implied-eval */
 
+// eslint-disable-next-line import/no-extraneous-dependencies
 import { TmplGroup } from 'glass-easel-template-compiler'
 import * as glassEasel from '../../src'
 import * as ComposedBackend from './composed_backend'
@@ -76,11 +77,20 @@ type TemplateOptions = {
   fallbackListenerOnNativeNode?: boolean
 }
 
-export const tmpl = (src: string, options?: TemplateOptions) => {
+type FilterFuncs = {
+  A?: glassEasel.template.ChangePropFilter
+  C?: glassEasel.template.EventListenerWrapper
+}
+
+export const tmpl = (src: string, options?: TemplateOptions, filterFuncs?: FilterFuncs) => {
   const group = TmplGroup.newDev()
   group.addTmpl('', src)
-  const genObjectSrc = `return ${group.getTmplGenObjectGroups()}`
+  let genObjectSrc = `return ${group.getTmplGenObjectGroups()}`
   group.free()
+  if (filterFuncs !== undefined) {
+    const C = filterFuncs.C || 'undefined'
+    genObjectSrc = genObjectSrc.replace('var Q={', `var Q={C:${C.toString()},`)
+  }
   // console.info(genObjectSrc)
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const genObjectGroupList = new Function(genObjectSrc)() as { [key: string]: any }

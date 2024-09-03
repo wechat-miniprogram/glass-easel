@@ -32,6 +32,8 @@ export class Behavior<
   /** @internal */
   _$: glassEasel.GeneralBehavior
   /** @internal */
+  _$chainingFilter?: typeUtils.ChainingFilterFunc<any, any>
+  /** @internal */
   _$bindedDefinitionFilter?: (target: GeneralComponentDefinition) => void
   /** @internal */
   _$export?: (source: GeneralComponent | null) => TComponentExport
@@ -41,9 +43,11 @@ export class Behavior<
     inner: glassEasel.Behavior<TData, TProperty, TMethod, TChainingFilter, TExtraThisFields>,
     parents: GeneralBehavior[],
     definitionFilter: DefinitionFilter | undefined,
+    chainingFilter: typeUtils.ChainingFilterFunc<any, any> | undefined,
     componentExport: ((source: GeneralComponent | null) => TComponentExport) | undefined,
   ) {
     this._$ = inner as glassEasel.GeneralBehavior
+    this._$chainingFilter = chainingFilter
     this._$export = componentExport
 
     // processing definition filter

@@ -119,8 +119,8 @@ describe('chaining-form interface', () => {
       .externalClasses(['a-class', 'b-class'])
       .template(
         tmpl(`
-        <div class="invalid a-class b-class"></div>
-      `),
+          <div class="invalid a-class b-class"></div>
+        `),
       )
       .registerComponent()
     const compDef = componentSpace
@@ -130,12 +130,14 @@ describe('chaining-form interface', () => {
       })
       .template(
         tmpl(`
-        <child invalid="i" a-class="a" b-class="b" />
-      `),
+          <child invalid="i" a-class="a" b-class="b" />
+        `),
       )
       .registerComponent()
-    const elem = glassEasel.Component.createWithContext('root', compDef, domBackend)
-    expect(domHtml(elem)).toBe('<child is=""><div class="invalid a b"></div></child>')
+    const elem = execWithWarn(1, () =>
+      glassEasel.Component.createWithContext('root', compDef, domBackend),
+    )
+    expect(domHtml(elem)).toBe('<child><div class="invalid a b"></div></child>')
   })
 
   test('chaining data and observers', () => {
@@ -579,9 +581,7 @@ describe('chaining-form interface', () => {
     const comp = glassEasel.Component.createWithContext('root', compDef, domBackend)
     glassEasel.Element.pretendAttached(comp)
     expect(eventArr).toStrictEqual([1, 2, 1, 2, 1, 2])
-    expect(domHtml(comp)).toBe(
-      '<parent is="parent-comp"><child is="child-comp">A</child><child is="child-comp">B</child><child is="child-comp">C</child></parent>',
-    )
+    expect(domHtml(comp)).toBe('<parent><child>A</child><child>B</child><child>C</child></parent>')
   })
 
   test('chaining filter', () => {

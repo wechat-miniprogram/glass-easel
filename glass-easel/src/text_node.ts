@@ -14,6 +14,7 @@ import { MutationObserverTarget } from './mutation_observer'
 import { type NodeCast } from './node'
 import { type ShadowRoot } from './shadow_root'
 import { TEXT_NODE_SYMBOL, isTextNode } from './type_symbol'
+import { AutoDestroyState } from './data_utils'
 
 export class TextNode implements NodeCast {
   /* @internal */
@@ -31,7 +32,7 @@ export class TextNode implements NodeCast {
   /** @internal */
   _$slotElement: Element | null = null
   /** @internal */
-  _$destroyOnDetach = false
+  _$destroyOnRemoval = AutoDestroyState.Disabled
   /** @internal */
   _$subtreeSlotStart = null
   /** @internal */
@@ -124,9 +125,36 @@ export class TextNode implements NodeCast {
     }
   }
 
-  /** Destroy the backend element on next detach */
+  /**
+   * Destroy the backend element when removed from any parent element
+   */
+  destroyBackendElementOnRemoval() {
+    this._$destroyOnRemoval = AutoDestroyState.Enabled
+  }
+
+  /**
+   * Cancel the destroy scheduling of the backend element
+   */
+  cancelDestroyBackendElementOnRemoval() {
+    this._$destroyOnRemoval = AutoDestroyState.Disabled
+  }
+
+  /**
+   * Destroy the backend element when removed from any parent element
+   *
+   * @deprecated Use `destroyBackendElementOnRemoval` instead.
+   */
   destroyBackendElementOnDetach() {
-    this._$destroyOnDetach = true
+    this._$destroyOnRemoval = AutoDestroyState.Enabled
+  }
+
+  /**
+   * Cancel the destroy scheduling of the backend element
+   *
+   * @deprecated Use `cancelDestroyBackendElementOnRemoval` instead.
+   */
+  cancelDestroyBackendElementOnDetach() {
+    this._$destroyOnRemoval = AutoDestroyState.Disabled
   }
 
   /** Get the backend element */

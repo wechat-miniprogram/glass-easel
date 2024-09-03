@@ -125,6 +125,9 @@ export class ComponentBuilder<
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       this._$export = behavior._$export as any
     }
+    if (behavior._$chainingFilter) {
+      return behavior._$chainingFilter(this as any)
+    }
     return this as any
   }
 

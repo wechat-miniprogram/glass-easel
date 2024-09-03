@@ -16,6 +16,7 @@ pub struct StyleSheetOptions {
     pub class_prefix_sign: Option<String>,
     pub rpx_ratio: f32,
     pub import_sign: Option<String>,
+    pub convert_host: bool,
     pub host_is: Option<String>,
 }
 
@@ -26,6 +27,7 @@ impl Default for StyleSheetOptions {
             class_prefix_sign: None,
             rpx_ratio: 750.,
             import_sign: None,
+            convert_host: false,
             host_is: None,
         }
     }
@@ -444,8 +446,7 @@ fn parse_qualified_rule(input: &mut StepParser, ss: &mut StyleSheetTransformer) 
     let mut in_class = false;
     let mut has_whitespace = false;
     input.skip_whitespace();
-    if let Some(host_is) = ss.options.host_is.as_ref() {
-        let quoted_host_is = Token::QuotedString(host_is.clone().into());
+    if ss.options.convert_host {
         let r = input.try_parse::<_, _, ParseError<()>>(|input| {
             input.expect_colon()?;
             let Ok(next) = input.next() else {
@@ -472,23 +473,40 @@ fn parse_qualified_rule(input: &mut StepParser, ss: &mut StyleSheetTransformer) 
                 ss.add_warning(error::ParseErrorKind::HostSelectorCombination, pos..pos);
             } else {
                 ss.write_in_low_priority(input, |ss, input| {
-                    ss.append_token(
-                        StepToken::wrap_at(Token::SquareBracketBlock, &next),
-                        input,
-                        None,
-                    );
-                    ss.append_token(
-                        StepToken::wrap_at(Token::Ident("is".into()), &next),
-                        input,
-                        None,
-                    );
-                    ss.append_token(StepToken::wrap_at(Token::Delim('='), &next), input, None);
-                    ss.append_token(StepToken::wrap_at(quoted_host_is, &next), input, None);
-                    ss.append_token(
-                        StepToken::wrap_at(Token::CloseSquareBracket, &next),
-                        input,
-                        None,
-                    );
+                    let write_attr_selector =
+                        |ss: &mut StyleSheetTransformer,
+                         input: &mut StepParser,
+                         name: &str,
+                         value: &str| {
+                            ss.append_token(
+                                StepToken::wrap_at(Token::SquareBracketBlock, &next),
+                                input,
+                                None,
+                            );
+                            ss.append_token(
+                                StepToken::wrap_at(Token::Ident(name.into()), &next),
+                                input,
+                                None,
+                            );
+                            ss.append_token(
+                                StepToken::wrap_at(Token::Delim('='), &next),
+                                input,
+                                None,
+                            );
+                            let quoted_value = Token::QuotedString(value.into());
+                            ss.append_token(StepToken::wrap_at(quoted_value, &next), input, None);
+                            ss.append_token(
+                                StepToken::wrap_at(Token::CloseSquareBracket, &next),
+                                input,
+                                None,
+                            );
+                        };
+                    let p = ss.options.class_prefix.clone().unwrap_or_default();
+                    write_attr_selector(ss, input, "wx-host", &p);
+                    if let Some(host_is) = ss.options.host_is.clone() {
+                        ss.append_token(StepToken::wrap_at(Token::Comma, &next), input, None);
+                        write_attr_selector(ss, input, "is", &host_is);
+                    }
                     let close = ss.append_nested_block(next, input);
                     convert_rpx_in_block(input, ss, None);
                     ss.append_nested_block_close(close, input);
@@ -902,7 +920,8 @@ mod test {
                 }
             "#,
             StyleSheetOptions {
-                host_is: Some("TEST".to_string()),
+                class_prefix: Some("ABC".into()),
+                convert_host: true,
                 ..Default::default()
             },
         );
@@ -914,7 +933,7 @@ mod test {
         lp.write(&mut s).unwrap();
         assert_eq!(
             std::str::from_utf8(&s).unwrap(),
-            r#"[is="TEST"]{color:red;}"#
+            r#"[wx-host="ABC"]{color:red;}"#
         );
     }
 
@@ -932,7 +951,7 @@ mod test {
                 .a { color: green }
             "#,
             StyleSheetOptions {
-                host_is: Some("TEST".to_string()),
+                convert_host: true,
                 ..Default::default()
             },
         );
@@ -972,7 +991,9 @@ mod test {
                 }
             "#,
             StyleSheetOptions {
-                host_is: Some("/\"\\".to_string()),
+                class_prefix: None,
+                convert_host: true,
+                host_is: Some("IS".into()),
                 ..Default::default()
             },
         );
@@ -987,7 +1008,7 @@ mod test {
         lp.write(&mut s).unwrap();
         assert_eq!(
             std::str::from_utf8(&s).unwrap(),
-            r#"@media(width: 1px){@supports(color: red){[is="/\"\\"]{color:pink;}}}"#
+            r#"@media(width: 1px){@supports(color: red){[wx-host=""],[is="IS"]{color:pink;}}}"#
         );
     }
 

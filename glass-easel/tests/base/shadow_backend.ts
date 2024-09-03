@@ -398,8 +398,14 @@ abstract class Node implements glassEasel.backend.Element {
       })
       const tagName = this.tagName.toLowerCase()
       ret.push(`<${tagName}`)
-      const is = this.__wxElement?.asGeneralComponent()?.is
-      if (typeof is === 'string') props.is = is
+      const comp = this.__wxElement?.asGeneralComponent()
+      if (comp) {
+        const def = comp.getComponentDefinition()
+        const scope = def.getComponentOptions().styleScope
+        if (scope && scope !== def.behavior.ownerSpace._$sharedStyleScope) {
+          props['wx-host'] = def.behavior.ownerSpace.styleScopeManager.queryName(scope)!
+        }
+      }
       if (this.id) props.id = this.getAttribute('id')!
       if (this._$style) props.style = this.getAttribute('style')!
       if (this._$classes) props.class = this.getAttribute('class')!
@@ -517,10 +523,12 @@ abstract class Node implements glassEasel.backend.Element {
     if (this._$wxElement) throw new Error(`associate value multiple times`)
     if (v !== this.__wxElement) throw new Error(`wrong associate value`)
     this._$wxElement = v
-    if (v.ownerShadowRoot) {
-      const ownerSpace = v.ownerShadowRoot.getHostNode()._$behavior.ownerSpace
-      this._$styleScopeManager = ownerSpace.styleScopeManager
-    }
+    if (!v.ownerShadowRoot && !glassEasel.Component.isComponent(v))
+      throw new Error('associate non-component on root node')
+    const ownerSpace = v.ownerShadowRoot
+      ? v.ownerShadowRoot.getHostNode()._$behavior.ownerSpace
+      : v.asGeneralComponent()!._$behavior.ownerSpace
+    this._$styleScopeManager = ownerSpace.styleScopeManager
   }
 
   getShadowRoot(): ShadowRoot | undefined {
