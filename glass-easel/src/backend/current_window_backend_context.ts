@@ -42,6 +42,10 @@ export class CurrentWindowBackendContext implements Context {
   /* @internal */
   private _$styleSheetRegistry = Object.create(null) as { [path: string]: string }
   /* @internal */
+  private tempStyleSheetContent: HTMLStyleElement | undefined = undefined
+  /* @internal */
+  private styleRuleEdits: WeakMap<CSSStyleRule, StyleRuleEdit> = new WeakMap()
+  /* @internal */
   private _$delegatedEventListeners = Object.create(null) as Record<string, true>
   /* @internal */
   private _$elementEventListeners = new WeakMap<Element, Record<string, true>>()
@@ -561,17 +565,226 @@ export class CurrentWindowBackendContext implements Context {
     }
   }
 
+  private queryMatchedRules(
+    sheetIndex: number,
+    sheet: CSSStyleSheet,
+    elem: HTMLElement,
+  ): shared.CSSRule[] {
+    const rules: shared.CSSRule[] = []
+    forEachStyleSheetRule(sheet, (ruleIndex, cssRule, ancestors) => {
+      if (cssRule instanceof CSSStyleRule) {
+        let inactive = false
+        const mediaQueries: string[] = []
+        for (let i = 0; i < ancestors.length; i += 1) {
+          const cssRule = ancestors[i]!
+          if (cssRule instanceof CSSMediaRule) {
+            if (!matchMedia(cssRule.conditionText).matches) {
+              inactive = true
+            }
+            mediaQueries.push(`@media ${cssRule.conditionText}`)
+          } else if (cssRule instanceof CSSLayerBlockRule) {
+            mediaQueries.push(`@layer ${cssRule.name}`)
+          }
+        }
+        const selector = cssRule.selectorText
+        if (elem.matches(selector)) {
+          const propertyText = cssRule.style.cssText
+          const styleRuleEdit = this.styleRuleEdits.get(cssRule)
+          const properties = styleRuleEdit
+            ? styleRuleEdit.props.slice()
+            : collectStyleSheetProperties(cssRule.style)
+          rules.push({
+            sheetIndex,
+            ruleIndex,
+            mediaQueries,
+            selector,
+            properties,
+            propertyText,
+            weightHighBits: 0, // FIXME infer priority values
+            inactive,
+          })
+        }
+      }
+    })
+    return rules
+  }
+
   getMatchedRules(target: Element, cb: (res: shared.GetMatchedRulesResponses) => void): void {
     const elem = target as unknown as HTMLElement
     const sheets = document.styleSheets
     const rules: shared.CSSRule[] = []
     for (let i = 0; i < sheets.length; i += 1) {
       const sheet = sheets[i]!
-      rules.push(...queryMatchedRules(i, sheet, elem))
+      rules.push(...this.queryMatchedRules(i, sheet, elem))
     }
     const inlineText = elem.style.cssText
     const inline = collectStyleSheetProperties(elem.style)
     cb({ inline, inlineText, rules })
+  }
+
+  private getTempStyleSheet(): CSSStyleSheet {
+    if (!this.tempStyleSheetContent) {
+      const ss = document.createElement('style')
+      document.documentElement.appendChild(ss)
+    }
+    const sheets = document.styleSheets
+    return sheets[sheets.length - 1]!
+  }
+
+  private findStyleRule(sheetIndex: number, ruleIndex: number): StyleRuleEdit | null {
+    const sheets = document.styleSheets
+    const sheet = sheets[sheetIndex]
+    const rule = sheet?.cssRules[ruleIndex]
+    if (rule?.constructor.name === 'CSSStyleRule') {
+      const r = rule as CSSStyleRule
+      if (!this.styleRuleEdits.get(r)) {
+        this.styleRuleEdits.set(r, new StyleRuleEdit(r))
+      }
+      return this.styleRuleEdits.get(r)!
+    }
+    return null
+  }
+
+  addStyleSheetRule(
+    mediaQueryStr: string,
+    selector: string,
+    cb: (ruleIndex: number | null) => void,
+  ) {
+    const ss = this.getTempStyleSheet()
+    const ruleIndex = ss.cssRules.length
+    const ruleString = `${selector} {}`
+    const normalizedMedia =
+      !mediaQueryStr || mediaQueryStr.startsWith('@media ')
+        ? mediaQueryStr
+        : `@media ${mediaQueryStr}`
+    const ruleStringWithMedia = normalizedMedia
+      ? `${normalizedMedia} { ${ruleString} }`
+      : ruleString
+    ss.insertRule(ruleStringWithMedia, ruleIndex)
+    cb(ruleIndex)
+  }
+
+  getStyleSheetIndexForNewRules(cb: (sheetIndex: number) => void) {
+    this.getTempStyleSheet()
+    const sheetIndex = document.styleSheets.length - 1
+    cb(sheetIndex)
+  }
+
+  resetStyleSheetRule(
+    sheetIndex: number,
+    ruleIndex: number,
+    cb: (ruleIndex: number | null) => void,
+  ) {
+    const rule = this.findStyleRule(sheetIndex, ruleIndex)
+    if (!rule) {
+      cb(null)
+      return
+    }
+    rule.clear()
+    cb(ruleIndex)
+  }
+
+  modifyStyleSheetRuleSelector(
+    sheetIndex: number,
+    ruleIndex: number,
+    selector: string,
+    cb: (ruleIndex: number | null) => void,
+  ) {
+    const rule = this.findStyleRule(sheetIndex, ruleIndex)
+    if (!rule) {
+      cb(null)
+      return
+    }
+    rule.setSelector(selector)
+    cb(ruleIndex)
+  }
+
+  addStyleSheetProperty(
+    sheetIndex: number,
+    ruleIndex: number,
+    inlineStyle: string,
+    cb: (propertyIndex: number | null) => void,
+  ) {
+    const rule = this.findStyleRule(sheetIndex, ruleIndex)
+    if (!rule) {
+      cb(null)
+      return
+    }
+    const ret = rule.countProps()
+    rule.append(inlineStyle)
+    cb(ret)
+  }
+
+  replaceStyleSheetAllProperties(
+    sheetIndex: number,
+    ruleIndex: number,
+    inlineStyle: string,
+    cb: (propertyIndex: number | null) => void,
+  ) {
+    const rule = this.findStyleRule(sheetIndex, ruleIndex)
+    if (!rule) {
+      cb(null)
+      return
+    }
+    rule.clear()
+    rule.append(inlineStyle)
+    cb(0)
+  }
+
+  setStyleSheetPropertyDisabled(
+    sheetIndex: number,
+    ruleIndex: number,
+    propertyIndex: number,
+    disabled: boolean,
+    cb: (propertyIndex: number | null) => void,
+  ) {
+    const rule = this.findStyleRule(sheetIndex, ruleIndex)
+    if (!rule) {
+      cb(null)
+      return
+    }
+    if (rule.setDisabled(propertyIndex)) {
+      cb(propertyIndex)
+    } else {
+      cb(null)
+    }
+  }
+
+  removeStyleSheetProperty(
+    sheetIndex: number,
+    ruleIndex: number,
+    propertyIndex: number,
+    cb: (propertyIndex: number | null) => void,
+  ) {
+    const rule = this.findStyleRule(sheetIndex, ruleIndex)
+    if (!rule) {
+      cb(null)
+      return
+    }
+    if (rule.remove(propertyIndex)) {
+      cb(propertyIndex)
+    } else {
+      cb(null)
+    }
+  }
+
+  replaceStyleSheetProperty(
+    sheetIndex: number,
+    ruleIndex: number,
+    propertyIndex: number,
+    inlineStyle: string,
+    cb: (propertyIndex: number | null) => void,
+  ) {
+    const rule = this.findStyleRule(sheetIndex, ruleIndex)
+    if (!rule) {
+      return
+      cb(null)
+    }
+    if (rule.replace(propertyIndex, inlineStyle)) {
+      cb(propertyIndex)
+    } else {
+      cb(null)
+    }
   }
 }
 
@@ -607,43 +820,79 @@ const forEachStyleSheetRule = (
   rec(sheet.cssRules)
 }
 
-const queryMatchedRules = (
-  sheetIndex: number,
-  sheet: CSSStyleSheet,
-  elem: HTMLElement,
-): shared.CSSRule[] => {
-  const rules: shared.CSSRule[] = []
-  forEachStyleSheetRule(sheet, (ruleIndex, cssRule, ancestors) => {
-    if (cssRule instanceof CSSStyleRule) {
-      let inactive = false
-      const mediaQueries: string[] = []
-      for (let i = 0; i < ancestors.length; i += 1) {
-        const cssRule = ancestors[i]!
-        if (cssRule instanceof CSSMediaRule) {
-          if (!matchMedia(cssRule.conditionText).matches) {
-            inactive = true
-          }
-          mediaQueries.push(`@media ${cssRule.conditionText}`)
-        } else if (cssRule instanceof CSSLayerBlockRule) {
-          mediaQueries.push(`@layer ${cssRule.name}`)
-        }
+class StyleRuleEdit {
+  private target: CSSStyleRule
+  props: shared.CSSProperty[]
+
+  constructor(target: CSSStyleRule) {
+    this.target = target
+    this.props = collectStyleSheetProperties(target.style)
+  }
+
+  private updateFromTarget() {
+    const oldProps = this.props
+    this.props = collectStyleSheetProperties(this.target.style)
+    let i = 0
+    oldProps.forEach((prop) => {
+      if (prop.disabled || prop.invalid) {
+        this.props.splice(i, 0, prop)
+        i += 1
       }
-      const selector = cssRule.selectorText
-      if (elem.matches(selector)) {
-        const propertyText = cssRule.style.cssText
-        const properties = collectStyleSheetProperties(cssRule.style)
-        rules.push({
-          sheetIndex,
-          ruleIndex,
-          mediaQueries,
-          selector,
-          properties,
-          propertyText,
-          weightHighBits: 0, // FIXME infer priority values
-          inactive,
-        })
+      while (i < this.props.length && prop.name === this.props[i]!.name) {
+        i += 1
       }
-    }
-  })
-  return rules
+    })
+  }
+
+  clear() {
+    this.props.length = 0
+    this.target.style.cssText = ''
+  }
+
+  countProps() {
+    return this.props.length
+  }
+
+  setSelector(s: string) {
+    this.target.selectorText = s
+  }
+
+  append(inlineStyle: string) {
+    this.target.style.cssText = this.stringify() + inlineStyle
+    this.updateFromTarget()
+  }
+
+  setDisabled(index: number): boolean {
+    if (index >= this.props.length) return false
+    this.props[index]!.disabled = true
+    this.target.style.cssText = this.stringify()
+    return true
+  }
+
+  remove(index: number): boolean {
+    if (index >= this.props.length) return false
+    this.props.splice(index, 1)
+    this.target.style.cssText = this.stringify()
+    this.updateFromTarget()
+    return true
+  }
+
+  replace(index: number, inlineStyle: string): boolean {
+    if (index >= this.props.length) return false
+    this.props.splice(index, 1)
+    this.target.style.cssText = this.stringify(0, index) + inlineStyle + this.stringify(index)
+    this.updateFromTarget()
+    return true
+  }
+
+  private stringify(start?: number, end?: number): string {
+    return this.props
+      .slice(start, end)
+      .map(({ name, value, important, disabled }) => {
+        if (disabled) return ''
+        if (important) return `${name}: ${value} !important;\n`
+        return `${name}: ${value};\n`
+      })
+      .join('')
+  }
 }
