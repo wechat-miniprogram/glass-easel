@@ -591,7 +591,7 @@ export class CurrentWindowBackendContext implements Context {
           const propertyText = cssRule.style.cssText
           const styleRuleEdit = this.styleRuleEdits.get(cssRule)
           const properties = styleRuleEdit
-            ? styleRuleEdit.props.slice()
+            ? styleRuleEdit.getProps()
             : collectStyleSheetProperties(cssRule.style)
           rules.push({
             sheetIndex,
@@ -743,7 +743,7 @@ export class CurrentWindowBackendContext implements Context {
       cb(null)
       return
     }
-    if (rule.setDisabled(propertyIndex)) {
+    if (rule.setDisabled(propertyIndex, disabled)) {
       cb(propertyIndex)
     } else {
       cb(null)
@@ -793,7 +793,8 @@ const collectStyleSheetProperties = (style: CSSStyleDeclaration) => {
   for (let i = 0; i < style.length; i += 1) {
     const name = style[i]!
     const important = style.getPropertyPriority(name) === 'important'
-    properties.push({ name, value: style.getPropertyValue(name), important })
+    const value = style.getPropertyValue(name).trim()
+    properties.push({ name, value, important })
   }
   return properties
 }
@@ -822,7 +823,7 @@ const forEachStyleSheetRule = (
 
 class StyleRuleEdit {
   private target: CSSStyleRule
-  props: shared.CSSProperty[]
+  private props: shared.CSSProperty[]
 
   constructor(target: CSSStyleRule) {
     this.target = target
@@ -834,14 +835,21 @@ class StyleRuleEdit {
     this.props = collectStyleSheetProperties(this.target.style)
     let i = 0
     oldProps.forEach((prop) => {
-      if (prop.disabled || prop.invalid) {
+      if (prop.disabled) {
         this.props.splice(i, 0, prop)
         i += 1
       }
-      while (i < this.props.length && prop.name === this.props[i]!.name) {
+      while (i < this.props.length) {
         i += 1
+        if (prop.name === this.props[i - 1]!.name) {
+          break
+        }
       }
     })
+  }
+
+  getProps() {
+    return this.props.slice()
   }
 
   clear() {
@@ -862,10 +870,11 @@ class StyleRuleEdit {
     this.updateFromTarget()
   }
 
-  setDisabled(index: number): boolean {
+  setDisabled(index: number, disabled: boolean): boolean {
     if (index >= this.props.length) return false
-    this.props[index]!.disabled = true
+    this.props[index]!.disabled = disabled
     this.target.style.cssText = this.stringify()
+    this.updateFromTarget()
     return true
   }
 
