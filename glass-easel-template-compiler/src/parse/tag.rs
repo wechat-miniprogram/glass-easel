@@ -2230,6 +2230,20 @@ impl Element {
     }
 
     fn init_scopes_and_binding_map_keys(&mut self, sas: &mut ScopeAnalyzeState) {
+        // disable globally if there is an `include` tag
+        let should_globally_disabled = match &self.kind {
+            ElementKind::Include { .. } => true,
+            ElementKind::Normal { .. }
+            | ElementKind::Pure { .. }
+            | ElementKind::For { .. }
+            | ElementKind::If { .. }
+            | ElementKind::TemplateRef { .. }
+            | ElementKind::Slot { .. } => false,
+        };
+        if should_globally_disabled {
+            sas.binding_map_collector.disable_all();
+        }
+
         // update dynamic tree state
         let self_dynamic_tree = match &self.kind {
             ElementKind::Normal { .. } | ElementKind::Pure { .. } => false,

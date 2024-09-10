@@ -4,6 +4,7 @@ use crate::{escape::gen_lit_str, proc_gen::JsFunctionScopeWriter, TmplError};
 
 #[derive(Debug, Clone)]
 pub(crate) struct BindingMapCollector {
+    overall_disabled: bool,
     fields: HashMap<String, BindingMapField>,
 }
 
@@ -16,8 +17,13 @@ pub(crate) enum BindingMapField {
 impl BindingMapCollector {
     pub(crate) fn new() -> Self {
         Self {
+            overall_disabled: false,
             fields: HashMap::new(),
         }
+    }
+
+    pub(crate) fn disable_all(&mut self) {
+        self.overall_disabled = true;
     }
 
     pub(crate) fn add_field(&mut self, field: &str) -> Option<usize> {
@@ -39,6 +45,7 @@ impl BindingMapCollector {
     }
 
     pub(crate) fn get_field(&self, field: &str) -> Option<()> {
+        if self.overall_disabled { return None; }
         self.fields.get(field).and_then(|x| match x {
             BindingMapField::Mapped(_) => Some(()),
             BindingMapField::Disabled => None,
@@ -46,9 +53,15 @@ impl BindingMapCollector {
     }
 
     pub(crate) fn list_fields(&self) -> impl Iterator<Item = (&str, usize)> {
-        self.fields.iter().filter_map(|(key, field)| match field {
-            BindingMapField::Mapped(x) => Some((key.as_str(), *x)),
-            BindingMapField::Disabled => None,
+        let overall_disabled = self.overall_disabled;
+        self.fields.iter().filter_map(move |(key, field)| {
+            if overall_disabled {
+                return None;
+            }
+            match field {
+                BindingMapField::Mapped(x) => Some((key.as_str(), *x)),
+                BindingMapField::Disabled => None,
+            }
         })
     }
 }

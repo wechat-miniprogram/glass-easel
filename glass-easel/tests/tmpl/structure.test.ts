@@ -895,19 +895,23 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     const def = glassEasel
       .registerElement({
         template: multiTmpl({
-          '': '<include src="./a.wxml" />',
-          a: '<div>{{a}}</div>',
+          '': '<include src="./a.wxml" /><span>{{a}}</span>',
+          a: '<div>{{a}}{{b}}</div>',
         }),
         data: {
           a: 123,
+          b: 'abc',
         },
       })
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
-    expect(domHtml(elem)).toBe('<div>123</div>')
+    expect(domHtml(elem)).toBe('<div>123abc</div><span>123</span>')
     matchElementWithDom(elem)
     elem.setData({ a: 456 })
-    expect(domHtml(elem)).toBe('<div>456</div>')
+    expect(domHtml(elem)).toBe('<div>456abc</div><span>456</span>')
+    matchElementWithDom(elem)
+    elem.setData({ b: 'def' })
+    expect(domHtml(elem)).toBe('<div>456def</div><span>456</span>')
     matchElementWithDom(elem)
   })
 
