@@ -42,10 +42,6 @@ export class CurrentWindowBackendContext implements Context {
   /* @internal */
   private _$styleSheetRegistry = Object.create(null) as { [path: string]: string }
   /* @internal */
-  private tempStyleSheetContent: HTMLStyleElement | undefined = undefined
-  /* @internal */
-  private styleRuleEdits: WeakMap<CSSStyleRule, StyleRuleEdit> = new WeakMap()
-  /* @internal */
   private _$delegatedEventListeners = Object.create(null) as Record<string, true>
   /* @internal */
   private _$elementEventListeners = new WeakMap<Element, Record<string, true>>()
@@ -589,10 +585,7 @@ export class CurrentWindowBackendContext implements Context {
         const selector = cssRule.selectorText
         if (elem.matches(selector)) {
           const propertyText = cssRule.style.cssText
-          const styleRuleEdit = this.styleRuleEdits.get(cssRule)
-          const properties = styleRuleEdit
-            ? styleRuleEdit.getProps()
-            : collectStyleSheetProperties(cssRule.style)
+          const properties = collectStyleSheetProperties(cssRule.style)
           rules.push({
             sheetIndex,
             ruleIndex,
@@ -622,97 +615,14 @@ export class CurrentWindowBackendContext implements Context {
     cb({ inline, inlineText, rules })
   }
 
-  private getTempStyleSheet(): CSSStyleSheet {
-    if (!this.tempStyleSheetContent) {
-      const ss = document.createElement('style')
-      document.documentElement.appendChild(ss)
-    }
-    const sheets = document.styleSheets
-    return sheets[sheets.length - 1]!
-  }
-
-  private findStyleRule(sheetIndex: number, ruleIndex: number): StyleRuleEdit | null {
+  private findStyleRule(sheetIndex: number, ruleIndex: number): CSSStyleRule | null {
     const sheets = document.styleSheets
     const sheet = sheets[sheetIndex]
     const rule = sheet?.cssRules[ruleIndex]
     if (rule?.constructor.name === 'CSSStyleRule') {
-      const r = rule as CSSStyleRule
-      if (!this.styleRuleEdits.get(r)) {
-        this.styleRuleEdits.set(r, new StyleRuleEdit(r))
-      }
-      return this.styleRuleEdits.get(r)!
+      return rule as CSSStyleRule
     }
     return null
-  }
-
-  addStyleSheetRule(
-    mediaQueryStr: string,
-    selector: string,
-    cb: (ruleIndex: number | null) => void,
-  ) {
-    const ss = this.getTempStyleSheet()
-    const ruleIndex = ss.cssRules.length
-    const ruleString = `${selector} {}`
-    const normalizedMedia =
-      !mediaQueryStr || mediaQueryStr.startsWith('@media ')
-        ? mediaQueryStr
-        : `@media ${mediaQueryStr}`
-    const ruleStringWithMedia = normalizedMedia
-      ? `${normalizedMedia} { ${ruleString} }`
-      : ruleString
-    ss.insertRule(ruleStringWithMedia, ruleIndex)
-    cb(ruleIndex)
-  }
-
-  getStyleSheetIndexForNewRules(cb: (sheetIndex: number) => void) {
-    this.getTempStyleSheet()
-    const sheetIndex = document.styleSheets.length - 1
-    cb(sheetIndex)
-  }
-
-  resetStyleSheetRule(
-    sheetIndex: number,
-    ruleIndex: number,
-    cb: (ruleIndex: number | null) => void,
-  ) {
-    const rule = this.findStyleRule(sheetIndex, ruleIndex)
-    if (!rule) {
-      cb(null)
-      return
-    }
-    rule.clear()
-    cb(ruleIndex)
-  }
-
-  modifyStyleSheetRuleSelector(
-    sheetIndex: number,
-    ruleIndex: number,
-    selector: string,
-    cb: (ruleIndex: number | null) => void,
-  ) {
-    const rule = this.findStyleRule(sheetIndex, ruleIndex)
-    if (!rule) {
-      cb(null)
-      return
-    }
-    rule.setSelector(selector)
-    cb(ruleIndex)
-  }
-
-  addStyleSheetProperty(
-    sheetIndex: number,
-    ruleIndex: number,
-    inlineStyle: string,
-    cb: (propertyIndex: number | null) => void,
-  ) {
-    const rule = this.findStyleRule(sheetIndex, ruleIndex)
-    if (!rule) {
-      cb(null)
-      return
-    }
-    const ret = rule.countProps()
-    rule.append(inlineStyle)
-    cb(ret)
   }
 
   replaceStyleSheetAllProperties(
@@ -726,65 +636,8 @@ export class CurrentWindowBackendContext implements Context {
       cb(null)
       return
     }
-    rule.clear()
-    rule.append(inlineStyle)
+    rule.cssText = inlineStyle
     cb(0)
-  }
-
-  setStyleSheetPropertyDisabled(
-    sheetIndex: number,
-    ruleIndex: number,
-    propertyIndex: number,
-    disabled: boolean,
-    cb: (propertyIndex: number | null) => void,
-  ) {
-    const rule = this.findStyleRule(sheetIndex, ruleIndex)
-    if (!rule) {
-      cb(null)
-      return
-    }
-    if (rule.setDisabled(propertyIndex, disabled)) {
-      cb(propertyIndex)
-    } else {
-      cb(null)
-    }
-  }
-
-  removeStyleSheetProperty(
-    sheetIndex: number,
-    ruleIndex: number,
-    propertyIndex: number,
-    cb: (propertyIndex: number | null) => void,
-  ) {
-    const rule = this.findStyleRule(sheetIndex, ruleIndex)
-    if (!rule) {
-      cb(null)
-      return
-    }
-    if (rule.remove(propertyIndex)) {
-      cb(propertyIndex)
-    } else {
-      cb(null)
-    }
-  }
-
-  replaceStyleSheetProperty(
-    sheetIndex: number,
-    ruleIndex: number,
-    propertyIndex: number,
-    inlineStyle: string,
-    cb: (propertyIndex: number | null) => void,
-  ) {
-    const rule = this.findStyleRule(sheetIndex, ruleIndex)
-    if (!rule) {
-      return
-      cb(null)
-    }
-    if (rule.replace(propertyIndex, inlineStyle)) {
-      cb(propertyIndex)
-    } else {
-      cb(null)
-    }
   }
 }
 
@@ -793,7 +646,7 @@ const collectStyleSheetProperties = (style: CSSStyleDeclaration) => {
   for (let i = 0; i < style.length; i += 1) {
     const name = style[i]!
     const important = style.getPropertyPriority(name) === 'important'
-    const value = style.getPropertyValue(name).trim()
+    const value = style.getPropertyValue(name)
     properties.push({ name, value, important })
   }
   return properties
@@ -819,89 +672,4 @@ const forEachStyleSheetRule = (
     }
   }
   rec(sheet.cssRules)
-}
-
-class StyleRuleEdit {
-  private target: CSSStyleRule
-  private props: shared.CSSProperty[]
-
-  constructor(target: CSSStyleRule) {
-    this.target = target
-    this.props = collectStyleSheetProperties(target.style)
-  }
-
-  private updateFromTarget() {
-    const oldProps = this.props
-    this.props = collectStyleSheetProperties(this.target.style)
-    let i = 0
-    oldProps.forEach((prop) => {
-      if (prop.disabled) {
-        this.props.splice(i, 0, prop)
-        i += 1
-      }
-      while (i < this.props.length) {
-        i += 1
-        if (prop.name === this.props[i - 1]!.name) {
-          break
-        }
-      }
-    })
-  }
-
-  getProps() {
-    return this.props.slice()
-  }
-
-  clear() {
-    this.props.length = 0
-    this.target.style.cssText = ''
-  }
-
-  countProps() {
-    return this.props.length
-  }
-
-  setSelector(s: string) {
-    this.target.selectorText = s
-  }
-
-  append(inlineStyle: string) {
-    this.target.style.cssText = this.stringify() + inlineStyle
-    this.updateFromTarget()
-  }
-
-  setDisabled(index: number, disabled: boolean): boolean {
-    if (index >= this.props.length) return false
-    this.props[index]!.disabled = disabled
-    this.target.style.cssText = this.stringify()
-    this.updateFromTarget()
-    return true
-  }
-
-  remove(index: number): boolean {
-    if (index >= this.props.length) return false
-    this.props.splice(index, 1)
-    this.target.style.cssText = this.stringify()
-    this.updateFromTarget()
-    return true
-  }
-
-  replace(index: number, inlineStyle: string): boolean {
-    if (index >= this.props.length) return false
-    this.props.splice(index, 1)
-    this.target.style.cssText = this.stringify(0, index) + inlineStyle + this.stringify(index)
-    this.updateFromTarget()
-    return true
-  }
-
-  private stringify(start?: number, end?: number): string {
-    return this.props
-      .slice(start, end)
-      .map(({ name, value, important, disabled }) => {
-        if (disabled) return ''
-        if (important) return `${name}: ${value} !important;\n`
-        return `${name}: ${value};\n`
-      })
-      .join('')
-  }
 }
