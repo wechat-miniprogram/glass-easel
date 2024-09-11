@@ -257,7 +257,9 @@ impl Node {
                 false
             });
             let is_whitespace = match &value {
-                Value::Static { value, .. } => value.trim_matches(super::is_template_whitespace).is_empty(),
+                Value::Static { value, .. } => {
+                    value.trim_matches(super::is_template_whitespace).is_empty()
+                }
                 Value::Dynamic { .. } => false,
             };
             if !is_whitespace {

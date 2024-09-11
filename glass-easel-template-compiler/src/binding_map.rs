@@ -45,7 +45,9 @@ impl BindingMapCollector {
     }
 
     pub(crate) fn get_field(&self, field: &str) -> Option<()> {
-        if self.overall_disabled { return None; }
+        if self.overall_disabled {
+            return None;
+        }
         self.fields.get(field).and_then(|x| match x {
             BindingMapField::Mapped(_) => Some(()),
             BindingMapField::Disabled => None,
