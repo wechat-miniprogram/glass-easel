@@ -257,7 +257,7 @@ impl Node {
                 false
             });
             let is_whitespace = match &value {
-                Value::Static { value, .. } => value.trim().is_empty(),
+                Value::Static { value, .. } => value.trim_matches(super::is_template_whitespace).is_empty(),
                 Value::Dynamic { .. } => false,
             };
             if !is_whitespace {
@@ -1962,7 +1962,7 @@ impl Element {
                         content_location,
                     })
                 } else {
-                    if content.trim().len() > 0 {
+                    if content.trim_matches(super::is_template_whitespace).len() > 0 {
                         ps.add_warning(ParseErrorKind::ChildNodesNotAllowed, content_location);
                     }
                     globals.scripts.push(Script::GlobalRef {
@@ -3163,6 +3163,13 @@ mod test {
         case!("&lt;", r#"&lt;"#);
         case!("&gt;", r#">"#);
         case!("&", r#"&amp;"#);
+    }
+
+    #[test]
+    fn white_space_parsing() {
+        case!("&nbsp;", "\u{A0}");
+        case!("<div>&#x85;</div>", "<div>\u{85}</div>");
+        case!("<div> &#x2028; </div>", "<div> \u{2028} </div>");
     }
 
     #[test]
