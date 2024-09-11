@@ -636,7 +636,7 @@ export class CurrentWindowBackendContext implements Context {
       cb(null)
       return
     }
-    rule.cssText = inlineStyle
+    rule.style.cssText = inlineStyle
     cb(0)
   }
 }
