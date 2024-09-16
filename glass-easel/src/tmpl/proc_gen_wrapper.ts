@@ -41,12 +41,19 @@ export interface EventListenerWrapper {
     listener: EventListener<T>,
     generalLvaluePath?: DataPath | null,
   ): boolean | void
+  isEventListenerWrapper?: true
 }
 
-const emptyFilter = <T>(x: T) => x
+let defaultChangePropFilter: ChangePropFilter = <T>(x: T) => x
+export const setDefaultChangePropFilter = (fn: ChangePropFilter) => {
+  defaultChangePropFilter = fn
+}
 
-const defaultEventListenerWrapper: EventListenerWrapper = (elem, event, listener) =>
+let defaultEventListenerWrapper: EventListenerWrapper = (elem, event, listener) =>
   listener.apply(elem, [event])
+export const setDefaultEventListenerWrapper = (fn: EventListenerWrapper) => {
+  defaultEventListenerWrapper = fn
+}
 
 type TmplArgs = {
   key?: number | string
@@ -171,7 +178,7 @@ export class ProcGenWrapper {
   procGen: ProcGen
   fallbackListenerOnNativeNode: boolean
   bindingMapDisabled = false
-  changePropFilter: ChangePropFilter = emptyFilter
+  changePropFilter: ChangePropFilter = defaultChangePropFilter
   eventListenerWrapper: EventListenerWrapper = defaultEventListenerWrapper
 
   constructor(shadowRoot: ShadowRoot, procGen: ProcGen, fallbackListenerOnNativeNode: boolean) {
