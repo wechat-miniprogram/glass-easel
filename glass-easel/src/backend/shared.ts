@@ -42,6 +42,7 @@ export type CSSRule = {
   weightHighBits?: number // the priority value of the layer level (0 by default)
   weightLowBits?: number // the priority value of the selector level (calculated from selector by default)
   inactive?: boolean
+  styleScope?: string | number
 }
 
 export type GetMatchedRulesResponses = {

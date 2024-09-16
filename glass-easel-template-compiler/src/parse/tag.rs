@@ -257,7 +257,9 @@ impl Node {
                 false
             });
             let is_whitespace = match &value {
-                Value::Static { value, .. } => value.trim().is_empty(),
+                Value::Static { value, .. } => {
+                    value.trim_matches(super::is_template_whitespace).is_empty()
+                }
                 Value::Dynamic { .. } => false,
             };
             if !is_whitespace {
@@ -1962,7 +1964,7 @@ impl Element {
                         content_location,
                     })
                 } else {
-                    if content.trim().len() > 0 {
+                    if content.trim_matches(super::is_template_whitespace).len() > 0 {
                         ps.add_warning(ParseErrorKind::ChildNodesNotAllowed, content_location);
                     }
                     globals.scripts.push(Script::GlobalRef {
@@ -2230,6 +2232,20 @@ impl Element {
     }
 
     fn init_scopes_and_binding_map_keys(&mut self, sas: &mut ScopeAnalyzeState) {
+        // disable globally if there is an `include` tag
+        let should_globally_disabled = match &self.kind {
+            ElementKind::Include { .. } => true,
+            ElementKind::Normal { .. }
+            | ElementKind::Pure { .. }
+            | ElementKind::For { .. }
+            | ElementKind::If { .. }
+            | ElementKind::TemplateRef { .. }
+            | ElementKind::Slot { .. } => false,
+        };
+        if should_globally_disabled {
+            sas.binding_map_collector.disable_all();
+        }
+
         // update dynamic tree state
         let self_dynamic_tree = match &self.kind {
             ElementKind::Normal { .. } | ElementKind::Pure { .. } => false,
@@ -3149,6 +3165,13 @@ mod test {
         case!("&lt;", r#"&lt;"#);
         case!("&gt;", r#">"#);
         case!("&", r#"&amp;"#);
+    }
+
+    #[test]
+    fn white_space_parsing() {
+        case!("&nbsp;", "\u{A0}");
+        case!("<div>&#x85;</div>", "<div>\u{85}</div>");
+        case!("<div> &#x2028; </div>", "<div> \u{2028} </div>");
     }
 
     #[test]

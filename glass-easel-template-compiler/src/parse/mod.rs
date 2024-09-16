@@ -43,6 +43,14 @@ macro_rules! case {
 pub mod expr;
 pub mod tag;
 
+const fn is_template_whitespace(c: char) -> bool {
+    match c {
+        ' ' => true,
+        '\x09'..='\x0D' => true,
+        _ => false,
+    }
+}
+
 pub trait TemplateStructure {
     fn location(&self) -> Range<Position>;
 
@@ -318,7 +326,7 @@ impl<'s> ParseState<'s> {
             let Some((index, c)) = i.next() else {
                 break s.len();
             };
-            if !char::is_whitespace(c) {
+            if !is_template_whitespace(c) {
                 break index;
             }
             if start_pos.is_none() {
