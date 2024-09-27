@@ -298,7 +298,6 @@ pub enum ElementKind {
         style: StyleAttribute,
         change_attributes: Vec<Attribute>,
         worklet_attributes: Vec<StaticAttribute>,
-        data: Vec<Attribute>,
         children: Vec<Node>,
         generics: Vec<StaticAttribute>,
         extra_attr: Vec<StaticAttribute>,
@@ -392,7 +391,6 @@ impl Element {
                 style,
                 change_attributes,
                 worklet_attributes: _,
-                data,
                 children: _,
                 generics: _,
                 extra_attr: _,
@@ -420,9 +418,6 @@ impl Element {
                     }
                 }
                 for attr in change_attributes {
-                    f(&mut attr.value, false);
-                }
-                for attr in data {
                     f(&mut attr.value, false);
                 }
                 common.for_each_value_mut(f);
@@ -541,7 +536,6 @@ impl Element {
                 style: StyleAttribute::None,
                 change_attributes: vec![],
                 worklet_attributes: vec![],
-                data: vec![],
                 children: vec![],
                 generics: vec![],
                 extra_attr: vec![],
@@ -640,7 +634,7 @@ impl Element {
                             (_, "slot") => AttrPrefixKind::Slot,
                             (ElementKind::Normal { .. }, "class") => AttrPrefixKind::ClassString,
                             (ElementKind::Normal { .. }, "style") => AttrPrefixKind::StyleString,
-                            (ElementKind::Normal { .. }, x) if x.starts_with("data-") => {
+                            (ElementKind::Normal { .. }, x) | (ElementKind::Slot { .. }, x) if x.starts_with("data-") => {
                                 AttrPrefixKind::DataHyphen
                             }
                             _ => AttrPrefixKind::Normal,
@@ -1346,11 +1340,12 @@ impl Element {
                         }
                     },
                     AttrPrefixKind::Data(prefix_location) => match &mut element {
-                        ElementKind::Normal { data, .. } => {
+                        ElementKind::Normal { common, .. } | ElementKind::Slot { common, .. } => {
                             if let AttrPrefixParseResult::Value(value, is_value_unspecified) =
                                 attr_value
                             {
-                                if data
+                                if common
+                                    .data
                                     .iter()
                                     .find(|attr| attr.name.name_eq(&attr_name))
                                     .is_some()
@@ -1360,7 +1355,7 @@ impl Element {
                                         attr_name.location,
                                     );
                                 } else {
-                                    data.push(Attribute {
+                                    common.data.push(Attribute {
                                         name: attr_name,
                                         value,
                                         is_model: false,
@@ -1370,8 +1365,7 @@ impl Element {
                                 }
                             }
                         }
-                        ElementKind::Slot { .. }
-                        | ElementKind::Pure { .. }
+                        ElementKind::Pure { .. }
                         | ElementKind::For { .. }
                         | ElementKind::If { .. }
                         | ElementKind::TemplateRef { .. }
@@ -1380,11 +1374,12 @@ impl Element {
                         }
                     },
                     AttrPrefixKind::DataHyphen => match &mut element {
-                        ElementKind::Normal { data, .. } => {
+                        ElementKind::Normal { common, .. } | ElementKind::Slot { common, .. } => {
                             if let AttrPrefixParseResult::Value(value, is_value_unspecified) =
                                 attr_value
                             {
-                                if data
+                                if common
+                                    .data
                                     .iter()
                                     .find(|attr| attr.name.name_eq(&attr_name))
                                     .is_some()
@@ -1396,7 +1391,7 @@ impl Element {
                                 } else {
                                     let prefix_location =
                                         attr_name.location.start..attr_name.location.start;
-                                    data.push(Attribute {
+                                    common.data.push(Attribute {
                                         name: attr_name,
                                         value,
                                         is_model: false,
@@ -1406,8 +1401,7 @@ impl Element {
                                 }
                             }
                         }
-                        ElementKind::Slot { .. }
-                        | ElementKind::Pure { .. }
+                        ElementKind::Pure { .. }
                         | ElementKind::For { .. }
                         | ElementKind::If { .. }
                         | ElementKind::TemplateRef { .. }
@@ -2336,6 +2330,7 @@ pub struct CommonElementAttributes {
     pub slot: Option<(Range<Position>, Value)>,
     pub slot_value_refs: Vec<StaticAttribute>,
     pub event_bindings: Vec<EventBinding>,
+    pub data: Vec<Attribute>,
     pub marks: Vec<Attribute>,
 }
 
@@ -2365,6 +2360,7 @@ impl CommonElementAttributes {
             slot,
             slot_value_refs: _,
             event_bindings,
+            data,
             marks,
         } = self;
         if let Some(id) = id {
@@ -2375,6 +2371,9 @@ impl CommonElementAttributes {
         }
         for ev in event_bindings {
             f(&mut ev.value, false);
+        }
+        for attr in data {
+            f(&mut attr.value, false);
         }
         for attr in marks {
             f(&mut attr.value, false);
@@ -3687,6 +3686,8 @@ mod test {
             6..12
         );
         case!("<slot mut-bind:a />", r#"<slot mut-bind:a/>"#);
+        case!("<slot data-a />", r#"<slot data:a/>"#);
+        case!("<slot data:a='abc' />", r#"<slot data:a="abc"/>"#);
         case!("<slot mark:a />", r#"<slot mark:a/>"#);
         case!("<slot slot='a' />", r#"<slot slot="a"/>"#);
     }
