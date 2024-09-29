@@ -1,4 +1,5 @@
 import { type Element as GlassEaselElement } from '../element'
+import { type EventBubbleStatus, type EventOptions } from '../event'
 import {
   type BoundingClientRect,
   type GetAllComputedStylesResponses,
@@ -48,6 +49,23 @@ export interface Context<Ctx, Elem> {
   createContext(
     options: unknown,
     cb: (ContextWrapper: GetWrapper<Partial<Context<Ctx, Elem> & Ctx>>) => void,
+  ): void
+
+  addPriorEventListener(
+    listener: (
+      target: GlassEaselElement,
+      type: string,
+      detail: unknown,
+      options: EventOptions,
+    ) => EventBubbleStatus | void,
+  ): void
+  removePriorEventListener(
+    listener: (
+      target: GlassEaselElement,
+      type: string,
+      detail: unknown,
+      options: EventOptions,
+    ) => EventBubbleStatus | void,
   ): void
 
   setFocusedNode(target: Elem): void

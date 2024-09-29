@@ -1,4 +1,4 @@
-import { tmpl, domBackend, composedBackend, shadowBackend, execWithWarn, } from '../base/env'
+import { domBackend, composedBackend, shadowBackend } from '../base/env'
 import * as glassEasel from '../../src'
 
 const domHtml = (elem: glassEasel.Element): string => {
