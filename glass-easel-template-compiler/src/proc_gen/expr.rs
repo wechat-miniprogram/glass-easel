@@ -49,7 +49,11 @@ impl PathSliceList {
                 if i > 0 {
                     write!(w, "||")?;
                 }
-                write!(w, "{}", this.to_path_analysis_str(scopes, is_template_data)?)?;
+                write!(
+                    w,
+                    "{}",
+                    this.to_path_analysis_str(scopes, is_template_data)?
+                )?;
             }
             if need_paren {
                 write!(w, ")")?;
@@ -210,7 +214,11 @@ impl PathSliceList {
         Ok(())
     }
 
-    fn to_path_analysis_str(&self, scopes: &Vec<ScopeVar>, is_template_data: bool) -> Result<String, TmplError> {
+    fn to_path_analysis_str(
+        &self,
+        scopes: &Vec<ScopeVar>,
+        is_template_data: bool,
+    ) -> Result<String, TmplError> {
         let mut ret = String::new();
         for path_slice in self.0.iter() {
             match path_slice {
@@ -235,8 +243,12 @@ impl PathSliceList {
                     let mut next_need_comma_sep = false;
                     for (key, sub_pas_str, sub_p) in v.iter() {
                         let mut sub_s = String::new();
-                        let sub_pas_str =
-                            sub_pas_str.to_path_analysis_str(sub_p, &mut sub_s, scopes, is_template_data)?;
+                        let sub_pas_str = sub_pas_str.to_path_analysis_str(
+                            sub_p,
+                            &mut sub_s,
+                            scopes,
+                            is_template_data,
+                        )?;
                         if let Some(_) = sub_pas_str {
                             match key {
                                 Some(key) => {
@@ -272,8 +284,12 @@ impl PathSliceList {
                 PathSlice::CombineArr(v, spread) => {
                     for (sub_pas, sub_p) in spread.iter() {
                         let mut sub_s = String::new();
-                        let sub_pas_str =
-                            sub_pas.to_path_analysis_str(sub_p, &mut sub_s, scopes, is_template_data)?;
+                        let sub_pas_str = sub_pas.to_path_analysis_str(
+                            sub_p,
+                            &mut sub_s,
+                            scopes,
+                            is_template_data,
+                        )?;
                         if let Some(_) = sub_pas_str {
                             write!(ret, "({})!==undefined||", sub_s)?;
                         }
@@ -285,7 +301,12 @@ impl PathSliceList {
                             write!(ret, ",")?;
                         }
                         let mut s = String::new();
-                        let sub_pas_str = sub_pas.to_path_analysis_str(sub_p, &mut s, scopes, is_template_data)?;
+                        let sub_pas_str = sub_pas.to_path_analysis_str(
+                            sub_p,
+                            &mut s,
+                            scopes,
+                            is_template_data,
+                        )?;
                         if let Some(_) = sub_pas_str {
                             write!(ret, "{}", s)?;
                             next_need_comma_sep = true;
@@ -1240,7 +1261,9 @@ impl ExpressionProcGen {
         scopes: &Vec<ScopeVar>,
         is_template_data: bool,
     ) -> Result<(), TmplError> {
-        let pas_str = self.pas.to_path_analysis_str(&self.sub_p, w, scopes, is_template_data)?;
+        let pas_str = self
+            .pas
+            .to_path_analysis_str(&self.sub_p, w, scopes, is_template_data)?;
         if let Some(_) = pas_str {
             // empty
         } else {

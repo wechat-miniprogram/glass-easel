@@ -561,17 +561,83 @@ export class CurrentWindowBackendContext implements Context {
     }
   }
 
+  private queryMatchedRules(
+    sheetIndex: number,
+    sheet: CSSStyleSheet,
+    elem: HTMLElement,
+  ): shared.CSSRule[] {
+    const rules: shared.CSSRule[] = []
+    forEachStyleSheetRule(sheet, (ruleIndex, cssRule, ancestors) => {
+      if (cssRule instanceof CSSStyleRule) {
+        let inactive = false
+        const mediaQueries: string[] = []
+        for (let i = 0; i < ancestors.length; i += 1) {
+          const cssRule = ancestors[i]!
+          if (cssRule instanceof CSSMediaRule) {
+            if (!matchMedia(cssRule.conditionText).matches) {
+              inactive = true
+            }
+            mediaQueries.push(`@media ${cssRule.conditionText}`)
+          } else if (cssRule instanceof CSSLayerBlockRule) {
+            mediaQueries.push(`@layer ${cssRule.name}`)
+          }
+        }
+        const selector = cssRule.selectorText
+        if (elem.matches(selector)) {
+          const propertyText = cssRule.style.cssText
+          const properties = collectStyleSheetProperties(cssRule.style)
+          rules.push({
+            sheetIndex,
+            ruleIndex,
+            mediaQueries,
+            selector,
+            properties,
+            propertyText,
+            weightHighBits: 0, // FIXME infer priority values
+            inactive,
+          })
+        }
+      }
+    })
+    return rules
+  }
+
   getMatchedRules(target: Element, cb: (res: shared.GetMatchedRulesResponses) => void): void {
     const elem = target as unknown as HTMLElement
     const sheets = document.styleSheets
     const rules: shared.CSSRule[] = []
     for (let i = 0; i < sheets.length; i += 1) {
       const sheet = sheets[i]!
-      rules.push(...queryMatchedRules(i, sheet, elem))
+      rules.push(...this.queryMatchedRules(i, sheet, elem))
     }
     const inlineText = elem.style.cssText
     const inline = collectStyleSheetProperties(elem.style)
     cb({ inline, inlineText, rules })
+  }
+
+  private findStyleRule(sheetIndex: number, ruleIndex: number): CSSStyleRule | null {
+    const sheets = document.styleSheets
+    const sheet = sheets[sheetIndex]
+    const rule = sheet?.cssRules[ruleIndex]
+    if (rule?.constructor.name === 'CSSStyleRule') {
+      return rule as CSSStyleRule
+    }
+    return null
+  }
+
+  replaceStyleSheetAllProperties(
+    sheetIndex: number,
+    ruleIndex: number,
+    inlineStyle: string,
+    cb: (propertyIndex: number | null) => void,
+  ) {
+    const rule = this.findStyleRule(sheetIndex, ruleIndex)
+    if (!rule) {
+      cb(null)
+      return
+    }
+    rule.style.cssText = inlineStyle
+    cb(0)
   }
 }
 
@@ -580,7 +646,8 @@ const collectStyleSheetProperties = (style: CSSStyleDeclaration) => {
   for (let i = 0; i < style.length; i += 1) {
     const name = style[i]!
     const important = style.getPropertyPriority(name) === 'important'
-    properties.push({ name, value: style.getPropertyValue(name), important })
+    const value = style.getPropertyValue(name)
+    properties.push({ name, value, important })
   }
   return properties
 }
@@ -605,45 +672,4 @@ const forEachStyleSheetRule = (
     }
   }
   rec(sheet.cssRules)
-}
-
-const queryMatchedRules = (
-  sheetIndex: number,
-  sheet: CSSStyleSheet,
-  elem: HTMLElement,
-): shared.CSSRule[] => {
-  const rules: shared.CSSRule[] = []
-  forEachStyleSheetRule(sheet, (ruleIndex, cssRule, ancestors) => {
-    if (cssRule instanceof CSSStyleRule) {
-      let inactive = false
-      const mediaQueries: string[] = []
-      for (let i = 0; i < ancestors.length; i += 1) {
-        const cssRule = ancestors[i]!
-        if (cssRule instanceof CSSMediaRule) {
-          if (!matchMedia(cssRule.conditionText).matches) {
-            inactive = true
-          }
-          mediaQueries.push(`@media ${cssRule.conditionText}`)
-        } else if (cssRule instanceof CSSLayerBlockRule) {
-          mediaQueries.push(`@layer ${cssRule.name}`)
-        }
-      }
-      const selector = cssRule.selectorText
-      if (elem.matches(selector)) {
-        const propertyText = cssRule.style.cssText
-        const properties = collectStyleSheetProperties(cssRule.style)
-        rules.push({
-          sheetIndex,
-          ruleIndex,
-          mediaQueries,
-          selector,
-          properties,
-          propertyText,
-          weightHighBits: 0, // FIXME infer priority values
-          inactive,
-        })
-      }
-    }
-  })
-  return rules
 }
