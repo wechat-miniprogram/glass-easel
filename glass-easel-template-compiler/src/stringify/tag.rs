@@ -222,10 +222,24 @@ impl Stringify for Element {
                     slot: _,
                     slot_value_refs: _,
                     event_bindings,
+                    data,
                     marks,
                 } = common;
                 if let Some((loc, value)) = id.as_ref() {
                     write_named_attr(stringifier, "id", loc, value)?;
+                }
+                for attr in data.iter() {
+                    let prefix = (
+                        "data",
+                        attr.prefix_location.as_ref().unwrap_or(&attr.name.location),
+                    );
+                    write_attr(
+                        stringifier,
+                        Some(prefix),
+                        &attr.name,
+                        &attr.value,
+                        Some(attr.is_value_unspecified),
+                    )?;
                 }
                 for attr in marks.iter() {
                     let prefix = (
@@ -367,7 +381,6 @@ impl Stringify for Element {
                 style,
                 change_attributes,
                 worklet_attributes,
-                data,
                 children: _,
                 generics,
                 extra_attr,
@@ -440,19 +453,6 @@ impl Stringify for Element {
                         )),
                         &attr.name,
                         &attr.value,
-                    )?;
-                }
-                for attr in data.iter() {
-                    let prefix = (
-                        "data",
-                        attr.prefix_location.as_ref().unwrap_or(&attr.name.location),
-                    );
-                    write_attr(
-                        stringifier,
-                        Some(prefix),
-                        &attr.name,
-                        &attr.value,
-                        Some(attr.is_value_unspecified),
                     )?;
                 }
                 for attr in generics.iter() {

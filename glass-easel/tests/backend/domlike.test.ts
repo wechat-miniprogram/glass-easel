@@ -14,9 +14,7 @@ componentSpace.defineComponent({
 
 describe('domlike backend', () => {
   beforeAll(() => {
-    domBackend.onEvent((target, type, detail, options) => {
-      glassEasel.Event.triggerEvent(target, type, detail, options)
-    })
+    domBackend.onEvent(glassEasel.Event.triggerEvent)
   })
 
   describe('events', () => {

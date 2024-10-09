@@ -1700,6 +1700,35 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     ops = []
   })
 
+  test('binding event on slot', () => {
+    const ops: any[] = []
+    const def = glassEasel
+      .registerElement({
+        template: tmpl(`
+        <div data:n="wrong">
+          <slot id="child" mark:b="{{ 123 }}" data:a="abc" bind:customEv="ev" />
+        </div>
+      `),
+        methods: {
+          ev(ev: any) {
+            // eslint-disable-next-line no-use-before-define
+            expect(this).toBe(elem)
+            ops.push(ev)
+          },
+        },
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe('<div></div>')
+    matchElementWithDom(elem)
+    const child = elem.getShadowRoot()!.getElementById('child')!
+    child.triggerEvent('customEv', null, { bubbles: true })
+    const ev = ops.shift() as glassEasel.ShadowedEvent<any>
+    expect(ev.mark).toStrictEqual({ b: 123 })
+    expect(ev.target.dataset).toStrictEqual({ a: 'abc' })
+  })
+
   test('setting properties', () => {
     const cs = new glassEasel.ComponentSpace()
     const subComp = cs.defineComponent({

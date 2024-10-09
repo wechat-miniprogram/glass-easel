@@ -640,6 +640,10 @@ abstract class Node implements glassEasel.backend.Element {
     this.id = id
   }
 
+  setSlot(_name: string): void {
+    assertType(this, Element)
+  }
+
   setSlotName(slot: string): void {
     assertType(this, Element)
     this._$slotName = slot

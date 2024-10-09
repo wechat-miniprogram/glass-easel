@@ -24,6 +24,7 @@ const dashToCamelCase = (dash: string): string =>
 
 const camelCaseToDash = (camel: string): string =>
   camel.replace(/(^|.)([A-Z])/g, (s) => (s[0] ? `${s[0]}-` : '') + s[1]!.toLowerCase())
+
 class EmptyTemplateEngine implements templateEngine.Template {
   private static _instance: EmptyTemplateEngine | undefined
 
@@ -89,6 +90,10 @@ export class ViewController {
   private _styleScopeIdMapping = Object.create(null) as Record<number, number>
 
   private _traceStartTimestampMapping = Object.create(null) as Record<number, number>
+
+  private _WXSCallMethodHandler:
+    | ((element: Element, method: string, args: unknown[]) => void)
+    | undefined
 
   // eslint-disable-next-line no-useless-constructor
   constructor(
@@ -334,6 +339,10 @@ export class ViewController {
     element.id = id
   }
 
+  setSlot(element: Element, name: string): void {
+    element.slot = name
+  }
+
   setSlotName(element: Element, name: string): void {
     const { _glassEasel } = this
     _glassEasel.Element.setSlotName(element, name)
@@ -576,6 +585,39 @@ export class ViewController {
     const startTimestamp = this._traceStartTimestampMapping[index]!
     delete this._traceStartTimestampMapping[index]
     cb({ startTimestamp, endTimestamp })
+  }
+
+  setWXSListenerStats(
+    element: Element,
+    eventName: string,
+    final: boolean,
+    mutated: boolean,
+    capture: boolean,
+    lvaluePath: (string | number)[],
+    listener: EventListener<unknown>,
+  ): void {
+    // To be override
+    const { _glassEasel } = this
+    this.setListenerStats(
+      element,
+      eventName,
+      capture,
+      // eslint-disable-next-line no-nested-ternary
+      final
+        ? _glassEasel.EventMutLevel.Final
+        : mutated
+        ? _glassEasel.EventMutLevel.Mut
+        : _glassEasel.EventMutLevel.None,
+      listener,
+    )
+  }
+
+  setWXSCallMethodHandler(handler: (element: Element, method: string, args: unknown[]) => void) {
+    this._WXSCallMethodHandler = handler
+  }
+
+  onWXSCallMethod(element: Element, method: string, args: unknown[]): void {
+    this._WXSCallMethodHandler?.(element, method, args)
   }
 }
 

@@ -222,6 +222,10 @@ export class ShadowDomElement implements GlassEaselBackend.Element {
     this._context.channel.setId(this._id, id)
   }
 
+  setSlot(name: string): void {
+    this._context.channel.setSlot(this._id, name)
+  }
+
   setSlotName(name: string): void {
     this._context.channel.setSlotName(this._id, name)
   }
@@ -337,6 +341,23 @@ export class ShadowDomElement implements GlassEaselBackend.Element {
 
   getContext(cb: (res: any) => void): void {
     this._context.channel.getContext(this._id, cb)
+  }
+
+  setWXSListenerStats(
+    eventName: string,
+    final: boolean,
+    mutated: boolean,
+    capture: boolean,
+    lvaluePath: (string | number)[],
+  ): void {
+    this._context.channel.setWXSListenerStats(
+      this._id,
+      eventName,
+      final,
+      mutated,
+      capture,
+      lvaluePath,
+    )
   }
 }
 
@@ -650,6 +671,13 @@ export class ShadowDomBackendContext implements GlassEaselBackend.Context {
         },
       })
       this._shadowRoot.appendChild(getShadowDomElement(root))
+    })
+  }
+
+  onWXSCallMethod(handler: (component: GeneralComponent, method: string, args: any[]) => void) {
+    this.channel.onWXSCallMethod((componentId, method, args) => {
+      const component = this._getElementId(componentId)!.__wxElement as GeneralComponent
+      handler(component, method, args)
     })
   }
 }

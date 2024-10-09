@@ -193,8 +193,7 @@ export class ProcGenWrapperDom {
   // set event handler
   v(elem: HTMLElement, evName: string, v: string, final: boolean) {
     this.shadowRoot.setListener(elem as unknown as GeneralBackendElement, evName, (ev) => {
-      const handler = this.shadowRoot.template.methods[v]
-      const ret = handler?.(ev) as unknown
+      const ret = this.shadowRoot.comp.callMethod(v, ev) as unknown
       if (final) return false
       return ret
     })

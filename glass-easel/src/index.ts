@@ -54,6 +54,7 @@ export {
   MutLevel as EventMutLevel,
   EventOptions,
   ShadowedEvent,
+  EventPhase,
 } from './event'
 export { ExternalShadowRoot } from './external_shadow_tree'
 export { FuncArr, GeneralFuncType, safeCallback } from './func_arr'
@@ -78,6 +79,7 @@ export * as template from './tmpl'
 export { TraitBehavior } from './trait_behaviors'
 export { VirtualNode } from './virtual_node'
 export {
+  triggerWarning,
   dispatchError,
   addGlobalErrorListener,
   addGlobalWarningListener,

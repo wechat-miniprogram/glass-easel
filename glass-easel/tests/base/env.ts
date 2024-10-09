@@ -125,6 +125,8 @@ export const multiTmpl = (src: { [path: string]: string }, options?: TemplateOpt
 }
 
 export const domBackend = new glassEasel.CurrentWindowBackendContext()
+domBackend.onEvent(glassEasel.triggerEvent)
+
 export const shadowBackend = new ShadowBackend.Context()
 export const composedBackend = new ComposedBackend.Context()
 

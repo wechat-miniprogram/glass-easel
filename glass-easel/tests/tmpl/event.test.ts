@@ -17,22 +17,42 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       `,
       {},
       {
-        C: (elem, event, listener) => {
-          switch (event.getEventName()) {
-            case 'customEv': {
-              event.target = Object.assign(event.target, { id: 'b' })
-              return listener.apply(elem, [event])
-            }
-            case 'dropEvent': {
-              return undefined
-            }
+        C: (elem, evName, listener, final, mutated, capture, generalLvaluePath) => {
+          const hostMethodCaller = elem.ownerShadowRoot?.getHostNode().getMethodCaller()
+          expect(final).toBe(false)
+          expect(mutated).toBe(false)
+          expect(capture).toBe(false)
+          switch (evName) {
             case 'customHandler': {
-              const ret = (listener as any as typeof customHandler)(event.detail as number, 2)
-              expect(ret).toBe(3)
-              return undefined
+              expect(generalLvaluePath).toStrictEqual([
+                glassEasel.template.GeneralLvaluePathPrefix.InlineScript,
+                '',
+                'w',
+                'customHandler',
+              ])
+              break
             }
-            default: {
-              return listener.apply(elem, [event])
+            default:
+              expect(generalLvaluePath).toBe(undefined)
+          }
+          return (event) => {
+            expect(event.getEventName()).toBe(evName)
+            switch (evName) {
+              case 'customEv': {
+                event.target = Object.assign(event.target, { id: 'b' })
+                return listener.apply(hostMethodCaller, [event])
+              }
+              case 'dropEvent': {
+                return undefined
+              }
+              case 'customHandler': {
+                const ret = (listener as any as typeof customHandler)(event.detail as number, 2)
+                expect(ret).toBe(3)
+                return undefined
+              }
+              default: {
+                return listener.apply(hostMethodCaller, [event])
+              }
             }
           }
         },
@@ -45,6 +65,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       template,
       methods: {
         f(ev: glassEasel.ShadowedEvent<unknown>) {
+          expect(this).toBe(elem.getMethodCaller())
           expect(ev.target.id).toBe('b')
           eventOrder.push(1)
         },
@@ -462,6 +483,69 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     })
     expect(eventOrder).toStrictEqual([3, 4])
   })
+
+  it('event phrase', () => {
+    const def = glassEasel.registerElement({
+      template: tmpl(`
+        <div id="a" bind:customEv="evA">
+          <div id="b" catch:customEv="evB">
+            <div id="c" bind:customEv="evC" />
+          </div>
+        </div>
+      `),
+      methods: {
+        evA(e: glassEasel.ShadowedEvent<unknown>) {
+          expect(e.eventPhase).toBe(glassEasel.EventPhase.BubblingPhase)
+        },
+        evB(e: glassEasel.ShadowedEvent<unknown>) {
+          expect(e.eventPhase).toBe(glassEasel.EventPhase.CapturingPhase)
+        },
+        evC(e: glassEasel.ShadowedEvent<unknown>) {
+          expect(e.eventPhase).toBe(glassEasel.EventPhase.BubblingPhase)
+        },
+      },
+    })
+    const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
+    const c = elem.getShadowRoot()!.getElementById('c')!
+    const event = new glassEasel.Event('customEv', {}, { composed: true, capturePhase: true })
+    expect(event.eventPhase).toBe(glassEasel.EventPhase.None)
+    c.dispatchEvent(event)
+    expect(event.eventPhase).toBe(glassEasel.EventPhase.None)
+  })
+
+  if (testBackend === domBackend) {
+    it('prevent default', () => {
+      const events: string[] = []
+      const def = glassEasel.registerElement({
+        template: tmpl(`
+          <div id="a" bind:custom="evA">
+            <div id="b" capture-bind:custom="evB">
+              <div id="c" bind:custom="evC" />
+            </div>
+          </div>
+        `),
+        methods: {
+          evA() {
+            events.push('a')
+          },
+          evB() {
+            events.push('b')
+          },
+          evC() {
+            events.push('c')
+            return false
+          },
+        },
+      })
+      const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
+      const c = elem.getShadowRoot()!.getElementById('c')!
+      const domElemC = c.getBackendElement() as unknown as HTMLDivElement
+      const event = new Event('custom', { bubbles: true, composed: true, cancelable: true })
+      domElemC.dispatchEvent(event)
+      expect(events).toStrictEqual(['b', 'c'])
+      expect(event.defaultPrevented).toBe(true)
+    })
+  }
 }
 
 describe('event bindings (DOM backend)', () => testCases(domBackend))
