@@ -74,7 +74,7 @@ export function replayShadowBackend(
       if (captureMutLevel !== undefined) be.setListenerStats(name, true, captureMutLevel)
     })
     const slotName = glassEasel.Element.getSlotName(elem)
-    if (slotName) be.setSlotName(slotName)
+    if (slotName) be.setSlot(slotName)
   }
 
   const backendElementMap = new Map<Node, ShadowBackend.Element>()

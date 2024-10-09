@@ -3,13 +3,14 @@ import type {
   DataValue,
   Element,
   Event,
+  EventListener,
   EventOptions,
   GeneralComponent,
+  backend as GlassEaselBackend,
   NativeNode,
   Node,
   ShadowRoot,
   TextNode,
-  backend as GlassEaselBackend,
 } from 'glass-easel'
 import { type IDGenerator } from './utils'
 import { type Fragment, type ViewController } from './view_controller'
@@ -48,6 +49,7 @@ export const enum ChannelEventType {
   SPLICE_REMOVE,
 
   SET_ID,
+  SET_SLOT,
   SET_SLOT_NAME,
   SET_CONTAINING_SLOT,
   REASSIGN_CONTAINING_SLOT,
@@ -92,6 +94,9 @@ export const enum ChannelEventType {
   PERFORMANCE_START_TRACE,
   PERFORMANCE_END_TRACE,
   PERFORMANCE_STATS_CALLBACK,
+
+  SET_WXS_LISTENER_STATS,
+  ON_WXS_CALL_METHOD,
 }
 
 export type ChannelEventTypeViewSide =
@@ -109,6 +114,7 @@ export type ChannelEventTypeViewSide =
   | ChannelEventType.ON_EVENT
   | ChannelEventType.ON_RELEASE_EVENT
   | ChannelEventType.PERFORMANCE_STATS_CALLBACK
+  | ChannelEventType.ON_WXS_CALL_METHOD
 
 export type ChannelEventTypeDataSide = Exclude<ChannelEventType, ChannelEventTypeViewSide>
 
@@ -158,6 +164,7 @@ export type ChannelArgs = ExhaustiveChannelEvent<{
   [ChannelEventType.SPLICE_REMOVE]: [number, number, number]
 
   [ChannelEventType.SET_ID]: [number, string]
+  [ChannelEventType.SET_SLOT]: [number, string]
   [ChannelEventType.SET_SLOT_NAME]: [number, string]
   [ChannelEventType.SET_CONTAINING_SLOT]: [number, number | undefined | null]
   [ChannelEventType.REASSIGN_CONTAINING_SLOT]: [number, number | null, number | null]
@@ -211,6 +218,16 @@ export type ChannelArgs = ExhaustiveChannelEvent<{
   [ChannelEventType.PERFORMANCE_START_TRACE]: [number]
   [ChannelEventType.PERFORMANCE_END_TRACE]: [number, number]
   [ChannelEventType.PERFORMANCE_STATS_CALLBACK]: [number, number, number]
+
+  [ChannelEventType.SET_WXS_LISTENER_STATS]: [
+    number,
+    string,
+    boolean,
+    boolean,
+    boolean,
+    (string | number)[],
+  ]
+  [ChannelEventType.ON_WXS_CALL_METHOD]: [number, string, string]
 }>
 
 export type Channel = ReturnType<typeof MessageChannelDataSide>
@@ -244,8 +261,9 @@ export const MessageChannelDataSide = (
   const callbackIdGen = idGenerator()
 
   const callbacks: ((...args: any[]) => void)[] = []
-  let createEvent: ((type: string, detail: any, options: EventOptions) => Event<unknown>) | null =
-    null
+  let createEvent:
+    | ((eventName: string, detail: any, options: EventOptions) => Event<unknown>)
+    | null = null
   let triggerEvent:
     | ((
         event: Event<unknown>,
@@ -255,6 +273,9 @@ export const MessageChannelDataSide = (
         isCapture: boolean,
       ) => void)
     | null = null
+
+  let handleWXSCallMethod: ((elementId: number, method: string, args: unknown[]) => void) | null =
+    null
 
   const callback2id = (cb: (...args: any[]) => void) => {
     const id = callbackIdGen.gen()
@@ -337,9 +358,10 @@ export const MessageChannelDataSide = (
         id2callback<Channel['getContext']>(arg[1])(JSON.parse(arg[2]))
         break
       case ChannelEventType.ON_CREATE_EVENT: {
-        const [, eventId, type, detail, options, currentTargetId, mark, targetId, capture] = arg
+        const [, eventId, eventName, detail, options, currentTargetId, mark, targetId, capture] =
+          arg
         const event = createEvent!(
-          type,
+          eventName,
           detail ? (JSON.parse(detail) as unknown) : detail,
           JSON.parse(options) as EventOptions,
         )
@@ -376,6 +398,11 @@ export const MessageChannelDataSide = (
         })
         break
       }
+      case ChannelEventType.ON_WXS_CALL_METHOD: {
+        const [, elementId, method, args] = arg
+        handleWXSCallMethod!(elementId, method, JSON.parse(args) as unknown[])
+        break
+      }
       default:
         throw assertUnreachable(arg[0])
     }
@@ -398,7 +425,7 @@ export const MessageChannelDataSide = (
     onThemeChange: (cb: (res: { theme: string }) => void) => publish([ChannelEventType.ON_THEME_CHANGE, callback2id(cb)]),
     render: (cb: (err: Error | null) => void) => publish([ChannelEventType.RENDER, callback2id(cb)]),
     onEvent: (
-      _createEvent: (type: string, detail: any, options: EventOptions) => Event<unknown>,
+      _createEvent: (eventName: string, detail: any, options: EventOptions) => Event<unknown>,
       _triggerEvent: (
         event: Event<unknown>,
         currentTargetId: number,
@@ -449,6 +476,7 @@ export const MessageChannelDataSide = (
     associateValue: (componentId: number, data: Record<string, unknown>) => publish([ChannelEventType.ASSOCIATE_VALUE, componentId, JSON.stringify(data)]),
 
     setId: (elementId: number, id: string) => publish([ChannelEventType.SET_ID, elementId, id]),
+    setSlot: (nodeId: number, name: string) => publish([ChannelEventType.SET_SLOT, nodeId, name]),
     setSlotName: (nodeId: number, name: string) => publish([ChannelEventType.SET_SLOT_NAME, nodeId, name]),
     setContainingSlot: (nodeId: number, slot: number | undefined | null) => publish([ChannelEventType.SET_CONTAINING_SLOT, nodeId, slot]),
     reassignContainingSlot: (nodeId: number, oldSlot: number | null, newSlot: number | null) => publish([ChannelEventType.REASSIGN_CONTAINING_SLOT, nodeId, oldSlot, newSlot]),
@@ -466,7 +494,7 @@ export const MessageChannelDataSide = (
     removeAttribute: (elementId: number, name: string) => publish([ChannelEventType.REMOVE_ATTRIBUTE, elementId, name]),
     setDataset: (elementId: number, name: string, value: unknown) => publish([ChannelEventType.SET_DATASET, elementId, name, value]),
     setText: (textNodeId: number, textContent: string) => publish([ChannelEventType.SET_TEXT, textNodeId, textContent]),
-    setListenerStats: (node: number, type: string, capture: boolean, mutLevel: number) => publish([ChannelEventType.SET_LISTENER_STATS, node, type, capture, mutLevel]),
+    setListenerStats: (node: number, eventName: string, capture: boolean, mutLevel: number) => publish([ChannelEventType.SET_LISTENER_STATS, node, eventName, capture, mutLevel]),
 
     setModelBindingStat: (
       node: number,
@@ -499,7 +527,12 @@ export const MessageChannelDataSide = (
     disableStyleSheet: (index: number) => publish([ChannelEventType.DISABLE_STYLE_SHEET, index]),
 
     performanceStartTrace: (index: number) => publish([ChannelEventType.PERFORMANCE_START_TRACE, index]),
-    performanceEndTrace: (id: number, cb: (stats: { startTimestamp: number; endTimestamp: number }) => void,) => publish([ChannelEventType.PERFORMANCE_END_TRACE, id, callback2id(cb)])
+    performanceEndTrace: (id: number, cb: (stats: { startTimestamp: number; endTimestamp: number }) => void,) => publish([ChannelEventType.PERFORMANCE_END_TRACE, id, callback2id(cb)]),
+
+    setWXSListenerStats: (elementId: number, eventName: string, final: boolean, mutated: boolean, capture: boolean, lvaluePath: (string | number)[]) => publish([ChannelEventType.SET_WXS_LISTENER_STATS, elementId, eventName, final, mutated, capture, lvaluePath]),
+    onWXSCallMethod: (handler: (elementId: number, method: string, args: unknown[]) => void) => {
+      handleWXSCallMethod = handler
+    },
   }
 }
 
@@ -525,7 +558,7 @@ export const MessageChannelViewSide = (
           ...(T extends keyof ChannelArgs ? ChannelArgs[T] : never),
         ]
       }[ChannelEventTypeDataSide],
-    ) => boolean | void,
+    ) => void,
   ) => void,
   controller: ViewController,
   idGenerator: () => IDGenerator,
@@ -536,12 +569,67 @@ export const MessageChannelViewSide = (
 
   const observersMap: Record<number, { disconnect(): void } | undefined> = []
 
+  const eventHandler: EventListener<unknown> = (shadowedEvent) => {
+    // ShadowedEvent is fresh created for each target
+    // We should check it's prototype
+    const event = Object.getPrototypeOf(shadowedEvent) as Event<unknown>
+    const targetId = getNodeId(shadowedEvent.target)
+    const currentTargetId = getNodeId(shadowedEvent.currentTarget)
+    const capture = shadowedEvent.isCapturePhase()
+    if (typeof targetId !== 'number' || typeof currentTargetId !== 'number') return
+
+    if (!eventIdMap.has(event)) {
+      const eventId = eventIdGen.gen()
+      publish([
+        ChannelEventType.ON_CREATE_EVENT,
+        eventId,
+        event.getEventName(),
+        JSON.stringify(event.detail),
+        JSON.stringify({
+          bubbles: event.bubbles,
+          composed: event.composed,
+          extraFields: event.extraFields,
+        }),
+        currentTargetId,
+        JSON.stringify(shadowedEvent.mark),
+        targetId,
+        capture,
+      ])
+      eventIdMap.set(event, eventId)
+
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises,promise/catch-or-return,promise/always-return
+      Promise.resolve().then(() => {
+        // eslint-disable-next-line promise/always-return
+        publish([ChannelEventType.ON_RELEASE_EVENT, eventId])
+        eventIdMap.delete(event)
+      })
+    } else {
+      const eventId = eventIdMap.get(event)!
+
+      publish([
+        ChannelEventType.ON_EVENT,
+        eventId,
+        currentTargetId,
+        JSON.stringify(shadowedEvent.mark),
+        targetId,
+        capture,
+      ])
+    }
+  }
+
+  const wxsCallMethodHandler = (elem: Element, method: string, args: any[]) => {
+    const elemId = getNodeId(elem)!
+    publish([ChannelEventType.ON_WXS_CALL_METHOD, elemId, method, JSON.stringify(args)])
+  }
+
+  controller.setWXSCallMethodHandler(wxsCallMethodHandler)
+
   // eslint-disable-next-line consistent-return
   subscribe((arg) => {
     switch (arg[0]) {
       case ChannelEventType.CREATE: {
         const [, callbackId] = arg
-        return controller.create(({ windowInfo, themeInfo }) => {
+        controller.create(({ windowInfo, themeInfo }) => {
           publish([
             ChannelEventType.CREATE_CALLBACK,
             callbackId,
@@ -551,16 +639,19 @@ export const MessageChannelViewSide = (
             themeInfo.theme,
           ])
         })
+        break
       }
       case ChannelEventType.DESTROY:
-        return controller.destroy()
+        controller.destroy()
+        break
       case ChannelEventType.INIT_DATA: {
         const [, initData] = arg
-        return controller.initData(JSON.parse(initData))
+        controller.initData(JSON.parse(initData))
+        break
       }
       case ChannelEventType.ON_WINDOW_RESIZE: {
         const [, callbackId] = arg
-        return controller.onWindowResize(({ width, height, devicePixelRatio }) => {
+        controller.onWindowResize(({ width, height, devicePixelRatio }) => {
           publish([
             ChannelEventType.ON_WINDOW_RESIZE_CALLBACK,
             callbackId,
@@ -569,18 +660,21 @@ export const MessageChannelViewSide = (
             devicePixelRatio,
           ])
         })
+        break
       }
       case ChannelEventType.ON_THEME_CHANGE: {
         const [, callbackId] = arg
-        return controller.onThemeChange(({ theme }) => {
+        controller.onThemeChange(({ theme }) => {
           publish([ChannelEventType.ON_THEME_CHANGE_CALLBACK, callbackId, theme])
         })
+        break
       }
       case ChannelEventType.RENDER: {
         const [, callbackId] = arg
-        return controller.render((err) => {
+        controller.render((err) => {
           publish([ChannelEventType.RENDER_CALLBACK, callbackId, err ? err.message : null])
         })
+        break
       }
       case ChannelEventType.CREATE_MEDIA_QUERY_OBSERVER: {
         const [, status, callbackId] = arg
@@ -693,201 +787,190 @@ export const MessageChannelViewSide = (
         const [, id] = arg
         const node = nodeMap[id]!
         delete nodeMap[id]
-        return controller.release(node)
+        controller.release(node)
+        break
       }
       case ChannelEventType.APPEND_CHILD: {
         const [, parentId, childId] = arg
         const parent = nodeMap[parentId] as Element | undefined
         const child = nodeMap[childId]! as Node
-        return controller.appendChild(parent, child)
+        controller.appendChild(parent, child)
+        break
       }
       case ChannelEventType.REMOVE_CHILD: {
         const [, parentId, childId] = arg
         const parent = nodeMap[parentId] as Element | undefined
         const child = nodeMap[childId]! as Node
-        return controller.removeChild(parent, child)
+        controller.removeChild(parent, child)
+        break
       }
       case ChannelEventType.INSERT_BEFORE: {
         const [, parentId, childId, beforeId] = arg
         const parent = nodeMap[parentId] as Element | undefined
         const child = nodeMap[childId]! as Node
         const before = nodeMap[beforeId]! as Node
-        return controller.insertBefore(parent, child, before)
+        controller.insertBefore(parent, child, before)
+        break
       }
       case ChannelEventType.REPLACE_CHILD: {
         const [, parentId, childId, oldChildId] = arg
         const parent = nodeMap[parentId] as Element | undefined
         const child = nodeMap[childId]! as Node
         const oldChild = nodeMap[oldChildId]! as Node
-        return controller.replaceChild(parent, child, oldChild)
+        controller.replaceChild(parent, child, oldChild)
+        break
       }
       case ChannelEventType.SPLICE_BEFORE: {
         const [, parentId, beforeId, deleteCount, fragmentId] = arg
         const parent = nodeMap[parentId]! as Element
         const before = nodeMap[beforeId]! as Node
         const fragment = nodeMap[fragmentId]! as Fragment
-        return controller.spliceBefore(parent, before, deleteCount, fragment)
+        controller.spliceBefore(parent, before, deleteCount, fragment)
+        break
       }
       case ChannelEventType.SPLICE_APPEND: {
         const [, parentId, fragmentId] = arg
         const parent = nodeMap[parentId]! as Element
         const fragment = nodeMap[fragmentId]! as Fragment
-        return controller.spliceAppend(parent, fragment)
+        controller.spliceAppend(parent, fragment)
+        break
       }
       case ChannelEventType.SPLICE_REMOVE: {
         const [, parentId, startId, deleteCount] = arg
         const parent = nodeMap[parentId]! as Element
         const start = nodeMap[startId]! as Node
-        return controller.spliceRemove(parent, start, deleteCount)
+        controller.spliceRemove(parent, start, deleteCount)
+        break
       }
       case ChannelEventType.ASSOCIATE_VALUE: {
         const [, nodeId, data] = arg
         const node = nodeMap[nodeId]! as Node
-        return controller.associateValue(node, JSON.parse(data))
+        controller.associateValue(node, JSON.parse(data))
+        break
       }
       case ChannelEventType.SET_ID: {
         const [, elementId, id] = arg
         const element = nodeMap[elementId]! as Element
-        return controller.setId(element, id)
+        controller.setId(element, id)
+        break
+      }
+      case ChannelEventType.SET_SLOT: {
+        const [, elementId, name] = arg
+        const element = nodeMap[elementId]! as Element
+        controller.setSlot(element, name)
+        break
       }
       case ChannelEventType.SET_SLOT_NAME: {
         const [, elementId, name] = arg
         const element = nodeMap[elementId]! as Element
-        return controller.setSlotName(element, name)
+        controller.setSlotName(element, name)
+        break
       }
       case ChannelEventType.SET_CONTAINING_SLOT: {
         const [, nodeId, slotId] = arg
         const node = nodeMap[nodeId]! as Node
         const slot = typeof slotId === 'number' ? (nodeMap[slotId]! as Element) : slotId
-        return controller.setContainingSlot(node, slot)
+        controller.setContainingSlot(node, slot)
+        break
       }
       case ChannelEventType.REASSIGN_CONTAINING_SLOT: {
         const [, nodeId, oldSlotId, newSlotId] = arg
         const node = nodeMap[nodeId]! as Node
         const oldSlot = typeof oldSlotId === 'number' ? (nodeMap[oldSlotId]! as Element) : oldSlotId
         const newSlot = typeof newSlotId === 'number' ? (nodeMap[newSlotId]! as Element) : newSlotId
-        return controller.reassignContainingSlot(node, oldSlot, newSlot)
+        controller.reassignContainingSlot(node, oldSlot, newSlot)
+        break
       }
       case ChannelEventType.SPLICE_BEFORE_SLOT_NODES: {
         const [, slotId, before, count, listId] = arg
         const slot = typeof slotId === 'number' ? (nodeMap[slotId]! as Element) : slotId
         const list = nodeMap[listId] as Fragment
-        return controller.spliceBeforeSlotNodes(slot, before, count, list)
+        controller.spliceBeforeSlotNodes(slot, before, count, list)
+        break
       }
       case ChannelEventType.SPLICE_APPEND_SLOT_NODES: {
         const [, slotId, listId] = arg
         const slot = typeof slotId === 'number' ? (nodeMap[slotId]! as Element) : slotId
         const list = nodeMap[listId] as Fragment
-        return controller.spliceAppendSlotNodes(slot, list)
+        controller.spliceAppendSlotNodes(slot, list)
+        break
       }
       case ChannelEventType.SPLICE_REMOVE_SLOT_NODES: {
         const [, slotId, before, count] = arg
         const slot = typeof slotId === 'number' ? (nodeMap[slotId]! as Element) : slotId
-        return controller.spliceRemoveSlotNodes(slot, before, count)
+        controller.spliceRemoveSlotNodes(slot, before, count)
+        break
       }
       case ChannelEventType.SET_INHERIT_SLOTS: {
         const [, elementId] = arg
         const element = nodeMap[elementId]! as Element
-        return controller.setInheritSlots(element)
+        controller.setInheritSlots(element)
+        break
       }
       case ChannelEventType.REGISTER_STYLE_SCOPE: {
         const [, scopeId, stylePrefix] = arg
-        return controller.registerStyleScope(scopeId, stylePrefix)
+        controller.registerStyleScope(scopeId, stylePrefix)
+        break
       }
       case ChannelEventType.SET_STYLE: {
         const [, elementId, styleText] = arg
         const element = nodeMap[elementId]! as Element
-        return controller.setStyle(element, styleText)
+        controller.setStyle(element, styleText)
+        break
       }
       case ChannelEventType.ADD_CLASS: {
         const [, elementId, className] = arg
         const element = nodeMap[elementId]! as Element
-        return controller.addClass(element, className)
+        controller.addClass(element, className)
+        break
       }
       case ChannelEventType.REMOVE_CLASS: {
         const [, elementId, className] = arg
         const element = nodeMap[elementId]! as Element
-        return controller.removeClass(element, className)
+        controller.removeClass(element, className)
+        break
       }
       case ChannelEventType.CLEAR_CLASSES: {
         const [, elementId] = arg
         const element = nodeMap[elementId]! as Element
-        return controller.clearClasses(element)
+        controller.clearClasses(element)
+        break
       }
       case ChannelEventType.SET_CLASS_ALIAS: {
         const [, elementId, className, target] = arg
         const element = nodeMap[elementId]! as GeneralComponent
-        return controller.setClassAlias(element, className, target)
+        controller.setClassAlias(element, className, target)
+        break
       }
       case ChannelEventType.SET_ATTRIBUTE: {
         const [, elementId, name, value] = arg
         const element = nodeMap[elementId]! as Element
-        return controller.setAttribute(element, name, value)
+        controller.setAttribute(element, name, value)
+        break
       }
       case ChannelEventType.REMOVE_ATTRIBUTE: {
         const [, elementId, name] = arg
         const element = nodeMap[elementId]! as Element
-        return controller.removeAttribute(element, name)
+        controller.removeAttribute(element, name)
+        break
       }
       case ChannelEventType.SET_DATASET: {
         const [, elementId, name, value] = arg
         const element = nodeMap[elementId]! as Element
-        return controller.setDataset(element, name, value)
+        controller.setDataset(element, name, value)
+        break
       }
       case ChannelEventType.SET_TEXT: {
         const [, textNodeId, textContent] = arg
         const textNode = nodeMap[textNodeId]! as TextNode
-        return controller.setText(textNode, textContent)
+        controller.setText(textNode, textContent)
+        break
       }
       case ChannelEventType.SET_LISTENER_STATS: {
-        const [, elementId, type, capture, mutLevel] = arg
+        const [, elementId, eventName, capture, mutLevel] = arg
         const element = nodeMap[elementId]! as Element
-        return controller.setListenerStats(element, type, capture, mutLevel, (shadowedEvent) => {
-          // ShadowedEvent is fresh created for each target
-          // We should check it's prototype
-          const event = Object.getPrototypeOf(shadowedEvent) as Event<unknown>
-          const targetId = getNodeId(shadowedEvent.target)
-          const currentTargetId = getNodeId(shadowedEvent.currentTarget)
-          if (typeof targetId !== 'number' || typeof currentTargetId !== 'number') return
-
-          if (!eventIdMap.has(event)) {
-            const eventId = eventIdGen.gen()
-            publish([
-              ChannelEventType.ON_CREATE_EVENT,
-              eventId,
-              event.type,
-              JSON.stringify(event.detail),
-              JSON.stringify({
-                bubbles: event.bubbles,
-                composed: event.composed,
-                extraFields: event.extraFields,
-              }),
-              currentTargetId,
-              JSON.stringify(shadowedEvent.mark),
-              targetId,
-              capture,
-            ])
-            eventIdMap.set(event, eventId)
-
-            // eslint-disable-next-line @typescript-eslint/no-floating-promises,promise/catch-or-return,promise/always-return
-            Promise.resolve().then(() => {
-              // eslint-disable-next-line promise/always-return
-              publish([ChannelEventType.ON_RELEASE_EVENT, eventId])
-              eventIdMap.delete(event)
-            })
-          } else {
-            const eventId = eventIdMap.get(event)!
-
-            publish([
-              ChannelEventType.ON_EVENT,
-              eventId,
-              currentTargetId,
-              JSON.stringify(shadowedEvent.mark),
-              targetId,
-              capture,
-            ])
-          }
-        })
+        controller.setListenerStats(element, eventName, capture, mutLevel, eventHandler)
+        break
       }
       case ChannelEventType.SET_MODEL_BINDING_STAT: {
         const [, elementId, attributeName, listenerId] = arg
@@ -895,18 +978,19 @@ export const MessageChannelViewSide = (
         if (!listenerId) {
           throw new Error('missing listenerId for setModelBindingStat')
         }
-        return controller.setModelBindingStat(element, attributeName, (newValue) => {
+        controller.setModelBindingStat(element, attributeName, (newValue) => {
           publish([
             ChannelEventType.SET_MODEL_BINDING_STAT_CALLBACK,
             listenerId,
             JSON.stringify(newValue),
           ])
         })
+        break
       }
       case ChannelEventType.GET_BOUNDING_CLIENT_RECT: {
         const [, elementId, callbackId] = arg
         const element = nodeMap[elementId]! as Element
-        return controller.getBoundingClientRect(element, (res) => {
+        controller.getBoundingClientRect(element, (res) => {
           publish([
             ChannelEventType.GET_BOUNDING_CLIENT_RECT_CALLBACK,
             callbackId,
@@ -916,11 +1000,12 @@ export const MessageChannelViewSide = (
             res.height,
           ])
         })
+        break
       }
       case ChannelEventType.GET_SCROLL_OFFSET: {
         const [, elementId, callbackId] = arg
         const element = nodeMap[elementId]! as Element
-        return controller.getScrollOffset(element, (res) => {
+        controller.getScrollOffset(element, (res) => {
           publish([
             ChannelEventType.GET_SCROLL_OFFSET_CALLBACK,
             callbackId,
@@ -930,43 +1015,51 @@ export const MessageChannelViewSide = (
             res.scrollHeight,
           ])
         })
+        break
       }
       case ChannelEventType.GET_CONTEXT: {
         const [, elementId, callbackId] = arg
         const element = nodeMap[elementId]! as Element
-        return controller.getContext(element, (res) => {
+        controller.getContext(element, (res) => {
           publish([ChannelEventType.GET_CONTEXT_CALLBACK, callbackId, JSON.stringify(res)])
         })
+        break
       }
       case ChannelEventType.INIT_VALUES: {
         const [, elementId, values] = arg
         const element = nodeMap[elementId]! as Element
-        return controller.initValues(element, JSON.parse(values))
+        controller.initValues(element, JSON.parse(values))
+        break
       }
       case ChannelEventType.UPDATE_VALUES: {
         const [, elementId, values] = arg
         const element = nodeMap[elementId]! as Element
-        return controller.updateValues(element, JSON.parse(values))
+        controller.updateValues(element, JSON.parse(values))
+        break
       }
       case ChannelEventType.REGISTER_STYLE_SHEET_CONTENT: {
         const [, path, content] = arg
-        return controller.registerStyleSheetContent(path, JSON.parse(content))
+        controller.registerStyleSheetContent(path, JSON.parse(content))
+        break
       }
       case ChannelEventType.APPEND_STYLE_SHEET_PATH: {
         const [, index, path, styleScope] = arg
-        return controller.appendStyleSheetPath(index, path, styleScope)
+        controller.appendStyleSheetPath(index, path, styleScope)
+        break
       }
       case ChannelEventType.DISABLE_STYLE_SHEET: {
         const [, index] = arg
-        return controller.disableStyleSheet(index)
+        controller.disableStyleSheet(index)
+        break
       }
       case ChannelEventType.PERFORMANCE_START_TRACE: {
         const [, index] = arg
-        return controller.performanceStartTrace(index)
+        controller.performanceStartTrace(index)
+        break
       }
       case ChannelEventType.PERFORMANCE_END_TRACE: {
         const [, index, callbackId] = arg
-        return controller.performanceEndTrace(index, (stats) => {
+        controller.performanceEndTrace(index, (stats) => {
           publish([
             ChannelEventType.PERFORMANCE_STATS_CALLBACK,
             callbackId,
@@ -974,6 +1067,21 @@ export const MessageChannelViewSide = (
             stats.endTimestamp,
           ])
         })
+        break
+      }
+      case ChannelEventType.SET_WXS_LISTENER_STATS: {
+        const [, elementId, eventName, final, mutated, capture, lvaluePath] = arg
+        const element = nodeMap[elementId]! as Element
+        controller.setWXSListenerStats(
+          element,
+          eventName,
+          final,
+          mutated,
+          capture,
+          lvaluePath,
+          eventHandler,
+        )
+        break
       }
       default:
         throw assertUnreachable(arg[0])
