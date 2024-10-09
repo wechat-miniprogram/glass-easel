@@ -45,6 +45,7 @@ export interface Element extends Partial<suggestedBackend.Element<Element>> {
   spliceAppend(list: Element): void
   spliceRemove(before: Element, deleteCount: number): void
   setId(id: string): void
+  setSlot(name: string): void
   setSlotName(slot: string): void
   setContainingSlot(slot: Element | undefined | null): void
   reassignContainingSlot(oldSlot: Element | null, newSlot: Element | null): void

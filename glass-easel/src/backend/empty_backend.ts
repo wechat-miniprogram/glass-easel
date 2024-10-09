@@ -154,6 +154,10 @@ export class EmptyBackendElement implements Element {
     // empty
   }
 
+  setSlot(_name: string): void {
+    // empty
+  }
+
   setSlotName(_name: string): void {
     // empty
   }

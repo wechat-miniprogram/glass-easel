@@ -280,6 +280,8 @@ export class Element implements NodeCast {
       Element.insertChildReassign(this.parentNode!, this, oldSlot, newSlot, this.parentIndex + 1)
 
       slotUpdater?.insertSlotNodes()
+    } else if (BM.SHADOW || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Shadow)) {
+      ;(this._$backendElement as backend.Element).setSlot(newSlot)
     }
     if (this._$mutationObserverTarget) {
       MutationObserverTarget.callAttrObservers(this, {

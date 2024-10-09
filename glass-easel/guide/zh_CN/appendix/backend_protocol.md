@@ -316,6 +316,12 @@ glass-easel 并不会自行调用这个接口。应由其他模块调用这个�
 
 设置节点 id 。
 
+### `Element#setSlot(name: string)`
+
+设置节点的目标 slot name。
+
+**仅 Shadow Mode 有效。**
+
 ### `Element#setSlotName(name: string)`
 
 将节点设为 slot 节点并设置 slot name 。
