@@ -75,6 +75,13 @@ export const enum FinalChanged {
   Mut,
 }
 
+export const enum EventPhase {
+  None,
+  CapturingPhase,
+  AtTarget,
+  BubblingPhase,
+}
+
 /** The target of an event */
 export class EventTarget<TEvents extends { [type: string]: unknown }> {
   listeners = Object.create(null) as {
@@ -213,6 +220,7 @@ export class Event<TDetail> {
   bubbles: boolean
   composed: boolean
   extraFields: Record<string, unknown> | undefined
+  eventPhase: EventPhase = EventPhase.None
   /** @internal */
   private _$eventName: string
   /** @internal */
@@ -305,6 +313,10 @@ export class Event<TDetail> {
     return this._$handleListenerReturn
   }
 
+  isCapturePhase() {
+    return this.eventPhase === EventPhase.CapturingPhase
+  }
+
   callListener(
     currentTarget: Element,
     mark: Record<string, unknown> | null,
@@ -394,6 +406,7 @@ export class Event<TDetail> {
 
     // capture phase
     if (this._$capturePhase && !eventBubblingControl.stopped && !inExternalOnly) {
+      this.eventPhase = EventPhase.CapturingPhase
       const bubblingPath: [Element, Element, Record<string, unknown>][] = []
       forEachBubblePath(target, (currentTarget, target, mark) => {
         bubblingPath.push([currentTarget, target, mark])
@@ -406,6 +419,8 @@ export class Event<TDetail> {
         }
       }
     }
+
+    this.eventPhase = EventPhase.AtTarget
 
     // bubble phase in external component
     if (!eventBubblingControl.stopped && externalTarget) {
@@ -423,6 +438,7 @@ export class Event<TDetail> {
           sr.handleEvent(sr.slot, this)
         }
         atTarget = false
+        this.eventPhase = EventPhase.BubblingPhase
         if (currentTarget._$eventTarget) {
           this.callListener(currentTarget, mark, target, false)
         }
@@ -430,7 +446,10 @@ export class Event<TDetail> {
       })
     }
 
+    this.eventPhase = EventPhase.None
+
     if (ENV.DEV) performanceMeasureEnd()
+    return this.getEventBubbleStatus()
   }
 
   static dispatchEvent<TDetail>(target: Element, event: Event<TDetail>) {
@@ -453,7 +472,7 @@ export class Event<TDetail> {
     options?: EventOptions,
   ) {
     const ev = new Event(name, detail, options)
-    Event.dispatchEvent(target, ev)
+    return Event.dispatchEvent(target, ev)
   }
 
   static triggerExternalEvent<TDetail>(
@@ -465,6 +484,6 @@ export class Event<TDetail> {
     options?: EventOptions,
   ) {
     const ev = new Event(name, detail, options)
-    Event.dispatchExternalEvent(component, target, ev)
+    return Event.dispatchExternalEvent(component, target, ev)
   }
 }

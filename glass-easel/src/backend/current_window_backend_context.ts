@@ -343,12 +343,16 @@ export class CurrentWindowBackendContext implements Context {
     if (listeners[type]) return
     listeners[type] = true
 
-    element.addEventListener(type, (ev) => {
-      if (this._$triggedEvents.has(ev)) return
-      this._$triggedEvents.add(ev)
-      if (defaultPrevented) ev.preventDefault()
-      this._$trigger(ev, type, this._$getEventDetail(ev), ev.bubbles, ev.composed)
-    })
+    element.addEventListener(
+      type,
+      (ev) => {
+        if (this._$triggedEvents.has(ev)) return
+        this._$triggedEvents.add(ev)
+        if (defaultPrevented) ev.preventDefault()
+        this._$trigger(ev, type, this._$getEventDetail(ev), ev.bubbles, ev.composed)
+      },
+      { capture },
+    )
   }
 
   setModelBindingStat(
