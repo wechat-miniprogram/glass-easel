@@ -433,7 +433,6 @@ impl Element {
                 class,
                 style,
                 change_attributes,
-                data,
                 common,
                 ..
             } => {
@@ -459,7 +458,7 @@ impl Element {
                 for attr in change_attributes {
                     f(&gen_lit_str(&attr.name.name))?;
                 }
-                for attr in data {
+                for attr in common.data.iter() {
                     f(&gen_lit_str(&format!("data:{}", &attr.name.name)))?;
                 }
                 for attr in common.marks.iter() {
@@ -492,6 +491,9 @@ impl Element {
                 for attr in values {
                     f(&gen_lit_str(&attr.name.name))?;
                 }
+                for attr in common.data.iter() {
+                    f(&gen_lit_str(&format!("data:{}", &attr.name.name)))?;
+                }
                 for attr in common.marks.iter() {
                     f(&gen_lit_str(&format!("mark:{}", &attr.name.name)))?;
                 }
@@ -517,7 +519,6 @@ impl Element {
                 style,
                 change_attributes,
                 worklet_attributes,
-                data,
                 children,
                 generics,
                 extra_attr,
@@ -606,9 +607,6 @@ impl Element {
                         }
                         for attr in attributes.iter() {
                             attr.to_proc_gen_as_normal(w, scopes, bmc)?;
-                        }
-                        for attr in data.iter() {
-                            attr.to_proc_gen_with_method(w, "R.d", true, scopes, bmc)?;
                         }
                         common.to_proc_gen_without_slot(w, scopes, bmc)?;
                         if let SlotKind::Dynamic(p) = &slot_kind {
@@ -1197,8 +1195,12 @@ impl CommonElementAttributes {
             slot: _,
             slot_value_refs: _,
             event_bindings,
+            data,
             marks,
         } = self;
+        for attr in data.iter() {
+            attr.to_proc_gen_with_method(w, "R.d", true, scopes, bmc)?;
+        }
         for mark in marks {
             mark.to_proc_gen_with_method(w, "M", true, scopes, bmc)?;
         }
@@ -1299,7 +1301,8 @@ impl Attribute {
                 double_brace_location: _,
                 binding_map_keys,
             } => {
-                let maybe_event_binding = !self.is_model && attr_name_maybe_event_binding(&self.name.name);
+                let maybe_event_binding =
+                    !self.is_model && attr_name_maybe_event_binding(&self.name.name);
                 let p = expression.to_proc_gen_prepare(w, scopes)?;
                 w.expr_stmt(|w| {
                     write!(w, "if(C||K||")?;

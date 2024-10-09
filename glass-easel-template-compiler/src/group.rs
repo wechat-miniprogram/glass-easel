@@ -52,8 +52,14 @@ const RUNTIME_ITEMS: [(&'static str, &'static str); 4] = [
 ];
 
 const EXTRA_RUNTIME_ITEMS: [(&'static str, &'static str); 2] = [
-    ("a", "function(a){for(var i=0;i<a.length;i++)if(a[i])return a}"),
-    ("b", "function(b){var a=Object.values(b);for(var i=0;i<a.length;i++)if(a[i])return a}"),
+    (
+        "a",
+        "function(a){for(var i=0;i<a.length;i++)if(a[i])return a}",
+    ),
+    (
+        "b",
+        "function(b){var a=Object.values(b);for(var i=0;i<a.length;i++)if(a[i])return a}",
+    ),
 ];
 
 const WXS_RUNTIME_ITEMS: [(&'static str, &'static str); 2] = [

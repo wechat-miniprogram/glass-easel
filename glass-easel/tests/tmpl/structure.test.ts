@@ -895,19 +895,23 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     const def = glassEasel
       .registerElement({
         template: multiTmpl({
-          '': '<include src="./a.wxml" />',
-          a: '<div>{{a}}</div>',
+          '': '<include src="./a.wxml" /><span>{{a}}</span>',
+          a: '<div>{{a}}{{b}}</div>',
         }),
         data: {
           a: 123,
+          b: 'abc',
         },
       })
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
-    expect(domHtml(elem)).toBe('<div>123</div>')
+    expect(domHtml(elem)).toBe('<div>123abc</div><span>123</span>')
     matchElementWithDom(elem)
     elem.setData({ a: 456 })
-    expect(domHtml(elem)).toBe('<div>456</div>')
+    expect(domHtml(elem)).toBe('<div>456abc</div><span>456</span>')
+    matchElementWithDom(elem)
+    elem.setData({ b: 'def' })
+    expect(domHtml(elem)).toBe('<div>456def</div><span>456</span>')
     matchElementWithDom(elem)
   })
 
@@ -1659,6 +1663,35 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     child.triggerEvent('customEv')
     expect(ops).toStrictEqual([2])
     ops = []
+  })
+
+  test('binding event on slot', () => {
+    const ops: any[] = []
+    const def = glassEasel
+      .registerElement({
+        template: tmpl(`
+        <div data:n="wrong">
+          <slot id="child" mark:b="{{ 123 }}" data:a="abc" bind:customEv="ev" />
+        </div>
+      `),
+        methods: {
+          ev(ev: any) {
+            // eslint-disable-next-line no-use-before-define
+            expect(this).toBe(elem)
+            ops.push(ev)
+          },
+        },
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe('<div></div>')
+    matchElementWithDom(elem)
+    const child = elem.getShadowRoot()!.getElementById('child')!
+    child.triggerEvent('customEv', null, { bubbles: true })
+    const ev = ops.shift() as glassEasel.ShadowedEvent<any>
+    expect(ev.mark).toStrictEqual({ b: 123 })
+    expect(ev.target.dataset).toStrictEqual({ a: 'abc' })
   })
 
   test('setting properties', () => {

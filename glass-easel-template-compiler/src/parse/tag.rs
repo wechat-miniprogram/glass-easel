@@ -257,7 +257,9 @@ impl Node {
                 false
             });
             let is_whitespace = match &value {
-                Value::Static { value, .. } => value.trim().is_empty(),
+                Value::Static { value, .. } => {
+                    value.trim_matches(super::is_template_whitespace).is_empty()
+                }
                 Value::Dynamic { .. } => false,
             };
             if !is_whitespace {
@@ -296,7 +298,6 @@ pub enum ElementKind {
         style: StyleAttribute,
         change_attributes: Vec<Attribute>,
         worklet_attributes: Vec<StaticAttribute>,
-        data: Vec<Attribute>,
         children: Vec<Node>,
         generics: Vec<StaticAttribute>,
         extra_attr: Vec<StaticAttribute>,
@@ -390,7 +391,6 @@ impl Element {
                 style,
                 change_attributes,
                 worklet_attributes: _,
-                data,
                 children: _,
                 generics: _,
                 extra_attr: _,
@@ -418,9 +418,6 @@ impl Element {
                     }
                 }
                 for attr in change_attributes {
-                    f(&mut attr.value, false);
-                }
-                for attr in data {
                     f(&mut attr.value, false);
                 }
                 common.for_each_value_mut(f);
@@ -539,7 +536,6 @@ impl Element {
                 style: StyleAttribute::None,
                 change_attributes: vec![],
                 worklet_attributes: vec![],
-                data: vec![],
                 children: vec![],
                 generics: vec![],
                 extra_attr: vec![],
@@ -638,7 +634,7 @@ impl Element {
                             (_, "slot") => AttrPrefixKind::Slot,
                             (ElementKind::Normal { .. }, "class") => AttrPrefixKind::ClassString,
                             (ElementKind::Normal { .. }, "style") => AttrPrefixKind::StyleString,
-                            (ElementKind::Normal { .. }, x) if x.starts_with("data-") => {
+                            (ElementKind::Normal { .. }, x) | (ElementKind::Slot { .. }, x) if x.starts_with("data-") => {
                                 AttrPrefixKind::DataHyphen
                             }
                             _ => AttrPrefixKind::Normal,
@@ -1344,11 +1340,12 @@ impl Element {
                         }
                     },
                     AttrPrefixKind::Data(prefix_location) => match &mut element {
-                        ElementKind::Normal { data, .. } => {
+                        ElementKind::Normal { common, .. } | ElementKind::Slot { common, .. } => {
                             if let AttrPrefixParseResult::Value(value, is_value_unspecified) =
                                 attr_value
                             {
-                                if data
+                                if common
+                                    .data
                                     .iter()
                                     .find(|attr| attr.name.name_eq(&attr_name))
                                     .is_some()
@@ -1358,7 +1355,7 @@ impl Element {
                                         attr_name.location,
                                     );
                                 } else {
-                                    data.push(Attribute {
+                                    common.data.push(Attribute {
                                         name: attr_name,
                                         value,
                                         is_model: false,
@@ -1368,8 +1365,7 @@ impl Element {
                                 }
                             }
                         }
-                        ElementKind::Slot { .. }
-                        | ElementKind::Pure { .. }
+                        ElementKind::Pure { .. }
                         | ElementKind::For { .. }
                         | ElementKind::If { .. }
                         | ElementKind::TemplateRef { .. }
@@ -1378,11 +1374,12 @@ impl Element {
                         }
                     },
                     AttrPrefixKind::DataHyphen => match &mut element {
-                        ElementKind::Normal { data, .. } => {
+                        ElementKind::Normal { common, .. } | ElementKind::Slot { common, .. } => {
                             if let AttrPrefixParseResult::Value(value, is_value_unspecified) =
                                 attr_value
                             {
-                                if data
+                                if common
+                                    .data
                                     .iter()
                                     .find(|attr| attr.name.name_eq(&attr_name))
                                     .is_some()
@@ -1394,7 +1391,7 @@ impl Element {
                                 } else {
                                     let prefix_location =
                                         attr_name.location.start..attr_name.location.start;
-                                    data.push(Attribute {
+                                    common.data.push(Attribute {
                                         name: attr_name,
                                         value,
                                         is_model: false,
@@ -1404,8 +1401,7 @@ impl Element {
                                 }
                             }
                         }
-                        ElementKind::Slot { .. }
-                        | ElementKind::Pure { .. }
+                        ElementKind::Pure { .. }
                         | ElementKind::For { .. }
                         | ElementKind::If { .. }
                         | ElementKind::TemplateRef { .. }
@@ -1962,7 +1958,7 @@ impl Element {
                         content_location,
                     })
                 } else {
-                    if content.trim().len() > 0 {
+                    if content.trim_matches(super::is_template_whitespace).len() > 0 {
                         ps.add_warning(ParseErrorKind::ChildNodesNotAllowed, content_location);
                     }
                     globals.scripts.push(Script::GlobalRef {
@@ -2230,6 +2226,20 @@ impl Element {
     }
 
     fn init_scopes_and_binding_map_keys(&mut self, sas: &mut ScopeAnalyzeState) {
+        // disable globally if there is an `include` tag
+        let should_globally_disabled = match &self.kind {
+            ElementKind::Include { .. } => true,
+            ElementKind::Normal { .. }
+            | ElementKind::Pure { .. }
+            | ElementKind::For { .. }
+            | ElementKind::If { .. }
+            | ElementKind::TemplateRef { .. }
+            | ElementKind::Slot { .. } => false,
+        };
+        if should_globally_disabled {
+            sas.binding_map_collector.disable_all();
+        }
+
         // update dynamic tree state
         let self_dynamic_tree = match &self.kind {
             ElementKind::Normal { .. } | ElementKind::Pure { .. } => false,
@@ -2320,6 +2330,7 @@ pub struct CommonElementAttributes {
     pub slot: Option<(Range<Position>, Value)>,
     pub slot_value_refs: Vec<StaticAttribute>,
     pub event_bindings: Vec<EventBinding>,
+    pub data: Vec<Attribute>,
     pub marks: Vec<Attribute>,
 }
 
@@ -2349,6 +2360,7 @@ impl CommonElementAttributes {
             slot,
             slot_value_refs: _,
             event_bindings,
+            data,
             marks,
         } = self;
         if let Some(id) = id {
@@ -2359,6 +2371,9 @@ impl CommonElementAttributes {
         }
         for ev in event_bindings {
             f(&mut ev.value, false);
+        }
+        for attr in data {
+            f(&mut attr.value, false);
         }
         for attr in marks {
             f(&mut attr.value, false);
@@ -3152,6 +3167,13 @@ mod test {
     }
 
     #[test]
+    fn white_space_parsing() {
+        case!("&nbsp;", "\u{A0}");
+        case!("<div>&#x85;</div>", "<div>\u{85}</div>");
+        case!("<div> &#x2028; </div>", "<div> \u{2028} </div>");
+    }
+
+    #[test]
     fn tag_structure() {
         case!("<", r#"&lt;"#);
         case!("<-", r#"&lt;-"#);
@@ -3664,6 +3686,8 @@ mod test {
             6..12
         );
         case!("<slot mut-bind:a />", r#"<slot mut-bind:a/>"#);
+        case!("<slot data-a />", r#"<slot data:a/>"#);
+        case!("<slot data:a='abc' />", r#"<slot data:a="abc"/>"#);
         case!("<slot mark:a />", r#"<slot mark:a/>"#);
         case!("<slot slot='a' />", r#"<slot slot="a"/>"#);
     }
