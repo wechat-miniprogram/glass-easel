@@ -315,7 +315,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         <wxs module="modA">
           exports.fA = function (newVal, oldVal, self, target) {
             self._test = 789
-            target._test = newVal + ':' + oldVal
+            target._test = newVal + ':' + (oldVal || '-')
           }
         </wxs>
         <abc id="a" change:abc="{{ modA.fA }}" abc="{{ abc }}" />
@@ -327,7 +327,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
     const a = elem.getShadowRoot()!.getElementById('a')!
     expect((elem as unknown as { _test: number })._test).toBe(789)
-    expect((a as unknown as { _test: string })._test).toBe('123:')
+    expect((a as unknown as { _test: string })._test).toBe('123:-')
     elem.setData({ abc: 456 })
     expect((a as unknown as { _test: string })._test).toBe('456:123')
   })
