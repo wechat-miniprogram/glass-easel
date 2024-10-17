@@ -634,7 +634,9 @@ impl Element {
                             (_, "slot") => AttrPrefixKind::Slot,
                             (ElementKind::Normal { .. }, "class") => AttrPrefixKind::ClassString,
                             (ElementKind::Normal { .. }, "style") => AttrPrefixKind::StyleString,
-                            (ElementKind::Normal { .. }, x) | (ElementKind::Slot { .. }, x) if x.starts_with("data-") => {
+                            (ElementKind::Normal { .. }, x) | (ElementKind::Slot { .. }, x)
+                                if x.starts_with("data-") =>
+                            {
                                 AttrPrefixKind::DataHyphen
                             }
                             _ => AttrPrefixKind::Normal,
