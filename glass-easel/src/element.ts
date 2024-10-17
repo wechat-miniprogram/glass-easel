@@ -577,9 +577,9 @@ export class Element implements NodeCast {
           node.triggerLifetime('beforeDetach', [])
         }
         node.childNodes.forEach(callFunc)
+        const f = node._$placeholderHandlerRemover
+        if (typeof f === 'function') f()
         if (isComponent(node)) {
-          const f = node._$placeholderHandlerRemover
-          if (f) f()
           const shadowRoot = node.getShadowRoot()
           if (shadowRoot) callFunc(shadowRoot)
           node._$attached = false
