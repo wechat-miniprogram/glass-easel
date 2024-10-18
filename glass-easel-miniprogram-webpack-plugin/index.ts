@@ -483,7 +483,7 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
         for (const m of modules) {
           if (m.type !== 'javascript/auto') continue
           const module = m as NormalModule
-          if (module.resource === `${codeRoot}/index.js`) {
+          if (module.resource === path.join(codeRoot, 'index.js')) {
             indexModule = module
             continue
           }
