@@ -108,11 +108,9 @@ export class ComponentWaitingList {
   }
 
   call(c: GeneralComponentDefinition) {
-    const cbs = this._$callbacks
-    this._$callbacks = []
-    for (let i = 0; i < cbs.length; i += 1) {
-      const f = cbs[i]!
-      f(c)
+    while (this._$callbacks.length > 0) {
+      const callback = this._$callbacks.shift()!
+      callback(c)
     }
   }
 }
