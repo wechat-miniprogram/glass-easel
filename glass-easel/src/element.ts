@@ -577,8 +577,6 @@ export class Element implements NodeCast {
           node.triggerLifetime('beforeDetach', [])
         }
         node.childNodes.forEach(callFunc)
-        const f = node._$placeholderHandlerRemover
-        if (typeof f === 'function') f()
         if (isComponent(node)) {
           const shadowRoot = node.getShadowRoot()
           if (shadowRoot) callFunc(shadowRoot)
@@ -623,6 +621,8 @@ export class Element implements NodeCast {
         if (elem._$destroyOnRemoval === AutoDestroyState.Enabled) {
           elem._$destroyOnRemoval = AutoDestroyState.Destroyed
           elem.destroyBackendElement()
+          const f = elem._$placeholderHandlerRemover
+          if (typeof f === 'function') f()
         }
       }
       rec(node)
