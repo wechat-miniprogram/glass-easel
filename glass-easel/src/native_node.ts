@@ -78,8 +78,6 @@ export class NativeNode extends Element {
     const node = Object.create(NativeNode.prototype) as NativeNode
     node.is = tagName
     node.stylingName = stylingName ?? tagName
-    node._$placeholderHandlerRemover = placeholderHandlerRemover
-    node._$attributeFilters = {}
     const nodeTreeContext = owner.getBackendContext()
     let backendElement: GeneralBackendElement | null = null
     if (nodeTreeContext) {
@@ -95,6 +93,8 @@ export class NativeNode extends Element {
       if (ENV.DEV) performanceMeasureEnd()
     }
     node._$initialize(false, backendElement, owner, owner._$nodeTreeContext)
+    node._$placeholderHandlerRemover = placeholderHandlerRemover
+    node._$attributeFilters = {}
     const ownerHost = owner.getHostNode()
     const ownerComponentOptions = ownerHost.getComponentOptions()
     const styleScope = ownerComponentOptions.styleScope ?? StyleScopeManager.globalScope()
