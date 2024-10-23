@@ -625,8 +625,6 @@ export class Element implements NodeCast {
         if (elem._$destroyOnRemoval === AutoDestroyState.Enabled) {
           elem._$destroyOnRemoval = AutoDestroyState.Destroyed
           elem.destroyBackendElement()
-          const f = elem._$placeholderHandlerRemover
-          if (typeof f === 'function') f()
         }
         const f = elem._$placeholderHandlerRemover
         if (typeof f === 'function') f()
