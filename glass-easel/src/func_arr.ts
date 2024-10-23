@@ -42,7 +42,7 @@ export class FuncArr<F extends GeneralFuncType> {
   call(
     caller: ThisParameterType<F>,
     args: Parameters<F>,
-    relatedComponent?: AnyComponent,
+    relatedComponent?: AnyComponent | string,
   ): boolean {
     const arr = this._$arr
     let ret = true

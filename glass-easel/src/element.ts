@@ -559,6 +559,8 @@ export class Element implements NodeCast {
           }
           const shadowRoot = node.getShadowRoot()
           if (shadowRoot) callFunc(shadowRoot)
+        } else if (isNativeNode(node)) {
+          node.triggerLifetime('attached', [])
         }
         const childNodes = node.childNodes
         for (let i = 0; i < childNodes.length; i += 1) {
@@ -580,8 +582,12 @@ export class Element implements NodeCast {
         if (isComponent(node)) {
           const shadowRoot = node.getShadowRoot()
           if (shadowRoot) callFunc(shadowRoot)
-          node._$attached = false
+        }
+        node._$attached = false
+        if (isComponent(node) || isNativeNode(node)) {
           node.triggerLifetime('detached', [])
+        }
+        if (isComponent(node)) {
           if (node._$relation) {
             node._$relation.triggerLinkEvent(RelationType.ParentNonVirtualNode, true)
             node._$relation.triggerLinkEvent(RelationType.ParentComponent, true)
@@ -594,8 +600,6 @@ export class Element implements NodeCast {
               status: 'detached',
             })
           }
-        } else {
-          node._$attached = false
         }
       }
     }
@@ -621,6 +625,8 @@ export class Element implements NodeCast {
         if (elem._$destroyOnRemoval === AutoDestroyState.Enabled) {
           elem._$destroyOnRemoval = AutoDestroyState.Destroyed
           elem.destroyBackendElement()
+          const f = elem._$placeholderHandlerRemover
+          if (typeof f === 'function') f()
         }
         const f = elem._$placeholderHandlerRemover
         if (typeof f === 'function') f()
