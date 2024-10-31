@@ -993,7 +993,7 @@ impl Element {
                             Value::Static { value, .. } => w.expr_stmt(|w| {
                                 write!(
                                     w,
-                                    "if({}&&{}){}(R,C,{},undefined).C(C,T,E,B,F,S,J)",
+                                    "if({}&&{}){}(R,C,{},Object.create(null)).C(C,T,E,B,F,S,J)",
                                     var_key,
                                     var_target,
                                     var_target,
@@ -1012,7 +1012,7 @@ impl Element {
                                     p.value_expr(w)?;
                                     write!(w, ",K||(U?")?;
                                     p.lvalue_state_expr(w, scopes, true)?;
-                                    write!(w, ":undefined)).C(C,T,E,B,F,S,J)")?;
+                                    write!(w, ":Object.create(null))).C(C,T,E,B,F,S,J)")?;
                                     Ok(())
                                 })
                             }
