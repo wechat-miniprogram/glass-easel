@@ -104,7 +104,7 @@ export class ComponentWaitingList {
   remove(callback: (c: GeneralComponentDefinition) => void) {
     const index = this._$callbacks.indexOf(callback)
     // must guarantee order here (cannot swap-remove)
-    this._$callbacks.splice(index, 1)
+    if (index !== -1) this._$callbacks.splice(index, 1)
   }
 
   call(c: GeneralComponentDefinition) {
