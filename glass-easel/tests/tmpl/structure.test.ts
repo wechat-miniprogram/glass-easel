@@ -1207,6 +1207,32 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     matchElementWithDom(elem)
   })
 
+  test('undefined template-data', () => {
+    const def = glassEasel
+      .registerElement({
+        template: tmpl(`
+          <template name="child">
+            <span>{{ a }}</span>
+          </template>
+          <div>
+            <template is="child" />
+            <template is="child" data="{{ b }}" />
+          </div>
+        `),
+        data: {
+          a: 123,
+          b: 789,
+        },
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    expect(domHtml(elem)).toBe('<div><span></span><span></span></div>')
+    matchElementWithDom(elem)
+    elem.setData({ a: 456 })
+    expect(domHtml(elem)).toBe('<div><span></span><span></span></div>')
+    matchElementWithDom(elem)
+  })
+
   test('cascaded template', () => {
     const def = glassEasel
       .registerElement({
