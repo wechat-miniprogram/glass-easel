@@ -38,7 +38,7 @@ impl Template {
                     w.function_args("P", |w| {
                         w.expr_stmt(|w| {
                             write!(w, "if(!S)S=Object.assign({{}}")?;
-                            for target_path in self.globals.imports.iter() {
+                            for (_, _, target_path) in self.globals.imports.iter() {
                                 let p = crate::path::resolve(&self.path, &target_path.name);
                                 write!(w, ",(G[{}]||{{}})._", gen_lit_str(&p))?;
                             }
@@ -137,6 +137,8 @@ impl Template {
                         let ident = w.gen_ident();
                         let lvalue_path = match script {
                             Script::GlobalRef {
+                                tag_location: _,
+                                module_location: _,
                                 module_name: _,
                                 path,
                             } => {
@@ -148,6 +150,8 @@ impl Template {
                                 ScopeVarLvaluePath::Script { abs_path }
                             }
                             Script::Inline {
+                                tag_location: _,
+                                module_location: _,
                                 module_name,
                                 content,
                                 content_location: _,
@@ -176,7 +180,7 @@ impl Template {
                 } else {
                     false
                 };
-                for (k, v) in self.globals.sub_templates.iter() {
+                for (_, _, k, v) in self.globals.sub_templates.iter() {
                     let bmc = BindingMapCollector::new();
                     write_template_item(&k.name, w, scopes, &bmc, &v, has_scripts)?;
                 }
