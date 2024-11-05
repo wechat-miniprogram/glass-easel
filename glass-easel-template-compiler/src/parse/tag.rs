@@ -2075,7 +2075,7 @@ impl Element {
                 };
                 list.push((tag_location.clone(), path.0.clone(), path.1.clone()));
             }
-            _ => {},
+            _ => {}
         }
 
         // write script module
@@ -2117,7 +2117,9 @@ impl Element {
             {
                 ps.add_warning(ParseErrorKind::DuplicatedName, name.location());
             } else {
-                globals.sub_templates.push((tag_location.clone(), loc, name.clone(), new_children));
+                globals
+                    .sub_templates
+                    .push((tag_location.clone(), loc, name.clone(), new_children));
             }
         } else {
             let wrap_children = |mut element: Element| -> Vec<Node> {
@@ -3173,13 +3175,20 @@ impl Script {
 
     pub fn module_location(&self) -> Range<Position> {
         match self {
-            Self::Inline { module_location, .. } | Self::GlobalRef { module_location, .. } => module_location.clone(),
+            Self::Inline {
+                module_location, ..
+            }
+            | Self::GlobalRef {
+                module_location, ..
+            } => module_location.clone(),
         }
     }
 
     pub fn tag_location(&self) -> TagLocation {
         match self {
-            Self::Inline { tag_location, .. } | Self::GlobalRef { tag_location, .. } => tag_location.clone(),
+            Self::Inline { tag_location, .. } | Self::GlobalRef { tag_location, .. } => {
+                tag_location.clone()
+            }
         }
     }
 }

@@ -54,10 +54,18 @@ impl Stringify for Template {
                             None,
                             content_location,
                         )?;
-                        stringifier.write_token(r#"<"#, None, &tag_location.end.as_ref().unwrap_or(&tag_location.start).0)?;
+                        stringifier.write_token(
+                            r#"<"#,
+                            None,
+                            &tag_location.end.as_ref().unwrap_or(&tag_location.start).0,
+                        )?;
                         stringifier.write_token("/", None, &tag_location.close)?;
                         stringifier.write_str(r#"wxs"#)?;
-                        stringifier.write_token(r#">"#, None, &tag_location.end.as_ref().unwrap_or(&tag_location.start).1)?;
+                        stringifier.write_token(
+                            r#">"#,
+                            None,
+                            &tag_location.end.as_ref().unwrap_or(&tag_location.start).1,
+                        )?;
                     } else {
                         stringifier.write_token("/", None, &tag_location.close)?;
                         stringifier.write_token(">", None, &tag_location.start.1)?;
@@ -92,10 +100,18 @@ impl Stringify for Template {
                 for node in nodes {
                     node.stringify_write(stringifier)?;
                 }
-                stringifier.write_token(r#"<"#, None, &tag_location.end.as_ref().unwrap_or(&tag_location.start).0)?;
+                stringifier.write_token(
+                    r#"<"#,
+                    None,
+                    &tag_location.end.as_ref().unwrap_or(&tag_location.start).0,
+                )?;
                 stringifier.write_token("/", None, &tag_location.close)?;
                 stringifier.write_str(r#"template"#)?;
-                stringifier.write_token(r#">"#, None, &tag_location.end.as_ref().unwrap_or(&tag_location.start).1)?;
+                stringifier.write_token(
+                    r#">"#,
+                    None,
+                    &tag_location.end.as_ref().unwrap_or(&tag_location.start).1,
+                )?;
             } else {
                 stringifier.write_token("/", None, &tag_location.close)?;
                 stringifier.write_token(">", None, &tag_location.start.1)?;
