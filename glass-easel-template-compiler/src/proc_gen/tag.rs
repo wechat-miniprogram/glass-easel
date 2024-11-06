@@ -38,8 +38,8 @@ impl Template {
                     w.function_args("P", |w| {
                         w.expr_stmt(|w| {
                             write!(w, "if(!S)S=Object.assign({{}}")?;
-                            for (_, _, target_path) in self.globals.imports.iter() {
-                                let p = crate::path::resolve(&self.path, &target_path.name);
+                            for i in self.globals.imports.iter() {
+                                let p = crate::path::resolve(&self.path, &i.src.name);
                                 write!(w, ",(G[{}]||{{}})._", gen_lit_str(&p))?;
                             }
                             write!(w, ",H)")?;
@@ -140,9 +140,10 @@ impl Template {
                                 tag_location: _,
                                 module_location: _,
                                 module_name: _,
-                                path,
+                                src_location: _,
+                                src,
                             } => {
-                                let abs_path = crate::path::resolve(&self.path, &path.name);
+                                let abs_path = crate::path::resolve(&self.path, &src.name);
                                 w.expr_stmt(|w| {
                                     write!(w, r#"var {}=R[{}]()"#, ident, gen_lit_str(&abs_path))?;
                                     Ok(())
@@ -180,9 +181,9 @@ impl Template {
                 } else {
                     false
                 };
-                for (_, _, k, v) in self.globals.sub_templates.iter() {
+                for t in self.globals.sub_templates.iter() {
                     let bmc = BindingMapCollector::new();
-                    write_template_item(&k.name, w, scopes, &bmc, &v, has_scripts)?;
+                    write_template_item(&t.name.name, w, scopes, &bmc, &t.content, has_scripts)?;
                 }
                 write_template_item(
                     "",

@@ -20,14 +20,14 @@ use crate::{
 impl Stringify for Template {
     fn stringify_write<'s, W: FmtWrite>(&self, stringifier: &mut Stringifier<'s, W>) -> FmtResult {
         let globals = &self.globals;
-        for (tag_location, loc, import) in globals.imports.iter() {
-            stringifier.write_token("<", None, &tag_location.start.0)?;
+        for i in globals.imports.iter() {
+            stringifier.write_token("<", None, &i.tag_location.start.0)?;
             stringifier.write_str(r#"import "#)?;
-            stringifier.write_token("src", None, loc)?;
+            stringifier.write_token("src", None, &i.src_location)?;
             stringifier.write_str(r#"="#)?;
-            stringifier.write_str_name_quoted(import)?;
-            stringifier.write_token("/", None, &tag_location.close)?;
-            stringifier.write_token(">", None, &tag_location.start.1)?;
+            stringifier.write_str_name_quoted(&i.src)?;
+            stringifier.write_token("/", None, &i.tag_location.close)?;
+            stringifier.write_token(">", None, &i.tag_location.start.1)?;
         }
         stringifier.scope_names.clear();
         for script in globals.scripts.iter() {
@@ -75,26 +75,31 @@ impl Stringify for Template {
                     tag_location,
                     module_location,
                     module_name,
-                    path,
+                    src_location,
+                    src,
                 } => {
                     stringifier.write_token("<", None, &tag_location.start.0)?;
                     stringifier.write_str(r#"wxs "#)?;
                     stringifier.write_token("module", None, module_location)?;
                     stringifier.write_str(r#"="#)?;
                     stringifier.write_str_name_quoted(module_name)?;
-                    stringifier.write_str(r#" src="#)?;
-                    stringifier.write_str_name_quoted(path)?;
+                    stringifier.write_str(r#" "#)?;
+                    stringifier.write_token("src", None, src_location)?;
+                    stringifier.write_str(r#"="#)?;
+                    stringifier.write_str_name_quoted(src)?;
                     stringifier.write_token("/", None, &tag_location.close)?;
                     stringifier.write_token(">", None, &tag_location.start.1)?;
                 }
             }
         }
-        for (tag_location, loc, template_name, nodes) in globals.sub_templates.iter() {
+        for t in globals.sub_templates.iter() {
+            let tag_location = &t.tag_location;
             stringifier.write_token("<", None, &tag_location.start.0)?;
             stringifier.write_str(r#"template "#)?;
-            stringifier.write_token("name", None, loc)?;
+            stringifier.write_token("name", None, &t.name_location)?;
             stringifier.write_str(r#"="#)?;
-            stringifier.write_str_name_quoted(template_name)?;
+            stringifier.write_str_name_quoted(&t.name)?;
+            let nodes = &t.content;
             if nodes.len() > 0 {
                 stringifier.write_str(r#">"#)?;
                 for node in nodes {
@@ -131,9 +136,9 @@ impl Stringify for Node {
             Node::Text(value) => value.stringify_write(stringifier)?,
             Node::Element(element) => element.stringify_write(stringifier)?,
             Node::Comment(..) => {}
-            Node::UnknownMetaTag(s, location) => {
+            Node::UnknownMetaTag(t) => {
                 stringifier.write_str(r#"<!"#)?;
-                stringifier.write_token(&escape_html_text(&s), None, &location)?;
+                stringifier.write_token(&escape_html_text(&t.content), None, &t.location)?;
                 stringifier.write_str(r#">"#)?;
             }
         }

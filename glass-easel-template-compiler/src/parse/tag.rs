@@ -14,6 +14,7 @@ pub const DEFAULT_FOR_ITEM_SCOPE_NAME: &'static str = "item";
 pub const DEFAULT_FOR_INDEX_SCOPE_NAME: &'static str = "index";
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct Template {
     pub path: String,
     pub content: Vec<Node>,
@@ -21,15 +22,42 @@ pub struct Template {
 }
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct TemplateGlobals {
-    pub imports: Vec<(TagLocation, Range<Position>, StrName)>,
-    pub includes: Vec<(TagLocation, Range<Position>, StrName)>,
-    pub sub_templates: Vec<(TagLocation, Range<Position>, StrName, Vec<Node>)>,
+    pub imports: Vec<ImportElement>,
+    pub includes: Vec<IncludeElement>,
+    pub sub_templates: Vec<TemplateDefinition>,
     pub scripts: Vec<Script>,
     pub(crate) binding_map_collector: BindingMapCollector,
 }
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct ImportElement {
+    pub tag_location: TagLocation,
+    pub src_location: Range<Position>,
+    pub src: StrName,
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct IncludeElement {
+    pub tag_location: TagLocation,
+    pub src_location: Range<Position>,
+    pub src: StrName,
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct TemplateDefinition {
+    pub tag_location: TagLocation,
+    pub name_location: Range<Position>,
+    pub name: StrName,
+    pub content: Vec<Node>,
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct TagLocation {
     pub start: (Range<Position>, Range<Position>),
     pub close: Range<Position>,
@@ -77,7 +105,7 @@ impl Template {
                 inside_dynamic_tree: 1,
                 binding_map_collector: BindingMapCollector::new(),
             };
-            for node in &mut sub.3 {
+            for node in &mut sub.content {
                 node.init_scopes_and_binding_map_keys(&mut sas);
             }
         }
@@ -105,12 +133,20 @@ impl Template {
         }
     }
 
+    pub fn global_scopes(&self) -> Vec<&StrName> {
+        self.globals.scripts.iter().map(|x| x.module_name()).collect()
+    }
+
     pub fn direct_dependencies<'a>(&'a self) -> impl Iterator<Item = String> + 'a {
-        self.globals
+        let imports = self.globals
             .imports
             .iter()
-            .chain(self.globals.includes.iter())
-            .map(move |p| crate::path::resolve(&self.path, &p.2.name))
+            .map(move |p| crate::path::resolve(&self.path, &p.src.name));
+        let includes = self.globals
+            .includes
+            .iter()
+            .map(move |p| crate::path::resolve(&self.path, &p.src.name));
+        imports.chain(includes)
     }
 
     pub fn script_dependencies<'a>(&'a self) -> impl Iterator<Item = String> + 'a {
@@ -118,8 +154,8 @@ impl Template {
             .scripts
             .iter()
             .filter_map(move |script| match script {
-                Script::GlobalRef { path, .. } => {
-                    let abs_path = crate::path::resolve(&self.path, &path.name);
+                Script::GlobalRef { src, .. } => {
+                    let abs_path = crate::path::resolve(&self.path, &src.name);
                     Some(abs_path)
                 }
                 Script::Inline { .. } => None,
@@ -216,11 +252,26 @@ impl Template {
 }
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum Node {
     Text(Value),
     Element(Element),
-    Comment(String, Range<Position>),
-    UnknownMetaTag(String, Range<Position>),
+    Comment(Comment),
+    UnknownMetaTag(UnknownMetaTag),
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct Comment {
+    pub content: String,
+    pub location: Range<Position>,
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct UnknownMetaTag {
+    pub content: String,
+    pub location: Range<Position>,
 }
 
 impl TemplateStructure for Node {
@@ -228,8 +279,8 @@ impl TemplateStructure for Node {
         match self {
             Self::Text(x) => x.location(),
             Self::Element(x) => x.location(),
-            Self::Comment(_, location) => location.clone(),
-            Self::UnknownMetaTag(_, location) => location.clone(),
+            Self::Comment(x) => x.location.clone(),
+            Self::UnknownMetaTag(x) => x.location.clone(),
         }
     }
 }
@@ -248,12 +299,12 @@ impl Node {
                 if ps.consume_str("--").is_some() {
                     let s = ps.skip_until_after("-->").unwrap_or("");
                     let location = range.start..ps.position();
-                    ret.push(Node::Comment(s.to_string(), location));
+                    ret.push(Node::Comment(Comment { content: s.to_string(), location }));
                 } else {
                     let s = ps.skip_until_after(">").unwrap_or("");
                     let location = range.start..ps.position();
                     ps.add_warning(ParseErrorKind::UnknownMetaTag, location.clone());
-                    ret.push(Node::UnknownMetaTag(s.to_string(), location));
+                    ret.push(Node::UnknownMetaTag(UnknownMetaTag { content: s.to_string(), location }));
                 }
                 continue;
             }
@@ -301,13 +352,16 @@ impl Node {
 }
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct Element {
     pub kind: ElementKind,
     pub tag_location: TagLocation,
 }
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum ElementKind {
+    #[non_exhaustive]
     Normal {
         tag_name: Ident,
         attributes: Vec<Attribute>,
@@ -320,11 +374,13 @@ pub enum ElementKind {
         extra_attr: Vec<StaticAttribute>,
         common: CommonElementAttributes,
     },
+    #[non_exhaustive]
     Pure {
         children: Vec<Node>,
         slot: Option<(Range<Position>, Value)>,
         slot_value_refs: Vec<StaticAttribute>,
     },
+    #[non_exhaustive]
     For {
         list: (Range<Position>, Value),
         item_name: (Range<Position>, StrName),
@@ -332,17 +388,21 @@ pub enum ElementKind {
         key: (Range<Position>, StrName),
         children: Vec<Node>,
     },
+    #[non_exhaustive]
     If {
         branches: Vec<(Range<Position>, Value, Vec<Node>)>,
         else_branch: Option<(Range<Position>, Vec<Node>)>,
     },
+    #[non_exhaustive]
     TemplateRef {
         target: (Range<Position>, Value),
         data: (Range<Position>, Value),
     },
+    #[non_exhaustive]
     Include {
         path: (Range<Position>, StrName),
     },
+    #[non_exhaustive]
     Slot {
         name: (Range<Position>, Value),
         values: Vec<Attribute>,
@@ -360,6 +420,22 @@ impl TemplateStructure for Element {
 }
 
 impl Element {
+    pub fn introduced_scopes(&self) -> Vec<&StrName> {
+        match &self.kind {
+            ElementKind::Normal { common, .. }
+            | ElementKind::Slot { common, .. } => {
+                common.slot_value_refs.iter().map(|x| &x.value).collect()
+            }
+            ElementKind::For { item_name, index_name, .. } => {
+                vec![&item_name.1, &index_name.1]
+            }
+            ElementKind::Pure { .. }
+            | ElementKind::If { .. }
+            | ElementKind::TemplateRef { .. }
+            | ElementKind::Include { .. } => vec![],
+        }
+    }
+
     pub(crate) fn children(&self) -> Option<&Vec<Node>> {
         match &self.kind {
             ElementKind::Normal { children, .. }
@@ -1964,7 +2040,7 @@ impl Element {
                 let pos = ps.position();
                 (String::new(), pos..pos)
             };
-            if let Some((_, module_name)) = script_module {
+            if let Some((module_location, module_name)) = script_module {
                 if globals
                     .scripts
                     .iter()
@@ -1973,7 +2049,7 @@ impl Element {
                 {
                     ps.add_warning(ParseErrorKind::DuplicatedName, module_name.location());
                 } else {
-                    script_module_content = Some((path, module_name, content, content_location));
+                    script_module_content = Some((module_location, module_name, path, content, content_location));
                 }
             } else {
                 ps.add_warning(ParseErrorKind::MissingModuleName, tag_name.location());
@@ -2068,18 +2144,25 @@ impl Element {
         // write resources list
         match &element {
             ElementKind::Include { path, .. } => {
-                let list = if is_import_tag {
-                    &mut globals.imports
+                if is_import_tag {
+                    globals.imports.push(ImportElement {
+                        tag_location: tag_location.clone(),
+                        src_location: path.0.clone(),
+                        src: path.1.clone(),
+                    });
                 } else {
-                    &mut globals.includes
+                    globals.includes.push(IncludeElement {
+                        tag_location: tag_location.clone(),
+                        src_location: path.0.clone(),
+                        src: path.1.clone(),
+                    });
                 };
-                list.push((tag_location.clone(), path.0.clone(), path.1.clone()));
             }
             _ => {}
         }
 
         // write script module
-        if let Some((path, module_name, content, content_location)) = script_module_content {
+        if let Some((module_location, module_name, path, content, content_location)) = script_module_content {
             if path.1.name.is_empty() {
                 globals.scripts.push(Script::Inline {
                     tag_location: tag_location.clone(),
@@ -2094,9 +2177,10 @@ impl Element {
                 }
                 globals.scripts.push(Script::GlobalRef {
                     tag_location: tag_location.clone(),
-                    module_location: path.0.clone(),
+                    module_location,
                     module_name,
-                    path: path.1.clone(),
+                    src_location: path.0.clone(),
+                    src: path.1.clone(),
                 })
             }
         }
@@ -2112,14 +2196,19 @@ impl Element {
             if globals
                 .sub_templates
                 .iter()
-                .find(|(_, _, x, _)| x.name_eq(&name))
+                .find(|x| x.name.name_eq(&name))
                 .is_some()
             {
                 ps.add_warning(ParseErrorKind::DuplicatedName, name.location());
             } else {
                 globals
                     .sub_templates
-                    .push((tag_location.clone(), loc, name.clone(), new_children));
+                    .push(TemplateDefinition {
+                        tag_location: tag_location.clone(),
+                        name_location: loc,
+                        name: name.clone(),
+                        content: new_children,
+                    });
             }
         } else {
             let wrap_children = |mut element: Element| -> Vec<Node> {
@@ -2367,6 +2456,7 @@ impl Element {
 }
 
 #[derive(Debug, Clone, Default)]
+#[non_exhaustive]
 pub struct CommonElementAttributes {
     pub id: Option<(Range<Position>, Value)>,
     pub slot: Option<(Range<Position>, Value)>,
@@ -2424,6 +2514,7 @@ impl CommonElementAttributes {
 }
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct Attribute {
     pub name: Ident,
     pub value: Value,
@@ -2562,6 +2653,7 @@ impl Attribute {
 }
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct StaticAttribute {
     pub name: Ident,
     pub value: StrName,
@@ -2593,6 +2685,7 @@ impl StaticAttribute {
 }
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum ClassAttribute {
     None,
     String(Range<Position>, Value),
@@ -2600,6 +2693,7 @@ pub enum ClassAttribute {
 }
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum StyleAttribute {
     None,
     String(Range<Position>, Value),
@@ -2607,6 +2701,7 @@ pub enum StyleAttribute {
 }
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct EventBinding {
     pub name: Ident,
     pub value: Value,
@@ -2623,6 +2718,7 @@ pub struct EventBinding {
 /// Unlike JavaScript identifier, it can contain `-` .
 ///
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct Ident {
     pub name: CompactString,
     pub location: Range<Position>,
@@ -2714,6 +2810,7 @@ impl Ident {
 
 /// A static string with location information.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct StrName {
     pub name: CompactString,
     pub location: Range<Position>,
@@ -2726,6 +2823,22 @@ impl TemplateStructure for StrName {
 }
 
 impl StrName {
+    pub fn to_ident(&self) -> Option<Ident> {
+        let mut chars = self.name.chars();
+        if !Ident::is_start_char(chars.next()?) {
+            return None;
+        }
+        for ch in chars {
+            if !Ident::is_following_char(ch) {
+                return None;
+            }
+        }
+        Some(Ident {
+            name: self.name.clone(),
+            location: self.location(),
+        })
+    }
+
     pub fn name_eq(&self, other: &Self) -> bool {
         self.name == other.name
     }
@@ -2858,11 +2971,14 @@ impl StrName {
 
 /// A static string or an expression.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum Value {
+    #[non_exhaustive]
     Static {
         value: CompactString,
         location: Range<Position>,
     },
+    #[non_exhaustive]
     Dynamic {
         expression: Box<Expression>,
         double_brace_location: (Range<Position>, Range<Position>),
@@ -3150,7 +3266,9 @@ impl Value {
 }
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum Script {
+    #[non_exhaustive]
     Inline {
         tag_location: TagLocation,
         module_location: Range<Position>,
@@ -3158,11 +3276,13 @@ pub enum Script {
         content: String,
         content_location: Range<Position>,
     },
+    #[non_exhaustive]
     GlobalRef {
         tag_location: TagLocation,
         module_location: Range<Position>,
         module_name: StrName,
-        path: StrName,
+        src_location: Range<Position>,
+        src: StrName,
     },
 }
 
