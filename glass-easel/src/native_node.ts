@@ -138,6 +138,7 @@ export class NativeNode extends Element {
 
       const lifetimesFromBehaviors = extendedDefinition.lifetimesFromBehaviors || []
       lifetimesFromBehaviors.forEach((behavior) => {
+        behavior.prepare()
         const lifetimes = behavior._$lifetimes
         for (let i = 0; i < lifetimes.length; i += 1) {
           const { name, func } = lifetimes[i]!
