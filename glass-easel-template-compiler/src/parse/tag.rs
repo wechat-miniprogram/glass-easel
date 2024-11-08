@@ -426,10 +426,12 @@ impl Element {
             | ElementKind::Slot { common, .. } => {
                 common.slot_value_refs.iter().map(|x| &x.value).collect()
             }
+            ElementKind::Pure { slot_value_refs, .. } => {
+                slot_value_refs.iter().map(|x| &x.value).collect()
+            }
             ElementKind::For { item_name, index_name, .. } => {
                 vec![&item_name.1, &index_name.1]
             }
-            ElementKind::Pure { .. }
             | ElementKind::If { .. }
             | ElementKind::TemplateRef { .. }
             | ElementKind::Include { .. } => vec![],
@@ -460,7 +462,7 @@ impl Element {
         }
     }
 
-    pub(crate) fn slot_value_refs(&self) -> Option<impl Iterator<Item = &StaticAttribute>> {
+    pub fn slot_value_refs(&self) -> Option<impl Iterator<Item = &StaticAttribute>> {
         match &self.kind {
             ElementKind::Normal { common, .. } | ElementKind::Slot { common, .. } => {
                 Some(common.slot_value_refs.iter())
@@ -1310,7 +1312,7 @@ impl Element {
                     },
                     AttrPrefixKind::Module => {
                         if let AttrPrefixParseResult::ScopeName(s) = attr_value {
-                            if wx_for_item.is_some() {
+                            if script_module.is_some() {
                                 ps.add_warning(
                                     ParseErrorKind::InvalidAttribute,
                                     attr_name.location,
@@ -2166,7 +2168,7 @@ impl Element {
             if path.1.name.is_empty() {
                 globals.scripts.push(Script::Inline {
                     tag_location: tag_location.clone(),
-                    module_location: path.0.clone(),
+                    module_location,
                     module_name,
                     content,
                     content_location,
@@ -2837,6 +2839,10 @@ impl StrName {
             name: self.name.clone(),
             location: self.location(),
         })
+    }
+
+    pub fn is(&self, s: impl AsRef<str>) -> bool {
+        self.name == s.as_ref()
     }
 
     pub fn name_eq(&self, other: &Self) -> bool {
