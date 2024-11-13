@@ -71,9 +71,11 @@ export class RangeListManager {
         this.ownerShadowRoot.getHostNode(),
         this.elem,
       )
-      items = new Array<string>(dataList)
+      const length =
+        Number.isSafeInteger(dataList) && dataList >= 0 && dataList < 2 ** 32 ? dataList : 0
+      items = new Array<string>(length)
       indexes = null
-      for (let i = 0; i < dataList; i += 1) {
+      for (let i = 0; i < length; i += 1) {
         items[i] = i
       }
     } else {
