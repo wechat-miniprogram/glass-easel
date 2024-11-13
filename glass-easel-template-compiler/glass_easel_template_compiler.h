@@ -130,6 +130,8 @@ int32_t tmpl_group_set_inline_script(TmplGroup *self,
                                      const uint8_t *content_buf,
                                      size_t content_len);
 
+StrRef tmpl_group_stringify_tmpl(const TmplGroup *self, const uint8_t *path_buf, size_t path_len);
+
 void tmpl_parse_warning_array_free(TmplParseWarningArray self);
 
 void tmpl_parse_warning_free(TmplParseWarning self);

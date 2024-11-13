@@ -261,7 +261,7 @@ impl TmplGroup {
     }
 
     /// Regenerate a template content string of the specified template.
-    pub fn stringify_tmpl(&mut self, path: &str) -> Option<String> {
+    pub fn stringify_tmpl(&self, path: &str) -> Option<String> {
         let template = self.trees.get(path)?;
         let mut stringifier = crate::stringify::Stringifier::new(String::new(), path, "");
         template.stringify_write(&mut stringifier).unwrap();
