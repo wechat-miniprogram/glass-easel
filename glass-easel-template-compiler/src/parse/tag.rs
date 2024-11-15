@@ -2784,10 +2784,22 @@ impl Ident {
         self.name == other.name
     }
 
+    /// Check if a `str` is a valid identifier.
+    pub fn is_valid(s: &str) -> bool {
+        let mut chars = s.chars();
+        let Some(first) = chars.next() else { return false };
+        if !Self::is_start_char(first) { return false; }
+        for ch in chars {
+            if !Self::is_following_char(ch) {
+                return false;
+            }
+        }
+        true
+    }
+
     /// Parse colon-seperated identifiers.
     ///
     /// For example, `wx:for-item` will be parsed as two identifiers `wx` and `for-item` .
-    ///
     pub fn parse_colon_separated(ps: &mut ParseState) -> Vec<Self> {
         let Some(peek) = ps.peek::<0>() else {
             return vec![];
