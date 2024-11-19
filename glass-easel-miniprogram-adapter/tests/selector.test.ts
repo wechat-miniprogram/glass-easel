@@ -563,6 +563,32 @@ describe('selector query', () => {
       const root = ab.createRoot('body', codeSpace, 'path/to/comp')
       glassEasel.Element.pretendAttached(root.getComponent())
     }))
+
+  test('query context', () =>
+    new Promise<undefined>((resolve) => {
+      const env = new MiniProgramEnv()
+      const codeSpace = env.createCodeSpace('', true)
+
+      codeSpace.addComponentStaticConfig('path/to/comp', {})
+      codeSpace.addCompiledTemplate('path/to/comp', tmpl(''))
+      codeSpace.componentEnv('path/to/comp', ({ Component }) => {
+        Component()
+          .lifetime('attached', function () {
+            this.createSelectorQuery()
+              .selectViewport()
+              .context((res) => {
+                expect(res.context).toBeUndefined()
+                resolve(undefined)
+              })
+              .exec()
+          })
+          .register()
+      })
+
+      const ab = env.associateBackend()
+      const root = ab.createRoot('body', codeSpace, 'path/to/comp')
+      glassEasel.Element.pretendAttached(root.getComponent())
+    }))
 })
 
 describe('intersection observer', () => {

@@ -9,6 +9,7 @@ export type SelectorQueryFields = {
   size?: boolean
   scrollOffset?: boolean
   properties?: string[]
+  context?: boolean
   // TODO support computedStyle
 }
 
@@ -48,6 +49,10 @@ export type ScrollOffset = {
   scrollTop: number
   scrollWidth: number
   scrollHeight: number
+}
+
+export type ContextResult = {
+  context: unknown
 }
 
 const joinAsync = <T>(inits: ((cb: (ret: T) => void) => void)[], cb: (rets: T[]) => void) => {
@@ -135,6 +140,15 @@ class NodesRef<S extends boolean> {
       },
       cb,
     )
+    return this._$sq
+  }
+
+  context(
+    cb: (res: S extends true ? ContextResult : any[]) => void = () => {
+      /* empty */
+    },
+  ) {
+    this._$sq._$push(this._$sel, this._$comp, this._$single, { context: true }, cb)
     return this._$sq
   }
 }
@@ -292,6 +306,16 @@ export class SelectorQuery {
                       res.scrollTop = rect.scrollTop
                       res.scrollWidth = rect.scrollWidth
                       res.scrollHeight = rect.scrollHeight
+                      done(undefined)
+                    })
+                  } else {
+                    done(undefined)
+                  }
+                },
+                (done) => {
+                  if (fields.context) {
+                    elem.getContext((ctx) => {
+                      res.context = ctx
                       done(undefined)
                     })
                   } else {
