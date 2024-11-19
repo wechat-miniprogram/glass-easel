@@ -243,10 +243,7 @@ impl TmplGroup {
             self.has_scripts = true;
         }
         let ret = parse_state.take_warnings();
-        let success = ret.iter().find(|x| x.prevent_success()).is_none();
-        if success {
-            self.trees.insert(template.path.clone(), template);
-        }
+        self.trees.insert(template.path.clone(), template);
         ret
     }
 
