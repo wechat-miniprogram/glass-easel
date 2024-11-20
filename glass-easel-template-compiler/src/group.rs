@@ -418,7 +418,7 @@ impl TmplGroup {
         Ok(())
     }
 
-    /// Convert all to WXML GenObject js string
+    /// Convert all to WXML GenObject js string.
     pub fn get_tmpl_gen_object_groups(&self) -> Result<String, TmplError> {
         let mut w = JsTopScopeWriter::new(String::new());
         w.expr_scope(|w| {
@@ -453,7 +453,7 @@ impl TmplGroup {
         Ok(w.finish())
     }
 
-    /// Convert all to WXML GenObject js string, with wx environment support
+    /// Convert all to WXML GenObject js string, with wx environment support.
     pub fn get_wx_gen_object_groups(&self) -> Result<String, TmplError> {
         let mut w = JsTopScopeWriter::new(String::new());
         w.expr_scope(|w| {
@@ -506,13 +506,18 @@ impl TmplGroup {
         Ok(w.finish())
     }
 
-    /// Returns the number of templates in the group
+    /// Returns the number of templates in the group.
     pub fn len(&self) -> usize {
         self.trees.len()
     }
 
-    /// Check if the group contains certain template
+    /// Check if the group contains certain template.
     pub fn contains_template(&self, path: &str) -> bool {
         self.trees.contains_key(path)
+    }
+
+    /// List all available templates.
+    pub fn list_template_trees(&self) -> impl Iterator<Item = (&str, &Template)> {
+        self.trees.iter().map(|(name, tmpl)| (name.as_str(), tmpl))
     }
 }
