@@ -536,11 +536,6 @@ abstract class Node implements glassEasel.composedBackend.Element {
   }
 
   // eslint-disable-next-line class-methods-use-this
-  setEventDefaultPrevented(_type: string, _enabled: boolean): void {
-    // empty
-  }
-
-  // eslint-disable-next-line class-methods-use-this
   setModelBindingStat(
     _attributeName: string,
     _listener: ((newValue: unknown) => void) | null,

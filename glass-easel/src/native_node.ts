@@ -126,7 +126,7 @@ export class NativeNode extends Element {
         ;(backendElement as backend.Element).associateValue(node)
       } else if (BM.COMPOSED || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Composed)) {
         // FIXME temp for skyline
-        // ;(backendElement as backend.Element | composedBackend.Element).associateValue(node)
+        ;(backendElement as backend.Element | composedBackend.Element).associateValue?.(node)
       } else {
         ;(owner.getBackendContext() as domlikeBackend.Context).associateValue(
           backendElement as domlikeBackend.Element,

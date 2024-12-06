@@ -2444,11 +2444,18 @@ export class Element implements NodeCast {
           mutLevel,
         )
       } else if (BM.COMPOSED || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Composed)) {
-        const defaultPrevented = mutLevel === MutLevel.Final
-        ;(this._$backendElement as composedBackend.Element).setEventDefaultPrevented(
-          name,
-          defaultPrevented,
-        )
+        const backendElement = this._$backendElement as composedBackend.Element
+        if (backendElement.setListenerStats) {
+          backendElement.setListenerStats(name, capture, mutLevel)
+        } else {
+          // FIXME: for skyline compatibility, remove this in the future
+          const defaultPrevented = mutLevel === MutLevel.Final
+          ;(
+            backendElement as unknown as {
+              setEventDefaultPrevented: (type: string, enabled: boolean) => void
+            }
+          ).setEventDefaultPrevented(name, defaultPrevented)
+        }
       } else {
         ;(this._$backendElement as backend.Element).setListenerStats(name, capture, mutLevel)
       }

@@ -215,10 +215,6 @@ export class EmptyComposedBackendElement implements Element {
     }, 0)
   }
 
-  setEventDefaultPrevented(_type: string, _enabled: boolean): void {
-    // empty
-  }
-
   setListenerStats(_type: string, _capture: boolean, _mutLevel: MutLevel): void {
     // empty
   }

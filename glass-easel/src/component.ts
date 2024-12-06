@@ -658,7 +658,7 @@ export class Component<
         ;(backendElement as backend.Element).associateValue(comp)
       } else if (BM.COMPOSED || (BM.DYNAMIC && nodeTreeContext!.mode === BackendMode.Composed)) {
         // FIXME temp for skyline
-        // ;(backendElement as composedBackend.Element).associateValue?.(comp)
+        ;(backendElement as composedBackend.Element).associateValue?.(comp)
       } else {
         ;(nodeTreeContext as domlikeBackend.Context).associateValue(
           backendElement as domlikeBackend.Element,

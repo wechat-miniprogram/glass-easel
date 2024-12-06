@@ -1,5 +1,5 @@
 import { type Element as GlassEaselElement } from '../element'
-import { type EventBubbleStatus, type EventOptions } from '../event'
+import { type MutLevel, type EventBubbleStatus, type EventOptions } from '../event'
 import { type BackendMode } from './shared'
 import type * as suggestedBackend from './suggested_backend_protocol'
 
@@ -49,5 +49,5 @@ export interface Element extends Partial<suggestedBackend.Element<Element>> {
   removeAttribute(name: string): void
   setText(content: string): void
   setModelBindingStat(attributeName: string, listener: ((newValue: unknown) => void) | null): void
-  setEventDefaultPrevented(type: string, enabled: boolean): void
+  setListenerStats(type: string, capture: boolean, mutLevel: MutLevel): void
 }
