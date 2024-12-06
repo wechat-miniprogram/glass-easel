@@ -399,6 +399,22 @@ pub struct Position {
     pub utf16_col: u32,
 }
 
+impl PartialOrd for Position {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Position {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        if self.line == other.line {
+            self.utf16_col.cmp(&other.utf16_col)
+        } else {
+            self.line.cmp(&other.line)
+        }
+    }
+}
+
 impl Position {
     /// Get the line-column offsets (in UTF-16) in the source code.
     pub fn line_col_utf16<'s>(&self) -> (usize, usize) {

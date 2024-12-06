@@ -38,8 +38,8 @@ impl Template {
                     w.function_args("P", |w| {
                         w.expr_stmt(|w| {
                             write!(w, "if(!S)S=Object.assign({{}}")?;
-                            for target_path in self.globals.imports.iter() {
-                                let p = crate::path::resolve(&self.path, &target_path.name);
+                            for i in self.globals.imports.iter() {
+                                let p = crate::path::resolve(&self.path, &i.src.name);
                                 write!(w, ",(G[{}]||{{}})._", gen_lit_str(&p))?;
                             }
                             write!(w, ",H)")?;
@@ -137,10 +137,13 @@ impl Template {
                         let ident = w.gen_ident();
                         let lvalue_path = match script {
                             Script::GlobalRef {
+                                tag_location: _,
+                                module_location: _,
                                 module_name: _,
-                                path,
+                                src_location: _,
+                                src,
                             } => {
-                                let abs_path = crate::path::resolve(&self.path, &path.name);
+                                let abs_path = crate::path::resolve(&self.path, &src.name);
                                 w.expr_stmt(|w| {
                                     write!(w, r#"var {}=R[{}]()"#, ident, gen_lit_str(&abs_path))?;
                                     Ok(())
@@ -148,6 +151,8 @@ impl Template {
                                 ScopeVarLvaluePath::Script { abs_path }
                             }
                             Script::Inline {
+                                tag_location: _,
+                                module_location: _,
                                 module_name,
                                 content,
                                 content_location: _,
@@ -176,9 +181,9 @@ impl Template {
                 } else {
                     false
                 };
-                for (k, v) in self.globals.sub_templates.iter() {
+                for t in self.globals.sub_templates.iter() {
                     let bmc = BindingMapCollector::new();
-                    write_template_item(&k.name, w, scopes, &bmc, &v, has_scripts)?;
+                    write_template_item(&t.name.name, w, scopes, &bmc, &t.content, has_scripts)?;
                 }
                 write_template_item(
                     "",
@@ -993,7 +998,7 @@ impl Element {
                             Value::Static { value, .. } => w.expr_stmt(|w| {
                                 write!(
                                     w,
-                                    "if({}&&{}){}(R,C,{},undefined).C(C,T,E,B,F,S,J)",
+                                    "if({}&&{}){}(R,C,{},Object.create(null)).C(C,T,E,B,F,S,J)",
                                     var_key,
                                     var_target,
                                     var_target,
@@ -1012,7 +1017,7 @@ impl Element {
                                     p.value_expr(w)?;
                                     write!(w, ",K||(U?")?;
                                     p.lvalue_state_expr(w, scopes, true)?;
-                                    write!(w, ":undefined)).C(C,T,E,B,F,S,J)")?;
+                                    write!(w, ":Object.create(null))).C(C,T,E,B,F,S,J)")?;
                                     Ok(())
                                 })
                             }

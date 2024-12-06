@@ -20,10 +20,14 @@ use crate::{
 impl Stringify for Template {
     fn stringify_write<'s, W: FmtWrite>(&self, stringifier: &mut Stringifier<'s, W>) -> FmtResult {
         let globals = &self.globals;
-        for import in globals.imports.iter() {
-            stringifier.write_str(r#"<import src="#)?;
-            stringifier.write_str_name_quoted(import)?;
-            stringifier.write_str(r#"/>"#)?;
+        for i in globals.imports.iter() {
+            stringifier.write_token("<", None, &i.tag_location.start.0)?;
+            stringifier.write_str(r#"import "#)?;
+            stringifier.write_token("src", None, &i.src_location)?;
+            stringifier.write_str(r#"="#)?;
+            stringifier.write_str_name_quoted(&i.src)?;
+            stringifier.write_token("/", None, &i.tag_location.close)?;
+            stringifier.write_token(">", None, &i.tag_location.start.1)?;
         }
         stringifier.scope_names.clear();
         for script in globals.scripts.iter() {
@@ -32,44 +36,90 @@ impl Stringify for Template {
                 .push(script.module_name().name.clone());
             match script {
                 Script::Inline {
+                    tag_location,
+                    module_location,
                     module_name,
                     content,
                     content_location,
                 } => {
-                    stringifier.write_str(r#"<wxs module="#)?;
+                    stringifier.write_token("<", None, &tag_location.start.0)?;
+                    stringifier.write_str(r#"wxs "#)?;
+                    stringifier.write_token("module", None, module_location)?;
+                    stringifier.write_str(r#"="#)?;
                     stringifier.write_str_name_quoted(module_name)?;
                     if content.len() > 0 {
-                        stringifier.write_str(r#">"#)?;
+                        stringifier.write_token(">", None, &tag_location.start.1)?;
                         stringifier.write_token(
                             &content.replace("</wxs", "< /wxs"),
                             None,
                             content_location,
                         )?;
-                        stringifier.write_str(r#"</wxs>"#)?;
+                        stringifier.write_token(
+                            r#"<"#,
+                            None,
+                            &tag_location.end.as_ref().unwrap_or(&tag_location.start).0,
+                        )?;
+                        stringifier.write_token("/", None, &tag_location.close)?;
+                        stringifier.write_str(r#"wxs"#)?;
+                        stringifier.write_token(
+                            r#">"#,
+                            None,
+                            &tag_location.end.as_ref().unwrap_or(&tag_location.start).1,
+                        )?;
                     } else {
-                        stringifier.write_str(r#"/>"#)?;
+                        stringifier.write_token("/", None, &tag_location.close)?;
+                        stringifier.write_token(">", None, &tag_location.start.1)?;
                     }
                 }
-                Script::GlobalRef { module_name, path } => {
-                    stringifier.write_str(r#"<wxs module="#)?;
+                Script::GlobalRef {
+                    tag_location,
+                    module_location,
+                    module_name,
+                    src_location,
+                    src,
+                } => {
+                    stringifier.write_token("<", None, &tag_location.start.0)?;
+                    stringifier.write_str(r#"wxs "#)?;
+                    stringifier.write_token("module", None, module_location)?;
+                    stringifier.write_str(r#"="#)?;
                     stringifier.write_str_name_quoted(module_name)?;
-                    stringifier.write_str(r#" src="#)?;
-                    stringifier.write_str_name_quoted(path)?;
-                    stringifier.write_str(r#"/>"#)?;
+                    stringifier.write_str(r#" "#)?;
+                    stringifier.write_token("src", None, src_location)?;
+                    stringifier.write_str(r#"="#)?;
+                    stringifier.write_str_name_quoted(src)?;
+                    stringifier.write_token("/", None, &tag_location.close)?;
+                    stringifier.write_token(">", None, &tag_location.start.1)?;
                 }
             }
         }
-        for (template_name, nodes) in globals.sub_templates.iter() {
-            stringifier.write_str(r#"<template name="#)?;
-            stringifier.write_str_name_quoted(template_name)?;
+        for t in globals.sub_templates.iter() {
+            let tag_location = &t.tag_location;
+            stringifier.write_token("<", None, &tag_location.start.0)?;
+            stringifier.write_str(r#"template "#)?;
+            stringifier.write_token("name", None, &t.name_location)?;
+            stringifier.write_str(r#"="#)?;
+            stringifier.write_str_name_quoted(&t.name)?;
+            let nodes = &t.content;
             if nodes.len() > 0 {
                 stringifier.write_str(r#">"#)?;
                 for node in nodes {
                     node.stringify_write(stringifier)?;
                 }
-                stringifier.write_str(r#"</template>"#)?;
+                stringifier.write_token(
+                    r#"<"#,
+                    None,
+                    &tag_location.end.as_ref().unwrap_or(&tag_location.start).0,
+                )?;
+                stringifier.write_token("/", None, &tag_location.close)?;
+                stringifier.write_str(r#"template"#)?;
+                stringifier.write_token(
+                    r#">"#,
+                    None,
+                    &tag_location.end.as_ref().unwrap_or(&tag_location.start).1,
+                )?;
             } else {
-                stringifier.write_str(r#"/>"#)?;
+                stringifier.write_token("/", None, &tag_location.close)?;
+                stringifier.write_token(">", None, &tag_location.start.1)?;
             }
         }
         for node in self.content.iter() {
@@ -86,9 +136,9 @@ impl Stringify for Node {
             Node::Text(value) => value.stringify_write(stringifier)?,
             Node::Element(element) => element.stringify_write(stringifier)?,
             Node::Comment(..) => {}
-            Node::UnknownMetaTag(s, location) => {
+            Node::UnknownMetaTag(t) => {
                 stringifier.write_str(r#"<!"#)?;
-                stringifier.write_token(&escape_html_text(&s), None, &location)?;
+                stringifier.write_token(&escape_html_text(&t.content), None, &t.location)?;
                 stringifier.write_str(r#">"#)?;
             }
         }
@@ -293,7 +343,7 @@ impl Stringify for Element {
         {
             let mut is_first = true;
             for (loc, value, children) in branches {
-                stringifier.write_token("<", None, &self.start_tag_location.0)?;
+                stringifier.write_token("<", None, &self.tag_location.start.0)?;
                 stringifier.write_str("block")?;
                 let name = if is_first {
                     is_first = false;
@@ -303,7 +353,7 @@ impl Stringify for Element {
                 };
                 write_named_attr(stringifier, name, loc, value)?;
                 if !is_children_empty(children) {
-                    stringifier.write_token(">", None, &self.start_tag_location.1)?;
+                    stringifier.write_token(">", None, &self.tag_location.start.1)?;
                     for child in children {
                         child.stringify_write(stringifier)?;
                     }
@@ -311,34 +361,36 @@ impl Stringify for Element {
                         "<",
                         None,
                         &self
-                            .end_tag_location
+                            .tag_location
+                            .end
                             .as_ref()
-                            .unwrap_or(&self.start_tag_location)
+                            .unwrap_or(&self.tag_location.start)
                             .0,
                     )?;
-                    stringifier.write_token("/", None, &self.close_location)?;
+                    stringifier.write_token("/", None, &self.tag_location.close)?;
                     stringifier.write_str("block")?;
                     stringifier.write_token(
                         ">",
                         None,
                         &self
-                            .end_tag_location
+                            .tag_location
+                            .end
                             .as_ref()
-                            .unwrap_or(&self.start_tag_location)
+                            .unwrap_or(&self.tag_location.start)
                             .1,
                     )?;
                 } else {
-                    stringifier.write_token("/", None, &self.close_location)?;
-                    stringifier.write_token(">", None, &self.start_tag_location.1)?;
+                    stringifier.write_token("/", None, &self.tag_location.close)?;
+                    stringifier.write_token(">", None, &self.tag_location.start.1)?;
                 }
             }
             if let Some((loc, children)) = else_branch.as_ref() {
-                stringifier.write_token("<", None, &self.start_tag_location.0)?;
+                stringifier.write_token("<", None, &self.tag_location.start.0)?;
                 stringifier.write_str("block")?;
                 stringifier.write_str(" ")?;
                 stringifier.write_token("wx:else", None, loc)?;
                 if !is_children_empty(children) {
-                    stringifier.write_token(">", None, &self.start_tag_location.1)?;
+                    stringifier.write_token(">", None, &self.tag_location.start.1)?;
                     for child in children {
                         child.stringify_write(stringifier)?;
                     }
@@ -346,25 +398,27 @@ impl Stringify for Element {
                         "<",
                         None,
                         &self
-                            .end_tag_location
+                            .tag_location
+                            .end
                             .as_ref()
-                            .unwrap_or(&self.start_tag_location)
+                            .unwrap_or(&self.tag_location.start)
                             .0,
                     )?;
-                    stringifier.write_token("/", None, &self.close_location)?;
+                    stringifier.write_token("/", None, &self.tag_location.close)?;
                     stringifier.write_str("block")?;
                     stringifier.write_token(
                         ">",
                         None,
                         &self
-                            .end_tag_location
+                            .tag_location
+                            .end
                             .as_ref()
-                            .unwrap_or(&self.start_tag_location)
+                            .unwrap_or(&self.tag_location.start)
                             .1,
                     )?;
                 } else {
-                    stringifier.write_token("/", None, &self.close_location)?;
-                    stringifier.write_token(">", None, &self.start_tag_location.1)?;
+                    stringifier.write_token("/", None, &self.tag_location.close)?;
+                    stringifier.write_token(">", None, &self.tag_location.start.1)?;
                 }
             }
             return Ok(());
@@ -372,7 +426,7 @@ impl Stringify for Element {
 
         // write tag start
         let prev_scopes_count = stringifier.scope_names.len();
-        stringifier.write_token("<", None, &self.start_tag_location.0)?;
+        stringifier.write_token("<", None, &self.tag_location.start.0)?;
         match &self.kind {
             ElementKind::Normal {
                 tag_name,
@@ -551,7 +605,7 @@ impl Stringify for Element {
         let empty_children = vec![];
         let children = self.children().unwrap_or(&empty_children);
         if !is_children_empty(children) {
-            stringifier.write_token(">", None, &self.start_tag_location.1)?;
+            stringifier.write_token(">", None, &self.tag_location.start.1)?;
             for child in children {
                 child.stringify_write(stringifier)?;
             }
@@ -559,12 +613,13 @@ impl Stringify for Element {
                 "<",
                 None,
                 &self
-                    .end_tag_location
+                    .tag_location
+                    .end
                     .as_ref()
-                    .unwrap_or(&self.start_tag_location)
+                    .unwrap_or(&self.tag_location.start)
                     .0,
             )?;
-            stringifier.write_token("/", None, &self.close_location)?;
+            stringifier.write_token("/", None, &self.tag_location.close)?;
             match &self.kind {
                 ElementKind::Normal { tag_name, .. } => {
                     stringifier.write_ident(&tag_name, false)?;
@@ -587,14 +642,15 @@ impl Stringify for Element {
                 ">",
                 None,
                 &self
-                    .end_tag_location
+                    .tag_location
+                    .end
                     .as_ref()
-                    .unwrap_or(&self.start_tag_location)
+                    .unwrap_or(&self.tag_location.start)
                     .1,
             )?;
         } else {
-            stringifier.write_token("/", None, &self.close_location)?;
-            stringifier.write_token(">", None, &self.start_tag_location.1)?;
+            stringifier.write_token("/", None, &self.tag_location.close)?;
+            stringifier.write_token(">", None, &self.tag_location.start.1)?;
         }
 
         // reset scopes
@@ -695,6 +751,8 @@ mod test {
             r#"<template name="a"><a href="/"> A </a></template><template is="a"/>"#
         );
         let mut expects = vec![
+            (2, 12, 0, 0, None),
+            (2, 22, 0, 10, None),
             (2, 28, 0, 16, Some("a")),
             (3, 16, 0, 19, None),
             (3, 17, 0, 20, Some("a")),
@@ -706,6 +764,9 @@ mod test {
             (3, 32, 0, 35, None),
             (3, 17, 0, 36, None),
             (3, 34, 0, 37, None),
+            (4, 12, 0, 38, None),
+            (4, 13, 0, 39, None),
+            (4, 22, 0, 48, None),
             (1, 12, 0, 49, None),
             (1, 22, 0, 59, Some("is")),
             (1, 26, 0, 63, None),

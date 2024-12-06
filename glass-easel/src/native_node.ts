@@ -14,6 +14,9 @@ import { type EventListener } from './event'
 import { ENV, globalOptions } from './global_options'
 import { type ShadowRoot } from './shadow_root'
 import { NATIVE_NODE_SYMBOL, isNativeNode } from './type_symbol'
+import { type Lifetimes, type LifetimeFuncs } from './component'
+import { type GeneralBehavior } from './behavior'
+import { FuncArr, type GeneralFuncType } from './func_arr'
 
 export type NativeNodeAttributeFilter = (
   // eslint-disable-next-line no-use-before-define
@@ -24,23 +27,14 @@ export type NativeNodeAttributeFilter = (
 ) => void
 
 export interface ExtendedNativeNodeDefinition {
-  lifetimes?: {
-    // eslint-disable-next-line no-use-before-define
-    created?: (elem: NativeNode) => void
-    listenerChange?: (
-      isAdd: boolean,
-      name: string,
-      func: EventListener<unknown>,
-      options: EventListenerOptions | undefined,
-    ) => void
-  }
+  lifetimes?: Partial<Lifetimes>
+  lifetimesFromBehaviors?: GeneralBehavior[]
   attributeFilters?: Record<string, NativeNodeAttributeFilter>
   eventListeners?: Record<
     string,
     {
       capture?: boolean
-      // eslint-disable-next-line no-use-before-define
-      handler?: (elem: NativeNode, event: any) => boolean | void
+      handler: (elem: NativeNode, event: any) => boolean | void
     }
   >
 }
@@ -58,6 +52,8 @@ export class NativeNode extends Element {
   private _$attributeFilters: Record<string, NativeNodeAttributeFilter>
   /* @internal */
   private _$modelBindingListeners?: { [name: string]: ModelBindingListener }
+  /** @internal */
+  _$lifetimeFuncs: LifetimeFuncs
 
   /* istanbul ignore next */
   constructor() {
@@ -78,8 +74,6 @@ export class NativeNode extends Element {
     const node = Object.create(NativeNode.prototype) as NativeNode
     node.is = tagName
     node.stylingName = stylingName ?? tagName
-    node._$placeholderHandlerRemover = placeholderHandlerRemover
-    node._$attributeFilters = {}
     const nodeTreeContext = owner.getBackendContext()
     let backendElement: GeneralBackendElement | null = null
     if (nodeTreeContext) {
@@ -95,6 +89,9 @@ export class NativeNode extends Element {
       if (ENV.DEV) performanceMeasureEnd()
     }
     node._$initialize(false, backendElement, owner, owner._$nodeTreeContext)
+    node._$placeholderHandlerRemover = placeholderHandlerRemover
+    node._$attributeFilters = Object.create(null) as Record<string, NativeNodeAttributeFilter>
+    node._$lifetimeFuncs = Object.create(null) as LifetimeFuncs
     const ownerHost = owner.getHostNode()
     const ownerComponentOptions = ownerHost.getComponentOptions()
     const styleScope = ownerComponentOptions.styleScope ?? StyleScopeManager.globalScope()
@@ -140,24 +137,32 @@ export class NativeNode extends Element {
       if (extendedDefinition.attributeFilters !== undefined) {
         node._$attributeFilters = extendedDefinition.attributeFilters
       }
-      const lifetimes = extendedDefinition.lifetimes || {}
-      if (typeof lifetimes.listenerChange === 'function') {
-        node._$listenerChangeCb = lifetimes.listenerChange
-      }
-      if (extendedDefinition.eventListeners !== undefined) {
-        Object.keys(extendedDefinition.eventListeners).forEach((event) => {
-          if (typeof extendedDefinition.eventListeners![event]!.handler === 'function') {
-            const func = extendedDefinition.eventListeners![event]!.handler!
-            node.addListener(event, (event) => func(node, event), {
-              capture: extendedDefinition.eventListeners![event]!.capture,
-            })
-          }
+
+      const lifetimesFromBehaviors = extendedDefinition.lifetimesFromBehaviors || []
+      lifetimesFromBehaviors.forEach((behavior) => {
+        behavior.prepare()
+        const lifetimes = behavior._$lifetimes
+        for (let i = 0; i < lifetimes.length; i += 1) {
+          const { name, func } = lifetimes[i]!
+          node._$addLifetimeFunc(name, func)
+        }
+      })
+
+      const lifetimes: Partial<Lifetimes> = extendedDefinition.lifetimes || {}
+      Object.entries(lifetimes).forEach(([name, func]) => {
+        node._$addLifetimeFunc(name, func)
+      })
+
+      const eventListeners = extendedDefinition.eventListeners || {}
+      Object.entries(eventListeners).forEach(([event, listener]) => {
+        const { handler, capture } = listener
+        node.addListener(event, (event) => handler(node, event), {
+          capture,
         })
-      }
-      if (typeof lifetimes.created === 'function') {
-        lifetimes.created.call(node, node)
-      }
+      })
     }
+
+    node.triggerLifetime('created', [])
 
     return node
   }
@@ -177,6 +182,20 @@ export class NativeNode extends Element {
     this._$attributeFilters[camelCase]!(this, camelCase, propValue, (newPropValue) =>
       callback(camelCase, newPropValue),
     )
+  }
+
+  private _$addLifetimeFunc(name: string, func: GeneralFuncType) {
+    if (this._$lifetimeFuncs[name]) {
+      this._$lifetimeFuncs[name]!.add(func)
+    } else {
+      const funcArr = (this._$lifetimeFuncs[name] = new FuncArr('lifetime'))
+      funcArr.add(func)
+    }
+  }
+
+  triggerLifetime(name: string, args: Parameters<GeneralFuncType>) {
+    const f = this._$lifetimeFuncs[name]
+    if (f) f.call(this, args, this.is)
   }
 
   setModelBindingListener(propName: string, listener: ModelBindingListener) {

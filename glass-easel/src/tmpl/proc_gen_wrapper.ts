@@ -22,11 +22,11 @@ export type UpdatePathTreeNode = true | { [key: string]: UpdatePathTreeNode } | 
 export type UpdatePathTreeRoot = UpdatePathTreeNode | undefined
 
 export type ChangePropListener<T> = (
-  this: GeneralComponent,
+  this: null,
   newValue: T,
   oldValue: T,
   host: GeneralComponent,
-  elem: GeneralComponent,
+  elem: Element,
 ) => void
 
 export type ChangePropFilter = <T>(
@@ -952,14 +952,28 @@ export class ProcGenWrapper {
     return elem
   }
 
+  private tryCallPropertyChangeListener(elem: Element, name: string, v: unknown) {
+    const tmplArgs = getTmplArgs(elem)
+    if (tmplArgs.changeProp?.[name]) {
+      const lv = tmplArgs.changeProp[name]!
+      const oldValue = lv.oldValue
+      if (oldValue !== v) {
+        lv.oldValue = v
+        const host = elem.ownerShadowRoot!.getHostNode()
+        safeCallback('Property Change Observer', lv.listener, null, [v, oldValue, host, elem], host)
+      }
+    }
+  }
+
   // set slot
   // (not used any more, leaving for compatibilities)
-  s(elem: Element, v: string) {
+  s = (elem: Element, v: string) => {
     elem.slot = v
+    this.tryCallPropertyChangeListener(elem, 'slot', v)
   }
 
   // set slot value
-  l(elem: Element, name: string, value: unknown, generalLvaluePath?: DataPath | null) {
+  l = (elem: Element, name: string, value: unknown, generalLvaluePath?: DataPath | null) => {
     if (this.shadowRoot.getSlotMode() === SlotMode.Dynamic) {
       this.shadowRoot.replaceSlotValue(elem, name, value)
     } else {
@@ -972,15 +986,17 @@ export class ProcGenWrapper {
         )
       }
     }
+    this.tryCallPropertyChangeListener(elem, name, value)
   }
 
   // set id
-  i(elem: Element, v: string) {
+  i = (elem: Element, v: string) => {
     elem.id = v
+    this.tryCallPropertyChangeListener(elem, 'id', v)
   }
 
   // set class or external classes named `class`
-  c(elem: Element, v: string | string[]) {
+  c = (elem: Element, v: string | string[]) => {
     if (isComponent(elem)) {
       // "class" itself can also be an external class
       const hasExternalClass = elem.hasExternalClass('class')
@@ -989,10 +1005,11 @@ export class ProcGenWrapper {
       }
     }
     elem.setNodeClass(v)
+    this.tryCallPropertyChangeListener(elem, 'class', v)
   }
 
   // set style or property named `style`
-  y(elem: Element, v: string) {
+  y = (elem: Element, v: string) => {
     if (isComponent(elem) && Component.hasProperty(elem, 'style')) {
       const nodeDataProxy = Component.getDataProxy(elem)
       const camelName = dashToCamelCase('style')
@@ -1000,20 +1017,21 @@ export class ProcGenWrapper {
     } else {
       elem.setNodeStyle(dataValueToString(v), StyleSegmentIndex.MAIN)
     }
+    this.tryCallPropertyChangeListener(elem, 'style', v)
   }
 
   // set dataset
-  d(elem: Element, name: string, v: unknown) {
+  d = (elem: Element, name: string, v: unknown) => {
     elem.setDataset(name, v)
   }
 
   // set mark
-  m(elem: Element, name: string, v: unknown) {
+  m = (elem: Element, name: string, v: unknown) => {
     elem.setMark(name, v)
   }
 
   // set event handler
-  v(
+  v = (
     elem: Element,
     evName: string,
     v: unknown,
@@ -1022,7 +1040,7 @@ export class ProcGenWrapper {
     capture: boolean,
     isDynamic: boolean,
     generalLvaluePath?: DataPath | null,
-  ) {
+  ) => {
     const handler = typeof v === 'function' ? v : dataValueToString(v)
     const listener = this.eventListenerWrapper(
       elem,
@@ -1087,22 +1105,6 @@ export class ProcGenWrapper {
             })
           }
         }
-        const tmplArgs = getTmplArgs(elem)
-        if (tmplArgs.changeProp?.[name]) {
-          const lv = tmplArgs.changeProp[name]!
-          const oldValue = lv.oldValue
-          if (oldValue !== v) {
-            lv.oldValue = v
-            const host = elem.ownerShadowRoot!.getHostNode()
-            safeCallback(
-              'Property Change Observer',
-              lv.listener,
-              host.getMethodCaller(),
-              [v, oldValue, host, elem],
-              elem,
-            )
-          }
-        }
       } else if (elem.hasExternalClass(name)) {
         elem.setExternalClass(name, v as string)
       } else {
@@ -1138,15 +1140,17 @@ export class ProcGenWrapper {
         })
       }
     }
+    this.tryCallPropertyChangeListener(elem, name, v)
   }
 
   // update a attribute
-  a(elem: Element, name: string, v: unknown) {
+  a = (elem: Element, name: string, v: unknown) => {
     elem.updateAttribute(name, v)
+    this.tryCallPropertyChangeListener(elem, name, v)
   }
 
   // set a worklet directive value
-  wl(elem: Element, name: string, value: unknown) {
+  wl = (elem: Element, name: string, value: unknown) => {
     if (isComponent(elem)) {
       elem.triggerWorkletChangeLifetime(name, value)
     } else {
@@ -1155,23 +1159,19 @@ export class ProcGenWrapper {
   }
 
   // add a change property binding
-  p(
+  p = (
     elem: Element,
     name: string,
     v: ChangePropListener<unknown>,
     generalLvaluePath?: DataPath | null,
-  ) {
-    if (isComponent(elem)) {
-      if (Component.hasProperty(elem, name)) {
-        const tmplArgs = getTmplArgs(elem)
-        if (!tmplArgs.changeProp) {
-          tmplArgs.changeProp = Object.create(null) as typeof tmplArgs.changeProp
-        }
-        tmplArgs.changeProp![name] = {
-          listener: this.changePropFilter(v, generalLvaluePath),
-          oldValue: (elem.data as { [k: string]: DataValue })[name],
-        }
-      }
+  ) => {
+    const tmplArgs = getTmplArgs(elem)
+    if (!tmplArgs.changeProp) {
+      tmplArgs.changeProp = Object.create(null) as typeof tmplArgs.changeProp
+    }
+    tmplArgs.changeProp![name] = {
+      listener: this.changePropFilter(v, generalLvaluePath),
+      oldValue: undefined,
     }
   }
 

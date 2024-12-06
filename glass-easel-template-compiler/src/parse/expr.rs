@@ -7,7 +7,23 @@ use crate::binding_map::{BindingMapCollector, BindingMapKeys};
 use super::{ParseErrorKind, ParseState, Position, TemplateStructure};
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum Expression {
+    /// A reference to a data scopes.
+    /// 
+    /// Some syntax could generate a new variable that can be used in expressions.
+    /// This variable is called a "scope".
+    /// These syntax includes:
+    /// 
+    /// - a script module (a.k.a. `<wxs />` element) introduces its name that can be used in the whole file;
+    /// - a `wx:for` introduces `item` and `index` that can be used in its subtree;
+    /// - each slot value (a.k.a. `slot:` attribute) introduces a new scope that can be used in the subtree of its element.
+    /// 
+    /// These scopes are indexed based on following rules.
+    /// 
+    /// - In an expression, its usable scopes are the scopes introduced by all its ancestors, where closer parents has larger indices.
+    /// - For any `wx:for` parent, `item` has a smaller index than `index`.
+    /// - The script module scopes are file-global so they always occupies the smallest indices.
     ScopeRef {
         location: Range<Position>,
         index: usize,

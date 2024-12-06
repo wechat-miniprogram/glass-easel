@@ -549,11 +549,9 @@ export class Component<
     const comp = Object.create(proto) as ComponentInstance<TData, TProperty, TMethod>
     if (ENV.DEV) performanceMeasureStart('component.create', comp)
     comp._$genericImpls = genericImpls
-    comp._$placeholderHandlerRemover = placeholderHandlerRemover
     comp._$external = external
     comp.tagName = tagName
     comp._$methodCaller = comp
-    comp._$virtual = virtualHost
 
     // check shared style scope
     const ownerSpace = behavior.ownerSpace
@@ -612,6 +610,7 @@ export class Component<
       owner,
       owner?._$nodeTreeContext ?? nodeTreeContext!,
     )
+    comp._$placeholderHandlerRemover = placeholderHandlerRemover
 
     const ownerHost = owner ? owner.getHostNode() : undefined
     const ownerComponentOptions = ownerHost?.getComponentOptions()
