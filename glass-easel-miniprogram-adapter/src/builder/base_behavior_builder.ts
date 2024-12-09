@@ -103,6 +103,25 @@ export class BaseBehaviorBuilder<
     return this as any
   }
 
+  staticData<T extends DataList>(
+    data: typeUtils.NewFieldList<AllData<TData, TProperty>, T>,
+  ): ResolveBehaviorBuilder<
+    BaseBehaviorBuilder<
+      T,
+      TData & T,
+      TProperty,
+      TMethod,
+      TChainingFilter,
+      TPendingChainingFilter,
+      TComponentExport,
+      TExtraThisFields
+    >,
+    TChainingFilter
+  > {
+    this._$.staticData(data)
+    return this as any
+  }
+
   property<N extends string, T extends PropertyType, V extends PropertyTypeToValueType<T>>(
     name: N,
     def: N extends keyof (TData & TProperty) ? never : typeUtils.PropertyListItem<T, V>,

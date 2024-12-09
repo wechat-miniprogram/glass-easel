@@ -133,7 +133,7 @@ export class BehaviorBuilder<
    * Add some template data fields
    *
    * It does not support raw data, but a `gen` function which returns the new data fields.
-   * The `gen` function executes once during component creation.
+   * The `gen` function executes once during component instance creation.
    */
   override data<T extends DataList>(
     gen: () => typeUtils.NewFieldList<AllData<TData, TProperty>, T>,
@@ -151,6 +151,29 @@ export class BehaviorBuilder<
     TChainingFilter
   > {
     return super.data(gen) as any
+  }
+
+  /**
+   * Add some template data fields
+   *
+   * The data should be JSON-compatible, and will be cloned during component creation.
+   */
+  override staticData<T extends DataList>(
+    data: typeUtils.NewFieldList<AllData<TData, TProperty>, T>,
+  ): ResolveBehaviorBuilder<
+    BehaviorBuilder<
+      T,
+      TData & T,
+      TProperty,
+      TMethod,
+      TChainingFilter,
+      TPendingChainingFilter,
+      TComponentExport,
+      TExtraThisFields
+    >,
+    TChainingFilter
+  > {
+    return super.staticData(data) as any
   }
 
   /**
