@@ -63,7 +63,6 @@ export class BaseBehaviorBuilder<
     return this
   }
 
-  /** Set the export value when the component is being selected */
   export<TNewComponentExport>(
     f: (this: GeneralComponent, source: GeneralComponent | null) => TNewComponentExport,
   ): ResolveBehaviorBuilder<
