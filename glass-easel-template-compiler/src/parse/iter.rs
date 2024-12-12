@@ -25,15 +25,22 @@ impl<'a> Iterator for ChildrenIter<'a> {
             | ElementKind::Pure { children, .. }
             | ElementKind::For { children, .. } => {
                 let ret = children.get(self.cur);
-                if ret.is_some() { self.cur += 1; }
+                if ret.is_some() {
+                    self.cur += 1;
+                }
                 ret
             }
-            ElementKind::If { branches, else_branch } => {
+            ElementKind::If {
+                branches,
+                else_branch,
+            } => {
                 let ret = loop {
                     if self.cur_branch >= branches.len() {
                         if let Some((_, children)) = else_branch {
                             let ret = children.get(self.cur);
-                            if ret.is_some() { self.cur += 1; }
+                            if ret.is_some() {
+                                self.cur += 1;
+                            }
                             break ret;
                         }
                         break None;
@@ -60,7 +67,10 @@ impl<'a> Iterator for ChildrenIter<'a> {
             ElementKind::Normal { children, .. }
             | ElementKind::Pure { children, .. }
             | ElementKind::For { children, .. } => children.len(),
-            ElementKind::If { branches, else_branch } => {
+            ElementKind::If {
+                branches,
+                else_branch,
+            } => {
                 branches.iter().map(|x| x.2.len()).sum::<usize>()
                     + else_branch.iter().map(|x| x.1.len()).sum::<usize>()
             }

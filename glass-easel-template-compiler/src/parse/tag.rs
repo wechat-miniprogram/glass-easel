@@ -134,15 +134,21 @@ impl Template {
     }
 
     pub fn global_scopes(&self) -> Vec<&StrName> {
-        self.globals.scripts.iter().map(|x| x.module_name()).collect()
+        self.globals
+            .scripts
+            .iter()
+            .map(|x| x.module_name())
+            .collect()
     }
 
     pub fn direct_dependencies<'a>(&'a self) -> impl Iterator<Item = String> + 'a {
-        let imports = self.globals
+        let imports = self
+            .globals
             .imports
             .iter()
             .map(move |p| crate::path::resolve(&self.path, &p.src.name));
-        let includes = self.globals
+        let includes = self
+            .globals
             .includes
             .iter()
             .map(move |p| crate::path::resolve(&self.path, &p.src.name));
@@ -299,12 +305,18 @@ impl Node {
                 if ps.consume_str("--").is_some() {
                     let s = ps.skip_until_after("-->").unwrap_or("");
                     let location = range.start..ps.position();
-                    ret.push(Node::Comment(Comment { content: s.to_string(), location }));
+                    ret.push(Node::Comment(Comment {
+                        content: s.to_string(),
+                        location,
+                    }));
                 } else {
                     let s = ps.skip_until_after(">").unwrap_or("");
                     let location = range.start..ps.position();
                     ps.add_warning(ParseErrorKind::UnknownMetaTag, location.clone());
-                    ret.push(Node::UnknownMetaTag(UnknownMetaTag { content: s.to_string(), location }));
+                    ret.push(Node::UnknownMetaTag(UnknownMetaTag {
+                        content: s.to_string(),
+                        location,
+                    }));
                 }
                 continue;
             }
@@ -399,9 +411,7 @@ pub enum ElementKind {
         data: (Range<Position>, Value),
     },
     #[non_exhaustive]
-    Include {
-        path: (Range<Position>, StrName),
-    },
+    Include { path: (Range<Position>, StrName) },
     #[non_exhaustive]
     Slot {
         name: (Range<Position>, Value),
@@ -422,17 +432,20 @@ impl TemplateStructure for Element {
 impl Element {
     pub fn introduced_scopes(&self) -> Vec<&StrName> {
         match &self.kind {
-            ElementKind::Normal { common, .. }
-            | ElementKind::Slot { common, .. } => {
+            ElementKind::Normal { common, .. } | ElementKind::Slot { common, .. } => {
                 common.slot_value_refs.iter().map(|x| &x.value).collect()
             }
-            ElementKind::Pure { slot_value_refs, .. } => {
-                slot_value_refs.iter().map(|x| &x.value).collect()
-            }
-            ElementKind::For { item_name, index_name, .. } => {
+            ElementKind::Pure {
+                slot_value_refs, ..
+            } => slot_value_refs.iter().map(|x| &x.value).collect(),
+            ElementKind::For {
+                item_name,
+                index_name,
+                ..
+            } => {
                 vec![&item_name.1, &index_name.1]
             }
-            | ElementKind::If { .. }
+            ElementKind::If { .. }
             | ElementKind::TemplateRef { .. }
             | ElementKind::Include { .. } => vec![],
         }
@@ -737,7 +750,9 @@ impl Element {
                                 AttrPrefixKind::Src(suffix)
                             }
                             (ElementKind::Include { .. }, "module") => match external_tag_type {
-                                ExternalTagKind::Include | ExternalTagKind::Import => AttrPrefixKind::Normal,
+                                ExternalTagKind::Include | ExternalTagKind::Import => {
+                                    AttrPrefixKind::Normal
+                                }
                                 ExternalTagKind::Script => AttrPrefixKind::Module,
                             },
                             (ElementKind::Slot { .. }, "name") => AttrPrefixKind::SlotName,
@@ -2067,7 +2082,13 @@ impl Element {
                 {
                     ps.add_warning(ParseErrorKind::DuplicatedName, module_name.location());
                 } else {
-                    script_module_content = Some((module_location, module_name, path, content, content_location));
+                    script_module_content = Some((
+                        module_location,
+                        module_name,
+                        path,
+                        content,
+                        content_location,
+                    ));
                 }
             } else {
                 ps.add_warning(ParseErrorKind::MissingModuleName, tag_name.location());
@@ -2161,30 +2182,30 @@ impl Element {
 
         // write resources list
         match &element {
-            ElementKind::Include { path, .. } => {
-                match external_tag_type {
-                    ExternalTagKind::Include => {
-                        globals.includes.push(IncludeElement {
-                            tag_location: tag_location.clone(),
-                            src_location: path.0.clone(),
-                            src: path.1.clone(),
-                        });
-                    }
-                    ExternalTagKind::Import => {
-                        globals.imports.push(ImportElement {
-                            tag_location: tag_location.clone(),
-                            src_location: path.0.clone(),
-                            src: path.1.clone(),
-                        });
-                    }
-                    ExternalTagKind::Script => {}
+            ElementKind::Include { path, .. } => match external_tag_type {
+                ExternalTagKind::Include => {
+                    globals.includes.push(IncludeElement {
+                        tag_location: tag_location.clone(),
+                        src_location: path.0.clone(),
+                        src: path.1.clone(),
+                    });
                 }
-            }
+                ExternalTagKind::Import => {
+                    globals.imports.push(ImportElement {
+                        tag_location: tag_location.clone(),
+                        src_location: path.0.clone(),
+                        src: path.1.clone(),
+                    });
+                }
+                ExternalTagKind::Script => {}
+            },
             _ => {}
         }
 
         // write script module
-        if let Some((module_location, module_name, path, content, content_location)) = script_module_content {
+        if let Some((module_location, module_name, path, content, content_location)) =
+            script_module_content
+        {
             if path.1.name.is_empty() {
                 globals.scripts.push(Script::Inline {
                     tag_location: tag_location.clone(),
@@ -2223,14 +2244,12 @@ impl Element {
             {
                 ps.add_warning(ParseErrorKind::DuplicatedName, name.location());
             } else {
-                globals
-                    .sub_templates
-                    .push(TemplateDefinition {
-                        tag_location: tag_location.clone(),
-                        name_location: loc,
-                        name: name.clone(),
-                        content: new_children,
-                    });
+                globals.sub_templates.push(TemplateDefinition {
+                    tag_location: tag_location.clone(),
+                    name_location: loc,
+                    name: name.clone(),
+                    content: new_children,
+                });
             }
         } else {
             let wrap_children = |mut element: Element| -> Vec<Node> {
@@ -2322,7 +2341,12 @@ impl Element {
                             unreachable!();
                         };
                         branches.push(branch);
-                        if_tag_location.end = Some(tag_location.end.clone().unwrap_or(tag_location.start.clone()));
+                        if_tag_location.end = Some(
+                            tag_location
+                                .end
+                                .clone()
+                                .unwrap_or(tag_location.start.clone()),
+                        );
                         None
                     } else {
                         ps.add_warning(ParseErrorKind::InvalidAttribute, location);
@@ -2340,7 +2364,12 @@ impl Element {
                             unreachable!();
                         };
                         *else_branch = Some(branch);
-                        if_tag_location.end = Some(tag_location.end.clone().unwrap_or(tag_location.start.clone()));
+                        if_tag_location.end = Some(
+                            tag_location
+                                .end
+                                .clone()
+                                .unwrap_or(tag_location.start.clone()),
+                        );
                         None
                     } else {
                         ps.add_warning(ParseErrorKind::InvalidAttribute, location);
@@ -2787,8 +2816,12 @@ impl Ident {
     /// Check if a `str` is a valid identifier.
     pub fn is_valid(s: &str) -> bool {
         let mut chars = s.chars();
-        let Some(first) = chars.next() else { return false };
-        if !Self::is_start_char(first) { return false; }
+        let Some(first) = chars.next() else {
+            return false;
+        };
+        if !Self::is_start_char(first) {
+            return false;
+        }
         for ch in chars {
             if !Self::is_following_char(ch) {
                 return false;
