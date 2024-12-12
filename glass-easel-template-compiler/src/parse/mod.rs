@@ -4,6 +4,8 @@ use super::binding_map;
 use serde::{Deserialize, Serialize};
 pub use tag::Template;
 
+pub mod iter;
+
 #[cfg(test)]
 macro_rules! case {
     ($src:expr, $expect:expr $(, $msg:expr, $range:expr)*) => {

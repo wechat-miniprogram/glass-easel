@@ -63,7 +63,6 @@ export class BaseBehaviorBuilder<
     return this
   }
 
-  /** Set the export value when the component is being selected */
   export<TNewComponentExport>(
     f: (this: GeneralComponent, source: GeneralComponent | null) => TNewComponentExport,
   ): ResolveBehaviorBuilder<
@@ -100,6 +99,25 @@ export class BaseBehaviorBuilder<
     TChainingFilter
   > {
     this._$.data(gen)
+    return this as any
+  }
+
+  staticData<T extends DataList>(
+    data: typeUtils.NewFieldList<AllData<TData, TProperty>, T>,
+  ): ResolveBehaviorBuilder<
+    BaseBehaviorBuilder<
+      T,
+      TData & T,
+      TProperty,
+      TMethod,
+      TChainingFilter,
+      TPendingChainingFilter,
+      TComponentExport,
+      TExtraThisFields
+    >,
+    TChainingFilter
+  > {
+    this._$.staticData(data)
     return this as any
   }
 

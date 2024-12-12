@@ -877,6 +877,30 @@ describe('define', () => {
     expect(callOrder).toStrictEqual([2, 1])
   })
 
+  test('chaining static data', () => {
+    const env = new MiniProgramEnv()
+    const codeSpace = env.createCodeSpace('', true)
+
+    codeSpace.addComponentStaticConfig('path/to/comp', {})
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
+        <div>{{ text }}</div>
+      `),
+    )
+    codeSpace.componentEnv('path/to/comp', ({ Component }) => {
+      Component()
+        .staticData({
+          text: 'abc',
+        })
+        .register()
+    })
+
+    const ab = env.associateBackend()
+    const root = ab.createRoot('body', codeSpace, 'path/to/comp')
+    expect(domHtml(root.getComponent())).toBe('<div>abc</div>')
+  })
+
   test('chaining observer', () => {
     const env = new MiniProgramEnv()
     const codeSpace = env.createCodeSpace('', true)
