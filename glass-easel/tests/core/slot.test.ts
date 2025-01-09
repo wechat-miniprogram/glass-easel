@@ -1061,6 +1061,59 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         matchElementWithDom(parentElem)
       })
 
+      test('should support slot props with wx:for', () => {
+        const child = componentSpace
+          .define()
+          .options({ dynamicSlots: true })
+          .data(() => ({
+            arr: [1, 2],
+          }))
+          .definition({
+            template: tmpl('<slot wx:for="{{arr}}" wx:key="*this" c="{{item}}" />'),
+          })
+          .registerComponent()
+
+        const parent = componentSpace
+          .define()
+          .usingComponents({ child })
+          .definition({
+            template: tmpl(`
+              <child>
+                <block slot:c>
+                  <s>{{c}}</s>
+                </block>
+              </child>
+            `),
+          })
+          .registerComponent()
+
+        const parentElem = glassEasel.Component.createWithContext(
+          'root',
+          parent.general(),
+          testBackend,
+        ).asInstanceOf(parent)!
+        const childElem = parentElem.getShadowRoot()!.childNodes[0]!.asInstanceOf(child)!
+
+        expect(domHtml(parentElem)).toBe('<child><s>1</s><s>2</s></child>')
+        matchElementWithDom(parentElem)
+
+        childElem.setData({ arr: [2, 1] })
+        expect(domHtml(parentElem)).toBe('<child><s>2</s><s>1</s></child>')
+        matchElementWithDom(parentElem)
+
+        childElem.spliceArrayDataOnPath(['arr'], 1, 0, [3, 4])
+        childElem.spliceArrayDataOnPath(['arr'], 4, 0, [5])
+        childElem.applyDataUpdates()
+        expect(domHtml(parentElem)).toBe('<child><s>2</s><s>3</s><s>4</s><s>1</s><s>5</s></child>')
+        matchElementWithDom(parentElem)
+
+        childElem.spliceArrayDataOnPath(['arr'], 0, 1, [])
+        childElem.spliceArrayDataOnPath(['arr'], 2, 1, [])
+        childElem.applyDataUpdates()
+        expect(domHtml(parentElem)).toBe('<child><s>3</s><s>4</s><s>5</s></child>')
+        matchElementWithDom(parentElem)
+      })
+
       test('should support duplicate slot props', () => {
         let ops: Array<[number, string]> = []
 

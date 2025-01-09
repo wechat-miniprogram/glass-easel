@@ -745,26 +745,28 @@ export class ProcGenWrapper {
           if (childNodes.length) elem.insertChildren(childNodes, -1)
         },
         (slots) => {
-          if (!slots.length || !slots[0]!.slotNodes!.length) return
-          slots.sort(
+          if (!slots.length) return
+          const sortedSlots: Element[] = []
+          for (let i = 0; i < slots.length; i += 1) {
+            // ignore empty slots
+            if (slots[i]!.slotNodes!.length) sortedSlots.push(slots[i]!)
+          }
+          sortedSlots.sort(
             (slot1, slot2) => slot1.slotNodes![0]!.parentIndex - slot2.slotNodes![0]!.parentIndex,
           )
-          let l = -Infinity
-          let r = -Infinity
-          for (let i = 0; i < slots.length; i += 1) {
-            const slotNodes = slots[i]!.slotNodes!
+          let l = 0
+          let r = 0
+          for (let i = 0; i < sortedSlots.length; i += 1) {
+            const slotNodes = sortedSlots[i]!.slotNodes!
             const firstIndex = slotNodes[0]!.parentIndex
-            if (r === firstIndex) {
-              r = firstIndex + slotNodes.length
-            } else {
-              if (l >= 0) {
-                elem.removeChildren(l, r - l)
-              }
+            const lastIndex = slotNodes.findLast((node) => node.parentNode === elem)!.parentIndex
+            if (r !== firstIndex) {
+              if (l >= 0) elem.removeChildren(l, r - l)
               l = firstIndex
-              r = firstIndex + slotNodes.length
             }
+            r = lastIndex + 1
           }
-          if (l >= 0) elem.removeChildren(l, r - l)
+          if (l !== r) elem.removeChildren(l, r - l)
         },
         (slot, slotValues, slotValueUpdatePathTrees) => {
           const slotName = slot._$slotName || ''
