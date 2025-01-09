@@ -17,6 +17,7 @@ import type {
   templateEngine,
   BehaviorBuilder,
   backend as GlassEaselBackend,
+  SlotMode,
 } from 'glass-easel'
 
 const dashToCamelCase = (dash: string): string =>
@@ -216,6 +217,8 @@ export class ViewController {
     styleScope: number,
     extraStyleScope: number | null,
     externalClasses: string[] | undefined,
+    slotMode: SlotMode | null,
+    writeIdToDOM: boolean,
     chainDefinition: ((def: BehaviorBuilder) => BehaviorBuilder) | undefined,
     cb: (component: GeneralComponent) => void,
   ): void {
@@ -234,10 +237,12 @@ export class ViewController {
     const componentSpace = this._componentSpace
     const compDefBuilder = componentSpace.define().definition({
       options: {
-        directSlots: !external,
+        multipleSlots: slotMode === _glassEasel.SlotMode.Multiple,
+        dynamicSlots: slotMode === _glassEasel.SlotMode.Dynamic,
         virtualHost,
         styleScope: actualStyleScope,
         extraStyleScope: actualExtraStyleScope,
+        writeIdToDOM,
         templateEngine: EmptyTemplateEngine,
       },
       externalClasses,
@@ -348,37 +353,13 @@ export class ViewController {
     _glassEasel.Element.setSlotName(element, name)
   }
 
-  setContainingSlot(node: Node, slot: Element | null | undefined): void {
+  setSlotElement(node: Node, slot: Element | null): void {
     const { _glassEasel } = this
-    _glassEasel.Element._$updateContainingSlot(node, slot)
+    _glassEasel.Element.setSlotElement(node, slot)
   }
 
-  reassignContainingSlot(node: Node, oldSlot: Element | null, newSlot: Element | null): void {
-    const { _glassEasel } = this
-    _glassEasel.Element.insertChildReassign(
-      node.parentNode!,
-      node,
-      oldSlot,
-      newSlot,
-      node.parentIndex,
-    )
-  }
-
-  spliceBeforeSlotNodes(slot: Element, before: number, count: number, list: Fragment): void {
-    const { _glassEasel } = this
-    _glassEasel.Element._$spliceSlotNodes(slot, before, count, list.childNodes)
-    list.childNodes = []
-  }
-
-  spliceAppendSlotNodes(slot: Element, list: Fragment): void {
-    const { _glassEasel } = this
-    _glassEasel.Element._$spliceSlotNodes(slot, -1, 0, list.childNodes)
-    list.childNodes = []
-  }
-
-  spliceRemoveSlotNodes(slot: Element, before: number, count: number): void {
-    const { _glassEasel } = this
-    _glassEasel.Element._$spliceSlotNodes(slot, before, count, undefined)
+  setExternalSlot(component: GeneralComponent, slot: Element): void {
+    // TODO
   }
 
   setInheritSlots(element: Element): void {
@@ -429,7 +410,7 @@ export class ViewController {
     const { _glassEasel } = this
     const Component = _glassEasel.Component
     const camelName = dashToCamelCase(name)
-    if (element instanceof Component && _glassEasel.Component.hasProperty(element, camelName)) {
+    if (Component.isComponent(element) && Component.hasProperty(element, camelName)) {
       element.replaceDataOnPath([camelName], undefined)
       element.applyDataUpdates()
     } else {
@@ -446,11 +427,17 @@ export class ViewController {
   }
 
   setModelBindingStat(
-    nativeNode: NativeNode,
+    element: Element,
     attributeName: string,
     listener: (newValue: unknown) => void,
   ): void {
-    nativeNode.setModelBindingListener(attributeName, listener)
+    const { _glassEasel } = this
+    if (_glassEasel.Component.isComponent(element)) {
+      const nodeDataProxy = _glassEasel.Component.getDataProxy(element)
+      nodeDataProxy.setModelBindingListener(attributeName, listener)
+    } else if (_glassEasel.NativeNode.isNativeNode(element)) {
+      element.setModelBindingListener(attributeName, listener)
+    }
   }
 
   getBoundingClientRect(

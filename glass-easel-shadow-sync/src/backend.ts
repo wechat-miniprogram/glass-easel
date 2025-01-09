@@ -13,6 +13,7 @@ import type {
   ShadowedEvent,
   StyleScopeManager,
   templateEngine,
+  SlotMode,
 } from 'glass-easel'
 import { type Channel } from './message_channel'
 import { type IDGenerator } from './utils'
@@ -71,6 +72,8 @@ export class ShadowDomElement implements GlassEaselBackend.Element {
     styleScope: number,
     extraStyleScope: number | null,
     externalClasses: string[] | undefined,
+    slotMode: SlotMode | null,
+    writeIdToDOM: boolean,
     ownerShadowRoot: ShadowDomShadowRoot,
   ): ShadowDomElement {
     context._checkStyleScope(styleScope)
@@ -85,6 +88,8 @@ export class ShadowDomElement implements GlassEaselBackend.Element {
       styleScope,
       extraStyleScope,
       externalClasses,
+      slotMode,
+      writeIdToDOM,
       ownerShadowRoot._id,
     )
     return componentElement
@@ -98,6 +103,8 @@ export class ShadowDomElement implements GlassEaselBackend.Element {
     styleScope: number,
     extraStyleScope: number | null,
     externalClasses: string[] | undefined,
+    slotMode: SlotMode,
+    writeIdToDOM: boolean,
     ownerShadowRoot: ShadowDomShadowRoot,
   ): ShadowDomElement {
     return ShadowDomElement._prepareComponent(
@@ -110,6 +117,8 @@ export class ShadowDomElement implements GlassEaselBackend.Element {
       styleScope,
       extraStyleScope,
       externalClasses,
+      slotMode,
+      writeIdToDOM,
       ownerShadowRoot,
     )
   }
@@ -230,28 +239,12 @@ export class ShadowDomElement implements GlassEaselBackend.Element {
     this._context.channel.setSlotName(this._id, name)
   }
 
-  setContainingSlot(slot: ShadowDomElement | undefined | null): void {
-    this._context.channel.setContainingSlot(this._id, slot ? slot._id : slot)
+  setSlotElement(slot: ShadowDomElement | null): void {
+    this._context.channel.setSlotElement(this._id, slot ? slot._id : slot)
   }
 
-  reassignContainingSlot(oldSlot: ShadowDomElement | null, newSlot: ShadowDomElement | null): void {
-    this._context.channel.reassignContainingSlot(
-      this._id,
-      oldSlot ? oldSlot._id : oldSlot,
-      newSlot ? newSlot._id : newSlot,
-    )
-  }
-
-  spliceBeforeSlotNodes(before: number, deleteCount: number, list: ShadowDomElement): void {
-    this._context.channel.spliceBeforeSlotNodes(this._id, before, deleteCount, list._id)
-  }
-
-  spliceAppendSlotNodes(list: ShadowDomElement): void {
-    this._context.channel.spliceAppendSlotNodes(this._id, list._id)
-  }
-
-  spliceRemoveSlotNodes(before: number, deleteCount: number): void {
-    this._context.channel.spliceRemoveSlotNodes(this._id, before, deleteCount)
+  setExternalSlot(slot: ShadowDomElement): void {
+    this._context.channel.setExternalSlot(this._id, slot._id)
   }
 
   setInheritSlots(): void {
@@ -384,6 +377,8 @@ export class ShadowDomShadowRoot
     styleScope: number,
     extraStyleScope: number | null,
     externalClasses: string[] | undefined,
+    slotMode: SlotMode,
+    writeIdToDOM: boolean,
   ): ShadowDomElement {
     return ShadowDomElement.createComponent(
       this._context,
@@ -393,6 +388,8 @@ export class ShadowDomShadowRoot
       styleScope,
       extraStyleScope,
       externalClasses,
+      slotMode,
+      writeIdToDOM,
       this,
     )
   }
@@ -662,6 +659,8 @@ export class ShadowDomBackendContext implements GlassEaselBackend.Context {
               options.styleScope ?? glassEasel.StyleScopeManager.globalScope(),
               options.extraStyleScope,
               Object.keys(elem.getExternalClasses()),
+              elem.getShadowRoot()?.getSlotMode() ?? null,
+              options.writeIdToDOM,
               ownerShadowRoot,
             )
           } else {

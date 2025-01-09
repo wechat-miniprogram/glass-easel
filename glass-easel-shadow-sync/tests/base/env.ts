@@ -9,19 +9,17 @@ import { getLinearIdGenerator } from '../../src/utils'
 import { MessageChannelViewSide, ViewController } from '../../src/view_controller'
 
 export { execWithWarn, multiTmpl, tmpl } from '../../../glass-easel/tests/base/env'
-;(['tagName', 'innerHTML', 'nodeType', 'textContent', 'TEXT_NODE'] as (keyof Element)[]).forEach(
-  (key) => {
-    Object.defineProperty(ShadowDomElement.prototype, key, {
-      get(this: ShadowDomElement) {
-        return (
-          (
-            messageChannelViewSide.getNode(this._id) as glassEasel.Node
-          ).getBackendElement() as unknown as Element
-        )[key]
-      },
-    })
-  },
-)
+;(['tagName', 'nodeType', 'textContent', 'TEXT_NODE'] as (keyof Element)[]).forEach((key) => {
+  Object.defineProperty(ShadowDomElement.prototype, key, {
+    get(this: ShadowDomElement) {
+      return (
+        (
+          messageChannelViewSide.getNode(this._id) as glassEasel.Node
+        ).getBackendElement() as unknown as Element
+      )[key]
+    },
+  })
+})
 
 Object.defineProperties(ShadowDomElement.prototype, {
   getAttribute: {
@@ -53,6 +51,15 @@ Object.defineProperties(ShadowDomElement.prototype, {
       return childNodes
     },
   },
+  innerHTML: {
+    get(this: ShadowDomElement) {
+      const nodeOnView = (
+        messageChannelViewSide.getNode(this._id) as glassEasel.Node
+      ).getBackendElement() as unknown as Element
+      const innerHTML = nodeOnView.innerHTML
+      return innerHTML
+    },
+  },
 })
 
 const createContext = (
@@ -80,6 +87,8 @@ const createContext = (
       styleScope: number,
       extraStyleScope: number | null,
       externalClasses: string[] | undefined,
+      slotMode: glassEasel.SlotMode | null,
+      writeIdToDOM: boolean,
       chainDefinition:
         | ((
             def: glassEasel.BehaviorBuilder<
@@ -111,6 +120,8 @@ const createContext = (
         styleScope,
         extraStyleScope,
         externalClasses,
+        slotMode,
+        writeIdToDOM,
         chainDefinition,
         cb,
       )
@@ -174,7 +185,6 @@ export const dataComponentSpace = glassEasel.getDefaultComponentSpace()
 export const viewComponentSpace = new glassEasel.ComponentSpace()
 viewComponentSpace.updateComponentOptions({
   writeFieldsToNode: true,
-  writeIdToDOM: true,
 })
 
 export const { messageChannelViewSide, syncController, shadowDomBackend } = createContext(

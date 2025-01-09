@@ -1,6 +1,7 @@
 import * as glassEasel from 'glass-easel'
-import { SyncTemplateEngine } from '../../src/backend'
+import { type ShadowDomElement, SyncTemplateEngine } from '../../src/backend'
 import { shadowDomBackend, viewComponentSpace, tmpl, getViewNode } from '../base/env'
+import { virtual as matchElementWithDom } from '../../../glass-easel/tests/base/match'
 
 const componentSpace = new glassEasel.ComponentSpace()
 componentSpace.updateComponentOptions({
@@ -176,5 +177,64 @@ describe('backend', () => {
     const viewButton = getViewNode(input) as glassEasel.GeneralComponent
     viewButton.triggerEvent('tap', { foo: 'foo' })
     expect(ops).toEqual([{ foo: 'foo' }])
+  })
+  test('external structure on lifetimes', () => {
+    viewComponentSpace.setGlobalUsingComponent(
+      'wx-button',
+      viewComponentSpace.defineComponent({
+        is: 'wx-button',
+        options: {
+          externalComponent: true,
+        },
+        template: tmpl('<button"><slot /></button>'),
+        attached() {
+          matchElementWithDom(getViewNode(root))
+        },
+        detached() {
+          matchElementWithDom(getViewNode(root))
+        },
+      }) as glassEasel.GeneralComponentDefinition,
+    )
+
+    const subComp = componentSpace.defineComponent({
+      template: tmpl(`
+        <div>
+          <slot />
+        </div>
+      `),
+    })
+
+    const rootDef = componentSpace.defineComponent({
+      using: {
+        'sub-comp': subComp,
+      },
+      template: tmpl(`
+        <sub-comp>
+          <sub-comp>
+            <wx-button wx:if="{{show}}">123</wx-button>
+          </sub-comp>
+        </sub-comp>
+      `),
+      data: {
+        show: false,
+      },
+    })
+    const root = glassEasel.Component.createWithContext('root', rootDef, shadowDomBackend)
+    shadowDomBackend.getRootNode().appendChild(root.getBackendElement() as ShadowDomElement)
+    glassEasel.Component.pretendAttached(root)
+    root.destroyBackendElementOnDetach()
+
+    expect(domHtml(root)).toEqual(
+      '<sub-comp><div><sub-comp><div></div></sub-comp></div></sub-comp>',
+    )
+    matchElementWithDom(root)
+    matchElementWithDom(getViewNode(root))
+    root.setData({ show: true })
+
+    expect(domHtml(root)).toEqual(
+      '<sub-comp><div><sub-comp><div><wx-button><button>123</button></wx-button></div></sub-comp></div></sub-comp>',
+    )
+    matchElementWithDom(root)
+    matchElementWithDom(getViewNode(root))
   })
 })

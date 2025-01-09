@@ -7,7 +7,6 @@ import type {
   EventOptions,
   GeneralComponent,
   backend as GlassEaselBackend,
-  NativeNode,
   Node,
   ShadowRoot,
   TextNode,
@@ -51,11 +50,8 @@ export const enum ChannelEventType {
   SET_ID,
   SET_SLOT,
   SET_SLOT_NAME,
-  SET_CONTAINING_SLOT,
-  REASSIGN_CONTAINING_SLOT,
-  SPLICE_BEFORE_SLOT_NODES,
-  SPLICE_APPEND_SLOT_NODES,
-  SPLICE_REMOVE_SLOT_NODES,
+  SET_SLOT_ELEMENT,
+  SET_EXTERNAL_SLOT,
   SET_INHERIT_SLOTS,
   REGISTER_STYLE_SCOPE,
   SET_STYLE,
@@ -148,6 +144,8 @@ export type ChannelArgs = ExhaustiveChannelEvent<{
     number,
     number | null,
     string[] | undefined,
+    number | null,
+    boolean,
     number,
   ]
   [ChannelEventType.CREATE_TEXT_NODE]: [number, string, number]
@@ -166,11 +164,8 @@ export type ChannelArgs = ExhaustiveChannelEvent<{
   [ChannelEventType.SET_ID]: [number, string]
   [ChannelEventType.SET_SLOT]: [number, string]
   [ChannelEventType.SET_SLOT_NAME]: [number, string]
-  [ChannelEventType.SET_CONTAINING_SLOT]: [number, number | undefined | null]
-  [ChannelEventType.REASSIGN_CONTAINING_SLOT]: [number, number | null, number | null]
-  [ChannelEventType.SPLICE_BEFORE_SLOT_NODES]: [number, number, number, number]
-  [ChannelEventType.SPLICE_APPEND_SLOT_NODES]: [number, number]
-  [ChannelEventType.SPLICE_REMOVE_SLOT_NODES]: [number, number, number]
+  [ChannelEventType.SET_SLOT_ELEMENT]: [number, number | null]
+  [ChannelEventType.SET_EXTERNAL_SLOT]: [number, number]
   [ChannelEventType.SET_INHERIT_SLOTS]: [number]
   [ChannelEventType.REGISTER_STYLE_SCOPE]: [number, string | undefined]
   [ChannelEventType.SET_STYLE]: [number, string]
@@ -459,7 +454,7 @@ export const MessageChannelDataSide = (
     },
 
     createElement: (id: number, logicalName: string, stylingName: string, ownerShadowRootId: number) => publish([ChannelEventType.CREATE_ELEMENT, id, logicalName, stylingName, ownerShadowRootId]),
-    createComponent: (id: number, shadowRootId: number, tagName: string, external: boolean, virtualHost: boolean, styleScope: number, extraStyleScope: number | null, externalClasses: string[] | undefined, ownerShadowRootId: number) => publish([ChannelEventType.CREATE_COMPONENT, id, shadowRootId, tagName, external, virtualHost, styleScope, extraStyleScope, externalClasses, ownerShadowRootId]),
+    createComponent: (id: number, shadowRootId: number, tagName: string, external: boolean, virtualHost: boolean, styleScope: number, extraStyleScope: number | null, externalClasses: string[] | undefined, slotMode: number | null, writeIdToDOM: boolean, ownerShadowRootId: number) => publish([ChannelEventType.CREATE_COMPONENT, id, shadowRootId, tagName, external, virtualHost, styleScope, extraStyleScope, externalClasses, slotMode, writeIdToDOM, ownerShadowRootId]),
     createTextNode: (id: number, textContent: string, ownerShadowRootId: number) => publish([ChannelEventType.CREATE_TEXT_NODE, id, textContent, ownerShadowRootId]),
     createVirtualNode: (id: number, virtualName: string, ownerShadowRootId: number) => publish([ChannelEventType.CREATE_VIRTUAL_NODE, id, virtualName, ownerShadowRootId]),
     createFragment: (id: number) => publish([ChannelEventType.CREATE_FRAGMENT, id]),
@@ -478,11 +473,8 @@ export const MessageChannelDataSide = (
     setId: (elementId: number, id: string) => publish([ChannelEventType.SET_ID, elementId, id]),
     setSlot: (nodeId: number, name: string) => publish([ChannelEventType.SET_SLOT, nodeId, name]),
     setSlotName: (nodeId: number, name: string) => publish([ChannelEventType.SET_SLOT_NAME, nodeId, name]),
-    setContainingSlot: (nodeId: number, slot: number | undefined | null) => publish([ChannelEventType.SET_CONTAINING_SLOT, nodeId, slot]),
-    reassignContainingSlot: (nodeId: number, oldSlot: number | null, newSlot: number | null) => publish([ChannelEventType.REASSIGN_CONTAINING_SLOT, nodeId, oldSlot, newSlot]),
-    spliceBeforeSlotNodes: (slotId: number, before: number, count: number, listId: number) => publish([ChannelEventType.SPLICE_BEFORE_SLOT_NODES, slotId, before, count, listId]),
-    spliceAppendSlotNodes: (slotId: number, listId: number) => publish([ChannelEventType.SPLICE_APPEND_SLOT_NODES, slotId, listId]),
-    spliceRemoveSlotNodes: (slotId: number, before: number, count: number) => publish([ChannelEventType.SPLICE_REMOVE_SLOT_NODES, slotId, before, count]),
+    setSlotElement: (nodeId: number, slot: number | null) => publish([ChannelEventType.SET_SLOT_ELEMENT, nodeId, slot]),
+    setExternalSlot: (nodeId: number, slot: number) => publish([ChannelEventType.SET_EXTERNAL_SLOT, nodeId, slot]),
     setInheritSlots: (nodeId: number) => publish([ChannelEventType.SET_INHERIT_SLOTS, nodeId]),
     registerStyleScope: (scopeId: number, stylePrefix: string | undefined) => publish([ChannelEventType.REGISTER_STYLE_SCOPE, scopeId, stylePrefix]),
     setStyle: (elementId: number, styleText: string) => publish([ChannelEventType.SET_STYLE, elementId, styleText]),
@@ -736,6 +728,8 @@ export const MessageChannelViewSide = (
           styleScope,
           extraStyleScope,
           externalClasses,
+          slotMode,
+          writeIdToDOM,
           ownerShadowRootId,
         ] = arg
         const ownerShadowRoot = nodeMap[ownerShadowRootId] as ShadowRoot | undefined
@@ -747,6 +741,8 @@ export const MessageChannelViewSide = (
           styleScope,
           extraStyleScope,
           externalClasses,
+          slotMode,
+          writeIdToDOM,
           undefined,
           (component) => {
             nodeMap[id] = component
@@ -866,39 +862,18 @@ export const MessageChannelViewSide = (
         controller.setSlotName(element, name)
         break
       }
-      case ChannelEventType.SET_CONTAINING_SLOT: {
+      case ChannelEventType.SET_SLOT_ELEMENT: {
         const [, nodeId, slotId] = arg
         const node = nodeMap[nodeId]! as Node
         const slot = typeof slotId === 'number' ? (nodeMap[slotId]! as Element) : slotId
-        controller.setContainingSlot(node, slot)
+        controller.setSlotElement(node, slot)
         break
       }
-      case ChannelEventType.REASSIGN_CONTAINING_SLOT: {
-        const [, nodeId, oldSlotId, newSlotId] = arg
-        const node = nodeMap[nodeId]! as Node
-        const oldSlot = typeof oldSlotId === 'number' ? (nodeMap[oldSlotId]! as Element) : oldSlotId
-        const newSlot = typeof newSlotId === 'number' ? (nodeMap[newSlotId]! as Element) : newSlotId
-        controller.reassignContainingSlot(node, oldSlot, newSlot)
-        break
-      }
-      case ChannelEventType.SPLICE_BEFORE_SLOT_NODES: {
-        const [, slotId, before, count, listId] = arg
-        const slot = typeof slotId === 'number' ? (nodeMap[slotId]! as Element) : slotId
-        const list = nodeMap[listId] as Fragment
-        controller.spliceBeforeSlotNodes(slot, before, count, list)
-        break
-      }
-      case ChannelEventType.SPLICE_APPEND_SLOT_NODES: {
-        const [, slotId, listId] = arg
-        const slot = typeof slotId === 'number' ? (nodeMap[slotId]! as Element) : slotId
-        const list = nodeMap[listId] as Fragment
-        controller.spliceAppendSlotNodes(slot, list)
-        break
-      }
-      case ChannelEventType.SPLICE_REMOVE_SLOT_NODES: {
-        const [, slotId, before, count] = arg
-        const slot = typeof slotId === 'number' ? (nodeMap[slotId]! as Element) : slotId
-        controller.spliceRemoveSlotNodes(slot, before, count)
+      case ChannelEventType.SET_EXTERNAL_SLOT: {
+        const [, nodeId, slotId] = arg
+        const comp = nodeMap[nodeId]! as GeneralComponent
+        const slot = nodeMap[slotId]! as Element
+        controller.setExternalSlot(comp, slot)
         break
       }
       case ChannelEventType.SET_INHERIT_SLOTS: {
@@ -974,7 +949,7 @@ export const MessageChannelViewSide = (
       }
       case ChannelEventType.SET_MODEL_BINDING_STAT: {
         const [, elementId, attributeName, listenerId] = arg
-        const element = nodeMap[elementId]! as NativeNode
+        const element = nodeMap[elementId]! as Element
         if (!listenerId) {
           throw new Error('missing listenerId for setModelBindingStat')
         }

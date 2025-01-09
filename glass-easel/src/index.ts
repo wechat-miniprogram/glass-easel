@@ -72,7 +72,7 @@ export { Node, NodeCast, dumpElement, dumpElementToString, dumpSingleElementToSt
 export { RelationFailedListener, RelationListener, RelationType } from './relation'
 export { triggerRender } from './render'
 export { ParsedSelector } from './selector'
-export { ShadowRoot } from './shadow_root'
+export { ShadowRoot, SlotMode } from './shadow_root'
 export * as templateEngine from './template_engine'
 export { TextNode } from './text_node'
 export * as template from './tmpl'

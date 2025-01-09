@@ -1,4 +1,5 @@
 import * as glassEasel from '../../src'
+import { SlotMode } from '../../src/shadow_root'
 
 export class Context implements glassEasel.backend.Context {
   mode = glassEasel.BackendMode.Shadow as const
@@ -229,16 +230,17 @@ abstract class Node implements glassEasel.backend.Element {
   public abstract nodeType: NODE_TYPE
   public __wxElement: glassEasel.Element | undefined
   public _$wxElement: glassEasel.Element | undefined
-  public containingSlot: NativeNode | VirtualNode | null | undefined
-  public slotNodes: Node[] = []
   public id = ''
   public textContent: string = ''
   public hostNode: Component | undefined
 
   public _$childNodes: Node[] = []
-  public _$parentNode: null | Node = null
+  public _$parentNode: null | Element = null
   public _$virtual = false
+  public _$nodeSlot: string = ''
   public _$slotName: string | null = null
+  public _$slotElement: NativeNode | VirtualNode | null = null
+  public _$externalSlot: Element | null = null
   public _$inheritSlots: boolean = false
   public _$style = ''
   public _$styleScope = 0
@@ -275,7 +277,7 @@ abstract class Node implements glassEasel.backend.Element {
       throw new Error(`expect an element but got ${stringifyType(child)}`)
     const index = this._$childNodes.indexOf(child)
     if (index === -1) throw new Error('element is not a child of `this`')
-    if (child._$parentNode !== this) throw new Error('element is not a child of `this`')
+    if ((child._$parentNode as any) !== this) throw new Error('element is not a child of `this`')
     return index
   }
   public assertChildWithIndex(child: Node, index?: number) {
@@ -321,15 +323,16 @@ abstract class Node implements glassEasel.backend.Element {
     if (this instanceof Component) {
       return recNonVirtual(this.shadowRoot as ShadowRoot)
     }
-    if (this._$slotName !== null) {
-      const childNodes = this._$ownerShadowRoot?.hostNode?.external
-        ? this._$ownerShadowRoot.hostNode._$childNodes
-        : this.slotNodes
-      for (let i = 0; i < childNodes.length; i += 1) {
-        const node = childNodes[i]!
-        if (!node._$inheritSlots && recNonVirtual(node) === false) return false
+    const ownerHost = this._$ownerShadowRoot?.hostNode
+    if (ownerHost?.external && (ownerHost._$externalSlot as any) === this) {
+      for (let i = 0; i < ownerHost._$childNodes.length; i += 1) {
+        if (recNonVirtual(ownerHost._$childNodes[i]!) === false) return false
       }
       return true
+    }
+    if (this._$slotName !== null) {
+      if (!ownerHost) return true
+      return ownerHost.forEachSlotContentInSpecifiedSlot(this as unknown as Element, recNonVirtual)
     }
     const recInheritSlots = (children: Node[]) => {
       for (let i = 0; i < children.length; i += 1) {
@@ -352,9 +355,18 @@ abstract class Node implements glassEasel.backend.Element {
     return childNodes
   }
 
+  getContainingSlot(): NativeNode | VirtualNode | null | undefined {
+    let parentSlotHost: Element | null = this._$parentNode
+    while (parentSlotHost?._$inheritSlots) parentSlotHost = parentSlotHost._$parentNode
+    if (parentSlotHost && parentSlotHost instanceof Component)
+      return parentSlotHost.calcContainingSlot(this)
+    return undefined
+  }
+
   getComposedParent(): Node | null {
     if (this instanceof ShadowRoot) return this.hostNode!
-    if (this.containingSlot !== undefined) return this.containingSlot
+    const containingSlot = this.getContainingSlot()
+    if (containingSlot !== undefined) return containingSlot
     let parent = this._$parentNode
     while (parent?._$inheritSlots) {
       parent = parent._$parentNode
@@ -541,7 +553,7 @@ abstract class Node implements glassEasel.backend.Element {
     ;(this as Element)._$childNodes.push(child)
     if (!(this instanceof Fragment)) {
       this.assertDetached(child)
-      child._$parentNode = this
+      child._$parentNode = this as Element
     }
   }
 
@@ -637,11 +649,14 @@ abstract class Node implements glassEasel.backend.Element {
 
   setId(id: string): void {
     assertType(this, Element)
-    this.id = id
+    if (this._$ownerShadowRoot?.hostNode?.writeIdToDOM) {
+      this.id = id
+    }
   }
 
-  setSlot(_name: string): void {
+  setSlot(name: string): void {
     assertType(this, Element)
+    this._$nodeSlot = name
   }
 
   setSlotName(slot: string): void {
@@ -649,38 +664,14 @@ abstract class Node implements glassEasel.backend.Element {
     this._$slotName = slot
   }
 
-  setContainingSlot(slot: NativeNode | VirtualNode | undefined | null): void {
-    assertTypes(slot, [NativeNode, VirtualNode, undefined, null])
-    this.containingSlot = slot
+  setSlotElement(slot: NativeNode | VirtualNode | null): void {
+    assertTypes(slot, [NativeNode, VirtualNode, null])
+    this._$slotElement = slot
   }
 
-  reassignContainingSlot(
-    oldSlot: NativeNode | VirtualNode | null,
-    newSlot: NativeNode | VirtualNode | null,
-  ): void {
-    assertTypes(oldSlot, [NativeNode, VirtualNode, null])
-    assertTypes(newSlot, [NativeNode, VirtualNode, null])
-    this.containingSlot = newSlot
-  }
-
-  spliceBeforeSlotNodes(before: number, deleteCount: number, list: Fragment): void {
-    this.assertFragment(list)
-    this.assertIndex(before, this.slotNodes)
-    this.assertDeleteCount(deleteCount, before, this.slotNodes)
-    this.slotNodes.splice(before, deleteCount, ...list._$childNodes)
-    list._$childNodes = []
-  }
-
-  spliceAppendSlotNodes(list: Fragment): void {
-    this.assertFragment(list)
-    this.slotNodes.push(...list._$childNodes)
-    list._$childNodes = []
-  }
-
-  spliceRemoveSlotNodes(before: number, deleteCount: number): void {
-    this.assertIndex(before, this.slotNodes)
-    this.assertDeleteCount(deleteCount, before, this.slotNodes)
-    this.slotNodes.splice(before, deleteCount)
+  setExternalSlot(slot: Element): void {
+    assertType(slot, Element)
+    this._$externalSlot = slot
   }
 
   setInheritSlots(): void {
@@ -879,6 +870,8 @@ export class ShadowRoot extends VirtualNode implements glassEasel.backend.Shadow
     styleScope: number,
     extraStyleScope: number | null,
     externalClasses: string[] | undefined,
+    slotMode: SlotMode | null,
+    writeIdToDOM: boolean,
   ): glassEasel.backend.Element {
     const comp = new Component(
       this._$ownerContext,
@@ -889,6 +882,8 @@ export class ShadowRoot extends VirtualNode implements glassEasel.backend.Shadow
       styleScope,
       extraStyleScope,
       externalClasses,
+      slotMode,
+      writeIdToDOM,
     )
     const shadowRoot = new ShadowRoot(this._$ownerContext)
     comp.shadowRoot = shadowRoot
@@ -926,6 +921,8 @@ export class Component extends Element {
     styleScope: number,
     extraStyleScope: number | null,
     public externalClasses: string[] | undefined,
+    public slotMode: SlotMode | null,
+    public writeIdToDOM: boolean,
   ) {
     super(ownerContext, shadowRoot, tagName, undefined)
     if (virtualHost) this._$virtual = true
@@ -939,6 +936,123 @@ export class Component extends Element {
         this._$classAlias[className] = []
       })
     }
+  }
+
+  forEachChildNodes(f: (node: Node) => boolean | void) {
+    const recv = (node: Node): boolean | void => {
+      if (f(node) === false) return false
+      for (let i = 0; i < node._$childNodes.length; i += 1) {
+        if (recv(node._$childNodes[i]!) === false) return false
+      }
+      return true
+    }
+    return recv(this.shadowRoot!)
+  }
+
+  forEachSlotContentInSpecifiedSlot(slot: Element, f: (node: Node) => boolean | void): boolean {
+    if (this.slotMode === SlotMode.Single) {
+      let singleSlot: NativeNode | VirtualNode | null = null
+      this.forEachChildNodes((node) => {
+        if (node._$slotName !== null) {
+          singleSlot = node as NativeNode | VirtualNode
+          return false
+        }
+        return true
+      })
+      if (singleSlot !== slot) return true
+      const recv = (node: Node) => {
+        if (f(node) === false) return false
+        if (node._$inheritSlots) {
+          for (let i = 0; i < node._$childNodes.length; i += 1) {
+            if (recv(node._$childNodes[i]!) === false) return false
+          }
+        }
+        return true
+      }
+      for (let i = 0; i < this._$childNodes.length; i += 1) {
+        if (recv(this._$childNodes[i]!) === false) return false
+      }
+    }
+    if (this.slotMode === SlotMode.Multiple) {
+      let multiSlot: NativeNode | VirtualNode | null = null
+      const name = slot._$slotName!
+      this.forEachChildNodes((node) => {
+        if (node._$slotName === name) {
+          multiSlot = node as NativeNode | VirtualNode
+          return false
+        }
+        return true
+      })
+      if (multiSlot !== slot) return true
+      const recv = (node: Node) => {
+        if (node._$nodeSlot === name) {
+          if (f(node) === false) return false
+        }
+        if (node._$inheritSlots) {
+          for (let i = 0; i < node._$childNodes.length; i += 1) {
+            if (recv(node._$childNodes[i]!) === false) return false
+          }
+        }
+        return true
+      }
+      for (let i = 0; i < this._$childNodes.length; i += 1) {
+        if (recv(this._$childNodes[i]!) === false) return false
+      }
+    }
+    if (this.slotMode === SlotMode.Dynamic) {
+      const recv = (node: Node) => {
+        if (f(node) === false) return false
+        if (node._$inheritSlots) {
+          for (let i = 0; i < node._$childNodes.length; i += 1) {
+            if (recv(node._$childNodes[i]!) === false) return false
+          }
+        }
+        return true
+      }
+      for (let i = 0; i < this._$childNodes.length; i += 1) {
+        const node = this._$childNodes[i]!
+        if (node._$slotElement === slot) {
+          if (recv(node) === false) return false
+        }
+      }
+    }
+    return true
+  }
+
+  calcContainingSlot(elem: Node | null): NativeNode | VirtualNode | null {
+    if (this.external) return this._$externalSlot
+    if (this.slotMode === SlotMode.Single) {
+      let singleSlot: NativeNode | VirtualNode | null = null
+      this.forEachChildNodes((node) => {
+        if (node._$slotName !== null) {
+          singleSlot = node as NativeNode | VirtualNode
+          return false
+        }
+        return true
+      })
+      return singleSlot
+    }
+    if (this.slotMode === SlotMode.Multiple) {
+      let slot: NativeNode | VirtualNode | null = null
+      const name = elem instanceof Element ? elem._$nodeSlot : ''
+      this.forEachChildNodes((node) => {
+        if (node._$slotName === name) {
+          slot = node as NativeNode | VirtualNode
+          return false
+        }
+        return true
+      })
+      return slot
+    }
+    if (this.slotMode === SlotMode.Dynamic) {
+      if (!elem) return null
+      let subTreeRoot = elem
+      while (subTreeRoot.parentNode?._$inheritSlots) {
+        subTreeRoot = subTreeRoot.parentNode
+      }
+      return subTreeRoot._$slotElement
+    }
+    return null
   }
 }
 

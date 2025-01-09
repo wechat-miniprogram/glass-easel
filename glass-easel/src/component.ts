@@ -71,7 +71,7 @@ import {
   type RelationDefinitionGroup,
   type RelationHandler,
 } from './relation'
-import { ShadowRoot } from './shadow_root'
+import { ShadowRoot, SlotMode } from './shadow_root'
 import { type Template, type TemplateEngine, type TemplateInstance } from './template_engine'
 import { getDefaultTemplateEngine } from './tmpl'
 import { TraitBehavior, TraitGroup } from './trait_behaviors'
@@ -599,6 +599,16 @@ export class Component<
           options.styleScope ?? StyleScopeManager.globalScope(),
           options.extraStyleScope,
           behavior._$externalClasses,
+          // eslint-disable-next-line no-nested-ternary
+          external
+            ? null
+            : // eslint-disable-next-line no-nested-ternary
+            options.dynamicSlots
+            ? SlotMode.Dynamic
+            : options.multipleSlots
+            ? SlotMode.Multiple
+            : SlotMode.Single,
+          options.writeIdToDOM,
         )
         backendElement = be
         if (ENV.DEV) performanceMeasureEnd()
@@ -862,6 +872,10 @@ export class Component<
     // init data
     const shadowRoot = tmplInst.shadowRoot
     comp.shadowRoot = shadowRoot
+    if (external && (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext!.mode === BackendMode.Shadow))) {
+      const slot = (shadowRoot as ExternalShadowRoot).slot as backend.Element
+      ;(backendElement as backend.Element).setExternalSlot(slot)
+    }
     const dataGroup = new DataGroup(
       comp,
       data as DataWithPropertyValues<TData, TProperty>,

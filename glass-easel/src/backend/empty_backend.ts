@@ -3,6 +3,7 @@
 import { type Element as GlassEaselElement } from '../element'
 import { type Event, type EventBubbleStatus, type EventOptions, type MutLevel } from '../event'
 import { safeCallback } from '../func_arr'
+import { type SlotMode } from '../shadow_root'
 import { type Context, type Element, type ShadowRootContext } from './backend_protocol'
 import { BackendMode } from './shared'
 
@@ -162,23 +163,11 @@ export class EmptyBackendElement implements Element {
     // empty
   }
 
-  setContainingSlot(_slot: EmptyBackendElement | undefined | null): void {
+  setSlotElement(_slot: EmptyBackendElement | null): void {
     // empty
   }
 
-  reassignContainingSlot(_oldSlot: Element | null, _newSlot: Element | null): void {
-    // empty
-  }
-
-  spliceBeforeSlotNodes(_before: number, _deleteCount: number, _list: Element): void {
-    // empty
-  }
-
-  spliceRemoveSlotNodes(_before: number, _deleteCount: number): void {
-    // empty
-  }
-
-  spliceAppendSlotNodes(_list: Element): void {
+  setExternalSlot(_slot: EmptyBackendElement): void {
     // empty
   }
 
@@ -259,6 +248,8 @@ export class EmptyBackendShadowRootContext
     _styleScope: number,
     _extraStyleScope: number | null,
     _externalClasses: string[] | undefined,
+    _slotMode: SlotMode | null,
+    _writeIdToDOM: boolean,
   ): EmptyBackendElement {
     return new EmptyBackendElement(EmptyBackendElementType.Component)
   }

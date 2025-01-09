@@ -77,6 +77,15 @@ export function replayShadowBackend(
     if (slotName) be.setSlot(slotName)
   }
 
+  const setSlotName = (node: Node, be: ShadowBackend.Element): void => {
+    if (glassEasel.Element.isElement(node)) {
+      const slotName = glassEasel.Element.getSlotName(node)
+      if (slotName !== undefined) be.setSlotName(slotName)
+    }
+    const slotElement = glassEasel.Element.getSlotElement(node)
+    if (slotElement) be.setSlotElement(backendElementMap.get(slotElement)!)
+  }
+
   const backendElementMap = new Map<Node, ShadowBackend.Element>()
 
   const recv = (
@@ -88,6 +97,7 @@ export function replayShadowBackend(
       be =
         handlers.createElement?.(ownerShadowRoot, elem) ||
         ownerShadowRoot.createTextNode(elem.textContent)
+      setSlotName(elem, be)
     } else if (glassEasel.NativeNode.isNativeNode(elem)) {
       be =
         handlers.createElement?.(ownerShadowRoot, elem) ||
@@ -100,6 +110,7 @@ export function replayShadowBackend(
         be.setModelBindingStat(name, listeners[name]!)
       })
       insertChildren(be, createChildren(elem, ownerShadowRoot))
+      setSlotName(elem, be)
     } else if (glassEasel.ShadowRoot.isShadowRoot(elem)) {
       be = ownerShadowRoot
       be.__wxElement = elem
@@ -117,6 +128,7 @@ export function replayShadowBackend(
       }
       setAttributes(elem, be)
       insertChildren(be, createChildren(elem, ownerShadowRoot))
+      setSlotName(elem, be)
     } else if (glassEasel.Component.isComponent(elem)) {
       const options = elem.getComponentOptions()
       be =
@@ -128,6 +140,8 @@ export function replayShadowBackend(
           options.styleScope ?? glassEasel.StyleScopeManager.globalScope(),
           options.extraStyleScope,
           Object.keys(elem.getExternalClasses()),
+          elem.getShadowRoot()?.getSlotMode() ?? null,
+          options.writeIdToDOM,
         )
       be.__wxElement = elem
       be.associateValue(elem)
@@ -145,26 +159,8 @@ export function replayShadowBackend(
           backendElementMap.set(shadowRoot, recv(shadowRoot, shadowRootBe))
         }
       }
-      const children = createChildren(elem, ownerShadowRoot)
-      if (shadowRoot) {
-        const slotNodesFragmentMap = new Map<ShadowBackend.Element, ShadowBackend.Element>()
-        shadowRoot.forEachNodeInSlot((node, slot) => {
-          const nodeBe = backendElementMap.get(node)!
-          const slotBe = slot ? backendElementMap.get(slot) : slot
-          nodeBe.setContainingSlot(slotBe)
-          if (slotBe) {
-            const slotNodesFragment =
-              slotNodesFragmentMap.get(slotBe) ||
-              slotNodesFragmentMap.set(slotBe, context.createFragment()).get(slotBe)!
-            slotNodesFragment.appendChild(nodeBe)
-          }
-        })
-        slotNodesFragmentMap.forEach((frag, slotBe) => {
-          slotBe.spliceAppendSlotNodes(frag)
-          frag.release()
-        })
-      }
-      insertChildren(be, children)
+      insertChildren(be, createChildren(elem, ownerShadowRoot))
+      setSlotName(elem, be)
     } else {
       throw new Error(`Unknown elem type ${elem.constructor.name}`)
     }

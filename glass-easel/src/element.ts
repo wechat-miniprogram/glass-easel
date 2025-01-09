@@ -202,23 +202,33 @@ export class Element implements NodeCast {
     const newId = String(x)
     if (this._$nodeId === newId) return
     this._$nodeId = newId
+    const be = this._$backendElement
     if (this.ownerShadowRoot) {
       const host = this.ownerShadowRoot.getHostNode()
       this.ownerShadowRoot._$markIdCacheDirty()
       if (host.getComponentOptions().writeIdToDOM) {
         const idPrefix = host._$idPrefix
-        const val = idPrefix ? `${idPrefix}--${newId}` : newId
-        const be = this._$backendElement
+        const idWithPrefix = idPrefix ? `${idPrefix}--${newId}` : newId
         if (be) {
-          if (ENV.DEV) performanceMeasureStart('backend.setId')
           if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
-            ;(be as domlikeBackend.Element).id = val
-          } else {
-            ;(be as backend.Element | composedBackend.Element).setId(val)
+            if (ENV.DEV) performanceMeasureStart('backend.setId')
+            ;(be as domlikeBackend.Element).id = idWithPrefix
+            if (ENV.DEV) performanceMeasureEnd()
+          } else if (
+            BM.COMPOSED ||
+            (BM.DYNAMIC && this.getBackendMode() === BackendMode.Composed)
+          ) {
+            if (ENV.DEV) performanceMeasureStart('backend.setId')
+            ;(be as composedBackend.Element).setId(idWithPrefix)
+            if (ENV.DEV) performanceMeasureEnd()
           }
-          if (ENV.DEV) performanceMeasureEnd()
         }
       }
+    }
+    if (BM.SHADOW || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Shadow)) {
+      if (ENV.DEV) performanceMeasureStart('backend.setId')
+      ;(be as backend.Element).setId(newId)
+      if (ENV.DEV) performanceMeasureEnd()
     }
     if (globalOptions.writeExtraInfoToAttr) {
       this._$backendElement?.setAttribute('exparser:info-attr-id', newId)
@@ -246,6 +256,9 @@ export class Element implements NodeCast {
       throw new Error('slots-inherited nodes do not support "slot" attribute.')
     }
     this._$nodeSlot = newSlot
+    if (BM.SHADOW || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Shadow)) {
+      ;(this._$backendElement as backend.Element).setSlot(newSlot)
+    }
     const slotParentShadowRoot = Element._$getParentHostShadowRoot(this.parentNode)
     if (slotParentShadowRoot) {
       const slotMode = slotParentShadowRoot.getSlotMode()
@@ -280,8 +293,6 @@ export class Element implements NodeCast {
       Element.insertChildReassign(this.parentNode!, this, oldSlot, newSlot, this.parentIndex + 1)
 
       slotUpdater?.insertSlotNodes()
-    } else if (BM.SHADOW || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Shadow)) {
-      ;(this._$backendElement as backend.Element).setSlot(newSlot)
     }
     if (this._$mutationObserverTarget) {
       MutationObserverTarget.callAttrObservers(this, {
@@ -758,12 +769,6 @@ export class Element implements NodeCast {
     ideaPosIndex: number,
   ) {
     if (BM.SHADOW || (BM.DYNAMIC && shadowParent.getBackendMode() === BackendMode.Shadow)) {
-      if (ENV.DEV) performanceMeasureStart('backend.reassignContainingSlot')
-      ;(child._$backendElement as backend.Element).reassignContainingSlot(
-        oldSlot ? (oldSlot._$backendElement as backend.Element) : null,
-        newSlot ? (newSlot._$backendElement as backend.Element) : null,
-      )
-      if (ENV.DEV) performanceMeasureEnd()
       return
     }
     if (oldSlot) {
@@ -827,6 +832,9 @@ export class Element implements NodeCast {
         continue
       }
       cur = cur.parentNode
+    }
+    if (isComponent(cur) && cur._$external) {
+      return (cur.shadowRoot as ExternalShadowRoot).slot as composedElement
     }
     return cur ? (cur._$backendElement as composedElement) : null
   }
@@ -1553,13 +1561,6 @@ export class Element implements NodeCast {
     const oldSlotMode = oldShadowRoot?.getSlotMode()
 
     if (
-      (slotMode === undefined || slotMode === SlotMode.Direct) &&
-      (oldSlotMode === undefined || oldSlotMode === SlotMode.Direct)
-    ) {
-      return undefined
-    }
-
-    if (
       (slotMode === undefined || slotMode === SlotMode.Single) &&
       (oldSlotMode === undefined || oldSlotMode === SlotMode.Single)
     ) {
@@ -1619,8 +1620,7 @@ export class Element implements NodeCast {
     for (let i = 0; i < elements.length; i += 1) {
       const elem = elements[i]!
       Element.forEachNodeInSlot(elem, (node, oldContainingSlot) => {
-        const containingSlot =
-          slotMode !== SlotMode.Direct ? shadowRoot?.getContainingSlot(node) : undefined
+        const containingSlot = shadowRoot?.getContainingSlot(node)
 
         if (oldContainingSlot) {
           const slotNodesToRemove = slotNodesToRemoveMap.get(oldContainingSlot)
@@ -2198,15 +2198,7 @@ export class Element implements NodeCast {
     if (placeholder === replacer) return
 
     // change the parent of replacer's children
-    let frag: backend.Element | null
-    if (BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) {
-      const backendContext = parent.getBackendContext() as backend.Context
-      if (ENV.DEV) performanceMeasureStart('backend.createFragment')
-      frag = backendContext.createFragment()
-      if (ENV.DEV) performanceMeasureEnd()
-    } else {
-      frag = null
-    }
+    let frag: backend.Element | null = null
     const replacedChildren = placeholder.childNodes
     if (BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) {
       if (replacedChildren.length > 0) {
@@ -2227,9 +2219,15 @@ export class Element implements NodeCast {
         // removal of in-tree elements are not needed for DOM backend
         // do nothing
       } else if (BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) {
+        if (!frag) {
+          const backendContext = parent.getBackendContext() as backend.Context
+          if (ENV.DEV) performanceMeasureStart('backend.createFragment')
+          frag = backendContext.createFragment()
+          if (ENV.DEV) performanceMeasureEnd()
+        }
         const be = child._$backendElement as backend.Element
         if (ENV.DEV) performanceMeasureStart('backend.appendChild')
-        ;(frag as backend.Element).appendChild(be)
+        frag.appendChild(be)
         if (ENV.DEV) performanceMeasureEnd()
       } else {
         Element.insertChildComposed(placeholder, null, child, true, i)
@@ -2283,15 +2281,17 @@ export class Element implements NodeCast {
           posIndex,
         )
         if (ENV.DEV) performanceMeasureEnd()
-        if (ENV.DEV) performanceMeasureStart('backend.spliceAppend')
-        ;(replacer._$backendElement as backend.Element | null)?.spliceAppend(
-          frag as backend.Element,
-        )
+        if (frag) {
+          if (ENV.DEV) performanceMeasureStart('backend.spliceAppend')
+          ;(replacer._$backendElement as backend.Element | null)?.spliceAppend(frag)
+          if (ENV.DEV) performanceMeasureEnd()
+        }
+      }
+      if (frag) {
+        if (ENV.DEV) performanceMeasureStart('backend.release')
+        frag.release()
         if (ENV.DEV) performanceMeasureEnd()
       }
-      if (ENV.DEV) performanceMeasureStart('backend.release')
-      ;(frag as backend.Element).release()
-      if (ENV.DEV) performanceMeasureEnd()
     } else {
       Element.insertChildComposed(parent, replacer, placeholder, true, posIndex)
       for (let i = 0; i < replacedChildren.length; i += 1) {
@@ -2798,6 +2798,17 @@ export class Element implements NodeCast {
     if (oldSlotElement === slot) return
     node._$slotElement = slot
 
+    if (
+      BM.SHADOW ||
+      (BM.DYNAMIC && node.ownerShadowRoot!.getBackendMode() === BackendMode.Shadow)
+    ) {
+      if (ENV.DEV) performanceMeasureStart('backend.setSlotName')
+      ;(node._$backendElement as backend.Element | null)?.setSlotElement(
+        slot ? (slot.getBackendElement() as backend.Element) : null,
+      )
+      if (ENV.DEV) performanceMeasureEnd()
+    }
+
     const slotParentShadowRoot = Element._$getParentHostShadowRoot(node.parentNode)
 
     if (slotParentShadowRoot) {
@@ -2831,19 +2842,15 @@ export class Element implements NodeCast {
     }
   }
 
+  /**
+   * Get the binding slot of specific node
+   */
+  static getSlotElement(node: Node): Element | null {
+    return node._$slotElement
+  }
+
   static _$updateContainingSlot(node: Node, containingSlot: Element | null | undefined): void {
     node.containingSlot = containingSlot
-
-    if (
-      BM.SHADOW ||
-      (BM.DYNAMIC && node.ownerShadowRoot?.getBackendMode() === BackendMode.Shadow)
-    ) {
-      if (ENV.DEV) performanceMeasureStart('backend.setContainingSlot')
-      ;(node._$backendElement as backend.Element).setContainingSlot(
-        containingSlot ? (containingSlot._$backendElement as backend.Element) : containingSlot,
-      )
-      if (ENV.DEV) performanceMeasureEnd()
-    }
   }
 
   static _$spliceSlotNodes(
@@ -2877,37 +2884,6 @@ export class Element implements NodeCast {
       slotNodes.splice(before, deleteCount)
       for (let i = before; i < slotNodes.length; i += 1) {
         slotNodes[i]!.slotIndex = i
-      }
-    }
-
-    if (BM.SHADOW || (BM.DYNAMIC && slot.getBackendMode() === BackendMode.Shadow)) {
-      if (insertion?.length) {
-        if (ENV.DEV) performanceMeasureStart('backend.createFragment')
-        const frag = (slot._$nodeTreeContext as backend.Context).createFragment()
-        if (ENV.DEV) performanceMeasureEnd()
-        for (let i = 0; i < insertion.length; i += 1) {
-          if (ENV.DEV) performanceMeasureStart('backend.appendChild')
-          frag.appendChild(insertion[i]!._$backendElement as backend.Element)
-          if (ENV.DEV) performanceMeasureEnd()
-        }
-        if (spliceBefore) {
-          if (ENV.DEV) performanceMeasureStart('backend.spliceBeforeSlotNodes')
-          ;(slot._$backendElement as backend.Element).spliceBeforeSlotNodes(
-            before,
-            deleteCount,
-            frag,
-          )
-          if (ENV.DEV) performanceMeasureEnd()
-        } else {
-          if (ENV.DEV) performanceMeasureStart('backend.spliceAppendSlotNodes')
-          ;(slot._$backendElement as backend.Element).spliceAppendSlotNodes(frag)
-          if (ENV.DEV) performanceMeasureEnd()
-        }
-        frag.release()
-      } else if (deleteCount) {
-        if (ENV.DEV) performanceMeasureStart('backend.spliceRemoveSlotNodes')
-        ;(slot._$backendElement as backend.Element).spliceRemoveSlotNodes(before, deleteCount)
-        if (ENV.DEV) performanceMeasureEnd()
       }
     }
   }
