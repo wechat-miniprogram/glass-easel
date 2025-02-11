@@ -545,8 +545,7 @@ export class BehaviorBuilder<
    * Execute a function while component instance creation
    *
    * A `BuilderContext` is provided to tweak the component creation progress.
-   * The return value is used as the "export" value of the behavior,
-   * which can be imported by other behaviors.
+   * The return value is used as the "export" value of the behavior.
    */
   init<TExport extends Record<string, TaggedMethod<(...args: any[]) => any>> | void>(
     func: (

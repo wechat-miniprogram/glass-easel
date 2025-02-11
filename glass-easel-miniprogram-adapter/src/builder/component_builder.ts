@@ -156,7 +156,7 @@ export class ComponentBuilder<
    * Add some template data fields
    *
    * It does not support raw data, but a `gen` function which returns the new data fields.
-   * The `gen` function executes once during component creation.
+   * The `gen` function executes once during component instance creation.
    */
   override data<T extends DataList>(
     gen: () => typeUtils.NewFieldList<AllData<TData, TProperty>, T>,
@@ -174,6 +174,29 @@ export class ComponentBuilder<
     TChainingFilter
   > {
     return super.data(gen) as any
+  }
+
+  /**
+   * Add some template data fields
+   *
+   * The data should be JSON-compatible, and will be cloned during component creation.
+   */
+  override staticData<T extends DataList>(
+    data: typeUtils.NewFieldList<AllData<TData, TProperty>, T>,
+  ): ResolveBehaviorBuilder<
+    ComponentBuilder<
+      T,
+      TData & T,
+      TProperty,
+      TMethod,
+      TChainingFilter,
+      TPendingChainingFilter,
+      TComponentExport,
+      TExtraThisFields
+    >,
+    TChainingFilter
+  > {
+    return super.staticData(data) as any
   }
 
   /**
@@ -227,8 +250,7 @@ export class ComponentBuilder<
    * Execute a function while component instance creation
    *
    * A `BuilderContext` is provided to tweak the component creation progress.
-   * The return value is used as the "export" value of the behavior,
-   * which can be imported by other behaviors.
+   * The return value is used as the "export" value of the behavior.
    */
   override init<TExport extends Record<string, TaggedMethod<(...args: any[]) => any>> | void>(
     func: (
