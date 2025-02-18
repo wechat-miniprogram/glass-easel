@@ -9,9 +9,7 @@ use crate::{
     parse::{
         expr::Expression,
         tag::{
-            ClassAttribute, CommonElementAttributes, Element, ElementKind, Ident, Node, Script,
-            StaticAttribute, StrName, StyleAttribute, Value, DEFAULT_FOR_INDEX_SCOPE_NAME,
-            DEFAULT_FOR_ITEM_SCOPE_NAME,
+            ClassAttribute, CommonElementAttributes, Element, ElementKind, Ident, Node, NormalAttributePrefix, Script, StaticAttribute, StrName, StyleAttribute, Value, DEFAULT_FOR_INDEX_SCOPE_NAME, DEFAULT_FOR_ITEM_SCOPE_NAME
         },
         Position, Template,
     },
@@ -170,8 +168,8 @@ impl Stringify for Element {
         let write_attr = |stringifier: &mut Stringifier<'s, W>,
                           prefix: Option<(&str, &Range<Position>)>,
                           name: &Ident,
-                          value: &Value,
-                          is_value_unspecified: Option<bool>|
+                          value: Option<&Value>,
+                          respect_none_value: bool|
          -> FmtResult {
             stringifier.write_str(" ")?;
             if let Some((p, loc)) = prefix {
@@ -179,11 +177,14 @@ impl Stringify for Element {
                 stringifier.write_str(":")?;
             }
             stringifier.write_ident(name, true)?;
-            let need_value = match is_value_unspecified {
-                None => !is_empty_value(value),
-                Some(x) => !x,
+            let value = match respect_none_value {
+                false => match value {
+                    None => None,
+                    Some(value) => is_empty_value(value).then_some(value),
+                },
+                true => value,
             };
-            if need_value {
+            if let Some(value) = value {
                 stringifier.write_str(r#"=""#)?;
                 value.stringify_write(stringifier)?;
                 stringifier.write_str(r#"""#)?;
@@ -287,8 +288,8 @@ impl Stringify for Element {
                         stringifier,
                         Some(prefix),
                         &attr.name,
-                        &attr.value,
-                        Some(attr.is_value_unspecified),
+                        attr.value.as_ref(),
+                        true,
                     )?;
                 }
                 for attr in marks.iter() {
@@ -300,8 +301,8 @@ impl Stringify for Element {
                         stringifier,
                         Some(prefix),
                         &attr.name,
-                        &attr.value,
-                        Some(attr.is_value_unspecified),
+                        attr.value.as_ref(),
+                        true,
                     )?;
                 }
                 for ev in event_bindings.iter() {
@@ -328,8 +329,8 @@ impl Stringify for Element {
                         stringifier,
                         Some((prefix, &ev.prefix_location)),
                         &ev.name,
-                        &ev.value,
-                        None,
+                        ev.value.as_ref(),
+                        false,
                     )?;
                 }
                 Ok(())
@@ -452,8 +453,8 @@ impl Stringify for Element {
                                 name: "class".into(),
                                 location: location.clone(),
                             },
-                            &value,
-                            None,
+                            Some(value),
+                            false,
                         )?;
                     }
                     ClassAttribute::Multiple(..) => {
@@ -470,8 +471,8 @@ impl Stringify for Element {
                                 name: "style".into(),
                                 location: location.clone(),
                             },
-                            &value,
-                            None,
+                            Some(value),
+                            false,
                         )?;
                     }
                     StyleAttribute::Multiple(..) => {
@@ -479,16 +480,21 @@ impl Stringify for Element {
                     }
                 }
                 for attr in attributes.iter() {
-                    let prefix = attr.is_model.then_some((
-                        "model",
-                        attr.prefix_location.as_ref().unwrap_or(&attr.name.location),
-                    ));
+                    let prefix = match &attr.prefix {
+                        NormalAttributePrefix::None => None,
+                        NormalAttributePrefix::Model(prefix_location) => {
+                            Some((
+                                "model",
+                                prefix_location,
+                            ))
+                        }
+                    };
                     write_attr(
                         stringifier,
                         prefix,
                         &attr.name,
-                        &attr.value,
-                        Some(attr.is_value_unspecified),
+                        attr.value.as_ref(),
+                        true,
                     )?;
                 }
                 for attr in change_attributes.iter() {
@@ -496,7 +502,7 @@ impl Stringify for Element {
                         "change",
                         attr.prefix_location.as_ref().unwrap_or(&attr.name.location),
                     );
-                    write_attr(stringifier, Some(prefix), &attr.name, &attr.value, None)?;
+                    write_attr(stringifier, Some(prefix), &attr.name, attr.value.as_ref(), false)?;
                 }
                 for attr in worklet_attributes.iter() {
                     write_static_attr(
@@ -595,7 +601,7 @@ impl Stringify for Element {
                     write_named_attr(stringifier, "name", &name.0, &name.1)?;
                 }
                 for attr in values.iter() {
-                    write_attr(stringifier, None, &attr.name, &attr.value, None)?;
+                    write_attr(stringifier, None, &attr.name, attr.value.as_ref(), false)?;
                 }
                 write_common_attributes_without_slot(stringifier, common)?;
             }
