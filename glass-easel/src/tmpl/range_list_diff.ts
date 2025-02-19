@@ -108,10 +108,10 @@ export class RangeListManager {
           if (!sharedKeyMap) {
             sharedKeyMap = Object.create(null) as { [key: string]: number[] }
           }
-          sharedKeyMap[rawKey] = [keyMap[rawKey]!, i]
+          sharedKeyMap[rawKey] = [keyMap[rawKey], i]
           delete keyMap[rawKey]
         } else if (sharedKeyMap?.[rawKey]) {
-          sharedKeyMap[rawKey]!.push(i)
+          sharedKeyMap[rawKey].push(i)
         } else {
           keyMap[rawKey] = i
         }

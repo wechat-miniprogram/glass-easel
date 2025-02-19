@@ -514,7 +514,7 @@ export class ShadowRoot extends VirtualNode {
     // the complexity without name duplication is priority guaranteed.
     if (slotsList[slotName]) {
       // with name duplication
-      const firstSlot = slotsList[slotName]!
+      const firstSlot = slotsList[slotName]
       let insertPos = { next: firstSlot } as DoubleLinkedList<Element> // this is a pointer to pointer
       let insertBeforeFirst = true
       for (let jt = this._$subtreeSlotStart; jt && insertPos.next; jt = jt.next) {
@@ -536,7 +536,7 @@ export class ShadowRoot extends VirtualNode {
       slotsList[slotName] = { value: slot, prev: null, next: null }
     }
     const oldSlot = slots[slotName]
-    const newSlot = slotsList[slotName]!.value
+    const newSlot = slotsList[slotName].value
     if (oldSlot === newSlot) return
     slots[slotName] = newSlot
     Element._$insertChildReassignSlot(this, slotName, oldSlot || null, newSlot)

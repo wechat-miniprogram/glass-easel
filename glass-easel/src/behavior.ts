@@ -1477,7 +1477,7 @@ export class Behavior<
     for (let i = 0; i < lifetimes.length; i += 1) {
       const { name, func } = lifetimes[i]!
       if (ret[name]) {
-        ret[name]!.add(func)
+        ret[name].add(func)
       } else {
         const fa = (ret[name] = new FuncArr('lifetime'))
         fa.add(func)
@@ -1494,7 +1494,7 @@ export class Behavior<
     for (let i = 0; i < pageLifetimes.length; i += 1) {
       const { name, func } = pageLifetimes[i]!
       if (ret[name]) {
-        ret[name]!.add(func)
+        ret[name].add(func)
       } else {
         const fa = (ret[name] = new FuncArr('pageLifetime'))
         fa.add(func)

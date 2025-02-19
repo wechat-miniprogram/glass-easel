@@ -12,7 +12,9 @@ import {
   type IntersectionStatus,
   type MediaQueryStatus,
   type Observer,
+  // eslint-disable-next-line import/no-duplicates
 } from './shared'
+// eslint-disable-next-line import/no-duplicates
 import type * as shared from './shared'
 
 const DELEGATE_EVENTS = [
@@ -191,7 +193,7 @@ export class CurrentWindowBackendContext implements Context {
     ) => {
       const id = t.identifier
       if (possibleTaps[id]) {
-        const u = possibleTaps[id]!
+        const u = possibleTaps[id]
         if (Math.abs(u.x - t.clientX) > TAP_DIST || Math.abs(u.y - t.clientY) > TAP_DIST) {
           delete possibleTaps[id]
           this._$trigger(ev, 'canceltap', u, true, true)
@@ -205,7 +207,7 @@ export class CurrentWindowBackendContext implements Context {
     ) => {
       const id = t.identifier
       if (possibleTaps[id]) {
-        const u = possibleTaps[id]!
+        const u = possibleTaps[id]
         delete possibleTaps[id]
         if (Math.abs(u.x - t.clientX) > TAP_DIST || Math.abs(u.y - t.clientY) > TAP_DIST) {
           this._$trigger(ev, 'canceltap', u, true, true)
@@ -221,7 +223,7 @@ export class CurrentWindowBackendContext implements Context {
     ) => {
       const id = t.identifier
       if (possibleTaps[id]) {
-        const u = possibleTaps[id]!
+        const u = possibleTaps[id]
         delete possibleTaps[id]
         this._$trigger(ev, 'canceltap', u, true, true)
       }

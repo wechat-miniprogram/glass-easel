@@ -707,7 +707,7 @@ export class DataGroup<
           // splice update for properties
           if (Array.isArray(oldData)) {
             const c = change as DataSplice
-            const spliceIndex = maybeSpliceIndex as number
+            const spliceIndex = maybeSpliceIndex
             normalizedSpliceIndex =
               spliceIndex >= 0 && spliceIndex < oldData.length ? spliceIndex : oldData.length
             c[2] = normalizedSpliceIndex
@@ -855,7 +855,7 @@ export class DataGroup<
           const oldData = (curData as DataList)[curSlice as string]
           if (Array.isArray(oldData)) {
             const c = change as DataSplice
-            const spliceIndex = maybeSpliceIndex as number
+            const spliceIndex = maybeSpliceIndex
             normalizedSpliceIndex =
               spliceIndex >= 0 && spliceIndex < oldData.length ? spliceIndex : oldData.length
             c[2] = normalizedSpliceIndex
