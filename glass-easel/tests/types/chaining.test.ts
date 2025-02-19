@@ -407,13 +407,13 @@ componentSpace
     /* */
   })
 
-// @ts-expect-error
 componentSpace
   .define()
   .data(() => ({
     str: 'foo',
     objFoo: { foo: 'foo' },
   }))
+  // @ts-expect-error
   .observer(['str', 'nonExists'], () => {
     /* */
   })
