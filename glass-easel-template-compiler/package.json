@@ -24,6 +24,10 @@
   "browser": "pkg/glass_easel_template_compiler.js",
   "types": "pkg/glass_easel_template_compiler.d.ts",
   "scripts": {
-    "build": "wasm-pack build --target bundler && rollup -o pkg/glass_easel_template_compiler_bg.cjs.js -f cjs pkg/glass_easel_template_compiler_bg.js"
-  }
+    "build": "wasm-pack build --target bundler && mv pkg/package.json pkg/package.json.orig && rollup -o pkg/glass_easel_template_compiler_bg.cjs.js -f cjs pkg/glass_easel_template_compiler_bg.js"
+  },
+  "sideEffects": [
+    "pkg/glass_easel_template_compiler.js",
+    "pkg/snippets/*"
+  ]
 }

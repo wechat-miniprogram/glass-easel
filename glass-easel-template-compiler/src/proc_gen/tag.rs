@@ -9,7 +9,8 @@ use crate::{
     parse::{
         tag::{
             Attribute, ClassAttribute, CommonElementAttributes, Element, ElementKind, EventBinding,
-            Node, Script, StaticAttribute, StyleAttribute, Value,
+            Node, NormalAttribute, NormalAttributePrefix, Script, StaticAttribute, StyleAttribute,
+            Value,
         },
         Position, Template,
     },
@@ -1096,7 +1097,8 @@ impl Element {
                             for attr in values {
                                 let name = attr.name.name.as_str();
                                 match &attr.value {
-                                    Value::Static { value, .. } => {
+                                    None => {
+                                        let value = "";
                                         w.expr_stmt(|w| {
                                             write!(
                                                 w,
@@ -1107,7 +1109,18 @@ impl Element {
                                             Ok(())
                                         })?;
                                     }
-                                    Value::Dynamic { expression, .. } => {
+                                    Some(Value::Static { value, .. }) => {
+                                        w.expr_stmt(|w| {
+                                            write!(
+                                                w,
+                                                r#"if(C)R.l(N,{},{})"#,
+                                                gen_lit_str(name),
+                                                gen_lit_str(value)
+                                            )?;
+                                            Ok(())
+                                        })?;
+                                    }
+                                    Some(Value::Dynamic { expression, .. }) => {
                                         let p = expression.to_proc_gen_prepare(w, scopes)?;
                                         w.expr_stmt(|w| {
                                             write!(w, "if(C||K||")?;
@@ -1204,10 +1217,10 @@ impl CommonElementAttributes {
             marks,
         } = self;
         for attr in data.iter() {
-            attr.to_proc_gen_with_method(w, "R.d", true, scopes, bmc)?;
+            attr.to_proc_gen_with_method(w, "R.d", scopes, bmc)?;
         }
         for mark in marks {
-            mark.to_proc_gen_with_method(w, "M", true, scopes, bmc)?;
+            mark.to_proc_gen_with_method(w, "M", scopes, bmc)?;
         }
         for ev in event_bindings {
             ev.to_proc_gen(w, scopes, bmc)?;
@@ -1219,22 +1232,105 @@ impl CommonElementAttributes {
     }
 }
 
+impl NormalAttribute {
+    fn to_proc_gen_as_normal<W: std::fmt::Write>(
+        &self,
+        w: &mut JsFunctionScopeWriter<W>,
+        scopes: &Vec<ScopeVar>,
+        bmc: &BindingMapCollector,
+    ) -> Result<(), TmplError> {
+        let attr_name = gen_lit_str(&self.name.name);
+        match &self.value {
+            None => {
+                w.expr_stmt(|w| {
+                    let value = "true";
+                    write!(w, "if(C)O(N,{},{})", attr_name, value)?;
+                    Ok(())
+                })?;
+            }
+            Some(Value::Static { value, location: _ }) => {
+                w.expr_stmt(|w| {
+                    write!(w, "if(C)O(N,{},{})", attr_name, gen_lit_str(value))?;
+                    Ok(())
+                })?;
+            }
+            Some(Value::Dynamic {
+                expression,
+                double_brace_location: _,
+                binding_map_keys,
+            }) => {
+                let is_model = if let NormalAttributePrefix::Model(_) = self.prefix {
+                    true
+                } else {
+                    false
+                };
+                let maybe_event_binding =
+                    !is_model && attr_name_maybe_event_binding(&self.name.name);
+                let p = expression.to_proc_gen_prepare(w, scopes)?;
+                w.expr_stmt(|w| {
+                    write!(w, "if(C||K||")?;
+                    p.lvalue_state_expr(w, scopes, false)?;
+                    write!(w, ")O(N,{},", attr_name)?;
+                    p.value_expr(w)?;
+                    if is_model {
+                        if p.has_model_lvalue_path(scopes) {
+                            write!(w, ",")?;
+                            p.lvalue_path(w, scopes, Some(true))?;
+                        }
+                    } else if maybe_event_binding {
+                        if p.has_script_lvalue_path(scopes) {
+                            write!(w, ",undefined,")?;
+                            p.lvalue_path(w, scopes, Some(false))?;
+                        }
+                    }
+                    write!(w, ")")?;
+                    Ok(())
+                })?;
+                if let Some(binding_map_keys) = binding_map_keys {
+                    if !binding_map_keys.is_empty(bmc) {
+                        binding_map_keys.to_proc_gen_write_map(w, bmc, |w| {
+                            let p = expression.to_proc_gen_prepare(w, scopes)?;
+                            w.expr_stmt(|w| {
+                                write!(w, "O(N,{},", attr_name)?;
+                                p.value_expr(w)?;
+                                if is_model {
+                                    if p.has_model_lvalue_path(scopes) {
+                                        write!(w, ",")?;
+                                        p.lvalue_path(w, scopes, Some(true))?;
+                                    }
+                                } else if maybe_event_binding {
+                                    if p.has_script_lvalue_path(scopes) {
+                                        write!(w, ",undefined,")?;
+                                        p.lvalue_path(w, scopes, Some(false))?;
+                                    }
+                                }
+                                write!(w, ")")?;
+                                Ok(())
+                            })?;
+                            w.expr_stmt(|w| {
+                                write!(w, "E(N)")?;
+                                Ok(())
+                            })
+                        })?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 impl Attribute {
     fn to_proc_gen_with_method<W: std::fmt::Write>(
         &self,
         w: &mut JsFunctionScopeWriter<W>,
         method_name: &str,
-        respect_value_unspecified: bool,
         scopes: &Vec<ScopeVar>,
         bmc: &BindingMapCollector,
     ) -> Result<(), TmplError> {
         match &self.value {
-            Value::Static { value, location: _ } => {
-                let value = if respect_value_unspecified && self.is_value_unspecified {
-                    "true".into()
-                } else {
-                    gen_lit_str(value)
-                };
+            None => {
+                let value = "true";
                 w.expr_stmt(|w| {
                     write!(
                         w,
@@ -1246,11 +1342,23 @@ impl Attribute {
                     Ok(())
                 })?;
             }
-            Value::Dynamic {
+            Some(Value::Static { value, location: _ }) => {
+                w.expr_stmt(|w| {
+                    write!(
+                        w,
+                        "if(C){}(N,{},{})",
+                        method_name,
+                        gen_lit_str(&self.name.name),
+                        gen_lit_str(value)
+                    )?;
+                    Ok(())
+                })?;
+            }
+            Some(Value::Dynamic {
                 expression,
                 double_brace_location: _,
                 binding_map_keys,
-            } => {
+            }) => {
                 let p = expression.to_proc_gen_prepare(w, scopes)?;
                 w.expr_stmt(|w| {
                     write!(w, "if(C||K||")?;
@@ -1282,85 +1390,6 @@ impl Attribute {
         Ok(())
     }
 
-    fn to_proc_gen_as_normal<W: std::fmt::Write>(
-        &self,
-        w: &mut JsFunctionScopeWriter<W>,
-        scopes: &Vec<ScopeVar>,
-        bmc: &BindingMapCollector,
-    ) -> Result<(), TmplError> {
-        let attr_name = gen_lit_str(&self.name.name);
-        match &self.value {
-            Value::Static { value, location: _ } => {
-                w.expr_stmt(|w| {
-                    let value = if self.is_value_unspecified {
-                        "true".into()
-                    } else {
-                        gen_lit_str(value)
-                    };
-                    write!(w, "if(C)O(N,{},{})", attr_name, value)?;
-                    Ok(())
-                })?;
-            }
-            Value::Dynamic {
-                expression,
-                double_brace_location: _,
-                binding_map_keys,
-            } => {
-                let maybe_event_binding =
-                    !self.is_model && attr_name_maybe_event_binding(&self.name.name);
-                let p = expression.to_proc_gen_prepare(w, scopes)?;
-                w.expr_stmt(|w| {
-                    write!(w, "if(C||K||")?;
-                    p.lvalue_state_expr(w, scopes, false)?;
-                    write!(w, ")O(N,{},", attr_name)?;
-                    p.value_expr(w)?;
-                    if self.is_model {
-                        if p.has_model_lvalue_path(scopes) {
-                            write!(w, ",")?;
-                            p.lvalue_path(w, scopes, Some(true))?;
-                        }
-                    } else if maybe_event_binding {
-                        if p.has_script_lvalue_path(scopes) {
-                            write!(w, ",undefined,")?;
-                            p.lvalue_path(w, scopes, Some(false))?;
-                        }
-                    }
-                    write!(w, ")")?;
-                    Ok(())
-                })?;
-                if let Some(binding_map_keys) = binding_map_keys {
-                    if !binding_map_keys.is_empty(bmc) {
-                        binding_map_keys.to_proc_gen_write_map(w, bmc, |w| {
-                            let p = expression.to_proc_gen_prepare(w, scopes)?;
-                            w.expr_stmt(|w| {
-                                write!(w, "O(N,{},", attr_name)?;
-                                p.value_expr(w)?;
-                                if self.is_model {
-                                    if p.has_model_lvalue_path(scopes) {
-                                        write!(w, ",")?;
-                                        p.lvalue_path(w, scopes, Some(true))?;
-                                    }
-                                } else if maybe_event_binding {
-                                    if p.has_script_lvalue_path(scopes) {
-                                        write!(w, ",undefined,")?;
-                                        p.lvalue_path(w, scopes, Some(false))?;
-                                    }
-                                }
-                                write!(w, ")")?;
-                                Ok(())
-                            })?;
-                            w.expr_stmt(|w| {
-                                write!(w, "E(N)")?;
-                                Ok(())
-                            })
-                        })?;
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-
     fn to_proc_gen_as_change_property<W: std::fmt::Write>(
         &self,
         w: &mut JsFunctionScopeWriter<W>,
@@ -1369,12 +1398,12 @@ impl Attribute {
     ) -> Result<(), TmplError> {
         let attr_name = gen_lit_str(&self.name.name);
         match &self.value {
-            Value::Static { .. } => {}
-            Value::Dynamic {
+            None | Some(Value::Static { .. }) => {}
+            Some(Value::Dynamic {
                 expression,
                 double_brace_location: _,
                 binding_map_keys,
-            } => {
+            }) => {
                 let p = expression.to_proc_gen_prepare(w, scopes)?;
                 w.expr_stmt(|w| {
                     write!(w, "if(C||K||")?;
@@ -1419,7 +1448,8 @@ impl EventBinding {
         bmc: &BindingMapCollector,
     ) -> Result<(), TmplError> {
         match &self.value {
-            Value::Static { value, location: _ } => {
+            None => {
+                let value = "";
                 w.expr_stmt(|w| {
                     write!(
                         w,
@@ -1433,11 +1463,25 @@ impl EventBinding {
                     Ok(())
                 })?;
             }
-            Value::Dynamic {
+            Some(Value::Static { value, location: _ }) => {
+                w.expr_stmt(|w| {
+                    write!(
+                        w,
+                        "if(C)R.v(N,{},{},{},{},{},!1)",
+                        gen_lit_str(&self.name.name),
+                        gen_lit_str(value),
+                        if self.is_catch { "!0" } else { "!1" },
+                        if self.is_mut { "!0" } else { "!1" },
+                        if self.is_capture { "!0" } else { "!1" },
+                    )?;
+                    Ok(())
+                })?;
+            }
+            Some(Value::Dynamic {
                 expression,
                 double_brace_location: _,
                 binding_map_keys,
-            } => {
+            }) => {
                 let p = expression.to_proc_gen_prepare(w, scopes)?;
                 w.expr_stmt(|w| {
                     write!(w, "if(C||K||")?;
