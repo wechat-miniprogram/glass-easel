@@ -1,6 +1,7 @@
 name: build-and-test
 on:
   push:
+    branches: ["master"]
   pull_request:
     branches:
       - master
@@ -21,15 +22,15 @@ jobs:
         uses: pnpm/action-setup@v2
         with:
           version: latest
-      - name: Setup node ${{ matrix.node-version }}
+      - name: Setup node
         uses: actions/setup-node@v3
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 20
           cache: 'pnpm'
       - name: Install
         uses: pnpm/action-setup@v2
         with:
-          version: 8
+          version: 9
           run_install: |
             - recursive: true
               args: [--frozen-lockfile, --strict-peer-dependencies]
