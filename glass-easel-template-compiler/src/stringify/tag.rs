@@ -5,11 +5,13 @@ use std::{
 
 use super::{Stringifier, Stringify};
 use crate::{
-    escape::{escape_html_body, escape_html_text},
+    escape::escape_html_body,
     parse::{
         expr::Expression,
         tag::{
-            ClassAttribute, CommonElementAttributes, Element, ElementKind, Ident, Node, NormalAttributePrefix, Script, StaticAttribute, StrName, StyleAttribute, Value, DEFAULT_FOR_INDEX_SCOPE_NAME, DEFAULT_FOR_ITEM_SCOPE_NAME
+            ClassAttribute, CommonElementAttributes, Element, ElementKind, Ident, Node,
+            NormalAttributePrefix, Script, StaticAttribute, StrName, StyleAttribute, Value,
+            DEFAULT_FOR_INDEX_SCOPE_NAME, DEFAULT_FOR_ITEM_SCOPE_NAME,
         },
         Position, Template,
     },
@@ -136,7 +138,13 @@ impl Stringify for Node {
             Node::Comment(..) => {}
             Node::UnknownMetaTag(t) => {
                 stringifier.write_str(r#"<!"#)?;
-                stringifier.write_token(&escape_html_text(&t.content), None, &t.location)?;
+                for (i, name) in t.tag_name.iter().enumerate() {
+                    if i > 0 { stringifier.write_str(":")?; }
+                    stringifier.write_ident(name, true)?;
+                }
+                for attr in t.attributes.iter() {
+                    write_custom_attr(stringifier, &attr.colon_separated_name, attr.value.as_ref())?;
+                }
                 stringifier.write_str(r#">"#)?;
             }
         }
@@ -156,186 +164,212 @@ fn is_children_empty(children: &[Node]) -> bool {
     true
 }
 
+fn is_empty_value(value: &Value) -> bool {
+    match value {
+        Value::Static { value, .. } => value.is_empty(),
+        Value::Dynamic { .. } => false,
+    }
+}
+
+fn write_custom_attr<'s, W: FmtWrite>(
+    stringifier: &mut Stringifier<'s, W>,
+    name: &[Ident],
+    value: Option<&Value>,
+) -> FmtResult {
+    stringifier.write_str(" ")?;
+    for (i, name) in name.iter().enumerate() {
+        if i > 0 { stringifier.write_str(":")?; }
+        stringifier.write_ident(name, true)?;
+    }
+    if let Some(value) = value {
+        stringifier.write_str(r#"=""#)?;
+        value.stringify_write(stringifier)?;
+        stringifier.write_str(r#"""#)?;
+    }
+    Ok(())
+}
+
+fn write_attr<'s, W: FmtWrite>(
+    stringifier: &mut Stringifier<'s, W>,
+    prefix: Option<(&str, &Range<Position>)>,
+    name: &Ident,
+    value: Option<&Value>,
+    respect_none_value: bool,
+) -> FmtResult {
+    stringifier.write_str(" ")?;
+    if let Some((p, loc)) = prefix {
+        stringifier.write_token(p, None, loc)?;
+        stringifier.write_str(":")?;
+    }
+    stringifier.write_ident(name, true)?;
+    let value = match respect_none_value {
+        false => match value {
+            None => None,
+            Some(value) => (!is_empty_value(value)).then_some(value),
+        },
+        true => value,
+    };
+    if let Some(value) = value {
+        stringifier.write_str(r#"=""#)?;
+        value.stringify_write(stringifier)?;
+        stringifier.write_str(r#"""#)?;
+    }
+    Ok(())
+}
+
+fn write_static_attr<'s, W: FmtWrite>(
+    stringifier: &mut Stringifier<'s, W>,
+    prefix: Option<(&str, &Range<Position>)>,
+    name: &Ident,
+    value: &StrName,
+) -> FmtResult {
+    stringifier.write_str(" ")?;
+    if let Some((p, loc)) = prefix {
+        stringifier.write_token(p, None, loc)?;
+        stringifier.write_str(":")?;
+    }
+    stringifier.write_ident(name, true)?;
+    if value.name.len() > 0 {
+        stringifier.write_str(r#"="#)?;
+        stringifier.write_str_name_quoted(value)?;
+    }
+    Ok(())
+}
+
+fn write_named_attr<'s, W: FmtWrite>(
+    stringifier: &mut Stringifier<'s, W>,
+    name: &str,
+    location: &Range<Position>,
+    value: &Value,
+) -> FmtResult {
+    stringifier.write_str(" ")?;
+    stringifier.write_token(name, Some(name), location)?;
+    if !is_empty_value(value) {
+        stringifier.write_str(r#"=""#)?;
+        value.stringify_write(stringifier)?;
+        stringifier.write_str(r#"""#)?;
+    }
+    Ok(())
+}
+
+fn write_named_static_attr<'s, W: FmtWrite>(
+    stringifier: &mut Stringifier<'s, W>,
+    name: &str,
+    location: &Range<Position>,
+    value: &StrName,
+) -> FmtResult {
+    stringifier.write_str(" ")?;
+    stringifier.write_token(name, Some(name), location)?;
+    if value.name.len() > 0 {
+        stringifier.write_str(r#"="#)?;
+        stringifier.write_str_name_quoted(value)?;
+    }
+    Ok(())
+}
+
+fn write_slot_and_slot_values<'s, W: FmtWrite>(
+    stringifier: &mut Stringifier<'s, W>,
+    slot: &Option<(Range<Position>, Value)>,
+    slot_value_refs: &Vec<StaticAttribute>,
+) -> FmtResult {
+    for attr in slot_value_refs {
+        let value = stringifier.add_scope(&attr.value.name).clone();
+        stringifier.write_str(" ")?;
+        stringifier.write_token(
+            "slot",
+            None,
+            attr.prefix_location.as_ref().unwrap_or(&attr.name.location),
+        )?;
+        stringifier.write_str(":")?;
+        stringifier.write_token(&attr.name.name, Some(&attr.name.name), &attr.name.location)?;
+        if value != &attr.name.name {
+            stringifier.write_str(r#"="#)?;
+            stringifier.write_str_name_quoted(&StrName {
+                name: value,
+                location: attr.value.location.clone(),
+            })?;
+        }
+    }
+    if let Some((loc, value)) = slot.as_ref() {
+        write_named_attr(stringifier, "slot", loc, value)?;
+    }
+    Ok(())
+}
+
+fn write_common_attributes_without_slot<'s, W: FmtWrite>(
+    stringifier: &mut Stringifier<'s, W>,
+    common: &CommonElementAttributes,
+) -> FmtResult {
+    let CommonElementAttributes {
+        id,
+        slot: _,
+        slot_value_refs: _,
+        event_bindings,
+        data,
+        marks,
+    } = common;
+    if let Some((loc, value)) = id.as_ref() {
+        write_named_attr(stringifier, "id", loc, value)?;
+    }
+    for attr in data.iter() {
+        let prefix = (
+            "data",
+            attr.prefix_location.as_ref().unwrap_or(&attr.name.location),
+        );
+        write_attr(
+            stringifier,
+            Some(prefix),
+            &attr.name,
+            attr.value.as_ref(),
+            true,
+        )?;
+    }
+    for attr in marks.iter() {
+        let prefix = (
+            "mark",
+            attr.prefix_location.as_ref().unwrap_or(&attr.name.location),
+        );
+        write_attr(
+            stringifier,
+            Some(prefix),
+            &attr.name,
+            attr.value.as_ref(),
+            true,
+        )?;
+    }
+    for ev in event_bindings.iter() {
+        let prefix = if ev.is_catch {
+            if ev.is_capture {
+                "capture-catch"
+            } else {
+                "catch"
+            }
+        } else if ev.is_mut {
+            if ev.is_capture {
+                "capture-mut-bind"
+            } else {
+                "mut-bind"
+            }
+        } else {
+            if ev.is_capture {
+                "capture-bind"
+            } else {
+                "bind"
+            }
+        };
+        write_attr(
+            stringifier,
+            Some((prefix, &ev.prefix_location)),
+            &ev.name,
+            ev.value.as_ref(),
+            false,
+        )?;
+    }
+    Ok(())
+}
+
 impl Stringify for Element {
     fn stringify_write<'s, W: FmtWrite>(&self, stringifier: &mut Stringifier<'s, W>) -> FmtResult {
-        // attribute writers
-        fn is_empty_value(value: &Value) -> bool {
-            match value {
-                Value::Static { value, .. } => value.is_empty(),
-                Value::Dynamic { .. } => false,
-            }
-        }
-        let write_attr = |stringifier: &mut Stringifier<'s, W>,
-                          prefix: Option<(&str, &Range<Position>)>,
-                          name: &Ident,
-                          value: Option<&Value>,
-                          respect_none_value: bool|
-         -> FmtResult {
-            stringifier.write_str(" ")?;
-            if let Some((p, loc)) = prefix {
-                stringifier.write_token(p, None, loc)?;
-                stringifier.write_str(":")?;
-            }
-            stringifier.write_ident(name, true)?;
-            let value = match respect_none_value {
-                false => match value {
-                    None => None,
-                    Some(value) => is_empty_value(value).then_some(value),
-                },
-                true => value,
-            };
-            if let Some(value) = value {
-                stringifier.write_str(r#"=""#)?;
-                value.stringify_write(stringifier)?;
-                stringifier.write_str(r#"""#)?;
-            }
-            Ok(())
-        };
-        let write_static_attr = |stringifier: &mut Stringifier<'s, W>,
-                                 prefix: Option<(&str, &Range<Position>)>,
-                                 name: &Ident,
-                                 value: &StrName|
-         -> FmtResult {
-            stringifier.write_str(" ")?;
-            if let Some((p, loc)) = prefix {
-                stringifier.write_token(p, None, loc)?;
-                stringifier.write_str(":")?;
-            }
-            stringifier.write_ident(name, true)?;
-            if value.name.len() > 0 {
-                stringifier.write_str(r#"="#)?;
-                stringifier.write_str_name_quoted(value)?;
-            }
-            Ok(())
-        };
-        let write_named_attr = |stringifier: &mut Stringifier<'s, W>,
-                                name: &str,
-                                location: &Range<Position>,
-                                value: &Value|
-         -> FmtResult {
-            stringifier.write_str(" ")?;
-            stringifier.write_token(name, Some(name), location)?;
-            if !is_empty_value(value) {
-                stringifier.write_str(r#"=""#)?;
-                value.stringify_write(stringifier)?;
-                stringifier.write_str(r#"""#)?;
-            }
-            Ok(())
-        };
-        let write_named_static_attr = |stringifier: &mut Stringifier<'s, W>,
-                                       name: &str,
-                                       location: &Range<Position>,
-                                       value: &StrName|
-         -> FmtResult {
-            stringifier.write_str(" ")?;
-            stringifier.write_token(name, Some(name), location)?;
-            if value.name.len() > 0 {
-                stringifier.write_str(r#"="#)?;
-                stringifier.write_str_name_quoted(value)?;
-            }
-            Ok(())
-        };
-        let write_slot_and_slot_values = |stringifier: &mut Stringifier<'s, W>,
-                                          slot: &Option<(Range<Position>, Value)>,
-                                          slot_value_refs: &Vec<StaticAttribute>|
-         -> FmtResult {
-            for attr in slot_value_refs {
-                let value = stringifier.add_scope(&attr.value.name).clone();
-                stringifier.write_str(" ")?;
-                stringifier.write_token(
-                    "slot",
-                    None,
-                    attr.prefix_location.as_ref().unwrap_or(&attr.name.location),
-                )?;
-                stringifier.write_str(":")?;
-                stringifier.write_token(
-                    &attr.name.name,
-                    Some(&attr.name.name),
-                    &attr.name.location,
-                )?;
-                if value != &attr.name.name {
-                    stringifier.write_str(r#"="#)?;
-                    stringifier.write_str_name_quoted(&StrName {
-                        name: value,
-                        location: attr.value.location.clone(),
-                    })?;
-                }
-            }
-            if let Some((loc, value)) = slot.as_ref() {
-                write_named_attr(stringifier, "slot", loc, value)?;
-            }
-            Ok(())
-        };
-        let write_common_attributes_without_slot =
-            |stringifier: &mut Stringifier<'s, W>, common: &CommonElementAttributes| -> FmtResult {
-                let CommonElementAttributes {
-                    id,
-                    slot: _,
-                    slot_value_refs: _,
-                    event_bindings,
-                    data,
-                    marks,
-                } = common;
-                if let Some((loc, value)) = id.as_ref() {
-                    write_named_attr(stringifier, "id", loc, value)?;
-                }
-                for attr in data.iter() {
-                    let prefix = (
-                        "data",
-                        attr.prefix_location.as_ref().unwrap_or(&attr.name.location),
-                    );
-                    write_attr(
-                        stringifier,
-                        Some(prefix),
-                        &attr.name,
-                        attr.value.as_ref(),
-                        true,
-                    )?;
-                }
-                for attr in marks.iter() {
-                    let prefix = (
-                        "mark",
-                        attr.prefix_location.as_ref().unwrap_or(&attr.name.location),
-                    );
-                    write_attr(
-                        stringifier,
-                        Some(prefix),
-                        &attr.name,
-                        attr.value.as_ref(),
-                        true,
-                    )?;
-                }
-                for ev in event_bindings.iter() {
-                    let prefix = if ev.is_catch {
-                        if ev.is_capture {
-                            "capture-catch"
-                        } else {
-                            "catch"
-                        }
-                    } else if ev.is_mut {
-                        if ev.is_capture {
-                            "capture-mut-bind"
-                        } else {
-                            "mut-bind"
-                        }
-                    } else {
-                        if ev.is_capture {
-                            "capture-bind"
-                        } else {
-                            "bind"
-                        }
-                    };
-                    write_attr(
-                        stringifier,
-                        Some((prefix, &ev.prefix_location)),
-                        &ev.name,
-                        ev.value.as_ref(),
-                        false,
-                    )?;
-                }
-                Ok(())
-            };
-
         // handle `wx:if`
         if let ElementKind::If {
             branches,
@@ -483,26 +517,23 @@ impl Stringify for Element {
                     let prefix = match &attr.prefix {
                         NormalAttributePrefix::None => None,
                         NormalAttributePrefix::Model(prefix_location) => {
-                            Some((
-                                "model",
-                                prefix_location,
-                            ))
+                            Some(("model", prefix_location))
                         }
                     };
-                    write_attr(
-                        stringifier,
-                        prefix,
-                        &attr.name,
-                        attr.value.as_ref(),
-                        true,
-                    )?;
+                    write_attr(stringifier, prefix, &attr.name, attr.value.as_ref(), true)?;
                 }
                 for attr in change_attributes.iter() {
                     let prefix = (
                         "change",
                         attr.prefix_location.as_ref().unwrap_or(&attr.name.location),
                     );
-                    write_attr(stringifier, Some(prefix), &attr.name, attr.value.as_ref(), false)?;
+                    write_attr(
+                        stringifier,
+                        Some(prefix),
+                        &attr.name,
+                        attr.value.as_ref(),
+                        false,
+                    )?;
                 }
                 for attr in worklet_attributes.iter() {
                     write_static_attr(

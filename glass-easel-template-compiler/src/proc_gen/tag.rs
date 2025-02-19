@@ -8,7 +8,9 @@ use crate::{
     escape::gen_lit_str,
     parse::{
         tag::{
-            Attribute, ClassAttribute, CommonElementAttributes, Element, ElementKind, EventBinding, Node, NormalAttribute, NormalAttributePrefix, Script, StaticAttribute, StyleAttribute, Value
+            Attribute, ClassAttribute, CommonElementAttributes, Element, ElementKind, EventBinding,
+            Node, NormalAttribute, NormalAttributePrefix, Script, StaticAttribute, StyleAttribute,
+            Value,
         },
         Position, Template,
     },

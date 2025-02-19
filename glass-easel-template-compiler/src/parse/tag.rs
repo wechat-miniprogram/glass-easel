@@ -320,10 +320,7 @@ impl Node {
                         let tag_name = Ident::parse_colon_separated(ps);
                         let attributes = CustomAttribute::parse_until_tag_end(ps);
                         if ps.consume_str(">").is_none() {
-                            ps.add_warning(
-                                ParseErrorKind::IncompleteTag,
-                                range.clone(),
-                            );
+                            ps.add_warning(ParseErrorKind::IncompleteTag, range.clone());
                         }
                         let location = range.start..ps.position();
                         ps.add_warning(ParseErrorKind::UnknownMetaTag, location.clone());
@@ -960,7 +957,11 @@ impl Element {
                 };
 
                 // unwrap an optional value
-                fn unwrap_option_value_for_attr(ps: &mut ParseState, value: Option<Value>, attr_name: &Ident) -> Value {
+                fn unwrap_option_value_for_attr(
+                    ps: &mut ParseState,
+                    value: Option<Value>,
+                    attr_name: &Ident,
+                ) -> Value {
                     match value {
                         Some(value) => value,
                         None => {
@@ -986,9 +987,7 @@ impl Element {
                 ) {
                     match element {
                         ElementKind::Normal { common, .. } | ElementKind::Slot { common, .. } => {
-                            if let AttrPrefixParseResult::Value(value) =
-                                attr_value
-                            {
+                            if let AttrPrefixParseResult::Value(value) = attr_value {
                                 common.event_bindings.push(EventBinding {
                                     name: attr_name,
                                     value,
@@ -1011,9 +1010,7 @@ impl Element {
                 match prefix {
                     AttrPrefixKind::Normal => match &mut element {
                         ElementKind::Normal { attributes, .. } => {
-                            if let AttrPrefixParseResult::Value(value) =
-                                attr_value
-                            {
+                            if let AttrPrefixParseResult::Value(value) = attr_value {
                                 if attributes
                                     .iter()
                                     .find(|x| x.name.name_eq(&attr_name))
@@ -1033,10 +1030,10 @@ impl Element {
                                 }
                             }
                         }
-                        ElementKind::Slot { values: attributes, .. } => {
-                            if let AttrPrefixParseResult::Value(value) =
-                                attr_value
-                            {
+                        ElementKind::Slot {
+                            values: attributes, ..
+                        } => {
+                            if let AttrPrefixParseResult::Value(value) = attr_value {
                                 if attributes
                                     .iter()
                                     .find(|x| x.name.name_eq(&attr_name))
@@ -1066,9 +1063,7 @@ impl Element {
                     },
                     AttrPrefixKind::Id => match &mut element {
                         ElementKind::Normal { common, .. } | ElementKind::Slot { common, .. } => {
-                            if let AttrPrefixParseResult::Value(value) =
-                                attr_value
-                            {
+                            if let AttrPrefixParseResult::Value(value) = attr_value {
                                 if common.id.is_some() {
                                     ps.add_warning(
                                         ParseErrorKind::DuplicatedAttribute,
@@ -1119,9 +1114,7 @@ impl Element {
                     },
                     AttrPrefixKind::ClassString => match &mut element {
                         ElementKind::Normal { class, .. } => {
-                            if let AttrPrefixParseResult::Value(value) =
-                                attr_value
-                            {
+                            if let AttrPrefixParseResult::Value(value) = attr_value {
                                 if let ClassAttribute::Multiple(..) | ClassAttribute::String(..) =
                                     class
                                 {
@@ -1146,9 +1139,7 @@ impl Element {
                     },
                     AttrPrefixKind::StyleString => match &mut element {
                         ElementKind::Normal { style, .. } => {
-                            if let AttrPrefixParseResult::Value(value) =
-                                attr_value
-                            {
+                            if let AttrPrefixParseResult::Value(value) = attr_value {
                                 if let StyleAttribute::Multiple(..) | StyleAttribute::String(..) =
                                     style
                                 {
@@ -1172,9 +1163,7 @@ impl Element {
                         }
                     },
                     AttrPrefixKind::WxIf(prefix_location) => {
-                        if let AttrPrefixParseResult::Value(value) =
-                            attr_value
-                        {
+                        if let AttrPrefixParseResult::Value(value) = attr_value {
                             if wx_if.is_some() {
                                 ps.add_warning(
                                     ParseErrorKind::DuplicatedAttribute,
@@ -1188,9 +1177,7 @@ impl Element {
                         }
                     }
                     AttrPrefixKind::WxElif(prefix_location) => {
-                        if let AttrPrefixParseResult::Value(value) =
-                            attr_value
-                        {
+                        if let AttrPrefixParseResult::Value(value) = attr_value {
                             if wx_elif.is_some() {
                                 ps.add_warning(
                                     ParseErrorKind::DuplicatedAttribute,
@@ -1223,9 +1210,7 @@ impl Element {
                         }
                     }
                     AttrPrefixKind::WxFor(prefix_location) => {
-                        if let AttrPrefixParseResult::Value(value) =
-                            attr_value
-                        {
+                        if let AttrPrefixParseResult::Value(value) = attr_value {
                             if wx_for.is_some() {
                                 ps.add_warning(
                                     ParseErrorKind::DuplicatedAttribute,
@@ -1297,9 +1282,7 @@ impl Element {
                     }
                     AttrPrefixKind::TemplateIs => match &mut element {
                         ElementKind::TemplateRef { target, .. } => {
-                            if let AttrPrefixParseResult::Value(value) =
-                                attr_value
-                            {
+                            if let AttrPrefixParseResult::Value(value) = attr_value {
                                 if target.1.location().end != default_attr_position {
                                     ps.add_warning(
                                         ParseErrorKind::DuplicatedAttribute,
@@ -1315,9 +1298,7 @@ impl Element {
                     },
                     AttrPrefixKind::TemplateData => match &mut element {
                         ElementKind::TemplateRef { data, .. } => {
-                            if let AttrPrefixParseResult::Value(value) =
-                                attr_value
-                            {
+                            if let AttrPrefixParseResult::Value(value) = attr_value {
                                 if data.1.location().end != default_attr_position {
                                     ps.add_warning(
                                         ParseErrorKind::DuplicatedAttribute,
@@ -1388,9 +1369,7 @@ impl Element {
                     },
                     AttrPrefixKind::Model(prefix_location) => match &mut element {
                         ElementKind::Normal { attributes, .. } => {
-                            if let AttrPrefixParseResult::Value(value) =
-                                attr_value
-                            {
+                            if let AttrPrefixParseResult::Value(value) = attr_value {
                                 if attributes
                                     .iter()
                                     .find(|x| x.name.name_eq(&attr_name))
@@ -1423,9 +1402,7 @@ impl Element {
                         ElementKind::Normal {
                             change_attributes, ..
                         } => {
-                            if let AttrPrefixParseResult::Value(value) =
-                                attr_value
-                            {
+                            if let AttrPrefixParseResult::Value(value) = attr_value {
                                 if change_attributes
                                     .iter()
                                     .find(|x| x.name.name_eq(&attr_name))
@@ -1487,9 +1464,7 @@ impl Element {
                     },
                     AttrPrefixKind::Data(prefix_location) => match &mut element {
                         ElementKind::Normal { common, .. } | ElementKind::Slot { common, .. } => {
-                            if let AttrPrefixParseResult::Value(value) =
-                                attr_value
-                            {
+                            if let AttrPrefixParseResult::Value(value) = attr_value {
                                 if common
                                     .data
                                     .iter()
@@ -1519,9 +1494,7 @@ impl Element {
                     },
                     AttrPrefixKind::DataHyphen => match &mut element {
                         ElementKind::Normal { common, .. } | ElementKind::Slot { common, .. } => {
-                            if let AttrPrefixParseResult::Value(value) =
-                                attr_value
-                            {
+                            if let AttrPrefixParseResult::Value(value) = attr_value {
                                 if common
                                     .data
                                     .iter()
@@ -1679,9 +1652,7 @@ impl Element {
                     }
                     AttrPrefixKind::Mark(prefix_location) => match &mut element {
                         ElementKind::Normal { common, .. } | ElementKind::Slot { common, .. } => {
-                            if let AttrPrefixParseResult::Value(value) =
-                                attr_value
-                            {
+                            if let AttrPrefixParseResult::Value(value) = attr_value {
                                 if common
                                     .marks
                                     .iter()
@@ -3454,6 +3425,15 @@ impl Script {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn meta_tag_parsing() {
+        case!("<!META>", "<!META>", ParseErrorKind::UnknownMetaTag, 0..7);
+        case!("<!META aA>", "<!META aA>", ParseErrorKind::UnknownMetaTag, 0..10);
+        case!(r#"<!META aA="">"#, r#"<!META aA="">"#, ParseErrorKind::UnknownMetaTag, 0..13);
+        case!(r#"<!META aA={{ 1 }}>"#, r#"<!META aA="{{1}}">"#, ParseErrorKind::UnknownMetaTag, 0..18);
+        case!(r#"<!META aA="a {{ 1 }}">"#, r#"<!META aA="a {{1}}">"#, ParseErrorKind::UnknownMetaTag, 0..22);
+    }
 
     #[test]
     fn value_parsing() {
