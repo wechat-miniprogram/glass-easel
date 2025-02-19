@@ -139,11 +139,17 @@ impl Stringify for Node {
             Node::UnknownMetaTag(t) => {
                 stringifier.write_str(r#"<!"#)?;
                 for (i, name) in t.tag_name.iter().enumerate() {
-                    if i > 0 { stringifier.write_str(":")?; }
+                    if i > 0 {
+                        stringifier.write_str(":")?;
+                    }
                     stringifier.write_ident(name, true)?;
                 }
                 for attr in t.attributes.iter() {
-                    write_custom_attr(stringifier, &attr.colon_separated_name, attr.value.as_ref())?;
+                    write_custom_attr(
+                        stringifier,
+                        &attr.colon_separated_name,
+                        attr.value.as_ref(),
+                    )?;
                 }
                 stringifier.write_str(r#">"#)?;
             }
@@ -178,7 +184,9 @@ fn write_custom_attr<'s, W: FmtWrite>(
 ) -> FmtResult {
     stringifier.write_str(" ")?;
     for (i, name) in name.iter().enumerate() {
-        if i > 0 { stringifier.write_str(":")?; }
+        if i > 0 {
+            stringifier.write_str(":")?;
+        }
         stringifier.write_ident(name, true)?;
     }
     if let Some(value) = value {

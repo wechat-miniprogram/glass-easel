@@ -3429,10 +3429,30 @@ mod test {
     #[test]
     fn meta_tag_parsing() {
         case!("<!META>", "<!META>", ParseErrorKind::UnknownMetaTag, 0..7);
-        case!("<!META aA>", "<!META aA>", ParseErrorKind::UnknownMetaTag, 0..10);
-        case!(r#"<!META aA="">"#, r#"<!META aA="">"#, ParseErrorKind::UnknownMetaTag, 0..13);
-        case!(r#"<!META aA={{ 1 }}>"#, r#"<!META aA="{{1}}">"#, ParseErrorKind::UnknownMetaTag, 0..18);
-        case!(r#"<!META aA="a {{ 1 }}">"#, r#"<!META aA="a {{1}}">"#, ParseErrorKind::UnknownMetaTag, 0..22);
+        case!(
+            "<!META aA>",
+            "<!META aA>",
+            ParseErrorKind::UnknownMetaTag,
+            0..10
+        );
+        case!(
+            r#"<!META aA="">"#,
+            r#"<!META aA="">"#,
+            ParseErrorKind::UnknownMetaTag,
+            0..13
+        );
+        case!(
+            r#"<!META aA={{ 1 }}>"#,
+            r#"<!META aA="{{1}}">"#,
+            ParseErrorKind::UnknownMetaTag,
+            0..18
+        );
+        case!(
+            r#"<!META aA="a {{ 1 }}">"#,
+            r#"<!META aA="a {{1}}">"#,
+            ParseErrorKind::UnknownMetaTag,
+            0..22
+        );
     }
 
     #[test]
