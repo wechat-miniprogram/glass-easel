@@ -275,7 +275,10 @@ pub struct Comment {
 
 impl Comment {
     pub fn new(content: &str, location: Range<Position>) -> Self {
-        Self { content: content.to_string(), location }
+        Self {
+            content: content.to_string(),
+            location,
+        }
     }
 }
 
@@ -3138,7 +3141,11 @@ impl Value {
         expression: Box<Expression>,
         double_brace_location: (Range<Position>, Range<Position>),
     ) -> Self {
-        Self::Dynamic { expression, double_brace_location, binding_map_keys: None }
+        Self::Dynamic {
+            expression,
+            double_brace_location,
+            binding_map_keys: None,
+        }
     }
 
     fn parse_data_binding(ps: &mut ParseState, is_template_data: bool) -> Option<Self> {

@@ -7,7 +7,7 @@ macro_rules! iter {
             cur: usize,
             cur_branch: usize,
         }
-        
+
         impl<'a> $t<'a> {
             pub(super) fn new(parent: &'a $($mut_t)* Element) -> Self {
                 Self {
@@ -17,10 +17,10 @@ macro_rules! iter {
                 }
             }
         }
-        
+
         impl<'a> Iterator for $t<'a> {
             type Item = &'a $($mut_t)* Node;
-        
+
             fn next(&mut self) -> Option<Self::Item> {
                 match & $($mut_t)* self.parent.kind {
                     ElementKind::Normal { children, .. }
@@ -67,7 +67,7 @@ macro_rules! iter {
                     | ElementKind::Slot { .. } => None,
                 }
             }
-        
+
             fn size_hint(&self) -> (usize, Option<usize>) {
                 let count = match &self.parent.kind {
                     ElementKind::Normal { children, .. }
@@ -112,7 +112,9 @@ mod test {
         let (mut template, _) = crate::parse::parse("TEST", SRC);
         fn rec(node: &mut Node, visited: &mut String) {
             if let Node::Text(v) = node {
-                let Value::Static { value, .. } = v else { unreachable!() };
+                let Value::Static { value, .. } = v else {
+                    unreachable!()
+                };
                 visited.push_str(&value);
                 *value = "".into();
             }
