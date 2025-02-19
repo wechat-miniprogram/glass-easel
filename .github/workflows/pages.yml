@@ -68,7 +68,7 @@ jobs:
           mv glass-easel/docs github-pages/docs/glass-easel
           mv glass-easel-miniprogram-adapter/docs github-pages/docs/glass-easel-miniprogram-adapter
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v1
+        uses: actions/upload-pages-artifact@v3
         with:
           path: 'github-pages'
       - name: Deploy to GitHub Pages
