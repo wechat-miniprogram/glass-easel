@@ -93,7 +93,7 @@ if (jobs.length) {
       'domlike-global': () => genConfig('domlike', 'domlike.global', 'iife', dev),
     } as Record<string, () => RollupOptions>
     if (!map[name]) throw new Error(`Unknown job: ${name}`)
-    config.push(map[name]())
+    config.push(map[name]!())
   })
 } else if (dev) {
   config.push(genConfig('dynamic', 'all.es', 'es', true))

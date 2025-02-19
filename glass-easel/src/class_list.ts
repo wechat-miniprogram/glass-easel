@@ -442,7 +442,7 @@ export class ClassList {
   ): boolean {
     const backendElement = this._$element._$backendElement
     const rawClassIndex = this._$rawNames[segmentIndex]
-      ? this._$rawNames[segmentIndex].indexOf(name)
+      ? this._$rawNames[segmentIndex]!.indexOf(name)
       : -1
     const isAdd = force === undefined ? rawClassIndex === -1 : !!force
 
@@ -453,7 +453,7 @@ export class ClassList {
         if (!rawNames[segmentIndex]) {
           rawNames[segmentIndex] = []
         }
-        const names = rawNames[segmentIndex]
+        const names = rawNames[segmentIndex]!
         names.push(name)
         if (backendElement) {
           if (BM.SHADOW || (BM.DYNAMIC && this._$element.getBackendMode() === BackendMode.Shadow)) {

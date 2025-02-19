@@ -947,7 +947,7 @@ export class ProcGenWrapper {
   private tryCallPropertyChangeListener(elem: Element, name: string, v: unknown) {
     const tmplArgs = getTmplArgs(elem)
     if (tmplArgs.changeProp?.[name]) {
-      const lv = tmplArgs.changeProp[name]
+      const lv = tmplArgs.changeProp[name]!
       const oldValue = lv.oldValue
       if (oldValue !== v) {
         lv.oldValue = v
@@ -1063,7 +1063,7 @@ export class ProcGenWrapper {
       if (!tmplArgs.dynEvListeners) tmplArgs.dynEvListeners = {}
       const dynEvListeners = tmplArgs.dynEvListeners
       if (dynEvListeners[evName]) {
-        elem.removeListener(evName, dynEvListeners[evName], evOptions)
+        elem.removeListener(evName, dynEvListeners[evName]!, evOptions)
       }
       dynEvListeners[evName] = listener
     }

@@ -139,8 +139,8 @@ export const generateRelationDefinitionGroup = (relations?: {
     const relation = relations[key]!
     const relationType = relation.type
     if (defs[relationType]) {
-      keyMap[key] = [relationType, defs[relationType].length]
-      defs[relationType].push(relation)
+      keyMap[key] = [relationType, defs[relationType]!.length]
+      defs[relationType]!.push(relation)
     } else {
       keyMap[key] = [relationType, 0]
       defs[relationType] = [relation]
@@ -216,8 +216,8 @@ export class Relation {
     const keyMap = this._$group!.keyMap
     const relationType = relation.type
     if (defs[relationType]) {
-      keyMap[key] = [relationType, defs[relationType].length]
-      defs[relationType].push(relation)
+      keyMap[key] = [relationType, defs[relationType]!.length]
+      defs[relationType]!.push(relation)
     } else {
       keyMap[key] = [relationType, 0]
       defs[relationType] = [relation]
@@ -226,7 +226,7 @@ export class Relation {
     if (linksGroup[relationType] === undefined) {
       linksGroup[relationType] = [null]
     } else {
-      linksGroup[relationType].push(null)
+      linksGroup[relationType]!.push(null)
     }
     return key
   }
