@@ -273,6 +273,12 @@ pub struct Comment {
     pub location: Range<Position>,
 }
 
+impl Comment {
+    pub fn new(content: &str, location: Range<Position>) -> Self {
+        Self { content: content.to_string(), location }
+    }
+}
+
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct UnknownMetaTag {
@@ -490,6 +496,10 @@ impl Element {
 
     pub fn iter_children(&self) -> super::iter::ChildrenIter {
         super::iter::ChildrenIter::new(self)
+    }
+
+    pub fn iter_children_mut(&mut self) -> super::iter::ChildrenIterMut {
+        super::iter::ChildrenIterMut::new(self)
     }
 
     pub fn slot_value_refs(&self) -> Option<impl Iterator<Item = &StaticAttribute>> {
@@ -3109,7 +3119,7 @@ impl TemplateStructure for Value {
 }
 
 impl Value {
-    fn new_empty(pos: Position) -> Self {
+    pub fn new_empty(pos: Position) -> Self {
         Self::Static {
             value: CompactString::new_inline(""),
             location: pos..pos,
@@ -3122,6 +3132,13 @@ impl Value {
         } else {
             false
         }
+    }
+
+    pub fn new_expression(
+        expression: Box<Expression>,
+        double_brace_location: (Range<Position>, Range<Position>),
+    ) -> Self {
+        Self::Dynamic { expression, double_brace_location, binding_map_keys: None }
     }
 
     fn parse_data_binding(ps: &mut ParseState, is_template_data: bool) -> Option<Self> {

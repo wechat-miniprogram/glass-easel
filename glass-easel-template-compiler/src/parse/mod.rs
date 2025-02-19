@@ -154,7 +154,7 @@ impl<'s> ParseState<'s> {
     }
 
     /// Try parse with `f` , reverting the state if it returns `None` .
-    pub fn try_parse<T>(&mut self, f: impl FnOnce(&mut Self) -> Option<T>) -> Option<T> {
+    pub(crate) fn try_parse<T>(&mut self, f: impl FnOnce(&mut Self) -> Option<T>) -> Option<T> {
         let prev = self.cur_index;
         let prev_line = self.line;
         let prev_utf16_col = self.utf16_col;
@@ -184,7 +184,7 @@ impl<'s> ParseState<'s> {
         }
     }
 
-    pub fn skip_until_before(&mut self, until: &str) -> Option<&'s str> {
+    pub(crate) fn skip_until_before(&mut self, until: &str) -> Option<&'s str> {
         let s = self.cur_str();
         if let Some(index) = s.find(until) {
             let ret = &s[..index];
@@ -196,7 +196,7 @@ impl<'s> ParseState<'s> {
         }
     }
 
-    pub fn skip_until_after(&mut self, until: &str) -> Option<&'s str> {
+    pub(crate) fn skip_until_after(&mut self, until: &str) -> Option<&'s str> {
         let ret = self.skip_until_before(until);
         if ret.is_some() {
             self.skip_bytes(until.len());
@@ -204,14 +204,14 @@ impl<'s> ParseState<'s> {
         ret
     }
 
-    pub fn peek_chars(&mut self) -> impl 's + Iterator<Item = char> {
+    pub(crate) fn peek_chars(&mut self) -> impl 's + Iterator<Item = char> {
         if let Some(f) = self.auto_skip_whitespace.as_ref() {
             f(self);
         }
         self.cur_str().chars()
     }
 
-    pub fn peek_n<const N: usize>(&mut self) -> Option<[char; N]> {
+    pub(crate) fn peek_n<const N: usize>(&mut self) -> Option<[char; N]> {
         let mut ret: [char; N] = ['\x00'; N];
         let mut iter = self.peek_chars();
         for i in 0..N {
@@ -220,7 +220,7 @@ impl<'s> ParseState<'s> {
         Some(ret)
     }
 
-    pub fn peek<const I: usize>(&mut self) -> Option<char> {
+    pub(crate) fn peek<const I: usize>(&mut self) -> Option<char> {
         let mut iter = self.peek_chars();
         for _ in 0..I {
             iter.next()?;
@@ -228,7 +228,7 @@ impl<'s> ParseState<'s> {
         iter.next()
     }
 
-    pub fn peek_str(&mut self, s: &str) -> bool {
+    pub(crate) fn peek_str(&mut self, s: &str) -> bool {
         if let Some(f) = self.auto_skip_whitespace.as_ref() {
             f(self);
         }
@@ -279,7 +279,7 @@ impl<'s> ParseState<'s> {
     }
 
     /// Consume the specified string if it matches the peek of the input.
-    pub fn consume_str(&mut self, s: &str) -> Option<Range<Position>> {
+    pub(crate) fn consume_str(&mut self, s: &str) -> Option<Range<Position>> {
         self.consume_str_except_followed(s, [])
     }
 
@@ -301,7 +301,7 @@ impl<'s> ParseState<'s> {
         }
     }
 
-    pub fn next(&mut self) -> Option<char> {
+    pub(crate) fn next(&mut self) -> Option<char> {
         if let Some(f) = self.auto_skip_whitespace.as_ref() {
             f(self);
         }
@@ -320,7 +320,7 @@ impl<'s> ParseState<'s> {
         Some(ret)
     }
 
-    pub fn skip_whitespace(&mut self) -> Option<Range<Position>> {
+    pub(crate) fn skip_whitespace(&mut self) -> Option<Range<Position>> {
         let mut start_pos = None;
         let s = self.cur_str();
         let mut i = s.char_indices();
@@ -370,17 +370,17 @@ impl<'s> ParseState<'s> {
     ///
     /// Panics if the start or the end is not at a character boundary.
     ///
-    pub fn code_slice(&self, range: Range<usize>) -> &'s str {
+    pub(crate) fn code_slice(&self, range: Range<usize>) -> &'s str {
         &self.whole_str[range]
     }
 
     /// Get the current UTF-8 byte index in the input.
-    pub fn cur_index(&self) -> usize {
+    pub(crate) fn cur_index(&self) -> usize {
         self.cur_index as usize
     }
 
     /// Get the current position.
-    pub fn position(&self) -> Position {
+    pub(crate) fn position(&self) -> Position {
         Position {
             line: self.line,
             utf16_col: self.utf16_col,
