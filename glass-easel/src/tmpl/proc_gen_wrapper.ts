@@ -1060,7 +1060,7 @@ export class ProcGenWrapper {
       capture,
       generalLvaluePath,
     )
-    if (ENV.DEV) {
+    if (ENV.DEV && listener) {
       Object.defineProperty(listener, 'name', {
         value: typeof handler === 'string' ? handler : handler.name,
       })
