@@ -21,6 +21,7 @@ export class NativeNode extends Element {
   /* @internal */
   private _$modelBindingListeners?: { [name: string]: ModelBindingListener }
 
+  /* @internal */
   /* istanbul ignore next */
   constructor() {
     throw new Error('Element cannot be constructed directly')
@@ -30,6 +31,7 @@ export class NativeNode extends Element {
 
   static isNativeNode = isNativeNode
 
+  /* @internal */
   static create(
     tagName: string,
     owner: ShadowRoot,

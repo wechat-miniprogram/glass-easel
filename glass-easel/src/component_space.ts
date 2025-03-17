@@ -27,6 +27,16 @@ import {
 } from './global_options'
 import { TraitBehavior } from './trait_behaviors'
 import { safeCallback } from './func_arr'
+import { type NativeNode } from './native_node'
+import { type TextNode } from './text_node'
+
+export type MiddlewareHook<R, T extends any[]> = (next: (...metadata: T) => R, ...metadata: T) => R
+
+export type ComponentSpaceHooks = {
+  createTextNode: MiddlewareHook<TextNode, [string]>
+  createNativeNode: MiddlewareHook<NativeNode, [string, string]>
+  createComponent: MiddlewareHook<GeneralComponent, [string, GeneralComponentDefinition]>
+}
 
 const normalizePath = (path: string, basePath: string): string => {
   let slices: string[]
@@ -140,7 +150,12 @@ export class ComponentSpace {
   private _$defaultComponent: string
   /** @internal */
   private _$componentOptions: NormalizedComponentOptions
-  styleScopeManager: StyleScopeManager
+  /**
+   * The corresponding `styleScopeManager`.
+   *
+   * A `styleScopeManager` can be shared by multiple component spaces.
+   */
+  readonly styleScopeManager: StyleScopeManager
   /** @internal */
   private _$listWaiting = Object.create(null) as {
     [path: string]: ComponentWaitingList
@@ -161,6 +176,12 @@ export class ComponentSpace {
   _$allowUnusedNativeNode = true
   /** @internal */
   _$sharedStyleScope = 0
+  /** The hooks used to alter some workflow within this component space. */
+  readonly hooks: ComponentSpaceHooks = {
+    createTextNode: (next, text) => next(text),
+    createNativeNode: (next, tagName, stylingName) => next(tagName, stylingName),
+    createComponent: (next, tagName, definition) => next(tagName, definition),
+  }
 
   /**
    * Create a new component space

@@ -291,4 +291,89 @@ describe('Component Space', () => {
     expect((a.$$ as unknown as HTMLElement).tagName).toBe('C')
     expect((b.$$ as unknown as HTMLElement).tagName).toBe('SPAN')
   })
+
+  describe('Hooks', () => {
+    test('`createTextNode` hook', () => {
+      const cs = new glassEasel.ComponentSpace()
+      const compDef = cs.defineComponent({
+        is: 'comp/parent',
+        data: {
+          br: false,
+        },
+        template: tmpl(`
+          <div>ABC</div>
+        `),
+      })
+      let callCount = 0
+      cs.hooks.createTextNode = (next, text) => {
+        callCount += 1
+        expect(text).toBe('ABC')
+        const ret = next(text)
+        expect(ret.textContent).toBe('ABC')
+        return ret
+      }
+      glassEasel.Component.createWithContext('root', compDef, domBackend)
+      expect(callCount).toBe(1)
+    })
+
+    test('`createNativeNode` hook', () => {
+      const cs = new glassEasel.ComponentSpace()
+      const compDef = cs.defineComponent({
+        is: 'comp/parent',
+        data: {
+          br: false,
+        },
+        template: tmpl(`
+          <div wx:if="{{ br }}" />
+          <native-node wx:else />
+        `),
+      })
+      cs.setGlobalUsingComponent('native-node', 'span')
+      let callCount = 0
+      cs.hooks.createNativeNode = (next, tagName, stylingName) => {
+        callCount += 1
+        expect(tagName).toBe('span')
+        expect(stylingName).toBe('native-node')
+        const ret = next(tagName, stylingName)
+        expect(ret.is).toBe('span')
+        return ret
+      }
+      const root = glassEasel.Component.createWithContext('root', compDef, domBackend)
+      cs.hooks.createNativeNode = (next, tagName, stylingName) => {
+        callCount += 1
+        expect(tagName).toBe('div')
+        expect(stylingName).toBe('div')
+        return next(tagName, stylingName)
+      }
+      root.setData({ br: true })
+      expect(callCount).toBe(2)
+    })
+
+    test('`createComponent` hook', () => {
+      const cs = new glassEasel.ComponentSpace()
+      const childCompDef = cs.defineComponent({
+        is: 'comp/child',
+      })
+      const compDef = cs.defineComponent({
+        is: 'comp/parent',
+        using: {
+          c: 'child',
+        },
+        template: tmpl(`
+          <c />
+        `),
+      })
+      let callCount = 0
+      cs.hooks.createComponent = (next, tagName, def) => {
+        callCount += 1
+        expect(tagName).toBe('c')
+        expect(def).toBe(childCompDef)
+        const ret = next(tagName, def)
+        expect(ret.is).toBe('comp/child')
+        return ret
+      }
+      glassEasel.Component.createWithContext('root', compDef, domBackend)
+      expect(callCount).toBe(1)
+    })
+  })
 })
