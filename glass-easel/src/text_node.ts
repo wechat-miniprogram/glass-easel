@@ -44,6 +44,7 @@ export class TextNode implements NodeCast {
   /** @internal */
   _$mutationObserverTarget: MutationObserverTarget | null = null
 
+  /* @internal */
   constructor(text: string, owner: ShadowRoot) {
     this._$text = String(text)
     let backendElement: GeneralBackendElement | null = null
@@ -70,6 +71,7 @@ export class TextNode implements NodeCast {
 
   static isTextNode = isTextNode
 
+  /* @internal */
   static create(text: string, ownerShadowRoot: ShadowRoot): TextNode {
     return new TextNode(text, ownerShadowRoot)
   }
