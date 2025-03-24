@@ -765,7 +765,7 @@ export class BehaviorBuilder<
     const behavior = new Behavior(this)
     const compDef = new ComponentDefinition(behavior)
     if (is !== undefined) {
-      this._$ownerSpace._$registerComponent(is, compDef as unknown as GeneralComponentDefinition)
+      this._$ownerSpace.registerComponent(is, compDef as unknown as GeneralComponentDefinition)
     }
     return compDef
   }

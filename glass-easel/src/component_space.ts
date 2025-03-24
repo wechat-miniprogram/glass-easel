@@ -412,8 +412,7 @@ export class ComponentSpace {
     return new BehaviorBuilder(is, this)
   }
 
-  /** @internal */
-  _$registerComponent(is: string, comp: GeneralComponentDefinition) {
+  registerComponent(is: string, comp: GeneralComponentDefinition) {
     this._$list[is] = comp
     this._$behaviorList[is] = comp.behavior as unknown as GeneralBehavior
     const waiting = this._$listWaiting[is]
