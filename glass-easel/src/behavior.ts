@@ -1343,7 +1343,7 @@ export class Behavior<
     if (listeners !== undefined) {
       const keys = Object.keys(listeners)
       if (keys.length > 0) {
-        this._$listeners = []
+        if (!this._$listeners) this._$listeners = []
         for (let i = 0; i < keys.length; i += 1) {
           const k = keys[i]!
           const v = listeners[k]!
