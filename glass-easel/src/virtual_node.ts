@@ -9,6 +9,7 @@ export class VirtualNode extends Element {
   [VIRTUAL_NODE_SYMBOL]: true
   is: string
 
+  /* @internal */
   /* istanbul ignore next */
   constructor() {
     throw new Error('Element cannot be constructed directly')
@@ -43,6 +44,7 @@ export class VirtualNode extends Element {
 
   static isVirtualNode = isVirtualNode
 
+  /* @internal */
   static create(virtualName: string, owner: ShadowRoot): VirtualNode {
     const node = Object.create(VirtualNode.prototype) as VirtualNode
     node._$initializeVirtual(virtualName, owner, owner.getBackendContext())

@@ -136,6 +136,6 @@ void tmpl_parse_warning_array_free(TmplParseWarningArray self);
 
 void tmpl_parse_warning_free(TmplParseWarning self);
 
-} // extern "C"
+}  // extern "C"
 
-} // namespace glass_easel_template_compiler
+}  // namespace glass_easel_template_compiler

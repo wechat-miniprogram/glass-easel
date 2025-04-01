@@ -423,16 +423,16 @@ export class ClassList {
     let index: number
     for (index = 0; index < oldClassNames.length; index += 1) {
       if (name === oldClassNames[index] && scopeId === oldScopeIds[index]) {
+        if (classNamesCount[index]! <= 1) {
+          oldClassNames.splice(index, 1)
+          oldScopeIds.splice(index, 1)
+          classNamesCount.splice(index, 1)
+          this._$removeClassFromBackend(name, scopeId, backendElement)
+        } else {
+          classNamesCount[index]! -= 1
+        }
         break
       }
-    }
-    if (classNamesCount[index]! <= 1) {
-      oldClassNames.splice(index, 1)
-      oldScopeIds.splice(index, 1)
-      classNamesCount.splice(index, 1)
-      this._$removeClassFromBackend(name, scopeId, backendElement)
-    } else {
-      classNamesCount[index]! -= 1
     }
   }
 

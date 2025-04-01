@@ -7,6 +7,7 @@ import {
   type GeneralComponent,
   type GeneralComponentDefinition,
 } from './component'
+import { type ComponentSpaceHooks } from './component_space'
 import { DeepCopyStrategy, getDeepCopyStrategy } from './data_proxy'
 import { deepCopy, simpleDeepCopy } from './data_utils'
 import { Element, type DoubleLinkedList } from './element'
@@ -34,6 +35,8 @@ export class ShadowRoot extends VirtualNode {
   [SHADOW_ROOT_SYMBOL]: true
   /* @internal */
   private _$host: GeneralComponent
+  /* @internal */
+  private _$hooks: ComponentSpaceHooks
   /** @internal */
   _$backendShadowRoot: backend.ShadowRootContext | null
   /* @internal */
@@ -115,6 +118,7 @@ export class ShadowRoot extends VirtualNode {
     node._$backendShadowRoot = be
     node._$initialize(true, be, node, host._$nodeTreeContext)
     node._$host = host
+    node._$hooks = host.getOwnerSpace().hooks
     host.shadowRoot = node
     if (be) {
       be.__wxElement = node
@@ -128,11 +132,15 @@ export class ShadowRoot extends VirtualNode {
   }
 
   createTextNode(text = ''): TextNode {
-    return new TextNode(text, this)
+    return this._$hooks.createTextNode((text) => new TextNode(text, this), text)
   }
 
   createNativeNode(tagName: string): NativeNode {
-    return NativeNode.create(tagName, this)
+    return this._$hooks.createNativeNode(
+      (tagName, stylingName) => NativeNode.create(tagName, this, stylingName),
+      tagName,
+      tagName,
+    )
   }
 
   createVirtualNode(virtualName = 'virtual'): VirtualNode {
@@ -146,12 +154,11 @@ export class ShadowRoot extends VirtualNode {
     initPropValues?: (comp: NativeNode) => void,
   ): NativeNode {
     const extendedDef = this._$host._$behavior.ownerSpace.getExtendedNativeNode(tagName)
-    const ret = NativeNode.create(
+    const ret = this._$hooks.createNativeNode(
+      (tagName, stylingName) =>
+        NativeNode.create(tagName, this, stylingName, extendedDef, placeholderHandlerRemover),
       tagName,
-      this,
       stylingName,
-      extendedDef,
-      placeholderHandlerRemover,
     )
     initPropValues?.(ret)
     return ret
@@ -213,14 +220,19 @@ export class ShadowRoot extends VirtualNode {
         )
       }
       if (usingTarget) {
-        return Component._$advancedCreate(
+        return this._$hooks.createComponent(
+          (tagName, usingTarget) =>
+            Component._$advancedCreate(
+              tagName,
+              usingTarget,
+              this,
+              null,
+              convertGenerics(usingTarget, beh, host, genericTargets),
+              placeholderHandlerRemover,
+              initPropValues,
+            ),
           tagName,
           usingTarget,
-          this,
-          null,
-          convertGenerics(usingTarget, beh, host, genericTargets),
-          placeholderHandlerRemover,
-          initPropValues,
         )
       }
     }
@@ -241,14 +253,19 @@ export class ShadowRoot extends VirtualNode {
     if (typeof comp === 'string') {
       return this.createNativeNodeWithInit(comp, tagName, undefined, initPropValues)
     }
-    return Component._$advancedCreate(
+    return this._$hooks.createComponent(
+      (tagName, comp) =>
+        Component._$advancedCreate(
+          tagName,
+          comp,
+          this,
+          null,
+          convertGenerics(comp, beh, host, genericTargets),
+          undefined,
+          initPropValues,
+        ),
       tagName,
       comp,
-      this,
-      null,
-      convertGenerics(comp, beh, host, genericTargets),
-      undefined,
-      initPropValues,
     )
   }
 
@@ -256,7 +273,12 @@ export class ShadowRoot extends VirtualNode {
     tagName: string,
     componentDef: GeneralComponentDefinition,
   ): GeneralComponent {
-    return Component._$advancedCreate(tagName, componentDef, this, null, null, undefined)
+    return this._$hooks.createComponent(
+      (tagName, compDef) =>
+        Component._$advancedCreate(tagName, compDef, this, null, null, undefined),
+      tagName,
+      componentDef,
+    )
   }
 
   /**
@@ -281,20 +303,29 @@ export class ShadowRoot extends VirtualNode {
       return this.createNativeNodeWithInit(comp, tagName, undefined, initPropValues)
     }
     if (comp) {
-      return Component._$advancedCreate(
+      return this._$hooks.createComponent(
+        (tagName, comp) =>
+          Component._$advancedCreate(
+            tagName,
+            comp,
+            this,
+            null,
+            convertGenerics(comp, beh, host, genericTargets),
+            undefined,
+            initPropValues,
+          ),
         tagName,
         comp,
-        this,
-        null,
-        convertGenerics(comp, beh, host, genericTargets),
-        undefined,
-        initPropValues,
       )
     }
 
     if (space._$allowUnusedNativeNode) {
       // use native node otherwise
-      const node = NativeNode.create(tagName, this)
+      const node = this._$hooks.createNativeNode(
+        (tagName) => NativeNode.create(tagName, this),
+        tagName,
+        tagName,
+      )
       initPropValues?.(node)
       return node
     }
