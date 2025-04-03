@@ -500,6 +500,7 @@ pub enum ParseErrorKind {
     ShouldQuoted,
     EmptyExpression,
     InvalidEndTag,
+    DeprecatedAttribute,
 }
 
 impl ParseErrorKind {
@@ -536,6 +537,7 @@ impl ParseErrorKind {
             Self::ShouldQuoted => "should be quoted",
             Self::EmptyExpression => "the expression is empty",
             Self::InvalidEndTag => "invalid end tag",
+            Self::DeprecatedAttribute => "this attribute is deprecated",
         }
     }
 
@@ -572,6 +574,7 @@ impl ParseErrorKind {
             Self::ShouldQuoted => ParseErrorLevel::Warn,
             Self::EmptyExpression => ParseErrorLevel::Warn,
             Self::InvalidEndTag => ParseErrorLevel::Warn,
+            Self::DeprecatedAttribute => ParseErrorLevel::Warn,
         }
     }
 }
