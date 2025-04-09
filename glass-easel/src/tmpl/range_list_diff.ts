@@ -208,7 +208,20 @@ export class RangeListManager {
         updatePathTree = new Array(newRawKeys.length)
         for (let i = 0; i < newRawKeys.length; i += 1) {
           const k = newRawKeys[i]!
-          if (oldSharedKeyMap?.[k] !== undefined || newSharedKeyMap?.[k] !== undefined) {
+          let isSharedKey = false
+          if (oldSharedKeyMap || newSharedKeyMap) {
+            const splitPos = k.lastIndexOf('--')
+            if (splitPos >= 0) {
+              const oriKey = k.slice(0, splitPos)
+              if (
+                oldSharedKeyMap?.[oriKey] !== undefined ||
+                newSharedKeyMap?.[oriKey] !== undefined
+              ) {
+                isSharedKey = true
+              }
+            }
+          }
+          if (isSharedKey) {
             updatePathTree[i] = true
           } else {
             const subTree = (oriUpdatePathTree as { [s: string]: UpdatePathTreeNode })[i] as
