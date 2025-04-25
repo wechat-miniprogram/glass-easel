@@ -30,15 +30,14 @@ jobs:
         uses: pnpm/action-setup@v2
         with:
           version: latest
-      - name: Setup node ${{ matrix.node-version }}
+      - name: Setup node
         uses: actions/setup-node@v3
         with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'pnpm'
+          node-version: 20
       - name: Install
         uses: pnpm/action-setup@v2
         with:
-          version: latest
+          version: 9
           run_install: |
             - recursive: true
               args: [--frozen-lockfile, --strict-peer-dependencies]
@@ -69,9 +68,9 @@ jobs:
           mv glass-easel/docs github-pages/docs/glass-easel
           mv glass-easel-miniprogram-adapter/docs github-pages/docs/glass-easel-miniprogram-adapter
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v1
+        uses: actions/upload-pages-artifact@v3
         with:
           path: 'github-pages'
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v2
+        uses: actions/deploy-pages@v4

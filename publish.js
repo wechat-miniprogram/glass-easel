@@ -118,7 +118,7 @@ if (gitStatusRes.status !== 0 || gitStatusRes.stdout.length > 0) {
 // pnpm install
 console.info('Run pnpm install')
 if (childProcess.spawnSync('pnpm', ['install'], { stdio: 'inherit' }).status !== 0) {
-  throw new Error('failed to clean glass-easel dist')
+  throw new Error('failed to pnpm install')
 }
 
 // generate cbindgen files for template compiler
@@ -209,13 +209,13 @@ if (
 // cargo test
 console.info('Run cargo test')
 if (childProcess.spawnSync('cargo', ['test'], { stdio: 'inherit' }).status !== 0) {
-  throw new Error('failed to clean glass-easel dist')
+  throw new Error('failed to cargo test')
 }
 
 // npm test
 console.info('Run pnpm test')
 if (childProcess.spawnSync('pnpm', ['test', '-r'], { stdio: 'inherit' }).status !== 0) {
-  throw new Error('failed to clean glass-easel dist')
+  throw new Error('failed to pnpm test')
 }
 
 // add lock files
@@ -238,7 +238,7 @@ if (
 ;['glass-easel-template-compiler', 'glass-easel-stylesheet-compiler'].forEach((p) => {
   console.info(`Publish ${p} to crates.io`)
   if (childProcess.spawnSync('cargo', ['publish', '-p', p], { stdio: 'inherit' }).status !== 0) {
-    throw new Error('failed to execute wasm-pack on the template compiler')
+    throw new Error('failed to publish Cargo crates')
   }
 })
 
@@ -269,7 +269,7 @@ if (
       stdio: 'inherit',
     }).status !== 0
   ) {
-    throw new Error('failed to execute wasm-pack on the template compiler')
+    throw new Error('failed to publish NPM modules')
   }
 })
 

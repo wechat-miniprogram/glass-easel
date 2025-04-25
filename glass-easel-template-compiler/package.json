@@ -1,7 +1,7 @@
 {
   "name": "glass-easel-template-compiler",
   "description": "The template compiler of the glass-easel project.",
-  "version": "0.11.0",
+  "version": "0.12.1",
   "repository": {
     "type": "git",
     "url": "https://github.com/wechat-miniprogram/glass-easel.git"
@@ -24,6 +24,10 @@
   "browser": "pkg/glass_easel_template_compiler.js",
   "types": "pkg/glass_easel_template_compiler.d.ts",
   "scripts": {
-    "build": "wasm-pack build --target bundler && rollup -o pkg/glass_easel_template_compiler_bg.cjs.js -f cjs pkg/glass_easel_template_compiler_bg.js"
-  }
+    "build": "wasm-pack build --target bundler && mv pkg/package.json pkg/package.json.orig && rollup -o pkg/glass_easel_template_compiler_bg.cjs.js -f cjs pkg/glass_easel_template_compiler_bg.js"
+  },
+  "sideEffects": [
+    "pkg/glass_easel_template_compiler.js",
+    "pkg/snippets/*"
+  ]
 }

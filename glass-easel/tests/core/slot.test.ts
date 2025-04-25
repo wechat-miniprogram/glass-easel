@@ -341,6 +341,50 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     })
 
     describe('tmpl', () => {
+      test('should support slot value usages', () => {
+        const child = componentSpace
+          .define()
+          .options({ dynamicSlots: true, virtualHost: true })
+          .definition({
+            data: {
+              v: 123,
+            },
+            template: tmpl(`
+              <slot some-text="{{v}}" />
+            `),
+          })
+          .data(() => ({
+            sn: 'abc',
+          }))
+          .registerComponent()
+
+        const parent = componentSpace
+          .define()
+          .usingComponents({ child })
+          .definition({
+            template: tmpl(`
+              <child>
+                <div slot:some-text class="c{{someText}}">{{someText}}</div>
+              </child>
+            `),
+          })
+          .registerComponent()
+
+        const parentElem = glassEasel.Component.createWithContext(
+          'root',
+          parent.general(),
+          testBackend,
+        )
+        const childElem = parentElem.getShadowRoot()!.childNodes[0]!.asInstanceOf(child)!
+
+        expect(domHtml(parentElem)).toBe('<div class="c123">123</div>')
+        matchElementWithDom(parentElem)
+
+        childElem.setData({ v: 456 })
+        expect(domHtml(parentElem)).toBe('<div class="c456">456</div>')
+        matchElementWithDom(parentElem)
+      })
+
       test('should support slot content modification', () => {
         const child = componentSpace
           .define()

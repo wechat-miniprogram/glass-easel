@@ -1,6 +1,7 @@
 name: build-and-test
 on:
   push:
+    branches: ["master"]
   pull_request:
     branches:
       - master
@@ -25,11 +26,10 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'pnpm'
       - name: Install
         uses: pnpm/action-setup@v2
         with:
-          version: latest
+          version: 9
           run_install: |
             - recursive: true
               args: [--frozen-lockfile, --strict-peer-dependencies]
@@ -41,7 +41,7 @@ jobs:
       - name: Setup wasm-pack
         uses: jetli/wasm-pack-action@v0.4.0
         with:
-          version: 'v0.10.3'
+          version: 'v0.13.1'
       - name: Build
         run: |
           pnpm -r run build
