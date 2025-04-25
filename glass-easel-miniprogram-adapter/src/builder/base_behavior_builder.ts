@@ -424,7 +424,7 @@ export class BaseBehaviorBuilder<
       export: exports,
     } = def
     behaviors?.forEach((beh) => {
-      this._$parents.push(beh as GeneralBehavior)
+      this._$parents.push(beh)
       inner.behavior(beh._$)
     })
     if (rawData !== undefined) {
