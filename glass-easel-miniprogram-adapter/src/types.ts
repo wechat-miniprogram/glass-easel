@@ -1,5 +1,5 @@
 import { type DeepCopyKind, type typeUtils as utils } from 'glass-easel'
-import type { Behavior, DefinitionFilter, GeneralBehavior } from './behavior'
+import type { DefinitionFilter, GeneralBehavior } from './behavior'
 import { type GeneralComponent } from './component'
 
 export { typeUtils as utils } from 'glass-easel'
@@ -44,7 +44,7 @@ export type BehaviorDefinition<
   TMethod extends utils.MethodList,
   TComponentExport,
 > = {
-  behaviors?: Behavior<any, any, any, any, any>[]
+  behaviors?: GeneralBehavior[]
   properties?: TProperty
   data?: TData | (() => TData)
   observers?:
