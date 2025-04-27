@@ -17,7 +17,6 @@ export type GeneralBehavior = Behavior<
   Record<string, any>,
   Record<string, any>,
   Record<string, any>,
-  any,
   any
 >
 

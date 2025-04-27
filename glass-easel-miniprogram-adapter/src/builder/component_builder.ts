@@ -147,9 +147,7 @@ export class ComponentBuilder<
     >,
     TChainingFilter
   > {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    this._$export = f as any
-    return this as any
+    return super.export(f) as any
   }
 
   /**

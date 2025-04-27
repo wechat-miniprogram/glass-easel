@@ -807,6 +807,10 @@ impl Element {
                                 "for" => AttrPrefixKind::WxFor(x.location()),
                                 "for-index" => AttrPrefixKind::WxForIndex(x.location()),
                                 "for-item" => AttrPrefixKind::WxForItem(x.location()),
+                                "for-items" => {
+                                    ps.add_warning(ParseErrorKind::DeprecatedAttribute, x.location());
+                                    AttrPrefixKind::WxFor(x.location())
+                                },
                                 "key" => AttrPrefixKind::WxKey(x.location()),
                                 _ => AttrPrefixKind::Invalid(segs.first().unwrap().location()),
                             },

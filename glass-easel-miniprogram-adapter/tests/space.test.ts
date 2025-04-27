@@ -1119,27 +1119,36 @@ describe('define', () => {
       .behavior()
       .extraThisFieldsType<{ behDelayedData: string }>()
       .lifetime('created', function () {
-        this.behDelayedData = ' World!'
+        this.behDelayedData = 'Say hello'
+      })
+      .register()
+
+    const beh2 = codeSpace
+      .behavior()
+      .behavior(beh)
+      .extraThisFieldsType<{ beh2DelayedData: string }>()
+      .lifetime('created', function () {
+        this.beh2DelayedData = `${this.behDelayedData} to`
       })
       .register()
 
     codeSpace
       .component('path/to/comp')
-      .behavior(beh)
+      .behavior(beh2)
       .extraThisFieldsType<{ delayedData: string }>()
       .data(() => ({
         hello: '',
       }))
       .lifetime('created', function () {
-        this.delayedData = 'Hello'
+        this.delayedData = `${this.beh2DelayedData} glass-easel!`
         this.setData({
-          hello: this.delayedData + this.behDelayedData,
+          hello: this.delayedData,
         })
       })
       .register()
 
     const ab = env.associateBackend()
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
-    expect(domHtml(root.getComponent())).toBe('<div>Hello World!</div>')
+    expect(domHtml(root.getComponent())).toBe('<div>Say hello to glass-easel!</div>')
   })
 })

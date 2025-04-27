@@ -85,9 +85,17 @@ export class BehaviorBuilder<
     UProperty extends PropertyList,
     UMethod extends MethodList,
     UChainingFilter extends ChainingFilterType,
+    UComponentExport,
     UExtraThisFields extends DataList,
   >(
-    behavior: Behavior<UData, UProperty, UMethod, UChainingFilter, UExtraThisFields>,
+    behavior: Behavior<
+      UData,
+      UProperty,
+      UMethod,
+      UChainingFilter,
+      UComponentExport,
+      UExtraThisFields
+    >,
   ): ResolveBehaviorBuilder<
     BehaviorBuilder<
       TPrevData,
