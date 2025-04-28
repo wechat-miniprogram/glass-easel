@@ -33,7 +33,7 @@ export class Behavior<
   /** @internal */
   _$chainingFilter?: typeUtils.ChainingFilterFunc<any, any>
   /** @internal */
-  _$bindedDefinitionFilter?: (target: GeneralComponentDefinition) => void
+  _$boundDefinitionFilter?: (target: GeneralComponentDefinition) => void
   /** @internal */
   _$export?: (source: GeneralComponent | null) => TComponentExport
 
@@ -51,8 +51,8 @@ export class Behavior<
 
     // processing definition filter
     if (definitionFilter !== undefined) {
-      const definitionFilterArgs = parents.map((p) => p._$bindedDefinitionFilter ?? null)
-      this._$bindedDefinitionFilter = (childDef) => {
+      const definitionFilterArgs = parents.map((p) => p._$boundDefinitionFilter ?? null)
+      this._$boundDefinitionFilter = (childDef) => {
         definitionFilter(childDef, definitionFilterArgs)
       }
     }

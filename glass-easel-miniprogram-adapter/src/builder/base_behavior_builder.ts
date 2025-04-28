@@ -404,7 +404,7 @@ export class BaseBehaviorBuilder<
     >,
     TChainingFilter
   > {
-    def.behaviors?.forEach((beh) => beh._$bindedDefinitionFilter?.(def))
+    def.behaviors?.forEach((beh) => beh._$boundDefinitionFilter?.(def))
     const inner = this._$
     const {
       behaviors,
