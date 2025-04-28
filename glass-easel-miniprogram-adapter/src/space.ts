@@ -14,20 +14,29 @@ import type {
   PageDefinition,
   utils as typeUtils,
 } from './types'
-import type { Behavior } from './behavior'
+import type { DefaultBehaviorBuilder, DefaultComponentBuilder } from './builder'
+import type { Behavior, ComponentType } from './behavior'
 import type { Component } from './component'
 
 // The page constructor
 export interface PageConstructor {
   <TData extends DataList, TNewExtraFields extends { [k: PropertyKey]: any }>(
     definition: PageDefinition<TData, TNewExtraFields> &
-      ThisType<Component<TData, Empty, TNewExtraFields, undefined>>,
+      ThisType<
+        Component<
+          /* TData */ TData,
+          /* TProperty */ Empty,
+          /* TMethod */ TNewExtraFields,
+          /* TComponentExport */ never,
+          /* TExtraThisFields */ Empty
+        >
+      >,
   ): void
 }
 
 // The component constructor
 export interface ComponentConstructor {
-  (): ComponentBuilder
+  (): DefaultComponentBuilder
   <
     TData extends DataList,
     TProperty extends PropertyList,
@@ -35,21 +44,51 @@ export interface ComponentConstructor {
     TComponentExport,
   >(
     definition: ComponentDefinition<TData, TProperty, TMethod, TComponentExport> &
-      ThisType<Component<TData, TProperty, TMethod, TComponentExport>>,
-  ): void
+      ThisType<
+        Component<
+          /* TData */ TData,
+          /* TProperty */ TProperty,
+          /* TMethod */ TMethod,
+          /* TComponentExport */ TComponentExport,
+          /* TExtraThisFields */ Empty
+        >
+      >,
+  ): ComponentType<
+    /* TData */ TData,
+    /* TProperty */ TProperty,
+    /* TMethod */ TMethod,
+    /* TComponentExport */ TComponentExport,
+    /* TExtraThisFields */ Empty
+  >
 }
 
 // The behavior constructor
 export interface BehaviorConstructor {
-  (): BehaviorBuilder
+  (): DefaultBehaviorBuilder
   <
     TData extends DataList,
     TProperty extends PropertyList,
     TMethod extends MethodList,
     TComponentExport,
   >(
-    definition: BehaviorDefinition<TData, TProperty, TMethod, TComponentExport>,
-  ): Behavior<TData, TProperty, TMethod, never>
+    definition: BehaviorDefinition<TData, TProperty, TMethod, TComponentExport> &
+      ThisType<
+        Component<
+          /* TData */ TData,
+          /* TProperty */ TProperty,
+          /* TMethod */ TMethod,
+          /* TComponentExport */ TComponentExport,
+          /* TExtraThisFields */ Empty
+        >
+      >,
+  ): Behavior<
+    /* TData */ TData,
+    /* TProperty */ TProperty,
+    /* TMethod */ TMethod,
+    /* TChainingFilter */ never,
+    /* TComponentExport */ TComponentExport,
+    /* TExtraThisFields */ Empty
+  >
   trait<TIn extends { [key: string]: any }>(): TraitBehavior<TIn, TIn>
   trait<TIn extends { [key: string]: any }, TOut extends { [key: string]: any }>(
     trans: (impl: TIn) => TOut,
@@ -323,19 +362,35 @@ export class CodeSpace {
       TNewExtraFields extends { [k: PropertyKey]: any },
     >(
       definition: PageDefinition<TData, TNewExtraFields> &
-        ThisType<Component<TData, Empty, TNewExtraFields, undefined>>,
+        ThisType<
+          Component<
+            /* TData */ TData,
+            /* TProperty */ Empty,
+            /* TMethod */ TNewExtraFields,
+            /* TComponentExport */ never,
+            /* TExtraThisFields */ Empty
+          >
+        >,
     ) {
       return self.component(path).pageDefinition(definition).register()
     }
 
     // The component constructor
-    function componentConstructor(): ComponentBuilder
+    function componentConstructor(): DefaultComponentBuilder
     function componentConstructor<
       TData extends DataList,
       TProperty extends PropertyList,
       TMethod extends MethodList,
       TComponentExport,
-    >(definition: ComponentDefinition<TData, TProperty, TMethod, TComponentExport>): void
+    >(
+      definition: ComponentDefinition<TData, TProperty, TMethod, TComponentExport>,
+    ): ComponentType<
+      /* TData */ TData,
+      /* TProperty */ TProperty,
+      /* TMethod */ TMethod,
+      /* TComponentExport */ TComponentExport,
+      /* TExtraThisFields */ Empty
+    >
     function componentConstructor<
       TData extends DataList,
       TProperty extends PropertyList,
@@ -349,7 +404,7 @@ export class CodeSpace {
     }
 
     // The behavior constructor
-    function behaviorConstructor(): BehaviorBuilder
+    function behaviorConstructor(): DefaultBehaviorBuilder
     function behaviorConstructor<
       TData extends DataList,
       TProperty extends PropertyList,
@@ -357,7 +412,14 @@ export class CodeSpace {
       TComponentExport,
     >(
       definition: BehaviorDefinition<TData, TProperty, TMethod, TComponentExport>,
-    ): Behavior<TData, TProperty, TMethod, never>
+    ): Behavior<
+      /* TData */ TData,
+      /* TProperty */ TProperty,
+      /* TMethod */ TMethod,
+      /* TChainingFilter */ never,
+      /* TComponentExport */ TComponentExport,
+      /* TExtraThisFields */ Empty
+    >
     function behaviorConstructor<
       TData extends DataList,
       TProperty extends PropertyList,
@@ -385,7 +447,7 @@ export class CodeSpace {
    * The method do not need a definition environment, so the global object pollution is avoided.
    * `path` should be the component path (without ".js" extension).
    */
-  component(path: string): ComponentBuilder {
+  component(path: string): DefaultComponentBuilder {
     return ComponentBuilder.create(this, path, this.waitingAliasMap[path])
   }
 
@@ -394,7 +456,7 @@ export class CodeSpace {
    *
    * The method do not need a definition environment, so the global object pollution is avoided.
    */
-  behavior(): BehaviorBuilder {
+  behavior(): DefaultBehaviorBuilder {
     return BehaviorBuilder.create(this)
   }
 

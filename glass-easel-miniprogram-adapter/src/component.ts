@@ -5,7 +5,6 @@ import { SelectorQuery } from './selector_query'
 import { IntersectionObserver } from './intersection'
 import { MediaQueryObserver } from './media_query'
 
-type Empty = typeUtils.Empty
 type DataList = typeUtils.DataList
 type PropertyList = typeUtils.PropertyList
 type MethodList = typeUtils.MethodList
@@ -19,8 +18,9 @@ type ExportType<
   UProperty extends PropertyList,
   UMethod extends MethodList,
   UComponentExport,
+  UExtraThisFields extends DataList,
 > = [UComponentExport] extends [never]
-  ? Component<UData, UProperty, UMethod, UComponentExport>
+  ? Component<UData, UProperty, UMethod, UComponentExport, UExtraThisFields>
   : UComponentExport
 
 const filterComponentExportWithType = <
@@ -28,11 +28,12 @@ const filterComponentExportWithType = <
   UProperty extends PropertyList,
   UMethod extends MethodList,
   UComponentExport,
+  UExtraThisFields extends DataList,
 >(
-  source: ComponentCaller<any, any, any, any>,
+  source: GeneralComponentCaller,
   elem: glassEasel.Element,
-  componentType: ComponentType<UData, UProperty, UMethod, UComponentExport>,
-): ExportType<UData, UProperty, UMethod, UComponentExport> | undefined => {
+  componentType: ComponentType<UData, UProperty, UMethod, UComponentExport, UExtraThisFields>,
+): ExportType<UData, UProperty, UMethod, UComponentExport, UExtraThisFields> | undefined => {
   const comp = elem.asInstanceOf(componentType._$)
   if (comp === null) return undefined
   const selectedSpace = comp.getRootBehavior().ownerSpace
@@ -70,17 +71,30 @@ const filterComponentExport = (
   return undefined
 }
 
-export type GeneralComponent = Component<any, any, any, any>
+export type GeneralComponent = Component<
+  /* TData */ Record<string, any>,
+  /* TProperty */ Record<string, any>,
+  /* TMethod */ Record<string, any>,
+  /* TComponentExport */ any,
+  /* TExtraThisFields */ Record<string, any>
+>
 
 export type Component<
   TData extends DataList,
   TProperty extends PropertyList,
   TMethod extends MethodList,
   TComponentExport,
-  TExtraThisFields extends DataList = Empty,
+  TExtraThisFields extends DataList,
 > = ComponentCaller<TData, TProperty, TMethod, TComponentExport> & {
   [k in keyof TMethod]: TMethod[k]
 } & TExtraThisFields
+
+type GeneralComponentCaller = ComponentCaller<
+  /* TData */ Record<string, any>,
+  /* TProperty */ Record<string, any>,
+  /* TMethod */ Record<string, any>,
+  /* TComponentExport */ any
+>
 
 export class ComponentCaller<
   TData extends DataList,
@@ -356,19 +370,21 @@ export class ComponentCaller<
     UProperty extends PropertyList,
     UMethod extends MethodList,
     UComponentExport,
+    UExtraThisFields extends DataList,
   >(
     selector: string,
-    componentType: ComponentType<UData, UProperty, UMethod, UComponentExport>,
-  ): ExportType<UData, UProperty, UMethod, UComponentExport> | null
+    componentType: ComponentType<UData, UProperty, UMethod, UComponentExport, UExtraThisFields>,
+  ): ExportType<UData, UProperty, UMethod, UComponentExport, UExtraThisFields> | null
   selectComponent<
     UData extends DataList,
     UProperty extends PropertyList,
     UMethod extends MethodList,
     UComponentExport,
+    UExtraThisFields extends DataList,
   >(
     selector: string,
-    componentType?: ComponentType<UData, UProperty, UMethod, UComponentExport>,
-  ): ExportType<UData, UProperty, UMethod, UComponentExport> | null {
+    componentType?: ComponentType<UData, UProperty, UMethod, UComponentExport, UExtraThisFields>,
+  ): ExportType<UData, UProperty, UMethod, UComponentExport, UExtraThisFields> | null {
     const target = this._$.getShadowRoot()!.querySelector(selector)
     if (target === null) return null
     return componentType
@@ -388,21 +404,23 @@ export class ComponentCaller<
     UProperty extends PropertyList,
     UMethod extends MethodList,
     UComponentExport,
+    UExtraThisFields extends DataList,
   >(
     selector: string,
-    componentType: ComponentType<UData, UProperty, UMethod, UComponentExport>,
-  ): ExportType<UData, UProperty, UMethod, UComponentExport>[]
+    componentType: ComponentType<UData, UProperty, UMethod, UComponentExport, UExtraThisFields>,
+  ): ExportType<UData, UProperty, UMethod, UComponentExport, UExtraThisFields>[]
   selectAllComponents<
     UData extends DataList,
     UProperty extends PropertyList,
     UMethod extends MethodList,
     UComponentExport,
+    UExtraThisFields extends DataList,
   >(
     selector: string,
-    componentType?: ComponentType<UData, UProperty, UMethod, UComponentExport>,
-  ): ExportType<UData, UProperty, UMethod, UComponentExport>[] {
+    componentType?: ComponentType<UData, UProperty, UMethod, UComponentExport, UExtraThisFields>,
+  ): ExportType<UData, UProperty, UMethod, UComponentExport, UExtraThisFields>[] {
     const targets = this._$.getShadowRoot()!.querySelectorAll(selector)
-    const ret = [] as ExportType<UData, UProperty, UMethod, UComponentExport>[]
+    const ret = [] as ExportType<UData, UProperty, UMethod, UComponentExport, UExtraThisFields>[]
     targets.forEach((target) => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const r = componentType
@@ -425,17 +443,19 @@ export class ComponentCaller<
     UProperty extends PropertyList,
     UMethod extends MethodList,
     UComponentExport,
+    UExtraThisFields extends DataList,
   >(
-    componentType: ComponentType<UData, UProperty, UMethod, UComponentExport>,
-  ): ExportType<UData, UProperty, UMethod, UComponentExport> | null
+    componentType: ComponentType<UData, UProperty, UMethod, UComponentExport, UExtraThisFields>,
+  ): ExportType<UData, UProperty, UMethod, UComponentExport, UExtraThisFields> | null
   selectOwnerComponent<
     UData extends DataList,
     UProperty extends PropertyList,
     UMethod extends MethodList,
     UComponentExport,
+    UExtraThisFields extends DataList,
   >(
-    componentType?: ComponentType<UData, UProperty, UMethod, UComponentExport>,
-  ): ExportType<UData, UProperty, UMethod, UComponentExport> | null {
+    componentType?: ComponentType<UData, UProperty, UMethod, UComponentExport, UExtraThisFields>,
+  ): ExportType<UData, UProperty, UMethod, UComponentExport, UExtraThisFields> | null {
     const target = this._$.ownerShadowRoot?.getHostNode()
     if (target === undefined) return null
     return componentType
@@ -464,12 +484,19 @@ export class ComponentCaller<
     UProperty extends PropertyList,
     UMethod extends MethodList,
     UComponentExport,
+    UExtraThisFields extends DataList,
   >(
-    componentType: ComponentType<UData, UProperty, UMethod, UComponentExport>,
-  ): Component<UData, UProperty, UMethod, UComponentExport> | null {
+    componentType: ComponentType<UData, UProperty, UMethod, UComponentExport, UExtraThisFields>,
+  ): Component<UData, UProperty, UMethod, UComponentExport, UExtraThisFields> | null {
     const inner = this._$.asInstanceOf(componentType._$)
     if (!inner) return null
-    return this as unknown as Component<UData, UProperty, UMethod, UComponentExport>
+    return this as unknown as Component<
+      UData,
+      UProperty,
+      UMethod,
+      UComponentExport,
+      UExtraThisFields
+    >
   }
 }
 
@@ -478,24 +505,33 @@ export class ComponentProto<
   TProperty extends PropertyList,
   TMethod extends MethodList,
   TComponentExport,
+  TExtraThisFields extends DataList,
 > {
-  private proto: Component<TData, TProperty, TMethod, TComponentExport>
+  private proto: Component<TData, TProperty, TMethod, TComponentExport, TExtraThisFields>
 
   constructor(
     methods: TMethod,
+    parents: GeneralBehavior[],
     componentExport?: (source: GeneralComponent | null) => TComponentExport,
   ) {
     this.proto = Object.create(ComponentCaller.prototype) as Component<
       TData,
       TProperty,
       TMethod,
-      TComponentExport
+      TComponentExport,
+      TExtraThisFields
     >
     Object.assign(this.proto, methods)
     this.proto._$export = componentExport
   }
 
-  derive(): Component<TData, TProperty, TMethod, TComponentExport> {
-    return Object.create(this.proto) as Component<TData, TProperty, TMethod, TComponentExport>
+  derive(): Component<TData, TProperty, TMethod, TComponentExport, TExtraThisFields> {
+    return Object.create(this.proto) as Component<
+      TData,
+      TProperty,
+      TMethod,
+      TComponentExport,
+      TExtraThisFields
+    >
   }
 }

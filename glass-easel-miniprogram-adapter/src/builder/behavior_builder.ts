@@ -3,7 +3,7 @@
 import { BaseBehaviorBuilder } from './base_behavior_builder'
 import { Behavior } from '../behavior'
 import type { BehaviorDefinition, utils as typeUtils } from '../types'
-import type { DefinitionFilter, GeneralBehavior } from '../behavior'
+import type { DefinitionFilter } from '../behavior'
 import type { AllData, Component, GeneralComponent } from '../component'
 import type { CodeSpace } from '../space'
 import type { ResolveBehaviorBuilder, BuilderContext } from './type_utils'
@@ -23,15 +23,26 @@ type ChainingFilterFunc<
   TRemovedFields extends string = never,
 > = typeUtils.ChainingFilterFunc<TAddedFields, TRemovedFields>
 
+export type DefaultBehaviorBuilder = BehaviorBuilder<
+  /* TPrevData */ Empty,
+  /* TData */ Empty,
+  /* TProperty */ Empty,
+  /* TMethod */ Empty,
+  /* TChainingFilter */ never,
+  /* TPendingChainingFilter */ never,
+  /* TComponentExport */ never,
+  /* TExtraThisFields */ Empty
+>
+
 export class BehaviorBuilder<
-  TPrevData extends DataList = Empty,
-  TData extends DataList = Empty,
-  TProperty extends PropertyList = Empty,
-  TMethod extends MethodList = Empty,
-  TChainingFilter extends ChainingFilterType = never,
-  TPendingChainingFilter extends ChainingFilterType = never,
-  TComponentExport = never,
-  TExtraThisFields extends DataList = Empty,
+  TPrevData extends DataList,
+  TData extends DataList,
+  TProperty extends PropertyList,
+  TMethod extends MethodList,
+  TChainingFilter extends ChainingFilterType,
+  TPendingChainingFilter extends ChainingFilterType,
+  TComponentExport,
+  TExtraThisFields extends DataList,
 > extends BaseBehaviorBuilder<
   TPrevData,
   TData,
@@ -46,11 +57,11 @@ export class BehaviorBuilder<
   private _$chainingFilter?: ChainingFilterFunc<any, any>
 
   /** @internal */
-  static create(codeSpace: CodeSpace): BehaviorBuilder {
+  static create(codeSpace: CodeSpace): DefaultBehaviorBuilder {
     const ret = new BehaviorBuilder()
     ret._$codeSpace = codeSpace
     ret._$ = codeSpace.getComponentSpace().defineWithMethodCaller()
-    return ret
+    return ret as DefaultBehaviorBuilder
   }
 
   /** Define a chaining filter */
@@ -109,7 +120,7 @@ export class BehaviorBuilder<
     >,
     UChainingFilter
   > {
-    this._$parents.push(behavior as GeneralBehavior)
+    this._$parents.push(behavior)
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     this._$ = this._$.behavior(behavior._$)
     if (behavior._$chainingFilter) {

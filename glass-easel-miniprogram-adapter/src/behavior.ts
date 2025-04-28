@@ -2,7 +2,6 @@ import type * as glassEasel from 'glass-easel'
 import { type GeneralComponentDefinition, type utils as typeUtils } from './types'
 import { type GeneralComponent } from './component'
 
-type Empty = typeUtils.Empty
 type DataList = typeUtils.DataList
 type PropertyList = typeUtils.PropertyList
 type MethodList = typeUtils.MethodList
@@ -14,10 +13,12 @@ export type DefinitionFilter = (
 ) => void
 
 export type GeneralBehavior = Behavior<
-  Record<string, any>,
-  Record<string, any>,
-  Record<string, any>,
-  any
+  /* TData */ Record<string, any>,
+  /* TProperty */ Record<string, any>,
+  /* TMethod */ Record<string, any>,
+  /* TChainingFilter */ any,
+  /* TComponentExport */ any,
+  /* TExtraThisFields */ Record<string, any>
 >
 
 export class Behavior<
@@ -25,8 +26,8 @@ export class Behavior<
   TProperty extends PropertyList,
   TMethod extends MethodList,
   TChainingFilter extends ChainingFilterType,
-  TComponentExport = never,
-  TExtraThisFields extends DataList = Empty,
+  TComponentExport,
+  TExtraThisFields extends DataList,
 > {
   /** @internal */
   _$: glassEasel.GeneralBehavior
@@ -65,6 +66,8 @@ export class ComponentType<
   TMethod extends MethodList,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   TComponentExport,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  TExtraThisFields extends DataList,
 > {
   /** @internal */
   _$: glassEasel.ComponentDefinition<TData, TProperty, TMethod>
@@ -74,6 +77,14 @@ export class ComponentType<
     this._$ = inner
   }
 }
+
+export type GeneralComponentType = ComponentType<
+  /* TData */ Record<string, any>,
+  /* TProperty */ Record<string, any>,
+  /* TMethod */ Record<string, any>,
+  /* TComponentExport */ any,
+  /* TExtraThisFields */ Record<string, any>
+>
 
 export class TraitBehavior<
   TIn extends { [key: string]: any },
