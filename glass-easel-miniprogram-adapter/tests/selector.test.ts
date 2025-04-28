@@ -178,6 +178,8 @@ describe('selector query', () => {
     codeSpace.addComponentStaticConfig('child2/comp', { component: false })
     codeSpace.addCompiledTemplate('child1/comp', tmpl('{{a}}'))
     codeSpace.addCompiledTemplate('child2/comp', tmpl('{{a}}'))
+    codeSpace.addCompiledTemplate('child3/comp', tmpl('{{a}}'))
+    codeSpace.addCompiledTemplate('child4/comp', tmpl('{{a}}'))
 
     // eslint-disable-next-line arrow-body-style
     const child1Def = codeSpace.componentEnv('child1/comp', ({ Behavior, Component }) => {
@@ -218,10 +220,59 @@ describe('selector query', () => {
       return Component().behavior(beh).register()
     })
 
+    const child3Def = codeSpace.componentEnv('child3/comp', ({ Behavior, Component }) => {
+      const beh = Behavior()
+        .definition({
+          data: () => ({
+            a: 123,
+          }),
+          export() {
+            return {
+              id: 3,
+              set: (d: { a: number }) => {
+                this.setData(d)
+              },
+            }
+          },
+        })
+        .register()
+
+      return Component()
+        .definition<
+          /* TNewData */ { a: number },
+          /* TNewProperty */ Record<string, never>,
+          /* TNewMethod */ Record<string, never>,
+          /* TNewComponentExport */ { id: number; set: (d: { a: number }) => void }
+        >({
+          behaviors: [beh],
+        })
+        .register()
+    })
+
+    const child4Def = codeSpace.componentEnv('child4/comp', ({ Behavior, Component }) => {
+      const beh = Behavior({
+        data: {
+          a: 123,
+        },
+        export() {
+          return {
+            id: 4,
+            set: (d: { a: number }) => {
+              this.setData(d)
+            },
+          }
+        },
+      })
+
+      return Component().behavior(beh).register()
+    })
+
     codeSpace.addComponentStaticConfig('path/to/comp', {
       usingComponents: {
         child1: '/child1/comp',
         child2: '/child2/comp',
+        child3: '/child3/comp',
+        child4: '/child4/comp',
       },
     })
     codeSpace.addCompiledTemplate(
@@ -230,6 +281,8 @@ describe('selector query', () => {
       <div id="d">
         <child1 id="c1" />
         <child2 id="c2" />
+        <child3 id="c3" />
+        <child4 id="c4" />
       </div>
     `),
     )
@@ -246,12 +299,20 @@ describe('selector query', () => {
           const c1 = this.selectComponent('#c1', child1Def)!
           const c2any = this.selectComponent('#c2') as { id: number }
           const c2 = this.selectComponent('#c2', child2Def)!
+          const c3any = this.selectComponent('#c3') as { id: number }
+          const c3 = this.selectComponent('#c3', child3Def)!
+          const c4any = this.selectComponent('#c4') as { id: number }
+          const c4 = this.selectComponent('#c4', child4Def)!
 
           expect(c1any.id).toBe(c1.id)
           expect(c2any.id).toBe(c2.id)
+          expect(c3any.id).toBe(c3.id)
+          expect(c4any.id).toBe(c4.id)
 
           c1.set({ a: 456 })
           c2.set({ a: 789 })
+          c3.set({ a: 654 })
+          c4.set({ a: 987 })
         })
         .register()
     })
@@ -259,7 +320,9 @@ describe('selector query', () => {
     const ab = env.associateBackend()
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
-    expect(domHtml(root.getComponent())).toBe('<div><child1>456</child1><child2>789</child2></div>')
+    expect(domHtml(root.getComponent())).toBe(
+      '<div><child1>456</child1><child2>789</child2><child3>654</child3><child4>987</child4></div>',
+    )
   })
 
   test('select all components', () => {
