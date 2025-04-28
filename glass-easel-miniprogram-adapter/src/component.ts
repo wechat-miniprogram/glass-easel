@@ -71,6 +71,16 @@ const filterComponentExport = (
   return undefined
 }
 
+export const determineComponentExports = (
+  parent: GeneralBehavior[],
+  selfExport: ((source: GeneralComponent | null) => any) | undefined,
+) => {
+  if (selfExport !== undefined) return selfExport
+  const targetBehavior = parent.findLast((behavior) => behavior._$export !== undefined)
+  if (targetBehavior !== undefined) return targetBehavior._$export
+  return undefined
+}
+
 export type GeneralComponent = Component<
   /* TData */ Record<string, any>,
   /* TProperty */ Record<string, any>,
@@ -522,7 +532,7 @@ export class ComponentProto<
       TExtraThisFields
     >
     Object.assign(this.proto, methods)
-    this.proto._$export = componentExport
+    this.proto._$export = determineComponentExports(parents, componentExport)
   }
 
   derive(): Component<TData, TProperty, TMethod, TComponentExport, TExtraThisFields> {

@@ -1,6 +1,6 @@
 import type * as glassEasel from 'glass-easel'
 import { type GeneralComponentDefinition, type utils as typeUtils } from './types'
-import { type GeneralComponent } from './component'
+import { determineComponentExports, type GeneralComponent } from './component'
 
 type DataList = typeUtils.DataList
 type PropertyList = typeUtils.PropertyList
@@ -48,7 +48,7 @@ export class Behavior<
   ) {
     this._$ = inner as glassEasel.GeneralBehavior
     this._$chainingFilter = chainingFilter
-    this._$export = componentExport
+    this._$export = determineComponentExports(parents, componentExport)
 
     // processing definition filter
     if (definitionFilter !== undefined) {
