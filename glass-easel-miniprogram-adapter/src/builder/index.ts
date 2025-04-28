@@ -1,3 +1,5 @@
 export { BehaviorBuilder } from './behavior_builder'
+export type { DefaultBehaviorBuilder } from './behavior_builder'
 export { ComponentBuilder } from './component_builder'
+export type { DefaultComponentBuilder } from './component_builder'
 export { BuilderContext } from './type_utils'

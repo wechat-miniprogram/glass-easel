@@ -1,6 +1,6 @@
 import type * as glassEasel from 'glass-easel'
 import type { utils as typeUtils } from '../types'
-import type { ComponentType, GeneralBehavior, TraitBehavior } from '../behavior'
+import type { GeneralComponentType, GeneralBehavior, TraitBehavior } from '../behavior'
 import type { GeneralComponent } from '../component'
 
 export type ResolveBehaviorBuilder<
@@ -33,7 +33,7 @@ export type TraitRelationParams<TOut extends { [key: string]: any }> = {
 }
 
 export type RelationParams = {
-  target?: string | ComponentType<any, any, any, any> | GeneralBehavior | TraitBehavior<any>
+  target?: string | GeneralComponentType | GeneralBehavior | TraitBehavior<any>
   type: 'ancestor' | 'descendant' | 'parent' | 'child' | 'parent-common-node' | 'child-common-node'
   linked?: (target: GeneralComponent) => void
   linkChanged?: (target: GeneralComponent) => void

@@ -1151,4 +1151,48 @@ describe('define', () => {
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     expect(domHtml(root.getComponent())).toBe('<div>Say hello to glass-easel!</div>')
   })
+
+  test('extraThisFieldsType with selectComponent', () => {
+    const env = new MiniProgramEnv()
+    const codeSpace = env.createCodeSpace('', true)
+
+    codeSpace.addCompiledTemplate('comp1', tmpl(`{{ num }}`))
+
+    const comp1 = codeSpace
+      .component('comp1')
+      .data(() => ({ num: 1 }))
+      .extraThisFieldsType<{ a: number; updateNum: (num: number) => void }>()
+      .lifetime('created', function () {
+        this.a = 1
+        this.updateNum = (num) => {
+          this.a = num
+          this.setData({ num })
+        }
+      })
+      .register()
+
+    codeSpace.addComponentStaticConfig('comp2', {
+      usingComponents: {
+        comp1: 'comp1',
+      },
+    })
+    codeSpace.addCompiledTemplate('comp2', tmpl(`<comp1 id="c1"></comp1>`))
+
+    codeSpace
+      .component('comp2')
+      .pageLifetime('show', function () {
+        const instance = this.selectComponent('#c1', comp1)
+        expect(instance).not.toBe(null)
+        expect(instance!.a).toBe(1)
+        instance!.updateNum(2)
+        expect(instance!.a).toBe(2)
+      })
+      .register()
+
+    const ab = env.associateBackend()
+    const root = ab.createRoot('body', codeSpace, 'comp2')
+    expect(domHtml(root.getComponent())).toBe('<comp1>1</comp1>')
+    root.getComponent().triggerPageLifetime('show', [])
+    expect(domHtml(root.getComponent())).toBe('<comp1>2</comp1>')
+  })
 })

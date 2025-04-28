@@ -67,7 +67,14 @@ describe('env', () => {
     )
 
     codeSpace.componentEnv('path/to/comp', ({ Behavior, Component }) => {
-      const beh = Behavior({ data: { num: 123 } })
+      const beh = Behavior({
+        data: { num: 123 },
+        methods: {
+          updateNum() {
+            this.setData({ num: 456 })
+          },
+        },
+      })
       Component().behavior(beh).register()
     })
 
