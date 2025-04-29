@@ -502,12 +502,12 @@ type CSSProperty = {
 获得节点匹配到的样式表规则，包括内联规则。其中 `CSSRule` 定义如下：
 
 ```typescript
-type glass-easelCSSRule = {
+type CSSRule = {
   sheetIndex: number;
   ruleIndex: number;
   mediaQueries: string[];
   selector: string;
-  properties: glass-easelCSSProperty[];
+  properties: CSSProperty[];
   weightHighBits: number;
   weightLowBits: number;
 };
@@ -531,7 +531,7 @@ type glass-easelCSSRule = {
 
 **这只是一个建议性质的接口。** glass-easel 并不会自行调用这个接口，但其他相关模块很可能调用。
 
-### `async Element#getScrollPosition(): { scrollLeft: number, scrollTop: number, scrollWidth: number, scrollHeight: number }`
+### `async Element#getScrollOffset(): { scrollLeft: number, scrollTop: number, scrollWidth: number, scrollHeight: number }`
 
 获得节点的内部滚动位置。
 

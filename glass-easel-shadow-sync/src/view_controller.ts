@@ -1,4 +1,4 @@
-/* eslint-disable class-methods-use-this */
+/* eslint-disable consistent-return, class-methods-use-this, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 import type {
   ComponentSpace,
   DataChange,
@@ -17,6 +17,9 @@ import type {
   templateEngine,
   BehaviorBuilder,
   backend as GlassEaselBackend,
+  backend as shadowBackend,
+  composedBackend,
+  domlikeBackend,
   SlotMode,
 } from 'glass-easel'
 
@@ -25,6 +28,12 @@ const dashToCamelCase = (dash: string): string =>
 
 const camelCaseToDash = (camel: string): string =>
   camel.replace(/(^|.)([A-Z])/g, (s) => (s[0] ? `${s[0]}-` : '') + s[1]!.toLowerCase())
+
+type OptionalKeys<T> = { [P in keyof T]-?: {} extends Pick<T, P> ? P : never }[keyof T]
+
+type CallbackFunction<Args extends any[], Ret> = (...args: [...Args, (ret: Ret) => void]) => void
+type ParametersOrNever<T> = T extends CallbackFunction<infer Arg, infer Ret> ? Arg : never
+type DefaultReturn<T> = T extends CallbackFunction<infer Arg, infer Ret> ? Ret : never
 
 class EmptyTemplateEngine implements templateEngine.Template {
   private static _instance: EmptyTemplateEngine | undefined
@@ -440,11 +449,106 @@ export class ViewController {
     }
   }
 
+  private callSuggestedBackendMethod<M extends OptionalKeys<GlassEaselBackend.Element>>(
+    element: Element,
+    method: M,
+    args: ParametersOrNever<GlassEaselBackend.Element[M]>,
+    defaultReturn: DefaultReturn<GlassEaselBackend.Element[M]>,
+    cb: (res: DefaultReturn<GlassEaselBackend.Element[M]>) => void,
+  ): void {
+    const { _glassEasel } = this
+    const backendContext = element.getBackendContext()
+    const backendElement = element.getBackendElement()
+    if (!backendContext || !backendElement) {
+      return cb(defaultReturn)
+    }
+    if (backendContext.mode === _glassEasel.BackendMode.Domlike) {
+      if (!(backendContext as any)[method]) {
+        return cb(defaultReturn)
+      }
+      ;(backendContext as any)[method](backendElement as domlikeBackend.Element, ...args, cb)
+    } else {
+      const be = backendElement as composedBackend.Element | shadowBackend.Element
+      if (!be[method]) {
+        return cb(defaultReturn)
+      }
+      ;(be as any)[method](...args, cb)
+    }
+  }
+
+  getAllComputedStyles(
+    element: Element,
+    cb: (res: GlassEaselBackend.GetAllComputedStylesResponses) => void,
+  ): void {
+    this.callSuggestedBackendMethod(element, 'getAllComputedStyles', [], { properties: [] }, cb)
+  }
+
+  getPseudoComputedStyles(
+    element: Element,
+    pseudoType: string,
+    cb: (res: GlassEaselBackend.GetAllComputedStylesResponses) => void,
+  ): void {
+    this.callSuggestedBackendMethod(
+      element,
+      'getPseudoComputedStyles',
+      [pseudoType],
+      { properties: [] },
+      cb,
+    )
+  }
+
+  getInheritedRules(
+    element: Element,
+    cb: (res: GlassEaselBackend.GetInheritedRulesResponses) => void,
+  ): void {
+    this.callSuggestedBackendMethod(element, 'getInheritedRules', [], { rules: [] }, cb)
+  }
+
+  replaceStyleSheetAllProperties(
+    sheetIndex: number,
+    ruleIndex: number,
+    inlineStyle: string,
+    callback: (propertyIndex: number | null) => void,
+  ): void {
+    const { _backendContext } = this
+    if (!_backendContext.replaceStyleSheetAllProperties) {
+      callback(null)
+      return
+    }
+    _backendContext.replaceStyleSheetAllProperties(sheetIndex, ruleIndex, inlineStyle, callback)
+  }
+
   getBoundingClientRect(
     element: Element,
     cb: (res: { left: number; top: number; width: number; height: number }) => void,
   ): void {
     element.getBoundingClientRect(cb)
+  }
+
+  getBoxModel(
+    element: Element,
+    cb: (res: {
+      margin: GlassEaselBackend.BoundingClientRect
+      border: GlassEaselBackend.BoundingClientRect
+      padding: GlassEaselBackend.BoundingClientRect
+      content: GlassEaselBackend.BoundingClientRect
+    }) => void,
+  ): void {
+    const mockRect = { left: 0, top: 0, width: 0, height: 0 }
+    const mockBoxModel = {
+      margin: mockRect,
+      border: mockRect,
+      padding: mockRect,
+      content: mockRect,
+    }
+    this.callSuggestedBackendMethod(element, 'getBoxModel', [], mockBoxModel, cb)
+  }
+
+  getMatchedRules(
+    element: Element,
+    cb: (res: GlassEaselBackend.GetMatchedRulesResponses) => void,
+  ): void {
+    this.callSuggestedBackendMethod(element, 'getMatchedRules', [], { inline: [], rules: [] }, cb)
   }
 
   getScrollOffset(
@@ -459,8 +563,59 @@ export class ViewController {
     element.getScrollOffset(cb)
   }
 
+  setScrollPosition(
+    element: Element,
+    scrollLeft: number,
+    scrollTop: number,
+    duration: number,
+  ): void {
+    const { _glassEasel } = this
+    const backendContext = element.getBackendContext()
+    const backendElement = element.getBackendElement()
+    if (!backendContext || !backendElement) {
+      return
+    }
+    if (backendContext.mode === _glassEasel.BackendMode.Domlike) {
+      if (!backendContext.setScrollPosition) {
+        return
+      }
+      backendContext.setScrollPosition?.(
+        backendElement as domlikeBackend.Element,
+        scrollLeft,
+        scrollTop,
+        duration,
+      )
+    } else {
+      const be = backendElement as composedBackend.Element | shadowBackend.Element
+      if (!be.setScrollPosition) {
+        return
+      }
+      be.setScrollPosition?.(scrollLeft, scrollTop, duration)
+    }
+  }
+
   getContext(element: Element, cb: (res: any) => void): void {
-    cb(null)
+    this.callSuggestedBackendMethod(element, 'getContext', [], null, cb)
+  }
+
+  getPseudoTypes(element: Element, cb: (res: string[]) => void): void {
+    this.callSuggestedBackendMethod(element, 'getPseudoTypes', [], [], cb)
+  }
+
+  startOverlayInspect(callback: (event: string, node: Element | null) => void): void {
+    const { _backendContext } = this
+    if (!_backendContext.startOverlayInspect) {
+      return
+    }
+    _backendContext.startOverlayInspect(callback)
+  }
+
+  stopOverlayInspect(): void {
+    const { _backendContext } = this
+    if (!_backendContext.stopOverlayInspect) {
+      return
+    }
+    _backendContext.stopOverlayInspect()
   }
 
   setListenerStats(

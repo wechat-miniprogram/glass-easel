@@ -2,13 +2,13 @@
 /* global window, document */
 
 import { type Element as GlassEaselElement } from '../element'
+import { type Node as GlassEaselNode } from '../node'
 import { EventBubbleStatus, MutLevel, type EventOptions } from '../event'
 import { safeCallback } from '../func_arr'
 import { triggerWarning } from '../warning'
 import { type Context, type Element } from './domlike_backend_protocol'
 import {
   BackendMode,
-  type ScrollOffset,
   type IntersectionStatus,
   type MediaQueryStatus,
   type Observer,
@@ -29,6 +29,8 @@ const DELEGATE_EVENTS = [
   'mouseleave',
   'click',
 ]
+
+const ALL_PSEUDO_TYPES = ['before', 'after']
 
 export class CurrentWindowBackendContext implements Context {
   mode: BackendMode.Domlike = BackendMode.Domlike
@@ -167,8 +169,7 @@ export class CurrentWindowBackendContext implements Context {
     }
   }
 
-  /* @internal */
-  private _$initEvent() {
+  protected _$initEvent() {
     const TAP_DIST = 10
 
     const possibleTaps = Object.create(null) as { [id: number]: { x: number; y: number } }
@@ -493,12 +494,12 @@ export class CurrentWindowBackendContext implements Context {
     ;(target as unknown as HTMLElement).focus()
   }
 
-  getFocusedNode(cb: (node: Element | null) => void): void {
+  getFocusedNode(cb: (node: GlassEaselNode | null) => void): void {
     let node = document.activeElement as Element | null
     while (!node?.__wxElement) {
       node = node?.parentNode || null
     }
-    cb(node)
+    cb(node?.__wxElement ?? null)
   }
 
   onWindowResize(
@@ -536,13 +537,79 @@ export class CurrentWindowBackendContext implements Context {
     cb({ properties })
   }
 
-  getScrollOffset(target: Element, cb: (res: ScrollOffset) => void): void {
-    const elem = target as unknown as HTMLElement
-    const scrollLeft = elem.scrollLeft
-    const scrollTop = elem.scrollTop
-    const scrollWidth = elem.scrollWidth
-    const scrollHeight = elem.scrollHeight
-    cb({ scrollLeft, scrollTop, scrollWidth, scrollHeight })
+  getPseudoComputedStyles(
+    target: Element,
+    pseudoType: string,
+    cb: (res: shared.GetAllComputedStylesResponses) => void,
+  ): void {
+    const style = window.getComputedStyle(target as unknown as HTMLElement, `::${pseudoType}`)
+    const properties = collectStyleSheetProperties(style)
+    cb({ properties })
+  }
+
+  getBoxModel(
+    target: Element,
+    cb: (res: {
+      margin: shared.BoundingClientRect
+      border: shared.BoundingClientRect
+      padding: shared.BoundingClientRect
+      content: shared.BoundingClientRect
+    }) => void,
+  ): void {
+    const rect = (target as unknown as HTMLElement).getBoundingClientRect()
+    const computed = window.getComputedStyle(target as unknown as HTMLElement)
+
+    const marginLeft = parseFloat(computed.marginLeft)
+    const marginTop = parseFloat(computed.marginTop)
+    const marginRight = parseFloat(computed.marginRight)
+    const marginBottom = parseFloat(computed.marginBottom)
+
+    const borderLeft = parseFloat(computed.borderLeftWidth)
+    const borderTop = parseFloat(computed.borderTopWidth)
+    const borderRight = parseFloat(computed.borderRightWidth)
+    const borderBottom = parseFloat(computed.borderBottomWidth)
+
+    const paddingLeft = parseFloat(computed.paddingLeft)
+    const paddingTop = parseFloat(computed.paddingTop)
+    const paddingRight = parseFloat(computed.paddingRight)
+    const paddingBottom = parseFloat(computed.paddingBottom)
+
+    const border = rect
+    const margin = {
+      left: border.left - marginLeft,
+      top: border.top - marginTop,
+      width: border.width + marginRight + marginLeft,
+      height: border.height + marginTop + marginBottom,
+    }
+    const padding = {
+      left: border.left + borderLeft,
+      top: border.top + borderTop,
+      width: border.width - borderRight - borderLeft,
+      height: border.height - borderTop - borderBottom,
+    }
+    const content = {
+      left: padding.left + paddingLeft,
+      top: padding.top + paddingTop,
+      width: padding.width - paddingRight - paddingLeft,
+      height: padding.height - paddingTop - paddingBottom,
+    }
+    cb({ margin, border, padding, content })
+  }
+
+  getPseudoTypes(target: Element, cb: (res: string[]) => void): void {
+    const ret: string[] = []
+    const htmlElement = target as unknown as HTMLElement
+    ALL_PSEUDO_TYPES.forEach((pseudoType) => {
+      const pseudoClass = `::${pseudoType}`
+      const pseudoStyle = window.getComputedStyle(htmlElement, pseudoClass)
+      const pseudoExists =
+        pseudoStyle.getPropertyValue('content') !== 'none' &&
+        pseudoStyle.getPropertyValue('display') !== 'none' &&
+        pseudoStyle.getPropertyValue('visibility') !== 'hidden'
+      if (!pseudoExists) return
+      ret.push(pseudoType)
+    })
+    cb(ret)
   }
 
   setScrollPosition(
@@ -569,38 +636,53 @@ export class CurrentWindowBackendContext implements Context {
     sheetIndex: number,
     sheet: CSSStyleSheet,
     elem: HTMLElement,
+    pseudoType?: string,
   ): shared.CSSRule[] {
     const rules: shared.CSSRule[] = []
+    const pseudoRegexp = pseudoType ? new RegExp(`:{1,2}${pseudoType}$`) : null
     forEachStyleSheetRule(sheet, (ruleIndex, cssRule, ancestors) => {
       if (cssRule instanceof CSSStyleRule) {
-        let inactive = false
         const mediaQueries: string[] = []
         for (let i = 0; i < ancestors.length; i += 1) {
           const cssRule = ancestors[i]!
           if (cssRule instanceof CSSMediaRule) {
             if (!matchMedia(cssRule.conditionText).matches) {
-              inactive = true
+              return
             }
             mediaQueries.push(`@media ${cssRule.conditionText}`)
-          } else if (cssRule instanceof CSSLayerBlockRule) {
+          } else if (
+            typeof CSSLayerBlockRule !== 'undefined' &&
+            cssRule instanceof CSSLayerBlockRule
+          ) {
             mediaQueries.push(`@layer ${cssRule.name}`)
           }
         }
         const selector = cssRule.selectorText
-        if (elem.matches(selector)) {
-          const propertyText = cssRule.style.cssText
-          const properties = collectStyleSheetProperties(cssRule.style)
-          rules.push({
-            sheetIndex,
-            ruleIndex,
-            mediaQueries,
-            selector,
-            properties,
-            propertyText,
-            weightHighBits: 0, // FIXME infer priority values
-            inactive,
-          })
-        }
+        let selectorMatches = false
+        const selectors = splitCSSSelectors(selector).map((selector) => {
+          const matches = pseudoRegexp
+            ? pseudoRegexp.test(selector) && elem.matches(selector.replace(pseudoRegexp, ''))
+            : elem.matches(selector)
+          selectorMatches ||= matches
+          return {
+            text: selector,
+            matches,
+          }
+        })
+        if (!selectorMatches) return
+        const propertyText = cssRule.style.cssText
+        const properties = collectStyleSheetProperties(cssRule.style)
+        rules.push({
+          sheetIndex,
+          ruleIndex,
+          inlineText: cssRule.cssText,
+          mediaQueries,
+          selector,
+          selectors,
+          properties,
+          propertyText,
+          weightHighBits: 0, // FIXME infer priority values
+        })
       }
     })
     return rules
@@ -617,6 +699,92 @@ export class CurrentWindowBackendContext implements Context {
     const inlineText = elem.style.cssText
     const inline = collectStyleSheetProperties(elem.style)
     cb({ inline, inlineText, rules })
+  }
+
+  getPseudoMatchedRules(
+    target: Element,
+    pseudoType: string,
+    cb: (res: shared.GetMatchedRulesResponses) => void,
+  ): void {
+    const elem = target as unknown as HTMLElement
+    const sheets = document.styleSheets
+    const rules: shared.CSSRule[] = []
+    for (let i = 0; i < sheets.length; i += 1) {
+      const sheet = sheets[i]!
+      rules.push(...this.queryMatchedRules(i, sheet, elem, pseudoType))
+    }
+    cb({ inline: [], rules })
+  }
+
+  private iframe: HTMLIFrameElement | null = null
+
+  private getIframe(): HTMLIFrameElement {
+    if (!this.iframe) {
+      this.iframe = document.createElement('iframe')
+      this.iframe.style.display = 'none'
+      document.body.appendChild(this.iframe)
+    }
+    return this.iframe
+  }
+
+  private getDefaultComputedStyles(target: Element): Record<string, string> {
+    const iframeWindow = this.getIframe().contentWindow!
+    const iframeDocument = iframeWindow.document
+    const ele = iframeDocument.createElement(target.tagName)
+    iframeDocument.body.appendChild(ele)
+    const computed = iframeWindow.getComputedStyle(ele)
+    const styles: Record<string, string> = {}
+    for (let i = 0; i < computed.length; i += 1) {
+      const name = computed[i]!
+      styles[name] = computed.getPropertyValue(name)
+    }
+    ele.remove()
+    return styles
+  }
+
+  private getModifiedComputedStyles(target: Element): Record<string, string> {
+    const defaultStyles = this.getDefaultComputedStyles(target)
+    const computedStyles = window.getComputedStyle(target as unknown as HTMLElement)
+    const styles: Record<string, string> = {}
+    for (let i = 0; i < computedStyles.length; i += 1) {
+      const prop = computedStyles[i]!
+      if (['blockSize'].includes(prop)) continue
+      if (computedStyles.getPropertyValue(prop) !== defaultStyles[prop]) {
+        styles[prop] = computedStyles.getPropertyValue(prop)
+      }
+    }
+    return styles
+  }
+
+  getInheritedRules(target: Element, cb: (res: shared.GetInheritedRulesResponses) => void): void {
+    const computed = this.getModifiedComputedStyles(target)
+    const documentElement = window.document.documentElement
+    const ret: shared.CSSRule[][] = []
+    for (
+      let currEle = target.parentNode;
+      currEle && (currEle as any) !== documentElement;
+      currEle = currEle.parentNode
+    ) {
+      const matchedRules: shared.CSSRule[] = []
+      let matched!: shared.CSSRule[]
+      this.getMatchedRules(currEle, ({ rules }) => {
+        matched = rules
+      })
+      for (let i = 0; i < matched.length; i += 1) {
+        const rule = matched[i]!
+        const containsComputedName = rule.properties.some((property) => {
+          const computedName = property.name.replace(/-(.|$)/g, (s) =>
+            s[1] ? s[1].toUpperCase() : '',
+          )
+          return computedName in computed
+        })
+        if (containsComputedName) {
+          matchedRules.push(rule)
+        }
+      }
+      if (matchedRules.length) ret.push(matchedRules)
+    }
+    cb({ rules: ret })
   }
 
   private findStyleRule(sheetIndex: number, ruleIndex: number): CSSStyleRule | null {
@@ -643,6 +811,73 @@ export class CurrentWindowBackendContext implements Context {
     rule.style.cssText = inlineStyle
     cb(0)
   }
+
+  private _stopOverlayInspectHandler: (() => void) | null = null
+
+  startOverlayInspect(cb: (event: string, node: GlassEaselElement | null) => void): void {
+    if (this._stopOverlayInspectHandler) return
+    const originalPointerEvents = window.document.body.style.pointerEvents
+    window.document.body.style.pointerEvents = 'none'
+
+    const handleClick = (e: MouseEvent) => {
+      e.preventDefault()
+      const { x, y } = e
+      window.document.body.style.pointerEvents = originalPointerEvents
+      this.elementFromPoint(x, y, (node) => {
+        window.document.body.style.pointerEvents = 'none'
+        cb('tap', node)
+      })
+    }
+
+    const handleMouseMove = debounce((e: MouseEvent) => {
+      if (e.type === 'mouseout') {
+        cb('mouseout', null)
+      } else if (e.type === 'mousemove') {
+        const { x, y } = e
+        window.document.body.style.pointerEvents = originalPointerEvents
+        this.elementFromPoint(x, y, (node) => {
+          window.document.body.style.pointerEvents = 'none'
+          cb('mouseover', node)
+        })
+      }
+    }, 100)
+
+    window.addEventListener('click', handleClick)
+    window.addEventListener('mousemove', handleMouseMove, {
+      passive: true,
+      capture: true,
+    })
+    window.addEventListener('mouseout', handleMouseMove, {
+      passive: true,
+      capture: true,
+    })
+
+    this._stopOverlayInspectHandler = () => {
+      window.document.body.style.pointerEvents = originalPointerEvents
+      window.removeEventListener('click', handleClick)
+      window.removeEventListener('mousemove', handleMouseMove, { capture: true })
+      window.removeEventListener('mouseout', handleMouseMove, { capture: true })
+    }
+  }
+
+  stopOverlayInspect(): void {
+    if (!this._stopOverlayInspectHandler) return
+    this._stopOverlayInspectHandler()
+    this._stopOverlayInspectHandler = null
+  }
+}
+
+const debounce = <Func extends (...args: any[]) => void>(func: Func, wait: number): Func => {
+  let timeout: ReturnType<typeof setTimeout> | null = null
+  return ((...args: Parameters<Func>) => {
+    if (timeout !== null) {
+      clearTimeout(timeout)
+    }
+    timeout = setTimeout(() => {
+      timeout = null
+      func(...args)
+    }, wait)
+  }) as Func
 }
 
 const collectStyleSheetProperties = (style: CSSStyleDeclaration) => {
@@ -665,7 +900,10 @@ const forEachStyleSheetRule = (
   const rec = (rules: CSSRuleList) => {
     for (let i = 0; i < rules.length; i += 1) {
       const cssRule = rules[i]!
-      if (cssRule instanceof CSSConditionRule || cssRule instanceof CSSLayerBlockRule) {
+      if (
+        cssRule instanceof CSSConditionRule ||
+        (typeof CSSLayerBlockRule !== 'undefined' && cssRule instanceof CSSLayerBlockRule)
+      ) {
         ancestors.push(cssRule)
         rec(cssRule.cssRules)
         ancestors.pop()
@@ -676,4 +914,86 @@ const forEachStyleSheetRule = (
     }
   }
   rec(sheet.cssRules)
+}
+
+function splitCSSSelectors(selectorText: string) {
+  let currentSelector = ''
+  const selectors = []
+  let depth = 0
+  let inString: false | string = false
+  let escapeNext = false
+  let inComment = false
+
+  for (let i = 0; i < selectorText.length; i += 1) {
+    const char = selectorText[i]!
+
+    if (escapeNext) {
+      currentSelector += char
+      escapeNext = false
+      continue
+    }
+
+    if (inComment) {
+      if (char === '*' && i < selectorText.length - 1 && selectorText[i + 1] === '/') {
+        inComment = false
+        i += 1
+      }
+      continue
+    }
+
+    if (inString) {
+      if (char === '\\') {
+        escapeNext = true
+      } else if (char === inString) {
+        inString = false
+      }
+      currentSelector += char
+      continue
+    }
+
+    switch (char) {
+      case '/':
+        if (selectorText[i + 1] === '*') {
+          inComment = true
+          i += 1
+          break
+        }
+        currentSelector += char
+        break
+      case '\\':
+        escapeNext = true
+        currentSelector += char
+        break
+      case '"':
+      case "'":
+        inString = char
+        currentSelector += char
+        break
+      case '(':
+      case '[':
+      case '{':
+        depth += 1
+        currentSelector += char
+        break
+      case ')':
+      case ']':
+      case '}':
+        if (depth > 0) depth -= 1
+        currentSelector += char
+        break
+      case ',':
+        if (depth === 0) {
+          selectors.push(currentSelector.trim())
+          currentSelector = ''
+        } else {
+          currentSelector += char
+        }
+        break
+      default:
+        currentSelector += char
+    }
+  }
+
+  if (currentSelector.trim()) selectors.push(currentSelector.trim())
+  return selectors
 }

@@ -287,10 +287,40 @@ export class ShadowDomElement implements GlassEaselBackend.Element {
     this._context.channel.setText(this._id, content)
   }
 
+  getAllComputedStyles(cb: (res: GlassEaselBackend.GetAllComputedStylesResponses) => void): void {
+    this._context.channel.getAllComputedStyles(this._id, cb)
+  }
+
+  getPseudoComputedStyles(
+    pseudoType: string,
+    cb: (res: GlassEaselBackend.GetAllComputedStylesResponses) => void,
+  ): void {
+    this._context.channel.getPseudoComputedStyles(this._id, pseudoType, cb)
+  }
+
+  getInheritedRules(cb: (res: GlassEaselBackend.GetInheritedRulesResponses) => void): void {
+    this._context.channel.getInheritedRules(this._id, cb)
+  }
+
   getBoundingClientRect(
     cb: (res: { left: number; top: number; width: number; height: number }) => void,
   ): void {
     this._context.channel.getBoundingClientRect(this._id, cb)
+  }
+
+  getBoxModel(
+    cb: (res: {
+      margin: GlassEaselBackend.BoundingClientRect
+      border: GlassEaselBackend.BoundingClientRect
+      padding: GlassEaselBackend.BoundingClientRect
+      content: GlassEaselBackend.BoundingClientRect
+    }) => void,
+  ): void {
+    this._context.channel.getBoxModel(this._id, cb)
+  }
+
+  getMatchedRules(cb: (res: GlassEaselBackend.GetMatchedRulesResponses) => void): void {
+    this._context.channel.getMatchedRules(this._id, cb)
   }
 
   getScrollOffset(
@@ -302,6 +332,14 @@ export class ShadowDomElement implements GlassEaselBackend.Element {
     }) => void,
   ): void {
     this._context.channel.getScrollOffset(this._id, cb)
+  }
+
+  setScrollPosition(scrollLeft: number, scrollTop: number, duration: number): void {
+    this._context.channel.setScrollPosition(this._id, scrollLeft, scrollTop, duration)
+  }
+
+  getPseudoTypes(cb: (res: string[]) => void): void {
+    this._context.channel.getPseudoTypes(this._id, cb)
   }
 
   setModelBindingStat(attributeName: string, listener: ((newValue: unknown) => void) | null): void {
@@ -531,6 +569,25 @@ export class ShadowDomBackendContext implements GlassEaselBackend.Context {
 
   disableStyleSheet(index: number): void {
     this.channel.disableStyleSheet(index)
+  }
+
+  replaceStyleSheetAllProperties(
+    sheetIndex: number,
+    ruleIndex: number,
+    inlineStyle: string,
+    callback: (propertyIndex: number | null) => void,
+  ): void {
+    this.channel.replaceStyleSheetAllProperties(sheetIndex, ruleIndex, inlineStyle, callback)
+  }
+
+  startOverlayInspect(cb: (event: string, node: Element | null) => void): void {
+    this.channel.startOverlayInspect((event, elementId) => {
+      cb(event, elementId ? (this._elementIdMap[elementId]!.__wxElement as Element) : null)
+    })
+  }
+
+  stopOverlayInspect(): void {
+    this.channel.stopOverlayInspect()
   }
 
   render(cb: (err: Error | null) => void) {

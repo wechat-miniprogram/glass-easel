@@ -71,10 +71,6 @@ export const enum ChannelEventType {
 
   SET_MODEL_BINDING_STAT,
   SET_MODEL_BINDING_STAT_CALLBACK,
-  GET_BOUNDING_CLIENT_RECT,
-  GET_BOUNDING_CLIENT_RECT_CALLBACK,
-  GET_SCROLL_OFFSET,
-  GET_SCROLL_OFFSET_CALLBACK,
   GET_CONTEXT,
   GET_CONTEXT_CALLBACK,
 
@@ -86,6 +82,29 @@ export const enum ChannelEventType {
   REGISTER_STYLE_SHEET_CONTENT,
   APPEND_STYLE_SHEET_PATH,
   DISABLE_STYLE_SHEET,
+
+  GET_ALL_COMPUTED_STYLES,
+  GET_ALL_COMPUTED_STYLES_CALLBACK,
+  GET_PSEUDO_COMPUTED_STYLES,
+  GET_PSEUDO_COMPUTED_STYLES_CALLBACK,
+  GET_INHERITED_RULES,
+  GET_INHERITED_RULES_CALLBACK,
+  GET_MATCHED_RULES,
+  GET_MATCHED_RULES_CALLBACK,
+  REPLACE_STYLE_SHEET_ALL_PROPERTIES,
+  REPLACE_STYLE_SHEET_ALL_PROPERTIES_CALLBACK,
+  GET_BOUNDING_CLIENT_RECT,
+  GET_BOUNDING_CLIENT_RECT_CALLBACK,
+  GET_SCROLL_OFFSET,
+  GET_SCROLL_OFFSET_CALLBACK,
+  SET_SCROLL_POSITION,
+  GET_BOX_MODEL,
+  GET_BOX_MODEL_CALLBACK,
+  GET_PSEUDO_TYPES,
+  GET_PSEUDO_TYPES_CALLBACK,
+  START_OVERLAY_INSPECT,
+  START_OVERLAY_INSPECT_CALLBACK,
+  STOP_OVERLAY_INSPECT,
 
   PERFORMANCE_START_TRACE,
   PERFORMANCE_END_TRACE,
@@ -103,8 +122,16 @@ export type ChannelEventTypeViewSide =
   | ChannelEventType.MEDIA_QUERY_OBSERVER_CALLBACK
   | ChannelEventType.INTERSECTION_OBSERVER_CALLBACK
   | ChannelEventType.SET_MODEL_BINDING_STAT_CALLBACK
+  | ChannelEventType.GET_ALL_COMPUTED_STYLES_CALLBACK
+  | ChannelEventType.GET_PSEUDO_COMPUTED_STYLES_CALLBACK
+  | ChannelEventType.GET_INHERITED_RULES_CALLBACK
+  | ChannelEventType.GET_MATCHED_RULES_CALLBACK
+  | ChannelEventType.REPLACE_STYLE_SHEET_ALL_PROPERTIES_CALLBACK
   | ChannelEventType.GET_BOUNDING_CLIENT_RECT_CALLBACK
   | ChannelEventType.GET_SCROLL_OFFSET_CALLBACK
+  | ChannelEventType.GET_BOX_MODEL_CALLBACK
+  | ChannelEventType.GET_PSEUDO_TYPES_CALLBACK
+  | ChannelEventType.START_OVERLAY_INSPECT_CALLBACK
   | ChannelEventType.GET_CONTEXT_CALLBACK
   | ChannelEventType.ON_CREATE_EVENT
   | ChannelEventType.ON_EVENT
@@ -181,10 +208,6 @@ export type ChannelArgs = ExhaustiveChannelEvent<{
 
   [ChannelEventType.SET_MODEL_BINDING_STAT]: [number, string, number | null]
   [ChannelEventType.SET_MODEL_BINDING_STAT_CALLBACK]: [number, string]
-  [ChannelEventType.GET_BOUNDING_CLIENT_RECT]: [number, number]
-  [ChannelEventType.GET_BOUNDING_CLIENT_RECT_CALLBACK]: [number, number, number, number, number]
-  [ChannelEventType.GET_SCROLL_OFFSET]: [number, number]
-  [ChannelEventType.GET_SCROLL_OFFSET_CALLBACK]: [number, number, number, number, number]
   [ChannelEventType.GET_CONTEXT]: [number, number]
   [ChannelEventType.GET_CONTEXT_CALLBACK]: [number, string]
 
@@ -213,6 +236,29 @@ export type ChannelArgs = ExhaustiveChannelEvent<{
   [ChannelEventType.PERFORMANCE_START_TRACE]: [number]
   [ChannelEventType.PERFORMANCE_END_TRACE]: [number, number]
   [ChannelEventType.PERFORMANCE_STATS_CALLBACK]: [number, number, number]
+
+  [ChannelEventType.GET_ALL_COMPUTED_STYLES]: [number, number]
+  [ChannelEventType.GET_ALL_COMPUTED_STYLES_CALLBACK]: [number, string]
+  [ChannelEventType.GET_PSEUDO_COMPUTED_STYLES]: [number, string, number]
+  [ChannelEventType.GET_PSEUDO_COMPUTED_STYLES_CALLBACK]: [number, string]
+  [ChannelEventType.GET_INHERITED_RULES]: [number, number]
+  [ChannelEventType.GET_INHERITED_RULES_CALLBACK]: [number, string]
+  [ChannelEventType.GET_MATCHED_RULES]: [number, number]
+  [ChannelEventType.GET_MATCHED_RULES_CALLBACK]: [number, string]
+  [ChannelEventType.REPLACE_STYLE_SHEET_ALL_PROPERTIES]: [number, number, string, number]
+  [ChannelEventType.REPLACE_STYLE_SHEET_ALL_PROPERTIES_CALLBACK]: [number, number | null]
+  [ChannelEventType.GET_BOUNDING_CLIENT_RECT]: [number, number]
+  [ChannelEventType.GET_BOUNDING_CLIENT_RECT_CALLBACK]: [number, number, number, number, number]
+  [ChannelEventType.GET_SCROLL_OFFSET]: [number, number]
+  [ChannelEventType.GET_SCROLL_OFFSET_CALLBACK]: [number, number, number, number, number]
+  [ChannelEventType.SET_SCROLL_POSITION]: [number, number, number, number]
+  [ChannelEventType.GET_BOX_MODEL]: [number, number]
+  [ChannelEventType.GET_BOX_MODEL_CALLBACK]: [number, string]
+  [ChannelEventType.GET_PSEUDO_TYPES]: [number, number]
+  [ChannelEventType.GET_PSEUDO_TYPES_CALLBACK]: [number, string[]]
+  [ChannelEventType.START_OVERLAY_INSPECT]: [number]
+  [ChannelEventType.START_OVERLAY_INSPECT_CALLBACK]: [number, string, number | null]
+  [ChannelEventType.STOP_OVERLAY_INSPECT]: []
 
   [ChannelEventType.SET_WXS_LISTENER_STATS]: [
     number,
@@ -271,6 +317,7 @@ export const MessageChannelDataSide = (
 
   let handleWXSCallMethod: ((elementId: number, method: string, args: unknown[]) => void) | null =
     null
+  let overlayInspectCallbackId: number | null = null
 
   const callback2id = (cb: (...args: any[]) => void) => {
     const id = callbackIdGen.gen()
@@ -283,8 +330,13 @@ export const MessageChannelDataSide = (
     release = true,
   ): ((...args: GetCallback<Parameters<F>>) => void) => {
     const cb = callbacks[id]!
-    if (release) callbackIdGen.release(id)
+    if (release) releaseCallbackId(id)
     return cb
+  }
+
+  const releaseCallbackId = (id: number) => {
+    delete callbacks[id]
+    callbackIdGen.release(id)
   }
 
   const eventIdMap = new Map<number, Event<unknown>>()
@@ -333,22 +385,6 @@ export const MessageChannelDataSide = (
       case ChannelEventType.SET_MODEL_BINDING_STAT_CALLBACK:
         id2callback<Channel['setModelBindingStat']>(arg[1])(JSON.parse(arg[2]))
         break
-      case ChannelEventType.GET_BOUNDING_CLIENT_RECT_CALLBACK:
-        id2callback<Channel['getBoundingClientRect']>(arg[1])({
-          left: arg[2],
-          top: arg[3],
-          width: arg[4],
-          height: arg[5],
-        })
-        break
-      case ChannelEventType.GET_SCROLL_OFFSET_CALLBACK:
-        id2callback<Channel['getScrollOffset']>(arg[1])({
-          scrollLeft: arg[2],
-          scrollTop: arg[3],
-          scrollWidth: arg[4],
-          scrollHeight: arg[5],
-        })
-        break
       case ChannelEventType.GET_CONTEXT_CALLBACK:
         id2callback<Channel['getContext']>(arg[1])(JSON.parse(arg[2]))
         break
@@ -384,6 +420,47 @@ export const MessageChannelDataSide = (
       case ChannelEventType.ON_RELEASE_EVENT: {
         const [, eventId] = arg
         eventIdMap.delete(eventId)
+        break
+      }
+      case ChannelEventType.GET_ALL_COMPUTED_STYLES_CALLBACK:
+        id2callback<Channel['getAllComputedStyles']>(arg[1])(JSON.parse(arg[2]))
+        break
+      case ChannelEventType.GET_PSEUDO_COMPUTED_STYLES_CALLBACK:
+        id2callback<Channel['getPseudoComputedStyles']>(arg[1])(JSON.parse(arg[2]))
+        break
+      case ChannelEventType.GET_INHERITED_RULES_CALLBACK:
+        id2callback<Channel['getInheritedRules']>(arg[1])(JSON.parse(arg[2]))
+        break
+      case ChannelEventType.REPLACE_STYLE_SHEET_ALL_PROPERTIES_CALLBACK:
+        id2callback<Channel['replaceStyleSheetAllProperties']>(arg[1])(arg[2])
+        break
+      case ChannelEventType.GET_BOUNDING_CLIENT_RECT_CALLBACK:
+        id2callback<Channel['getBoundingClientRect']>(arg[1])({
+          left: arg[2],
+          top: arg[3],
+          width: arg[4],
+          height: arg[5],
+        })
+        break
+      case ChannelEventType.GET_BOX_MODEL_CALLBACK:
+        id2callback<Channel['getBoxModel']>(arg[1])(JSON.parse(arg[2]))
+        break
+      case ChannelEventType.GET_MATCHED_RULES_CALLBACK:
+        id2callback<Channel['getMatchedRules']>(arg[1])(JSON.parse(arg[2]))
+        break
+      case ChannelEventType.GET_SCROLL_OFFSET_CALLBACK:
+        id2callback<Channel['getScrollOffset']>(arg[1])({
+          scrollLeft: arg[2],
+          scrollTop: arg[3],
+          scrollWidth: arg[4],
+          scrollHeight: arg[5],
+        })
+        break
+      case ChannelEventType.GET_PSEUDO_TYPES_CALLBACK:
+        id2callback<Channel['getPseudoTypes']>(arg[1])(arg[2])
+        break
+      case ChannelEventType.START_OVERLAY_INSPECT_CALLBACK: {
+        id2callback<Channel['startOverlayInspect']>(arg[1], false)(arg[2], arg[3])
         break
       }
       case ChannelEventType.PERFORMANCE_STATS_CALLBACK: {
@@ -493,19 +570,6 @@ export const MessageChannelDataSide = (
       attributeName: string,
       listener: ((newValue: unknown) => void) | null,
     ) => publish([ChannelEventType.SET_MODEL_BINDING_STAT, node, attributeName, listener ? callback2id(listener) : null]),
-    getBoundingClientRect: (
-      parent: number,
-      cb: (res: { left: number; top: number; width: number; height: number }) => void,
-    ) => publish([ChannelEventType.GET_BOUNDING_CLIENT_RECT, parent, callback2id(cb)]),
-    getScrollOffset: (
-      parent: number,
-      cb: (res: {
-        scrollLeft: number
-        scrollTop: number
-        scrollWidth: number
-        scrollHeight: number
-      }) => void,
-    ) => publish([ChannelEventType.GET_SCROLL_OFFSET, parent, callback2id(cb)]),
     getContext: (
       element: number,
       cb: (res: any) => void,
@@ -517,6 +581,48 @@ export const MessageChannelDataSide = (
     registerStyleSheetContent: (path: string, content: unknown) => publish([ChannelEventType.REGISTER_STYLE_SHEET_CONTENT, path, JSON.stringify(content)]),
     appendStyleSheetPath: (index: number, path: string, styleScope?: number) => publish([ChannelEventType.APPEND_STYLE_SHEET_PATH, index, path, styleScope]),
     disableStyleSheet: (index: number) => publish([ChannelEventType.DISABLE_STYLE_SHEET, index]),
+
+    getAllComputedStyles: (elementId: number, cb: (res: GlassEaselBackend.GetAllComputedStylesResponses) => void) => publish([ChannelEventType.GET_ALL_COMPUTED_STYLES, elementId, callback2id(cb)]),
+    getPseudoComputedStyles: (
+      elementId: number,
+      pseudoType: string,
+      cb: (res: GlassEaselBackend.GetAllComputedStylesResponses) => void,
+    ) => publish([ChannelEventType.GET_PSEUDO_COMPUTED_STYLES, elementId, pseudoType, callback2id(cb)]),
+    getInheritedRules: (elementId: number, cb: (res: GlassEaselBackend.GetInheritedRulesResponses) => void) => publish([ChannelEventType.GET_INHERITED_RULES, elementId, callback2id(cb)]),
+    replaceStyleSheetAllProperties: (sheetIndex: number, ruleIndex: number, inlineStyle: string, cb: (propertyIndex: number | null) => void) => publish([ChannelEventType.REPLACE_STYLE_SHEET_ALL_PROPERTIES, sheetIndex, ruleIndex, inlineStyle, callback2id(cb)]),
+    getBoundingClientRect: (parent: number, cb: (res: GlassEaselBackend.BoundingClientRect) => void) => publish([ChannelEventType.GET_BOUNDING_CLIENT_RECT, parent, callback2id(cb)]),
+    getBoxModel:(
+      elementId: number,
+      cb: (res: {
+        margin: GlassEaselBackend.BoundingClientRect
+        border: GlassEaselBackend.BoundingClientRect
+        padding: GlassEaselBackend.BoundingClientRect
+        content: GlassEaselBackend.BoundingClientRect
+      }) => void,
+    ) => publish([ChannelEventType.GET_BOX_MODEL, elementId, callback2id(cb)]),
+    getMatchedRules: (
+      elementId: number,
+      cb: (res: GlassEaselBackend.GetMatchedRulesResponses) => void,
+    ) => publish([ChannelEventType.GET_MATCHED_RULES, elementId, callback2id(cb)]),
+    getScrollOffset: (
+      elementId: number,
+      cb: (res: GlassEaselBackend.ScrollOffset) => void,
+    ) => publish([ChannelEventType.GET_SCROLL_OFFSET, elementId, callback2id(cb)]),
+    setScrollPosition: (
+      elementId: number,
+      scrollLeft: number,
+      scrollTop: number,
+      duration: number
+    ) => publish([ChannelEventType.SET_SCROLL_POSITION, elementId, scrollLeft, scrollTop, duration]),
+    getPseudoTypes: (elementId: number, cb: (res: string[]) => void) => publish([ChannelEventType.GET_PSEUDO_TYPES, elementId, callback2id(cb)]),
+    startOverlayInspect: (cb: (event: string, elementId: number | null) => void) => {
+      const callbackId = overlayInspectCallbackId = callback2id(cb)
+      publish([ChannelEventType.START_OVERLAY_INSPECT, callbackId])
+    },
+    stopOverlayInspect: () => {
+      if (overlayInspectCallbackId) releaseCallbackId(overlayInspectCallbackId)
+      publish([ChannelEventType.STOP_OVERLAY_INSPECT])
+    },
 
     performanceStartTrace: (index: number) => publish([ChannelEventType.PERFORMANCE_START_TRACE, index]),
     performanceEndTrace: (id: number, cb: (stats: { startTimestamp: number; endTimestamp: number }) => void,) => publish([ChannelEventType.PERFORMANCE_END_TRACE, id, callback2id(cb)]),
@@ -962,36 +1068,6 @@ export const MessageChannelViewSide = (
         })
         break
       }
-      case ChannelEventType.GET_BOUNDING_CLIENT_RECT: {
-        const [, elementId, callbackId] = arg
-        const element = nodeMap[elementId]! as Element
-        controller.getBoundingClientRect(element, (res) => {
-          publish([
-            ChannelEventType.GET_BOUNDING_CLIENT_RECT_CALLBACK,
-            callbackId,
-            res.left,
-            res.top,
-            res.width,
-            res.height,
-          ])
-        })
-        break
-      }
-      case ChannelEventType.GET_SCROLL_OFFSET: {
-        const [, elementId, callbackId] = arg
-        const element = nodeMap[elementId]! as Element
-        controller.getScrollOffset(element, (res) => {
-          publish([
-            ChannelEventType.GET_SCROLL_OFFSET_CALLBACK,
-            callbackId,
-            res.scrollLeft,
-            res.scrollTop,
-            res.scrollWidth,
-            res.scrollHeight,
-          ])
-        })
-        break
-      }
       case ChannelEventType.GET_CONTEXT: {
         const [, elementId, callbackId] = arg
         const element = nodeMap[elementId]! as Element
@@ -1025,6 +1101,126 @@ export const MessageChannelViewSide = (
       case ChannelEventType.DISABLE_STYLE_SHEET: {
         const [, index] = arg
         controller.disableStyleSheet(index)
+        break
+      }
+      case ChannelEventType.GET_ALL_COMPUTED_STYLES: {
+        const [, elementId, callbackId] = arg
+        const element = nodeMap[elementId]! as Element
+        controller.getAllComputedStyles(element, (res) => {
+          publish([
+            ChannelEventType.GET_ALL_COMPUTED_STYLES_CALLBACK,
+            callbackId,
+            JSON.stringify(res),
+          ])
+        })
+        break
+      }
+      case ChannelEventType.GET_PSEUDO_COMPUTED_STYLES: {
+        const [, elementId, pseudoType, callbackId] = arg
+        const element = nodeMap[elementId]! as Element
+        controller.getPseudoComputedStyles(element, pseudoType, (res) => {
+          publish([
+            ChannelEventType.GET_PSEUDO_COMPUTED_STYLES_CALLBACK,
+            callbackId,
+            JSON.stringify(res),
+          ])
+        })
+        break
+      }
+      case ChannelEventType.GET_INHERITED_RULES: {
+        const [, elementId, callbackId] = arg
+        const element = nodeMap[elementId]! as Element
+        controller.getInheritedRules(element, (res) => {
+          publish([ChannelEventType.GET_INHERITED_RULES_CALLBACK, callbackId, JSON.stringify(res)])
+        })
+        break
+      }
+      case ChannelEventType.REPLACE_STYLE_SHEET_ALL_PROPERTIES: {
+        const [, sheetIndex, ruleIndex, inlineStyle, callbackId] = arg
+        controller.replaceStyleSheetAllProperties(
+          sheetIndex,
+          ruleIndex,
+          inlineStyle,
+          (propertyIndex) => {
+            publish([
+              ChannelEventType.REPLACE_STYLE_SHEET_ALL_PROPERTIES_CALLBACK,
+              callbackId,
+              propertyIndex,
+            ])
+          },
+        )
+        break
+      }
+      case ChannelEventType.GET_MATCHED_RULES: {
+        const [, elementId, callbackId] = arg
+        const element = nodeMap[elementId]! as Element
+        controller.getMatchedRules(element, (res) => {
+          publish([ChannelEventType.GET_MATCHED_RULES_CALLBACK, callbackId, JSON.stringify(res)])
+        })
+        break
+      }
+      case ChannelEventType.GET_BOUNDING_CLIENT_RECT: {
+        const [, elementId, callbackId] = arg
+        const element = nodeMap[elementId]! as Element
+        controller.getBoundingClientRect(element, (res) => {
+          publish([
+            ChannelEventType.GET_BOUNDING_CLIENT_RECT_CALLBACK,
+            callbackId,
+            res.left,
+            res.top,
+            res.width,
+            res.height,
+          ])
+        })
+        break
+      }
+      case ChannelEventType.GET_SCROLL_OFFSET: {
+        const [, elementId, callbackId] = arg
+        const element = nodeMap[elementId]! as Element
+        controller.getScrollOffset(element, (res) => {
+          publish([
+            ChannelEventType.GET_SCROLL_OFFSET_CALLBACK,
+            callbackId,
+            res.scrollLeft,
+            res.scrollTop,
+            res.scrollWidth,
+            res.scrollHeight,
+          ])
+        })
+        break
+      }
+      case ChannelEventType.SET_SCROLL_POSITION: {
+        const [, elementId, scrollLeft, scrollTop, duration] = arg
+        const element = nodeMap[elementId]! as Element
+        controller.setScrollPosition(element, scrollLeft, scrollTop, duration)
+        break
+      }
+      case ChannelEventType.GET_BOX_MODEL: {
+        const [, elementId, callbackId] = arg
+        const element = nodeMap[elementId]! as Element
+        controller.getBoxModel(element, (res) => {
+          publish([ChannelEventType.GET_BOX_MODEL_CALLBACK, callbackId, JSON.stringify(res)])
+        })
+        break
+      }
+      case ChannelEventType.GET_PSEUDO_TYPES: {
+        const [, elementId, callbackId] = arg
+        const element = nodeMap[elementId]! as Element
+        controller.getPseudoTypes(element, (res) => {
+          publish([ChannelEventType.GET_PSEUDO_TYPES_CALLBACK, callbackId, res])
+        })
+        break
+      }
+      case ChannelEventType.START_OVERLAY_INSPECT: {
+        const [, callbackId] = arg
+        controller.startOverlayInspect((event, element) => {
+          const elementId = element ? getNodeId(element)! : null
+          publish([ChannelEventType.START_OVERLAY_INSPECT_CALLBACK, callbackId, event, elementId])
+        })
+        break
+      }
+      case ChannelEventType.STOP_OVERLAY_INSPECT: {
+        controller.stopOverlayInspect()
         break
       }
       case ChannelEventType.PERFORMANCE_START_TRACE: {
