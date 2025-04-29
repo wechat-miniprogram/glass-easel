@@ -26,14 +26,14 @@ type TaggedMethod<Fn extends ComponentMethod> = typeUtils.TaggedMethod<Fn>
 type UnTaggedMethod<M extends TaggedMethod<any>> = typeUtils.UnTaggedMethod<M>
 
 export class BaseBehaviorBuilder<
-  TPrevData extends DataList = Empty,
-  TData extends DataList = Empty,
-  TProperty extends PropertyList = Empty,
-  TMethod extends MethodList = Empty,
-  TChainingFilter extends ChainingFilterType = never,
-  TPendingChainingFilter extends ChainingFilterType = never,
-  TComponentExport = never,
-  TExtraThisFields extends DataList = Empty,
+  TPrevData extends DataList,
+  TData extends DataList,
+  TProperty extends PropertyList,
+  TMethod extends MethodList,
+  TChainingFilter extends ChainingFilterType,
+  TPendingChainingFilter extends ChainingFilterType,
+  TComponentExport,
+  TExtraThisFields extends DataList,
 > {
   protected _$codeSpace!: CodeSpace
   protected _$!: glassEasel.BehaviorBuilder<
@@ -404,7 +404,7 @@ export class BaseBehaviorBuilder<
     >,
     TChainingFilter
   > {
-    def.behaviors?.forEach((beh) => beh._$bindedDefinitionFilter?.(def))
+    def.behaviors?.forEach((beh) => beh._$boundDefinitionFilter?.(def))
     const inner = this._$
     const {
       behaviors,

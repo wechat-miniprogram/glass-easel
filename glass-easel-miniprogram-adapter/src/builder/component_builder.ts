@@ -10,7 +10,7 @@ import type {
   PageDefinition,
   utils as typeUtils,
 } from '../types'
-import type { Behavior, GeneralBehavior } from '../behavior'
+import type { Behavior } from '../behavior'
 import type { AllData, Component, GeneralComponent } from '../component'
 import type { CodeSpace } from '../space'
 import type { ResolveBehaviorBuilder, BuilderContext } from './type_utils'
@@ -26,18 +26,29 @@ type ComponentMethod = typeUtils.ComponentMethod
 type TaggedMethod<Fn extends ComponentMethod> = typeUtils.TaggedMethod<Fn>
 type UnTaggedMethod<M extends TaggedMethod<any>> = typeUtils.UnTaggedMethod<M>
 
+export type DefaultComponentBuilder = ComponentBuilder<
+  /* TPrevData */ Empty,
+  /* TData */ Empty,
+  /* TProperty */ Empty,
+  /* TMethod */ Empty,
+  /* TChainingFilter */ never,
+  /* TPendingChainingFilter */ never,
+  /* TComponentExport */ never,
+  /* TExtraThisFields */ Empty
+>
+
 /**
  * A direct way to create a component
  */
 export class ComponentBuilder<
-  TPrevData extends DataList = Empty,
-  TData extends DataList = Empty,
-  TProperty extends PropertyList = Empty,
-  TMethod extends MethodList = Empty,
-  TChainingFilter extends ChainingFilterType = never,
-  TPendingChainingFilter extends ChainingFilterType = never,
-  TComponentExport = never,
-  TExtraThisFields extends DataList = Empty,
+  TPrevData extends DataList,
+  TData extends DataList,
+  TProperty extends PropertyList,
+  TMethod extends MethodList,
+  TChainingFilter extends ChainingFilterType,
+  TPendingChainingFilter extends ChainingFilterType,
+  TComponentExport,
+  TExtraThisFields extends DataList,
 > extends BaseBehaviorBuilder<
   TPrevData,
   TData,
@@ -51,10 +62,10 @@ export class ComponentBuilder<
   private _$is!: string
   private _$alias?: string[]
   private _$options?: ComponentDefinitionOptions
-  private _$proto?: ComponentProto<TData, TProperty, TMethod, TComponentExport>
+  private _$proto?: ComponentProto<TData, TProperty, TMethod, TComponentExport, TExtraThisFields>
 
   /** @internal */
-  static create(codeSpace: CodeSpace, is: string, alias?: string[]) {
+  static create(codeSpace: CodeSpace, is: string, alias?: string[]): DefaultComponentBuilder {
     const ret = new ComponentBuilder()
     const overallBehavior = codeSpace._$overallBehavior
     ret._$codeSpace = codeSpace
@@ -67,7 +78,7 @@ export class ComponentBuilder<
       if (proto === undefined) {
         const methods = originalCaller.getComponentDefinition().behavior.getMethods()
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        proto = ret._$proto = new ComponentProto(methods, ret._$export) as any
+        proto = ret._$proto = new ComponentProto(methods, ret._$parents, ret._$export) as any
       }
       const caller = proto!.derive()
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -75,7 +86,7 @@ export class ComponentBuilder<
       return caller
     })
     if (overallBehavior) ret._$.behavior(overallBehavior)
-    return ret
+    return ret as DefaultComponentBuilder
   }
 
   /**
@@ -118,7 +129,7 @@ export class ComponentBuilder<
     >,
     UChainingFilter
   > {
-    this._$parents.push(behavior as GeneralBehavior)
+    this._$parents.push(behavior)
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     this._$ = this._$.behavior(behavior._$)
     if (behavior._$export) {
@@ -374,7 +385,7 @@ export class ComponentBuilder<
   /**
    * Finish the component definition process
    */
-  register(): ComponentType<TData, TProperty, TMethod, TComponentExport> {
+  register(): ComponentType<TData, TProperty, TMethod, TComponentExport, TExtraThisFields> {
     const is = this._$is
     const codeSpace = this._$codeSpace
 
