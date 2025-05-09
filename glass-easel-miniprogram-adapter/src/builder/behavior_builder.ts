@@ -91,7 +91,7 @@ export class BehaviorBuilder<
   }
 
   /** Use another behavior */
-  behavior<
+  override behavior<
     UData extends DataList,
     UProperty extends PropertyList,
     UMethod extends MethodList,
@@ -115,18 +115,12 @@ export class BehaviorBuilder<
       TMethod & UMethod,
       UChainingFilter,
       TPendingChainingFilter,
-      TComponentExport,
+      UComponentExport,
       TExtraThisFields & UExtraThisFields
     >,
     UChainingFilter
   > {
-    this._$parents.push(behavior)
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    this._$ = this._$.behavior(behavior._$)
-    if (behavior._$chainingFilter) {
-      return behavior._$chainingFilter(this as any)
-    }
-    return this as any
+    return super.behavior(behavior) as any
   }
 
   /** Set the export value when the component is being selected */

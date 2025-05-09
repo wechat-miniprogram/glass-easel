@@ -83,6 +83,45 @@ export class BaseBehaviorBuilder<
     return this as any
   }
 
+  /** Use another behavior */
+  behavior<
+    UData extends DataList,
+    UProperty extends PropertyList,
+    UMethod extends MethodList,
+    UChainingFilter extends ChainingFilterType,
+    UComponentExport,
+    UExtraThisFields extends DataList,
+  >(
+    behavior: Behavior<
+      UData,
+      UProperty,
+      UMethod,
+      UChainingFilter,
+      UComponentExport,
+      UExtraThisFields
+    >,
+  ): ResolveBehaviorBuilder<
+    BaseBehaviorBuilder<
+      TPrevData,
+      TData & UData,
+      TProperty & UProperty,
+      TMethod & UMethod,
+      UChainingFilter,
+      TPendingChainingFilter,
+      UComponentExport,
+      TExtraThisFields & UExtraThisFields
+    >,
+    UChainingFilter
+  > {
+    this._$parents.push(behavior)
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    this._$ = this._$.behavior(behavior._$)
+    if (behavior._$chainingFilter) {
+      return behavior._$chainingFilter(this as any)
+    }
+    return this as any
+  }
+
   data<T extends DataList>(
     gen: () => typeUtils.NewFieldList<AllData<TData, TProperty>, T>,
   ): ResolveBehaviorBuilder<
