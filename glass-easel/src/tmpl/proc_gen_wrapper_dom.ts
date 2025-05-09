@@ -192,11 +192,15 @@ export class ProcGenWrapperDom {
 
   // set event handler
   v(elem: HTMLElement, evName: string, v: string, final: boolean) {
-    this.shadowRoot.setListener(elem as unknown as GeneralBackendElement, evName, (ev) => {
+    const listener = (ev: ShadowedEvent<unknown>) => {
       const ret = this.shadowRoot.comp.callMethod(v, ev) as unknown
       if (final) return false
       return ret
+    }
+    Object.defineProperty(listener, 'name', {
+      value: v,
     })
+    this.shadowRoot.setListener(elem as unknown as GeneralBackendElement, evName, listener)
   }
 
   // update a property or external class of a component, or an attribute of a native node

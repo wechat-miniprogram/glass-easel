@@ -824,6 +824,7 @@ export class CurrentWindowBackendContext implements Context {
       const { x, y } = e
       window.document.body.style.pointerEvents = originalPointerEvents
       this.elementFromPoint(x, y, (node) => {
+        if (!this._stopOverlayInspectHandler) return
         window.document.body.style.pointerEvents = 'none'
         cb('tap', node)
       })
@@ -836,6 +837,7 @@ export class CurrentWindowBackendContext implements Context {
         const { x, y } = e
         window.document.body.style.pointerEvents = originalPointerEvents
         this.elementFromPoint(x, y, (node) => {
+          if (!this._stopOverlayInspectHandler) return
           window.document.body.style.pointerEvents = 'none'
           cb('mouseover', node)
         })

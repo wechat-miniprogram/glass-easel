@@ -1060,7 +1060,7 @@ export class ProcGenWrapper {
       capture,
       generalLvaluePath,
     )
-    if (ENV.DEV && listener) {
+    if (listener) {
       Object.defineProperty(listener, 'name', {
         value: typeof handler === 'string' ? handler : handler.name,
       })
@@ -1069,7 +1069,6 @@ export class ProcGenWrapper {
       final,
       mutated,
       capture,
-      extraFields: { handler },
     }
     if (isDynamic) {
       const tmplArgs = getTmplArgs(elem)
