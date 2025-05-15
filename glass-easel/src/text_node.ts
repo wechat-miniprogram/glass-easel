@@ -123,6 +123,8 @@ export class TextNode implements NodeCast {
         ;(this._$backendElement as backend.Element | composedBackend.Element).release()
         if (ENV.DEV) performanceMeasureEnd()
       }
+    }
+    if (this.ownerShadowRoot._$nodeTreeContext.dropBackendAfterRelease) {
       this._$backendElement = null
     }
   }
