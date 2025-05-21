@@ -19,6 +19,8 @@ export class Context implements glassEasel.backend.Context {
   private _$destroyed = false
   public _$currentMethod: string | null = null
 
+  public dropBackendAfterRelease = true
+
   private _$createEvent:
     | null
     | ((
@@ -242,7 +244,7 @@ abstract class Node implements glassEasel.backend.Element {
   public _$slotElement: NativeNode | VirtualNode | null = null
   public _$externalSlot: Element | null = null
   public _$inheritSlots: boolean = false
-  public _$style = ''
+  public _$styleSegments: string[] = []
   public _$styleScope = 0
   public _$extraStyleScope: number | null = null
   public _$externalClasses: Array<string> = []
@@ -419,7 +421,7 @@ abstract class Node implements glassEasel.backend.Element {
         }
       }
       if (this.id) props.id = this.getAttribute('id')!
-      if (this._$style) props.style = this.getAttribute('style')!
+      if (this._$styleSegments.length) props.style = this.getAttribute('style')!
       if (this._$classes) props.class = this.getAttribute('class')!
       const propsStr = Object.entries(props)
         .map(([key, value]) => `${key}="${value}"`)
@@ -511,7 +513,7 @@ abstract class Node implements glassEasel.backend.Element {
     // eslint-disable-next-line no-param-reassign
     name = name.toLowerCase()
     if (name === 'id') return this.id
-    if (name === 'style') return this._$style
+    if (name === 'style') return this._$styleSegments.join(';')
     if (name === 'class') {
       if (!this._$classes) return null
       return this._$classes.join(' ')
@@ -679,9 +681,9 @@ abstract class Node implements glassEasel.backend.Element {
     this._$inheritSlots = true
   }
 
-  setStyle(styleText: string): void {
+  setStyle(styleText: string, styleSegmentIndex: number): void {
     assertType(this, Element)
-    this._$style = styleText
+    this._$styleSegments[styleSegmentIndex] = styleText
   }
 
   addClass(elementClass: string): void {

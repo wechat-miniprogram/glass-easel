@@ -838,7 +838,7 @@ export class Component<
       }
       const initFuncs = behavior._$init
       for (let i = 0; i < initFuncs.length; i += 1) {
-        const init = initFuncs[i]!
+        const init = initFuncs[i]!.func
         if (ENV.DEV) performanceMeasureStart('component.init', comp)
         const exported = safeCallback(
           'Component Init',
