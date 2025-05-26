@@ -251,8 +251,8 @@ export class ShadowDomElement implements GlassEaselBackend.Element {
     this._context.channel.setInheritSlots(this._id)
   }
 
-  setStyle(_styleText: string): void {
-    this._context.channel.setStyle(this._id, _styleText)
+  setStyle(styleText: string, styleSegmentIndex: number): void {
+    this._context.channel.setStyle(this._id, styleText, styleSegmentIndex)
   }
 
   addClass(className: string): void {

@@ -175,7 +175,7 @@ export class EmptyBackendElement implements Element {
     // empty
   }
 
-  setStyle(_styleText: string): void {
+  setStyle(_styleText: string, _styleSegmentIndex: number): void {
     // empty
   }
 

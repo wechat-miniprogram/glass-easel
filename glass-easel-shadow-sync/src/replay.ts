@@ -40,8 +40,9 @@ export function replayShadowBackend(
       const classNames = elem.classList.getClassNames()
       if (classNames) classNames.split(' ').forEach((className) => be.addClass(className))
     }
-    const style = elem.getNodeStyleSegments().join(';')
-    if (style) be.setStyle(style)
+    elem.getNodeStyleSegments().forEach((style, index) => {
+      if (style) be.setStyle(style, index)
+    })
     elem.attributes.forEach(({ name, value }) => {
       be.setAttribute(name, value)
     })

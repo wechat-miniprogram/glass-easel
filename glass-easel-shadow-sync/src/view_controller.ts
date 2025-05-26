@@ -383,8 +383,8 @@ export class ViewController {
     this._styleScopeIdMapping[scopeId] = actualScopeId
   }
 
-  setStyle(element: Element, styleText: string): void {
-    element.style = styleText
+  setStyle(element: Element, styleText: string, styleSegmentIndex: number): void {
+    element.setNodeStyle(styleText, styleSegmentIndex)
   }
 
   addClass(element: Element, className: string): void {

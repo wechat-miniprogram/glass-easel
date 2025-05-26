@@ -532,15 +532,17 @@ export class Element implements NodeCast {
 
   /** Set the node style */
   setNodeStyle(styleSegment: string, index: StyleSegmentIndex = 0) {
-    if (this._$styleSegments[index] === styleSegment) return
+    if (index === 0 && this._$styleSegments[index] === styleSegment) return
     this._$styleSegments[index] = styleSegment
     const style = this._$styleSegments.join(';')
     if (ENV.DEV) performanceMeasureStart('backend.setStyle')
     if (this._$backendElement) {
       if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
         ;(this._$backendElement as domlikeBackend.Element).setAttribute('style', style)
+      } else if (BM.COMPOSED || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Composed)) {
+        ;(this._$backendElement as composedBackend.Element).setStyle(style)
       } else {
-        ;(this._$backendElement as backend.Element | composedBackend.Element).setStyle(style)
+        ;(this._$backendElement as backend.Element).setStyle(styleSegment, index)
       }
     }
     if (ENV.DEV) performanceMeasureEnd()

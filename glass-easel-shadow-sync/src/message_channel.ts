@@ -195,7 +195,7 @@ export type ChannelArgs = ExhaustiveChannelEvent<{
   [ChannelEventType.SET_EXTERNAL_SLOT]: [number, number]
   [ChannelEventType.SET_INHERIT_SLOTS]: [number]
   [ChannelEventType.REGISTER_STYLE_SCOPE]: [number, string | undefined]
-  [ChannelEventType.SET_STYLE]: [number, string]
+  [ChannelEventType.SET_STYLE]: [number, string, number]
   [ChannelEventType.ADD_CLASS]: [number, string]
   [ChannelEventType.REMOVE_CLASS]: [number, string]
   [ChannelEventType.CLEAR_CLASSES]: [number]
@@ -554,7 +554,7 @@ export const MessageChannelDataSide = (
     setExternalSlot: (nodeId: number, slot: number) => publish([ChannelEventType.SET_EXTERNAL_SLOT, nodeId, slot]),
     setInheritSlots: (nodeId: number) => publish([ChannelEventType.SET_INHERIT_SLOTS, nodeId]),
     registerStyleScope: (scopeId: number, stylePrefix: string | undefined) => publish([ChannelEventType.REGISTER_STYLE_SCOPE, scopeId, stylePrefix]),
-    setStyle: (elementId: number, styleText: string) => publish([ChannelEventType.SET_STYLE, elementId, styleText]),
+    setStyle: (elementId: number, styleText: string, styleSegmentIndex: number) => publish([ChannelEventType.SET_STYLE, elementId, styleText, styleSegmentIndex]),
     addClass: (elementId: number, className: string) => publish([ChannelEventType.ADD_CLASS, elementId, className]),
     removeClass: (elementId: number, className: string) => publish([ChannelEventType.REMOVE_CLASS, elementId, className]),
     clearClasses: (elementId: number) => publish([ChannelEventType.CLEAR_CLASSES, elementId]),
@@ -994,9 +994,9 @@ export const MessageChannelViewSide = (
         break
       }
       case ChannelEventType.SET_STYLE: {
-        const [, elementId, styleText] = arg
+        const [, elementId, styleText, styleSegmentIndex] = arg
         const element = nodeMap[elementId]! as Element
-        controller.setStyle(element, styleText)
+        controller.setStyle(element, styleText, styleSegmentIndex)
         break
       }
       case ChannelEventType.ADD_CLASS: {

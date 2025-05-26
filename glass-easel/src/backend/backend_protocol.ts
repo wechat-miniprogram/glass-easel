@@ -51,7 +51,7 @@ export interface Element extends Partial<suggestedBackend.Element<Element>> {
   setSlotElement(slot: Element | null): void
   setExternalSlot(slot: Element): void
   setInheritSlots(): void
-  setStyle(styleText: string): void
+  setStyle(styleText: string, styleSegmentIndex: number): void
   addClass(className: string): void
   removeClass(className: string): void
   clearClasses(): void
