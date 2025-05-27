@@ -1,6 +1,7 @@
 import { type DeepCopyKind, type typeUtils as utils } from 'glass-easel'
 import type { DefinitionFilter, GeneralBehavior } from './behavior'
 import { type GeneralComponent } from './component'
+import type { RelationParams } from './builder/type_utils'
 
 export { typeUtils as utils } from 'glass-easel'
 
@@ -61,7 +62,7 @@ export type BehaviorDefinition<
   detached?: ComponentMethod
   lifetimes?: { [name: string]: ComponentMethod }
   pageLifetimes?: { [name: string]: ComponentMethod }
-  relations?: utils.RelationParamsWithKey
+  relations?: Record<string, RelationParams>
   externalClasses?: string[]
   definitionFilter?: DefinitionFilter
   export?: (source: GeneralComponent | null) => TComponentExport
