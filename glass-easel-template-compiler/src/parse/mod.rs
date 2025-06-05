@@ -10,7 +10,7 @@ pub mod iter;
 macro_rules! case {
     ($src:expr, $expect:expr $(, $msg:expr, $range:expr)*) => {
         {
-            use crate::stringify::Stringify;
+            use crate::stringify::{Stringify, StringifyOptions};
             let src: &str = $src;
             let expect: &str = $expect;
 
@@ -25,9 +25,10 @@ macro_rules! case {
                 assert_eq!(err.location.start.utf16_col..err.location.end.utf16_col, $range);
             )*
             assert_eq!(warnings.next(), None);
+            let options = StringifyOptions { minimize: true, ..Default::default() };
 
             // check stringify result
-            let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src);
+            let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, options);
             template.stringify_write(&mut stringifier).unwrap();
             let (stringify_result, _sourcemap) = stringifier.finish();
             assert_eq!(stringify_result.as_str(), expect);
@@ -35,7 +36,7 @@ macro_rules! case {
             // re-parse and then stringify
             let (template, ps) = $crate::parse::parse("TEST", expect);
             assert_eq!(ps.warnings().filter(|x| x.kind.level() > crate::parse::ParseErrorLevel::Note).next(), None);
-            let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src);
+            let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, options);
             template.stringify_write(&mut stringifier).unwrap();
             assert_eq!(stringifier.finish().0.as_str(), expect);
         }

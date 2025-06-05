@@ -4134,8 +4134,12 @@ mod test {
         use crate::stringify::Stringify;
         let (template, ps) = crate::parse::parse("TEST", src);
         assert_eq!(ps.warnings().next(), None);
-        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src);
-        stringifier.set_mangling(true);
+        let options = crate::stringify::StringifyOptions {
+            mangling: true,
+            minimize: true,
+            ..Default::default()
+        };
+        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, options);
         template.stringify_write(&mut stringifier).unwrap();
         let (stringify_result, _sourcemap) = stringifier.finish();
         assert_eq!(stringify_result.as_str(), expect);

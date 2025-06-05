@@ -14,9 +14,11 @@ use crate::{
         Position, TemplateStructure,
     },
 };
+pub use options::StringifyOptions;
 
 pub(crate) mod expr;
 mod tag;
+pub mod options;
 
 pub struct Stringifier<'s, W: FmtWrite> {
     w: W,
@@ -25,11 +27,11 @@ pub struct Stringifier<'s, W: FmtWrite> {
     smb: SourceMapBuilder,
     source_path: &'s str,
     scope_names: Vec<CompactString>,
-    mangling: bool,
+    options: StringifyOptions,
 }
 
 impl<'s, W: FmtWrite> Stringifier<'s, W> {
-    pub fn new(w: W, source_path: &'s str, source: &'s str) -> Self {
+    pub fn new(w: W, source_path: &'s str, source: &'s str, options: StringifyOptions) -> Self {
         let mut smb = SourceMapBuilder::new(Some(source_path));
         let source_id = smb.add_source(source_path);
         smb.set_source_contents(source_id, Some(source));
@@ -40,7 +42,7 @@ impl<'s, W: FmtWrite> Stringifier<'s, W> {
             smb,
             source_path,
             scope_names: vec![],
-            mangling: false,
+            options,
         }
     }
 
@@ -49,13 +51,9 @@ impl<'s, W: FmtWrite> Stringifier<'s, W> {
         (self.w, sourcemap)
     }
 
-    pub fn set_mangling(&mut self, v: bool) {
-        self.mangling = v;
-    }
-
     fn add_scope(&mut self, name: &CompactString) -> &CompactString {
         let i = self.scope_names.len();
-        if self.mangling {
+        if self.options.mangling {
             self.scope_names.push(format!("_${}", i).into());
         } else {
             self.scope_names.push(name.clone());

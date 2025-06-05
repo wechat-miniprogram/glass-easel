@@ -788,7 +788,7 @@ mod test {
             </template>
         "#;
         let (template, _) = crate::parse::parse("TEST", src);
-        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src);
+        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, Default::default());
         template.stringify_write(&mut stringifier).unwrap();
         let (output, sourcemap) = stringifier.finish();
         assert_eq!(

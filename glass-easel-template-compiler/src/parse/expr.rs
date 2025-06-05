@@ -2090,8 +2090,12 @@ mod test {
             let r: Vec<_> = parsed
                 .sub_expressions()
                 .map(|x| {
+                    let options = crate::stringify::StringifyOptions {
+                        minimize: true,
+                        ..Default::default()
+                    };
                     let mut stringifier =
-                        crate::stringify::Stringifier::new(String::new(), "test", src);
+                        crate::stringify::Stringifier::new(String::new(), "test", src, options);
                     x.stringify_write(&mut stringifier).unwrap();
                     let (s, _) = stringifier.finish();
                     s
