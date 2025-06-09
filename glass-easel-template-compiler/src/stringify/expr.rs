@@ -1,6 +1,6 @@
 use std::fmt::{Result as FmtResult, Write as FmtWrite};
 
-use super::{Stringifier, Stringify};
+use super::stringifier::*;
 use crate::{
     escape::gen_lit_str,
     parse::expr::{ArrayFieldKind, Expression, ObjectFieldKind},
@@ -76,9 +76,9 @@ impl ExpressionLevel {
     }
 }
 
-fn expression_strigify_write<'s, W: FmtWrite>(
+fn expression_strigify_write<W: FmtWrite>(
     expression: &Expression,
-    stringifier: &mut Stringifier<'s, W>,
+    stringifier: &mut StringifierLine<W>,
     accept_level: ExpressionLevel,
 ) -> FmtResult {
     let cur_level = ExpressionLevel::from_expression(expression);
@@ -139,7 +139,7 @@ fn expression_strigify_write<'s, W: FmtWrite>(
                     } => {
                         let is_shortcut = match value {
                             Expression::ScopeRef { index, .. } => {
-                                stringifier.get_scope_name(*index) == name.as_str()
+                                stringifier.block().get_scope_name(*index) == name.as_str()
                             }
                             Expression::DataField { name: x, .. } => x == name,
                             _ => false,
@@ -484,8 +484,17 @@ fn expression_strigify_write<'s, W: FmtWrite>(
     Ok(())
 }
 
+impl StringifyLine for Expression {
+    fn stringify_write<'s, 't, 'u, W: FmtWrite>(&self, stringifier: &mut StringifierLine<'s, 't, 'u, W>) -> FmtResult {
+        expression_strigify_write(self, stringifier, ExpressionLevel::Cond) // FIXME write expr with spaces
+    }
+}
+
+#[cfg(test)]
 impl Stringify for Expression {
     fn stringify_write<'s, W: FmtWrite>(&self, stringifier: &mut Stringifier<'s, W>) -> FmtResult {
-        expression_strigify_write(self, stringifier, ExpressionLevel::Cond)
+        stringifier.block(|stringifier| {
+            stringifier.line(self)
+        })
     }
 }

@@ -2,6 +2,9 @@
 /// The options for the stringifier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StringifyOptions {
+    /// Enable source-map support or not.
+    pub source_map: bool,
+
     /// Mangling scope names or not.
     pub mangling: bool,
 
@@ -28,6 +31,7 @@ pub struct StringifyOptions {
 impl Default for StringifyOptions {
     fn default() -> Self {
         Self {
+            source_map: false,
             mangling: false,
             minimize: false,
             tab_size: 4,
