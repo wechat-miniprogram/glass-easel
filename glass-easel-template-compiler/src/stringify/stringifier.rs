@@ -81,6 +81,14 @@ pub struct StringifierBlock<'s, 't, W: FmtWrite> {
 }
 
 impl<'s, 't, W: FmtWrite> StringifierBlock<'s, 't, W> {
+    pub(super) fn current_position(&self) -> Position {
+        Position { line: self.top.line, utf16_col: self.top.utf16_col }
+    }
+
+    pub(super) fn minimize(&self) -> bool {
+        self.top.options.minimize
+    }
+
     pub(super) fn add_scope(&mut self, name: &CompactString) -> &CompactString {
         let i = self.scope_names.len();
         if self.top.options.mangling {
@@ -143,6 +151,16 @@ impl<'s, 't, W: FmtWrite> StringifierBlock<'s, 't, W> {
                 block: self,
             };
             f(&mut b)?;
+        }
+        if !self.top.options.minimize {
+            self.top.write_str("\n")?;
+        }
+        Ok(())
+    }
+
+    pub(super) fn empty_seperation_line(&mut self) -> FmtResult {
+        if self.top.line == 0 {
+            return Ok(())
         }
         if !self.top.options.minimize {
             self.top.write_str("\n")?;
@@ -249,8 +267,8 @@ impl<'s, 't, 'u, W: FmtWrite> StringifierLine<'s, 't, 'u, W> {
             }
             self.sub_block(&List { items: t })?;
         } else {
-            self.write_str(" ")?;
             for item in t {
+                self.write_str(" ")?;
                 self.inline(item)?;
             }
         }
@@ -304,14 +322,5 @@ pub trait StringifyItem: StringifyLine + Sized {
             })
         }).ok()?;
         Some(top.w.count)
-    }
-}
-
-impl<T: StringifyBlock> StringifyBlock for Vec<T> {
-    fn stringify_write<'s, 't, W: FmtWrite>(&self, stringifier: &mut StringifierBlock<'s, 't, W>) -> FmtResult {
-        for item in self {
-            item.stringify_write(stringifier)?;
-        }
-        Ok(())
     }
 }
