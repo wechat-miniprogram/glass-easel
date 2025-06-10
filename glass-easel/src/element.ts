@@ -2021,6 +2021,7 @@ export class Element implements NodeCast {
     posIndex: number,
   ) {
     const relChild: Node | undefined = posIndex >= 0 ? parent.childNodes[posIndex] : undefined
+    const actualPosIndex = posIndex >= 0 ? posIndex : parent.childNodes.length
 
     // update containingSlot
     let parentComponent: Element | null = parent
@@ -2160,7 +2161,7 @@ export class Element implements NodeCast {
       parent,
       subtreeSlotStart,
       subtreeSlotEnd,
-      posIndex + newChildList.length - 1,
+      actualPosIndex + newChildList.length - 1,
       false,
     )
 

@@ -1,78 +1,32 @@
 /* eslint-disable consistent-return, class-methods-use-this, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 import type {
+  BehaviorBuilder,
   ComponentSpace,
   DataChange,
-  DataValue,
   Element,
   EventListener,
   EventMutLevel,
   GeneralBackendContext,
   GeneralBackendElement,
   GeneralComponent,
-  NativeNode,
+  backend as GlassEaselBackend,
   Node,
   ShadowRoot,
+  SlotMode,
   TextNode,
   VirtualNode,
-  templateEngine,
-  BehaviorBuilder,
-  backend as GlassEaselBackend,
-  backend as shadowBackend,
   composedBackend,
   domlikeBackend,
-  SlotMode,
+  backend as shadowBackend,
 } from 'glass-easel'
-
-const dashToCamelCase = (dash: string): string =>
-  dash.indexOf('-') <= 0 ? dash : dash.replace(/-(.|$)/g, (s) => (s[1] ? s[1].toUpperCase() : ''))
-
-const camelCaseToDash = (camel: string): string =>
-  camel.replace(/(^|.)([A-Z])/g, (s) => (s[0] ? `${s[0]}-` : '') + s[1]!.toLowerCase())
+import { EmptyTemplateEngine } from './template_engine'
+import { dashToCamelCase, initValues, updateValues } from './utils'
 
 type OptionalKeys<T> = { [P in keyof T]-?: {} extends Pick<T, P> ? P : never }[keyof T]
 
 type CallbackFunction<Args extends any[], Ret> = (...args: [...Args, (ret: Ret) => void]) => void
 type ParametersOrNever<T> = T extends CallbackFunction<infer Arg, infer Ret> ? Arg : never
 type DefaultReturn<T> = T extends CallbackFunction<infer Arg, infer Ret> ? Ret : never
-
-class EmptyTemplateEngine implements templateEngine.Template {
-  private static _instance: EmptyTemplateEngine | undefined
-
-  static create() {
-    if (!EmptyTemplateEngine._instance) {
-      EmptyTemplateEngine._instance = new EmptyTemplateEngine()
-    }
-    return EmptyTemplateEngine._instance
-  }
-
-  // eslint-disable-next-line class-methods-use-this
-  createInstance(
-    comp: GeneralComponent,
-    createShadowRoot: (component: GeneralComponent) => ShadowRoot,
-  ): templateEngine.TemplateInstance {
-    return new EmptyTemplateInstance(comp, createShadowRoot(comp))
-  }
-}
-
-class EmptyTemplateInstance implements templateEngine.TemplateInstance {
-  comp: GeneralComponent
-  shadowRoot: ShadowRoot
-
-  constructor(comp: GeneralComponent, shadowRoot: ShadowRoot) {
-    this.comp = comp
-    this.shadowRoot = shadowRoot
-  }
-
-  // eslint-disable-next-line class-methods-use-this
-  initValues(_data: DataValue) {
-    // empty
-  }
-
-  // eslint-disable-next-line class-methods-use-this
-  updateValues(_data: DataValue, _changes: DataChange[]) {
-    // empty
-  }
-}
 
 export class Fragment {
   public childNodes: Node[] = []
@@ -218,6 +172,9 @@ export class ViewController {
     return node
   }
 
+  private _$pendingCreateSimpleComponent: ((isReflectComponent: boolean) => void) | undefined
+  private _$pendingAssignComponentId: ((component: GeneralComponent) => void) | undefined
+
   createSimpleComponent(
     tagName: string,
     external: boolean,
@@ -232,40 +189,47 @@ export class ViewController {
     cb: (component: GeneralComponent) => void,
   ): void {
     const { _glassEasel, _backendContext } = this
-
-    if (external) {
-      const comp = this.createExternalComponent(tagName, tagName, ownerShadowRoot)
-      if (comp && typeof comp !== 'string') return cb(comp)
+    this._$pendingAssignComponentId = (component) => {
+      this._$pendingAssignComponentId = undefined
+      cb(component)
     }
+    this._$pendingCreateSimpleComponent = (isReflect) => {
+      this._$pendingCreateSimpleComponent = undefined
+      if (isReflect || external) {
+        const comp = this.createExternalComponent(tagName, tagName, ownerShadowRoot)
+        if (comp && typeof comp !== 'string') return this._$pendingAssignComponentId?.(comp)
+      }
 
-    const actualStyleScope =
-      (styleScope !== undefined ? this._styleScopeIdMapping[styleScope] : undefined) ??
-      _glassEasel.StyleScopeManager.globalScope()
-    const actualExtraStyleScope =
-      extraStyleScope !== null ? this._styleScopeIdMapping[extraStyleScope] : undefined
-    const componentSpace = this._componentSpace
-    const compDefBuilder = componentSpace.define().definition({
-      options: {
-        multipleSlots: slotMode === _glassEasel.SlotMode.Multiple,
-        dynamicSlots: slotMode === _glassEasel.SlotMode.Dynamic,
-        virtualHost,
-        styleScope: actualStyleScope,
-        extraStyleScope: actualExtraStyleScope,
-        writeIdToDOM,
-        templateEngine: EmptyTemplateEngine,
-      },
-      externalClasses,
-    })
+      const actualStyleScope =
+        (styleScope !== undefined ? this._styleScopeIdMapping[styleScope] : undefined) ??
+        _glassEasel.StyleScopeManager.globalScope()
+      const actualExtraStyleScope =
+        extraStyleScope !== null ? this._styleScopeIdMapping[extraStyleScope] : undefined
+      const componentSpace = this._componentSpace
+      const compDefBuilder = componentSpace.define().definition({
+        options: {
+          // externalComponent: external,
+          multipleSlots: slotMode === _glassEasel.SlotMode.Multiple,
+          dynamicSlots: slotMode === _glassEasel.SlotMode.Dynamic,
+          virtualHost,
+          styleScope: actualStyleScope,
+          extraStyleScope: actualExtraStyleScope,
+          writeIdToDOM,
+          templateEngine: EmptyTemplateEngine,
+        },
+        externalClasses,
+      })
 
-    const compDef = (
-      chainDefinition ? chainDefinition(compDefBuilder) : compDefBuilder
-    ).registerComponent()
+      const compDef = (
+        chainDefinition ? chainDefinition(compDefBuilder) : compDefBuilder
+      ).registerComponent()
 
-    const node = ownerShadowRoot
-      ? ownerShadowRoot.createComponentByDef(tagName, compDef)
-      : _glassEasel.Component.createWithContext(tagName, compDef, _backendContext)
+      const node = ownerShadowRoot
+        ? ownerShadowRoot.createComponentByDef(tagName, compDef)
+        : _glassEasel.Component.createWithContext(tagName, compDef, _backendContext)
 
-    return cb(node)
+      return this._$pendingAssignComponentId?.(node)
+    }
   }
 
   createTextNode(textContent: string, ownerShadowRoot: ShadowRoot): TextNode {
@@ -346,7 +310,7 @@ export class ViewController {
   }
 
   associateValue(node: Node, data: Record<string, unknown>): void {
-    // To be override
+    this._$pendingCreateSimpleComponent?.(data.isReflect as boolean)
   }
 
   setId(element: Element, id: string): void {
@@ -645,57 +609,11 @@ export class ViewController {
   }
 
   initValues(element: Element, values: Record<string, unknown>): void {
-    const { _glassEasel } = this
-    const Component = _glassEasel.Component
-    if (!(element instanceof Component)) return
-
-    const data: Record<string, unknown> = {}
-    const keys = Object.keys(values)
-    let externalClassDirty = false
-    for (let i = 0; i < keys.length; i += 1) {
-      const key = keys[i]!
-      let dashName
-      // eslint-disable-next-line no-cond-assign
-      if (((dashName = camelCaseToDash(key)), element.hasExternalClass(dashName))) {
-        element.scheduleExternalClassChange(dashName, values[key] as string)
-        externalClassDirty = true
-      } else {
-        data[key] = values[key]
-      }
-    }
-    element.setData(values as any)
-    if (externalClassDirty) element.applyExternalClassChanges()
+    initValues(element, values)
   }
 
   updateValues(element: Element, changes: DataChange[]): void {
-    const { _glassEasel } = this
-    const Component = _glassEasel.Component
-    if (!(element instanceof Component)) return
-
-    let dataDirty = false
-    let externalClassDirty = false
-
-    for (let i = 0; i < changes.length; i += 1) {
-      const [path, newData, spliceIndex, spliceDel] = changes[i]!
-      let dashName
-      if (
-        path.length === 1 &&
-        typeof path[0] === 'string' &&
-        // eslint-disable-next-line no-cond-assign
-        ((dashName = camelCaseToDash(path[0])), element.hasExternalClass(dashName))
-      ) {
-        element.scheduleExternalClassChange(dashName, newData as string)
-        externalClassDirty = true
-      } else if (spliceDel !== undefined && spliceDel !== null) {
-        element.spliceArrayDataOnPath(path, spliceIndex, spliceDel, newData)
-        dataDirty = true
-      } else {
-        element.replaceDataOnPath(path, newData)
-        dataDirty = true
-      }
-    }
-    if (dataDirty) element.applyDataUpdates()
-    if (externalClassDirty) element.applyExternalClassChanges()
+    updateValues(element, changes)
   }
 
   registerStyleSheetContent(path: string, content: unknown): void {

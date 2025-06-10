@@ -1625,6 +1625,65 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
 
         expect(domHtml(parentElem)).toBe('<comp><div>comp</div><div>content</div></comp>')
       })
+
+      test('should support splice update', () => {
+        const li = componentSpace.define().property('s', String).registerComponent()
+
+        const listDef = componentSpace
+          .define()
+          .options({
+            dynamicSlots: true,
+          })
+          .property('list', Array)
+          .data(() => ({
+            displayList: [] as number[],
+          }))
+          .template(tmpl('<slot wx:for="{{displayList}}" item="{{list[item]}}" />'))
+          .registerComponent()
+
+        const listArray = new Array(100).fill(0).map((_, i) => i)
+
+        const parent = componentSpace
+          .define()
+          .usingComponents({ list: listDef, li })
+          .data(() => ({
+            listArray,
+          }))
+          .template(
+            tmpl(`
+              <list list="{{listArray}}">
+                <li slot:item>{{item}}</li>
+              </list>
+            `),
+          )
+          .registerComponent()
+
+        const root = glassEasel.Component.createWithContext('root', parent, testBackend)
+        const list = root.getShadowRoot()!.childNodes[0] as glassEasel.GeneralComponent
+
+        expect(domHtml(root)).toEqual('<list></list>')
+        matchElementWithDom(root)
+
+        list.setData({
+          displayList: [0, 1, 2],
+        })
+        expect(domHtml(root)).toEqual('<list><li>0</li><li>1</li><li>2</li></list>')
+        matchElementWithDom(root)
+
+        list.spliceArrayDataOnPath(['displayList'], undefined, undefined, [3, 4])
+        list.applyDataUpdates()
+        expect(list.data.displayList).toEqual([0, 1, 2, 3, 4])
+        expect(domHtml(root)).toEqual(
+          '<list><li>0</li><li>1</li><li>2</li><li>3</li><li>4</li></list>',
+        )
+        matchElementWithDom(root)
+
+        list.spliceArrayDataOnPath(['displayList'], 0, 2, [])
+        list.applyDataUpdates()
+        expect(list.data.displayList).toEqual([2, 3, 4])
+        expect(domHtml(root)).toEqual('<list><li>2</li><li>3</li><li>4</li></list>')
+        matchElementWithDom(root)
+      })
     })
   })
 

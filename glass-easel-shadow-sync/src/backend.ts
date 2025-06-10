@@ -1,23 +1,27 @@
 /* eslint-disable class-methods-use-this */
 import type {
   BackendMode,
+  DataChange,
   Element,
   Event,
   EventBubbleStatus,
   EventOptions,
-  ExternalShadowRoot,
+  GeneralBehavior,
   GeneralBehaviorBuilder,
   GeneralComponent,
   backend as GlassEaselBackend,
   Node,
-  ShadowedEvent,
+  NormalizedComponentOptions,
+  ShadowRoot,
+  SlotMode,
   StyleScopeManager,
   templateEngine,
-  SlotMode,
+  typeUtils,
 } from 'glass-easel'
 import { type Channel } from './message_channel'
-import { type IDGenerator } from './utils'
 import { replayShadowBackend } from './replay'
+import { EmptyTemplateEngine } from './template_engine'
+import { initValues, updateValues, type IDGenerator } from './utils'
 
 export const enum ShadowDomElementType {
   Fragment,
@@ -511,8 +515,11 @@ export class ShadowDomBackendContext implements GlassEaselBackend.Context {
     })
   }
 
-  getAssociateValueInfo(_node: Node): Record<string, unknown> {
-    return {}
+  getAssociateValueInfo(node: Node): Record<string, unknown> {
+    const behavior = node.asGeneralComponent()?.getComponentDefinition().behavior
+    return {
+      isReflect: behavior && ShadowDomBackendContext._reflectingComponentBehaviors.has(behavior),
+    }
   }
 
   destroy(): void {
@@ -736,93 +743,160 @@ export class ShadowDomBackendContext implements GlassEaselBackend.Context {
       handler(component, method, args)
     })
   }
+
+  private static _reflectingComponentBehaviors = new Set<GeneralBehavior>()
+
+  static hookReflectTemplateEngine(
+    TemplateEngine: templateEngine.TemplateEngine = EmptyTemplateEngine,
+  ) {
+    return class SyncTemplateEngine implements templateEngine.Template {
+      static create(behavior: GeneralBehavior, componentOptions: NormalizedComponentOptions) {
+        ShadowDomBackendContext._reflectingComponentBehaviors.add(behavior)
+        return new SyncTemplateEngine(TemplateEngine.create(behavior, componentOptions))
+      }
+
+      // eslint-disable-next-line no-useless-constructor
+      constructor(public template: templateEngine.Template) {
+        //
+      }
+
+      updateTemplate(behavior: GeneralBehavior): void {
+        this.template.updateTemplate?.(behavior)
+      }
+
+      createInstance(
+        elem: GeneralComponent,
+        createShadowRoot: (component: GeneralComponent) => ShadowRoot,
+      ): templateEngine.TemplateInstance {
+        const context = elem.getBackendContext()
+        if (!(context instanceof ShadowDomBackendContext)) {
+          throw new Error('')
+        }
+        const { channel } = context
+        const backendElement = elem.getBackendElement() as ShadowDomElement
+        const actualInstance = this.template.createInstance(elem, createShadowRoot)
+
+        const instance: templateEngine.TemplateInstance = {
+          shadowRoot: actualInstance.shadowRoot,
+          initValues: (data) => {
+            channel.initValues(backendElement._id, data)
+            actualInstance.initValues(data)
+          },
+          updateValues: (data, changes) => {
+            channel.updateValues(backendElement._id, changes)
+            actualInstance.updateValues(data, changes)
+          },
+          updateTemplate: (template, data) => {
+            actualInstance.updateTemplate?.(template, data)
+          },
+        }
+
+        return instance
+      }
+    }
+  }
 }
 
-class SyncExternalShadowRoot implements ExternalShadowRoot {
-  public root: ShadowDomElement
-  public slot: ShadowDomElement
+export const hookBuilderToSyncData = <TBuilder extends GeneralBehaviorBuilder>(
+  glassEasel: typeof import('glass-easel'),
+  builder: TBuilder,
+): TBuilder => {
+  const properties: string[] = []
+  const methodCallerMap = new WeakMap<any, GeneralComponent>()
 
-  constructor(_root: ShadowDomElement, _slot: ShadowDomElement) {
-    this.root = _root
-    this.slot = _slot
-  }
-
-  getIdMap() {
-    return {}
-  }
-  handleEvent<T>(target: ShadowDomElement, event: Event<T>): void {
-    // TODO
-  }
-  setListener<T>(
-    elem: ShadowDomElement,
-    ev: string,
-    listener: (event: ShadowedEvent<T>) => unknown,
-  ): void {
-    // TODO
-  }
-}
-
-export class SyncTemplateEngine implements templateEngine.Template {
-  static create() {
-    return new SyncTemplateEngine()
-  }
-
-  createInstance(elem: GeneralComponent): templateEngine.TemplateInstance {
-    const context = elem.getBackendContext()
+  const getContextFromMethodCaller = (methodCaller: GeneralComponent) => {
+    const component: GeneralComponent = methodCallerMap.get(methodCaller) || methodCaller
+    const context = component.getBackendContext() as ShadowDomBackendContext
+    const backendElement = component.getBackendElement() as ShadowDomElement
     if (!(context instanceof ShadowDomBackendContext)) {
       throw new Error('')
     }
-    const { channel } = context
-    const backendElement = elem.getBackendElement() as ShadowDomElement
-
-    const shadowRoot = new SyncExternalShadowRoot(backendElement, backendElement)
-
-    const instance: templateEngine.TemplateInstance = {
-      shadowRoot,
-      initValues: (data) => {
-        channel.initValues(backendElement._id, data)
-      },
-      updateValues: (data, changes) => {
-        channel.updateValues(backendElement._id, changes)
-      },
-    }
-
-    return instance
+    return { component, context, backendElement }
   }
-}
 
-export const SyncBehavior = <TBehaviorBuilder extends GeneralBehaviorBuilder>(
-  builder: TBehaviorBuilder,
-  properties: string[],
-  getContextFromMethodCaller: (methodCaller: unknown) => {
-    context: ShadowDomBackendContext
-    backendElement: ShadowDomElement
-  },
-): TBehaviorBuilder => {
-  builder.lifetime('created', function () {
-    const { context, backendElement } = getContextFromMethodCaller(this)
-    context.channel.initValues(
-      backendElement._id,
-      properties.reduce((initValues, property) => {
-        initValues[property] = this.data[property]
-        return initValues
-      }, {} as Record<string, unknown>),
-    )
-  })
-  properties.forEach((property) => {
-    builder.observer(property, function (newValue) {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  const builderPrototype = Object.getPrototypeOf(builder)
+
+  let pendingChanges: any[] | undefined
+
+  const addObserver = (builder: any, name: string) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    builderPrototype.observer.call(builder, name, function (this: any, newValue: any) {
       const { context, backendElement } = getContextFromMethodCaller(this)
-      context.channel.updateValues(backendElement._id, [
-        [[property], newValue, undefined, undefined],
-      ])
+
+      if (!pendingChanges) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises, promise/catch-or-return, promise/always-return
+        Promise.resolve().then(() => {
+          context.channel.updateValues(backendElement._id, pendingChanges!)
+          pendingChanges = undefined
+        })
+      }
+
+      pendingChanges = pendingChanges || []
+      pendingChanges.push([[name], newValue, undefined, undefined])
     })
-  })
-  return builder
+  }
+
+  Object.setPrototypeOf(
+    builder,
+    Object.create(builderPrototype, {
+      property: {
+        value(name: string, def: typeUtils.PropertyListItem<typeUtils.PropertyType, any>) {
+          properties.push(name)
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+          builderPrototype.property.call(this, name, def)
+          addObserver(this, name)
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+          return this
+        },
+      },
+      staticData: {
+        value(data: Record<string, unknown>) {
+          const keys = Object.keys(data || {})
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+          builderPrototype.staticData.call(this, data)
+          keys.forEach((key) => {
+            properties.push(key)
+            addObserver(this, key)
+          })
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+          return this
+        },
+      },
+      methodCallerInit: {
+        value(func: (this: GeneralComponent) => any) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+          builderPrototype.methodCaller.call(this, function (this: GeneralComponent) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            const methodCaller = func.call(this)
+            methodCallerMap.set(methodCaller, this)
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+            return methodCaller
+          })
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+          return this
+        },
+      },
+    }),
+  )
+
+  return builder.init(({ self, lifetime }) => {
+    lifetime('created', () => {
+      const { context, backendElement } = getContextFromMethodCaller(self)
+      context.channel.initValues(
+        backendElement._id,
+        properties.reduce((initValues, property) => {
+          initValues[property] = self.data[property]
+          return initValues
+        }, {} as Record<string, unknown>),
+      )
+    })
+  }) as TBuilder
 }
 
 export const getNodeId = (node: Node) =>
   (node.getBackendElement() as unknown as ShadowDomElement)._id
 
 export { Channel, ChannelEventType, MessageChannelDataSide } from './message_channel'
+export { ReplayHandler, replayShadowBackend } from './replay'
 export { getLinearIdGenerator, getRandomIdGenerator } from './utils'
-export { replayShadowBackend, ReplayHandler } from './replay'

@@ -82,6 +82,7 @@ if (jobs.length) {
       all: () => genConfig('dynamic', 'all', 'cjs', dev),
       'all-es': () => genConfig('dynamic', 'all.es', 'es', dev),
       'all-global': () => genConfig('dynamic', 'all.global', 'iife', dev),
+      'all-global-dev': () => genConfig('dynamic', 'all.global', 'iife', true),
       shadow: () => genConfig('shadow', 'shadow', 'cjs', dev),
       'shadow-es': () => genConfig('shadow', 'shadow.es', 'es', dev),
       'shadow-global': () => genConfig('shadow', 'shadow.global', 'iife', dev),

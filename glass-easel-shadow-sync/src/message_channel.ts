@@ -887,7 +887,7 @@ export const MessageChannelViewSide = (
       }
       case ChannelEventType.RELEASE: {
         const [, id] = arg
-        const node = nodeMap[id]!
+        const node = nodeMap[id]! as Element
         delete nodeMap[id]
         controller.release(node)
         break

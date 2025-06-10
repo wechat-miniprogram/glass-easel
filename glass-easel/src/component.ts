@@ -651,12 +651,6 @@ export class Component<
           )
         }
       }
-      if (styleScopeManager && writeExtraInfoToAttr) {
-        const prefix = styleScopeManager.queryName(styleScope)
-        if (prefix) {
-          backendElement.setAttribute('exparser:info-class-prefix', `${prefix}--`)
-        }
-      }
     }
 
     // associate in backend
@@ -675,6 +669,12 @@ export class Component<
         )
       }
       if (ENV.DEV) performanceMeasureEnd()
+      if (styleScopeManager && writeExtraInfoToAttr) {
+        const prefix = styleScopeManager.queryName(styleScope)
+        if (prefix) {
+          backendElement.setAttribute('exparser:info-class-prefix', `${prefix}--`)
+        }
+      }
     }
 
     // create template engine
