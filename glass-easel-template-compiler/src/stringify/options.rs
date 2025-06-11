@@ -58,7 +58,7 @@ mod test {
         assert!(sourcemap.is_none());
         assert_eq!(
             output.as_str(),
-            "<div/>\n",
+            "<div />\n",
         );
     }
 
@@ -72,7 +72,7 @@ mod test {
         let (output, _) = stringifier.finish();
         assert_eq!(
             output.as_str(),
-            "<div>\n  <span>\n    <a/>\n  </span>\n</div>\n",
+            "<div>\n  <span>\n    <a />\n  </span>\n</div>\n",
         );
     }
 
@@ -86,21 +86,21 @@ mod test {
         let (output, _) = stringifier.finish();
         assert_eq!(
             output.as_str(),
-            "<div>\n\t<span>\n\t\t<a/>\n\t</span>\n</div>\n",
+            "<div>\n\t<span>\n\t\t<a />\n\t</span>\n</div>\n",
         );
     }
 
     #[test]
     fn line_width_limit() {
-        let src = r#"<div data:a="this is a long string"></div>"#;
+        let src = r#"<div data:a="this is a long string"></div><div data:a="but short"></div>"#;
         let (template, _) = crate::parse::parse("TEST", src);
-        let options = StringifyOptions { line_width_limit: 20, ..Default::default() };
+        let options = StringifyOptions { line_width_limit: 30, ..Default::default() };
         let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, options);
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(
             output.as_str(),
-            "<div\n    data:a=\"this is a long string\"\n/>\n",
+            "<div\n    data:a=\"this is a long string\"\n/>\n<div data:a=\"but short\" />\n",
         );
     }
 
@@ -177,7 +177,7 @@ mod test {
     <a href="/"> A </a>
 </template>
 
-<template is="a"/>
+<template is="a" />
 "#,
         );
         let mut expects = vec![
@@ -200,8 +200,8 @@ mod test {
             (1, 12, 4, 0, None),
             (1, 22, 4, 10, Some("is")),
             (1, 26, 4, 14, None),
-            (1, 29, 4, 16, None),
-            (1, 30, 4, 17, None),
+            (1, 29, 4, 17, None),
+            (1, 30, 4, 18, None),
         ]
         .into_iter();
         for token in sourcemap.unwrap().tokens() {

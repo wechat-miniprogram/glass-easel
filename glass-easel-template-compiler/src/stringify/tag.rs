@@ -29,6 +29,7 @@ impl Stringify for Template {
                     stringifier.write_token("src", None, &i.src_location)?;
                     stringifier.write_str(r#"="#)?;
                     stringifier.write_str_name_quoted(&i.src)?;
+                    stringifier.write_optional_space()?;
                     stringifier.write_token("/", None, &i.tag_location.close)?;
                     stringifier.write_token(">", None, &i.tag_location.start.1)?;
                     Ok(())
@@ -71,6 +72,7 @@ impl Stringify for Template {
                                     &tag_location.end.as_ref().unwrap_or(&tag_location.start).1,
                                 )?;
                             } else {
+                                stringifier.write_optional_space()?;
                                 stringifier.write_token("/", None, &tag_location.close)?;
                                 stringifier.write_token(">", None, &tag_location.start.1)?;
                             }
@@ -95,6 +97,7 @@ impl Stringify for Template {
                             stringifier.write_token("src", None, src_location)?;
                             stringifier.write_str(r#"="#)?;
                             stringifier.write_str_name_quoted(src)?;
+                            stringifier.write_optional_space()?;
                             stringifier.write_token("/", None, &tag_location.close)?;
                             stringifier.write_token(">", None, &tag_location.start.1)?;
                             Ok(())
@@ -127,6 +130,7 @@ impl Stringify for Template {
                             &tag_location.end.as_ref().unwrap_or(&tag_location.start).1,
                         )?;
                     } else {
+                        stringifier.write_optional_space()?;
                         stringifier.write_token("/", None, &tag_location.close)?;
                         stringifier.write_token(">", None, &tag_location.start.1)?;
                     }
@@ -195,7 +199,7 @@ impl StringifyBlock for Node {
 
 impl StringifyLine for Vec<Node> {
     fn stringify_write<'s, 't, 'u, W: FmtWrite>(&self, stringifier: &mut StringifierLine<'s, 't, 'u, W>) -> FmtResult {
-        if let Some(value) = is_children_single_text(self, !stringifier.block().minimize()) {
+        if let Some(value) = is_children_single_text(self, !stringifier.minimize()) {
             value.stringify_write(stringifier)
         } else {
             stringifier.sub_block(self)
@@ -470,7 +474,7 @@ impl StringifyBlock for Element {
                         WriteAttrItem::NamedAttr { name, location: loc.clone(), value },
                     ];
                     stringifier.list(&list)?;
-                    if !is_children_empty(children, !stringifier.block().minimize()) {
+                    if !is_children_empty(children, !stringifier.minimize()) {
                         stringifier.write_token(">", None, &self.tag_location.start.1)?;
                         stringifier.inline(children)?;
                         stringifier.write_token(
@@ -496,6 +500,7 @@ impl StringifyBlock for Element {
                                 .1,
                         )?;
                     } else {
+                        stringifier.write_optional_space()?;
                         stringifier.write_token("/", None, &self.tag_location.close)?;
                         stringifier.write_token(">", None, &self.tag_location.start.1)?;
                     }
@@ -510,7 +515,7 @@ impl StringifyBlock for Element {
                         WriteAttrItem::NameOnly { name: "wx:else", location: loc.clone() },
                     ];
                     stringifier.list(&list)?;
-                    if !is_children_empty(children, !stringifier.block().minimize()) {
+                    if !is_children_empty(children, !stringifier.minimize()) {
                         stringifier.write_token(">", None, &self.tag_location.start.1)?;
                         stringifier.inline(children)?;
                         stringifier.write_token(
@@ -536,6 +541,7 @@ impl StringifyBlock for Element {
                                 .1,
                         )?;
                     } else {
+                        stringifier.write_optional_space()?;
                         stringifier.write_token("/", None, &self.tag_location.close)?;
                         stringifier.write_token(">", None, &self.tag_location.start.1)?;
                     }
@@ -727,7 +733,7 @@ impl StringifyBlock for Element {
                 // write tag body and end
                 let empty_children = vec![];
                 let children = self.children().unwrap_or(&empty_children);
-                if !is_children_empty(children, !stringifier.block().minimize()) {
+                if !is_children_empty(children, !stringifier.minimize()) {
                     stringifier.write_token(">", None, &self.tag_location.start.1)?;
                     stringifier.inline(children)?;
                     stringifier.write_token(
@@ -770,6 +776,7 @@ impl StringifyBlock for Element {
                             .1,
                     )?;
                 } else {
+                    stringifier.write_optional_space()?;
                     stringifier.write_token("/", None, &self.tag_location.close)?;
                     stringifier.write_token(">", None, &self.tag_location.start.1)?;
                 }
@@ -854,5 +861,44 @@ impl StringifyLine for Value {
 mod test {
     use crate::stringify::{Stringify, StringifyOptions};
 
-    // FIXME tests
+    #[test]
+    fn text_node() {
+        let src = r#" text <div> text <span/> </div>"#;
+        let (template, _) = crate::parse::parse("TEST", src);
+        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, Default::default());
+        template.stringify_write(&mut stringifier).unwrap();
+        let (output, _) = stringifier.finish();
+        assert_eq!(
+            output.as_str(),
+            "<block> text </block>\n<div>\n    <block> text </block>\n    <span />\n</div>\n",
+        );
+    }
+
+    #[test]
+    fn meta_tag() {
+        let src = r#"<!META a={{123}}> <!META data:a="123" data:b="456">"#;
+        let (template, _) = crate::parse::parse("TEST", src);
+        let options = StringifyOptions { line_width_limit: 20, ..Default::default() };
+        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, options);
+        template.stringify_write(&mut stringifier).unwrap();
+        let (output, _) = stringifier.finish();
+        assert_eq!(
+            output.as_str(),
+            "<!META a=\"{{123}}\">\n<!META\n    data:a=\"123\"\n    data:b=\"456\"\n>\n",
+        );
+    }
+
+    #[test]
+    fn normal_tag() {
+        let src = r#"<div a={{123}} /> <div data:a="123" data:b="456" />"#;
+        let (template, _) = crate::parse::parse("TEST", src);
+        let options = StringifyOptions { line_width_limit: 20, ..Default::default() };
+        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, options);
+        template.stringify_write(&mut stringifier).unwrap();
+        let (output, _) = stringifier.finish();
+        assert_eq!(
+            output.as_str(),
+            "<div a=\"{{123}}\" />\n<div\n    data:a=\"123\"\n    data:b=\"456\"\n/>\n",
+        );
+    }
 }

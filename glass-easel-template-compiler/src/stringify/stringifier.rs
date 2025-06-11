@@ -149,6 +149,7 @@ impl<'s, 't, W: FmtWrite> StringifierBlock<'s, 't, W> {
         {
             let mut b = StringifierLine {
                 block: self,
+                state: StringifierLineState::LineStart,
             };
             f(&mut b)?;
         }
@@ -175,8 +176,15 @@ impl<'s, 't, W: FmtWrite> StringifierBlock<'s, 't, W> {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StringifierLineState {
+    Normal,
+    LineStart,
+}
+
 pub struct StringifierLine<'s, 't, 'u, W: FmtWrite> {
     block: &'u mut StringifierBlock<'s, 't, W>,
+    state: StringifierLineState,
 }
 
 impl<'s, 't, 'u, W: FmtWrite> StringifierLine<'s, 't, 'u, W> {
@@ -184,7 +192,19 @@ impl<'s, 't, 'u, W: FmtWrite> StringifierLine<'s, 't, 'u, W> {
         &mut self.block
     }
 
+    pub(super) fn minimize(&self) -> bool {
+        self.block.minimize()
+    }
+
+    pub(super) fn write_optional_space(&mut self) -> FmtResult {
+        if !self.minimize() && self.state != StringifierLineState::LineStart {
+            self.write_str(" ")?;
+        }
+        Ok(())
+    }
+
     pub(super) fn write_str(&mut self, s: &str) -> FmtResult {
+        self.state = StringifierLineState::Normal;
         self.block.top.write_str(s)
     }
 
@@ -281,6 +301,7 @@ impl<'s, 't, 'u, W: FmtWrite> StringifierLine<'s, 't, 'u, W> {
         }
         self.block.sub_block(t)?;
         self.block.write_indent()?;
+        self.state = StringifierLineState::LineStart;
         Ok(())
     }
 }
