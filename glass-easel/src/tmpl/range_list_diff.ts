@@ -104,14 +104,13 @@ export class RangeListManager {
         const rawKeyField = keyName === '*this' ? item : item?.[keyName]
         const rawKey = rawKeyField !== undefined && rawKeyField !== null ? String(rawKeyField) : ''
         rawKeys[i] = rawKey
-        if (keyMap[rawKey] !== undefined) {
+        if (sharedKeyMap?.[rawKey]) {
+          sharedKeyMap[rawKey]!.push(i)
+        } else if (keyMap[rawKey] !== undefined) {
           if (!sharedKeyMap) {
             sharedKeyMap = Object.create(null) as { [key: string]: number[] }
           }
           sharedKeyMap[rawKey] = [keyMap[rawKey]!, i]
-          delete keyMap[rawKey]
-        } else if (sharedKeyMap?.[rawKey]) {
-          sharedKeyMap[rawKey]!.push(i)
         } else {
           keyMap[rawKey] = i
         }
@@ -128,7 +127,7 @@ export class RangeListManager {
           const key = keys[i]!
           const items = sharedKeyMap[key]!
           let inc = 0
-          for (let j = 0; j < items.length; j += 1) {
+          for (let j = 1; j < items.length; j += 1) {
             const index = items[j]!
             while (keyMap[`${key}--${inc}`] !== undefined) inc += 1
             const k = `${key}--${inc}`
@@ -210,14 +209,18 @@ export class RangeListManager {
           const k = newRawKeys[i]!
           let isSharedKey = false
           if (oldSharedKeyMap || newSharedKeyMap) {
-            const splitPos = k.lastIndexOf('--')
-            if (splitPos >= 0) {
-              const oriKey = k.slice(0, splitPos)
-              if (
-                oldSharedKeyMap?.[oriKey] !== undefined ||
-                newSharedKeyMap?.[oriKey] !== undefined
-              ) {
-                isSharedKey = true
+            if (oldSharedKeyMap?.[k] !== undefined || newSharedKeyMap?.[k] !== undefined) {
+              isSharedKey = true
+            } else {
+              const splitPos = k.lastIndexOf('--')
+              if (splitPos >= 0) {
+                const oriKey = k.slice(0, splitPos)
+                if (
+                  oldSharedKeyMap?.[oriKey] !== undefined ||
+                  newSharedKeyMap?.[oriKey] !== undefined
+                ) {
+                  isSharedKey = true
+                }
               }
             }
           }

@@ -366,13 +366,13 @@ describe('partial update', () => {
       })
     })
     expect(getP()).toStrictEqual(['A', 'B', 'C'])
-    expect(execArr).toStrictEqual(['A', 'B', 'C'])
+    expect(execArr).toStrictEqual(['B', 'A', 'C'])
     execArr = []
     comp.groupUpdates(() => {
       comp.replaceDataOnPath(['list', 1, 'k'], 3)
     })
     expect(getP()).toStrictEqual(['A', 'B', 'C'])
-    expect(execArr).toStrictEqual(['A', 'B'])
+    expect(execArr).toStrictEqual(['B', 'A'])
     execArr = []
     comp.groupUpdates(() => {
       comp.replaceDataOnPath(['list', 2, 'k'], 4)
@@ -386,7 +386,7 @@ describe('partial update', () => {
       })
     })
     expect(getP()).toStrictEqual(['A', 'B', 'C'])
-    expect(execArr).toStrictEqual(['B', 'C'])
+    expect(execArr).toStrictEqual(['C', 'B'])
   })
 
   test('should be able to do list-splice update (without key)', () => {
@@ -612,7 +612,7 @@ describe('partial update', () => {
       })
     })
     expect(getP()).toStrictEqual(['G', 'D', 'E', 'GG'])
-    expect(execArr).toStrictEqual(['G', 'GG'])
+    expect(execArr).toStrictEqual(['GG', 'G'])
     execArr = []
     execWithWarn(1, () => {
       comp.groupUpdates(() => {
