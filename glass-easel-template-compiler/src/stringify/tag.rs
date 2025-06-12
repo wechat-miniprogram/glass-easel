@@ -14,7 +14,7 @@ use crate::{
             NormalAttributePrefix, Script, StaticAttribute, StrName, StyleAttribute, Value,
             DEFAULT_FOR_INDEX_SCOPE_NAME, DEFAULT_FOR_ITEM_SCOPE_NAME,
         },
-        Position, Template,
+        Position, Template, TemplateStructure,
     },
 };
 
@@ -152,48 +152,67 @@ impl Stringify for Template {
 
 impl StringifyBlock for Vec<Node> {
     fn stringify_write<'s, 't, W: FmtWrite>(&self, stringifier: &mut StringifierBlock<'s, 't, W>) -> FmtResult {
-        for item in self {
-            item.stringify_write(stringifier)?;
+        let mut item_iter = self.iter().peekable();
+        while let Some(item) = item_iter.next() {
+            stringifier.new_scope_space(|stringifier| {
+                stringifier.write_line(|stringifier| {
+                    item.stringify_write(stringifier)?;
+                    let Some(peek) = item_iter.peek() else {
+                        return Ok(());
+                    };
+                    if let Node::Comment(comment) = peek {
+                        if comment.location.start.line == item.location_end().line {
+                            stringifier.write_str(r#" "#)?;
+                            item_iter.next().unwrap().stringify_write(stringifier)?;
+                            return Ok(());
+                        }
+                    }
+                    if peek.location_start().line.saturating_sub(item.location_end().line) > 1 {
+                        stringifier.write_str("\n")?;
+                        return Ok(());
+                    }
+                    Ok(())
+                })
+            })?;
         }
         Ok(())
     }
 }
 
-impl StringifyBlock for Node {
-    fn stringify_write<'s, 't, W: FmtWrite>(&self, stringifier: &mut StringifierBlock<'s, 't, W>) -> FmtResult {
+impl StringifyLine for Node {
+    fn stringify_write<'s, 't, 'u, W: FmtWrite>(&self, stringifier: &mut StringifierLine<'s, 't, 'u, W>) -> FmtResult {
         match self {
             Node::Text(value) => {
-                stringifier.write_line(|stringifier| {
-                    stringifier.write_str(r#"<block>"#)?;
-                    value.stringify_write(stringifier)?;
-                    stringifier.write_str(r#"</block>"#)?;
-                    Ok(())
-                })?;
+                stringifier.write_str(r#"<block>"#)?;
+                value.stringify_write(stringifier)?;
+                stringifier.write_str(r#"</block>"#)?;
+                Ok(())
             }
-            Node::Element(element) => element.stringify_write(stringifier)?,
-            Node::Comment(..) => {} // FIXME write comment
+            Node::Element(element) => element.stringify_write(stringifier),
+            Node::Comment(comment) => {
+                let full_text = format!("<!--{}-->", comment.content);
+                stringifier.write_token(&full_text, None, &comment.location)?;
+                Ok(())
+            }
             Node::UnknownMetaTag(t) => {
-                stringifier.write_line(|stringifier| {
-                    stringifier.write_str(r#"<!"#)?;
-                    for (i, name) in t.tag_name.iter().enumerate() {
-                        if i > 0 {
-                            stringifier.write_str(":")?;
-                        }
-                        stringifier.write_ident(name, true)?;
+                stringifier.write_str(r#"<!"#)?;
+                for (i, name) in t.tag_name.iter().enumerate() {
+                    if i > 0 {
+                        stringifier.write_str(":")?;
                     }
-                    let list: Vec<_> = t.attributes.iter().map(|attr| {
-                        WriteAttrItem::CustomAttr {
-                            name: &attr.colon_separated_name,
-                            value: attr.value.as_ref(),
-                        }
-                    }).collect();
-                    stringifier.list(&list)?;
-                    stringifier.write_str(r#">"#)?;
-                    Ok(())
-                })?;
+                    stringifier.write_ident(name, true)?;
+                }
+                let list: Vec<_> = t.attributes.iter().map(|attr| {
+                    WriteAttrItem::CustomAttr {
+                        name: &attr.colon_separated_name,
+                        value: attr.value.as_ref(),
+                    }
+                }).collect();
+                stringifier.list(&list)?;
+                stringifier.write_str(r#">"#)?;
+                Ok(())
             }
         }
-        Ok(())
     }
 }
 
@@ -451,8 +470,8 @@ impl StringifyLine for WriteAttrItem<'_> {
 
 impl StringifyItem for WriteAttrItem<'_> {}
 
-impl StringifyBlock for Element {
-    fn stringify_write<'s, 't, W: FmtWrite>(&self, stringifier: &mut StringifierBlock<'s, 't, W>) -> FmtResult {
+impl StringifyLine for Element {
+    fn stringify_write<'s, 't, 'u, W: FmtWrite>(&self, stringifier: &mut StringifierLine<'s, 't, 'u, W>) -> FmtResult {
         // handle `wx:if`
         if let ElementKind::If {
             branches,
@@ -461,278 +480,18 @@ impl StringifyBlock for Element {
         {
             let mut is_first = true;
             for (loc, value, children) in branches {
-                stringifier.write_line(|stringifier| {
-                    stringifier.write_token("<", None, &self.tag_location.start.0)?;
-                    stringifier.write_str("block")?;
-                    let name = if is_first {
-                        is_first = false;
-                        "wx:if"
-                    } else {
-                        "wx:elif"
-                    };
-                    let list = [
-                        WriteAttrItem::NamedAttr { name, location: loc.clone(), value },
-                    ];
-                    stringifier.list(&list)?;
-                    if !is_children_empty(children, !stringifier.minimize()) {
-                        stringifier.write_token(">", None, &self.tag_location.start.1)?;
-                        stringifier.inline(children)?;
-                        stringifier.write_token(
-                            "<",
-                            None,
-                            &self
-                                .tag_location
-                                .end
-                                .as_ref()
-                                .unwrap_or(&self.tag_location.start)
-                                .0,
-                        )?;
-                        stringifier.write_token("/", None, &self.tag_location.close)?;
-                        stringifier.write_str("block")?;
-                        stringifier.write_token(
-                            ">",
-                            None,
-                            &self
-                                .tag_location
-                                .end
-                                .as_ref()
-                                .unwrap_or(&self.tag_location.start)
-                                .1,
-                        )?;
-                    } else {
-                        stringifier.write_optional_space()?;
-                        stringifier.write_token("/", None, &self.tag_location.close)?;
-                        stringifier.write_token(">", None, &self.tag_location.start.1)?;
-                    }
-                    Ok(())
-                })?;
-            }
-            if let Some((loc, children)) = else_branch.as_ref() {
-                stringifier.write_line(|stringifier| {
-                    stringifier.write_token("<", None, &self.tag_location.start.0)?;
-                    stringifier.write_str("block")?;
-                    let list = [
-                        WriteAttrItem::NameOnly { name: "wx:else", location: loc.clone() },
-                    ];
-                    stringifier.list(&list)?;
-                    if !is_children_empty(children, !stringifier.minimize()) {
-                        stringifier.write_token(">", None, &self.tag_location.start.1)?;
-                        stringifier.inline(children)?;
-                        stringifier.write_token(
-                            "<",
-                            None,
-                            &self
-                                .tag_location
-                                .end
-                                .as_ref()
-                                .unwrap_or(&self.tag_location.start)
-                                .0,
-                        )?;
-                        stringifier.write_token("/", None, &self.tag_location.close)?;
-                        stringifier.write_str("block")?;
-                        stringifier.write_token(
-                            ">",
-                            None,
-                            &self
-                                .tag_location
-                                .end
-                                .as_ref()
-                                .unwrap_or(&self.tag_location.start)
-                                .1,
-                        )?;
-                    } else {
-                        stringifier.write_optional_space()?;
-                        stringifier.write_token("/", None, &self.tag_location.close)?;
-                        stringifier.write_token(">", None, &self.tag_location.start.1)?;
-                    }
-                    Ok(())
-                })?;
-            }
-            return Ok(());
-        }
-
-        // write normal tag
-        stringifier.new_scope_space(|stringifier| {
-            stringifier.write_line(|stringifier| {                
-                // write tag start
                 stringifier.write_token("<", None, &self.tag_location.start.0)?;
-                let mut attr_list = vec![];
-                match &self.kind {
-                    ElementKind::Normal {
-                        tag_name,
-                        attributes,
-                        class,
-                        style,
-                        change_attributes,
-                        worklet_attributes,
-                        children: _,
-                        generics,
-                        extra_attr,
-                        common,
-                    } => {
-                        stringifier.write_ident(&tag_name, true)?;
-                        write_slot_and_slot_values(stringifier, &mut attr_list, &common.slot, &common.slot_value_refs);
-                        match class {
-                            ClassAttribute::None => {}
-                            ClassAttribute::String(location, value) => {
-                                attr_list.push(WriteAttrItem::Attr {
-                                    prefix: None,
-                                    name: Cow::Owned(Ident {
-                                        name: "class".into(),
-                                        location: location.clone(),
-                                    }),
-                                    value: Some(value),
-                                    respect_none_value: false,
-                                });
-                            }
-                            ClassAttribute::Multiple(..) => {
-                                todo!()
-                            }
-                        }
-                        match style {
-                            StyleAttribute::None => {}
-                            StyleAttribute::String(location, value) => {
-                                attr_list.push(WriteAttrItem::Attr {
-                                    prefix: None, name: Cow::Owned(Ident {
-                                        name: "style".into(),
-                                        location: location.clone(),
-                                    }),
-                                    value: Some(value),
-                                    respect_none_value: false,
-                                });
-                            }
-                            StyleAttribute::Multiple(..) => {
-                                todo!()
-                            }
-                        }
-                        for attr in attributes.iter() {
-                            let prefix = match &attr.prefix {
-                                NormalAttributePrefix::None => None,
-                                NormalAttributePrefix::Model(prefix_location) => {
-                                    Some(("model", prefix_location.clone()))
-                                }
-                            };
-                            attr_list.push(WriteAttrItem::Attr {
-                                prefix,
-                                name: Cow::Borrowed(&attr.name),
-                                value: attr.value.as_ref(),
-                                respect_none_value: true,
-                            });
-                        }
-                        for attr in change_attributes.iter() {
-                            let prefix = (
-                                "change",
-                                attr.prefix_location.as_ref().unwrap_or(&attr.name.location).clone(),
-                            );
-                            attr_list.push(WriteAttrItem::Attr {
-                                prefix: Some(prefix),
-                                name: Cow::Borrowed(&attr.name),
-                                value: attr.value.as_ref(),
-                                respect_none_value: false,
-                            });
-                        }
-                        for attr in worklet_attributes.iter() {
-                            let prefix = (
-                                "worklet",
-                                attr.prefix_location.as_ref().unwrap_or(&attr.name.location).clone(),
-                            );
-                            attr_list.push(WriteAttrItem::StaticAttr {
-                                prefix: Some(prefix),
-                                name: &attr.name,
-                                value: &attr.value,
-                            });
-                        }
-                        for attr in generics.iter() {
-                            let prefix = (
-                                "generic",
-                                attr.prefix_location.as_ref().unwrap_or(&attr.name.location).clone(),
-                            );
-                            attr_list.push(WriteAttrItem::StaticAttr {
-                                prefix: Some(prefix),
-                                name: &attr.name,
-                                value: &attr.value,
-                            });
-                        }
-                        for attr in extra_attr.iter() {
-                            let prefix = (
-                                "extra-attr",
-                                attr.prefix_location.as_ref().unwrap_or(&attr.name.location).clone(),
-                            );
-                            attr_list.push(WriteAttrItem::StaticAttr {
-                                prefix: Some(prefix),
-                                name: &attr.name,
-                                value: &attr.value,
-                            });
-                        }
-                        write_common_attributes_without_slot(&mut attr_list, common);
-                    }
-                    ElementKind::Pure {
-                        children: _,
-                        slot,
-                        slot_value_refs,
-                    } => {
-                        stringifier.write_str("block")?;
-                        write_slot_and_slot_values(stringifier, &mut attr_list, slot, slot_value_refs);
-                    }
-                    ElementKind::For {
-                        list,
-                        item_name,
-                        index_name,
-                        key,
-                        children: _,
-                    } => {
-                        stringifier.write_str("block")?;
-                        attr_list.push(WriteAttrItem::NamedAttr { name: "wx:for", location: list.0.clone(), value: &list.1 });
-                        if item_name.1.name.as_str() != DEFAULT_FOR_ITEM_SCOPE_NAME {
-                            attr_list.push(WriteAttrItem::NamedStaticAttr { name: "wx:for-item", location: item_name.0.clone(), value: &item_name.1 });
-                        }
-                        if index_name.1.name.as_str() != DEFAULT_FOR_INDEX_SCOPE_NAME {
-                            attr_list.push(WriteAttrItem::NamedStaticAttr { name: "wx:for-index", location: index_name.0.clone(), value: &index_name.1 });
-                        }
-                        if !key.1.name.is_empty() {
-                            attr_list.push(WriteAttrItem::NamedStaticAttr { name: "wx:key", location: key.0.clone(), value: &key.1 });
-                        }
-                        stringifier.add_scope(&item_name.1.name);
-                        stringifier.add_scope(&index_name.1.name);
-                    }
-                    ElementKind::If { .. } => unreachable!(),
-                    ElementKind::TemplateRef { target, data } => {
-                        stringifier.write_str("template")?;
-                        attr_list.push(WriteAttrItem::NamedAttr { name: "is", location: target.0.clone(), value: &target.1 });
-                        if !data.1.is_empty() {
-                            attr_list.push(WriteAttrItem::NamedAttr { name: "data", location: data.0.clone(), value: &data.1 });
-                        }
-                    }
-                    ElementKind::Include { path } => {
-                        stringifier.write_str("include")?;
-                        attr_list.push(WriteAttrItem::NamedStaticAttr { name: "src", location: path.0.clone(), value: &path.1 })
-                    }
-                    ElementKind::Slot {
-                        name,
-                        values,
-                        common,
-                    } => {
-                        stringifier.write_str("slot")?;
-                        write_slot_and_slot_values(stringifier, &mut attr_list, &common.slot, &common.slot_value_refs);
-                        if !name.1.is_empty() {
-                            attr_list.push(WriteAttrItem::NamedAttr { name: "name", location: name.0.clone(), value: &name.1 });
-                        }
-                        for attr in values.iter() {
-                            attr_list.push(WriteAttrItem::Attr {
-                                prefix: None,
-                                name: Cow::Borrowed(&attr.name),
-                                value: attr.value.as_ref(),
-                                respect_none_value: false,
-                            });
-                        }
-                        write_common_attributes_without_slot(&mut attr_list, common);
-                    }
-                }
-                stringifier.list(&attr_list)?;
-
-                // write tag body and end
-                let empty_children = vec![];
-                let children = self.children().unwrap_or(&empty_children);
+                stringifier.write_str("block")?;
+                let name = if is_first {
+                    is_first = false;
+                    "wx:if"
+                } else {
+                    "wx:elif"
+                };
+                let list = [
+                    WriteAttrItem::NamedAttr { name, location: loc.clone(), value },
+                ];
+                stringifier.list(&list)?;
                 if !is_children_empty(children, !stringifier.minimize()) {
                     stringifier.write_token(">", None, &self.tag_location.start.1)?;
                     stringifier.inline(children)?;
@@ -747,24 +506,7 @@ impl StringifyBlock for Element {
                             .0,
                     )?;
                     stringifier.write_token("/", None, &self.tag_location.close)?;
-                    match &self.kind {
-                        ElementKind::Normal { tag_name, .. } => {
-                            stringifier.write_ident(&tag_name, false)?;
-                        }
-                        ElementKind::Pure { .. } | ElementKind::For { .. } => {
-                            stringifier.write_str("block")?;
-                        }
-                        ElementKind::If { .. } => unreachable!(),
-                        ElementKind::TemplateRef { .. } => {
-                            stringifier.write_str("template")?;
-                        }
-                        ElementKind::Include { .. } => {
-                            stringifier.write_str("include")?;
-                        }
-                        ElementKind::Slot { .. } => {
-                            stringifier.write_str("slot")?;
-                        }
-                    }
+                    stringifier.write_str("block")?;
                     stringifier.write_token(
                         ">",
                         None,
@@ -780,10 +522,276 @@ impl StringifyBlock for Element {
                     stringifier.write_token("/", None, &self.tag_location.close)?;
                     stringifier.write_token(">", None, &self.tag_location.start.1)?;
                 }
+            }
+            if let Some((loc, children)) = else_branch.as_ref() {
+                stringifier.write_token("<", None, &self.tag_location.start.0)?;
+                stringifier.write_str("block")?;
+                let list = [
+                    WriteAttrItem::NameOnly { name: "wx:else", location: loc.clone() },
+                ];
+                stringifier.list(&list)?;
+                if !is_children_empty(children, !stringifier.minimize()) {
+                    stringifier.write_token(">", None, &self.tag_location.start.1)?;
+                    stringifier.inline(children)?;
+                    stringifier.write_token(
+                        "<",
+                        None,
+                        &self
+                            .tag_location
+                            .end
+                            .as_ref()
+                            .unwrap_or(&self.tag_location.start)
+                            .0,
+                    )?;
+                    stringifier.write_token("/", None, &self.tag_location.close)?;
+                    stringifier.write_str("block")?;
+                    stringifier.write_token(
+                        ">",
+                        None,
+                        &self
+                            .tag_location
+                            .end
+                            .as_ref()
+                            .unwrap_or(&self.tag_location.start)
+                            .1,
+                    )?;
+                } else {
+                    stringifier.write_optional_space()?;
+                    stringifier.write_token("/", None, &self.tag_location.close)?;
+                    stringifier.write_token(">", None, &self.tag_location.start.1)?;
+                }
+            }
+            return Ok(());
+        }
 
-                Ok(())
-            })
-        })
+        // write tag start
+        stringifier.write_token("<", None, &self.tag_location.start.0)?;
+        let mut attr_list = vec![];
+        match &self.kind {
+            ElementKind::Normal {
+                tag_name,
+                attributes,
+                class,
+                style,
+                change_attributes,
+                worklet_attributes,
+                children: _,
+                generics,
+                extra_attr,
+                common,
+            } => {
+                stringifier.write_ident(&tag_name, true)?;
+                write_slot_and_slot_values(stringifier, &mut attr_list, &common.slot, &common.slot_value_refs);
+                match class {
+                    ClassAttribute::None => {}
+                    ClassAttribute::String(location, value) => {
+                        attr_list.push(WriteAttrItem::Attr {
+                            prefix: None,
+                            name: Cow::Owned(Ident {
+                                name: "class".into(),
+                                location: location.clone(),
+                            }),
+                            value: Some(value),
+                            respect_none_value: false,
+                        });
+                    }
+                    ClassAttribute::Multiple(..) => {
+                        todo!()
+                    }
+                }
+                match style {
+                    StyleAttribute::None => {}
+                    StyleAttribute::String(location, value) => {
+                        attr_list.push(WriteAttrItem::Attr {
+                            prefix: None, name: Cow::Owned(Ident {
+                                name: "style".into(),
+                                location: location.clone(),
+                            }),
+                            value: Some(value),
+                            respect_none_value: false,
+                        });
+                    }
+                    StyleAttribute::Multiple(..) => {
+                        todo!()
+                    }
+                }
+                for attr in attributes.iter() {
+                    let prefix = match &attr.prefix {
+                        NormalAttributePrefix::None => None,
+                        NormalAttributePrefix::Model(prefix_location) => {
+                            Some(("model", prefix_location.clone()))
+                        }
+                    };
+                    attr_list.push(WriteAttrItem::Attr {
+                        prefix,
+                        name: Cow::Borrowed(&attr.name),
+                        value: attr.value.as_ref(),
+                        respect_none_value: true,
+                    });
+                }
+                for attr in change_attributes.iter() {
+                    let prefix = (
+                        "change",
+                        attr.prefix_location.as_ref().unwrap_or(&attr.name.location).clone(),
+                    );
+                    attr_list.push(WriteAttrItem::Attr {
+                        prefix: Some(prefix),
+                        name: Cow::Borrowed(&attr.name),
+                        value: attr.value.as_ref(),
+                        respect_none_value: false,
+                    });
+                }
+                for attr in worklet_attributes.iter() {
+                    let prefix = (
+                        "worklet",
+                        attr.prefix_location.as_ref().unwrap_or(&attr.name.location).clone(),
+                    );
+                    attr_list.push(WriteAttrItem::StaticAttr {
+                        prefix: Some(prefix),
+                        name: &attr.name,
+                        value: &attr.value,
+                    });
+                }
+                for attr in generics.iter() {
+                    let prefix = (
+                        "generic",
+                        attr.prefix_location.as_ref().unwrap_or(&attr.name.location).clone(),
+                    );
+                    attr_list.push(WriteAttrItem::StaticAttr {
+                        prefix: Some(prefix),
+                        name: &attr.name,
+                        value: &attr.value,
+                    });
+                }
+                for attr in extra_attr.iter() {
+                    let prefix = (
+                        "extra-attr",
+                        attr.prefix_location.as_ref().unwrap_or(&attr.name.location).clone(),
+                    );
+                    attr_list.push(WriteAttrItem::StaticAttr {
+                        prefix: Some(prefix),
+                        name: &attr.name,
+                        value: &attr.value,
+                    });
+                }
+                write_common_attributes_without_slot(&mut attr_list, common);
+            }
+            ElementKind::Pure {
+                children: _,
+                slot,
+                slot_value_refs,
+            } => {
+                stringifier.write_str("block")?;
+                write_slot_and_slot_values(stringifier, &mut attr_list, slot, slot_value_refs);
+            }
+            ElementKind::For {
+                list,
+                item_name,
+                index_name,
+                key,
+                children: _,
+            } => {
+                stringifier.write_str("block")?;
+                attr_list.push(WriteAttrItem::NamedAttr { name: "wx:for", location: list.0.clone(), value: &list.1 });
+                if item_name.1.name.as_str() != DEFAULT_FOR_ITEM_SCOPE_NAME {
+                    attr_list.push(WriteAttrItem::NamedStaticAttr { name: "wx:for-item", location: item_name.0.clone(), value: &item_name.1 });
+                }
+                if index_name.1.name.as_str() != DEFAULT_FOR_INDEX_SCOPE_NAME {
+                    attr_list.push(WriteAttrItem::NamedStaticAttr { name: "wx:for-index", location: index_name.0.clone(), value: &index_name.1 });
+                }
+                if !key.1.name.is_empty() {
+                    attr_list.push(WriteAttrItem::NamedStaticAttr { name: "wx:key", location: key.0.clone(), value: &key.1 });
+                }
+                stringifier.add_scope(&item_name.1.name);
+                stringifier.add_scope(&index_name.1.name);
+            }
+            ElementKind::If { .. } => unreachable!(),
+            ElementKind::TemplateRef { target, data } => {
+                stringifier.write_str("template")?;
+                attr_list.push(WriteAttrItem::NamedAttr { name: "is", location: target.0.clone(), value: &target.1 });
+                if !data.1.is_empty() {
+                    attr_list.push(WriteAttrItem::NamedAttr { name: "data", location: data.0.clone(), value: &data.1 });
+                }
+            }
+            ElementKind::Include { path } => {
+                stringifier.write_str("include")?;
+                attr_list.push(WriteAttrItem::NamedStaticAttr { name: "src", location: path.0.clone(), value: &path.1 })
+            }
+            ElementKind::Slot {
+                name,
+                values,
+                common,
+            } => {
+                stringifier.write_str("slot")?;
+                write_slot_and_slot_values(stringifier, &mut attr_list, &common.slot, &common.slot_value_refs);
+                if !name.1.is_empty() {
+                    attr_list.push(WriteAttrItem::NamedAttr { name: "name", location: name.0.clone(), value: &name.1 });
+                }
+                for attr in values.iter() {
+                    attr_list.push(WriteAttrItem::Attr {
+                        prefix: None,
+                        name: Cow::Borrowed(&attr.name),
+                        value: attr.value.as_ref(),
+                        respect_none_value: false,
+                    });
+                }
+                write_common_attributes_without_slot(&mut attr_list, common);
+            }
+        }
+        stringifier.list(&attr_list)?;
+
+        // write tag body and end
+        let empty_children = vec![];
+        let children = self.children().unwrap_or(&empty_children);
+        if !is_children_empty(children, !stringifier.minimize()) {
+            stringifier.write_token(">", None, &self.tag_location.start.1)?;
+            stringifier.inline(children)?;
+            stringifier.write_token(
+                "<",
+                None,
+                &self
+                    .tag_location
+                    .end
+                    .as_ref()
+                    .unwrap_or(&self.tag_location.start)
+                    .0,
+            )?;
+            stringifier.write_token("/", None, &self.tag_location.close)?;
+            match &self.kind {
+                ElementKind::Normal { tag_name, .. } => {
+                    stringifier.write_ident(&tag_name, false)?;
+                }
+                ElementKind::Pure { .. } | ElementKind::For { .. } => {
+                    stringifier.write_str("block")?;
+                }
+                ElementKind::If { .. } => unreachable!(),
+                ElementKind::TemplateRef { .. } => {
+                    stringifier.write_str("template")?;
+                }
+                ElementKind::Include { .. } => {
+                    stringifier.write_str("include")?;
+                }
+                ElementKind::Slot { .. } => {
+                    stringifier.write_str("slot")?;
+                }
+            }
+            stringifier.write_token(
+                ">",
+                None,
+                &self
+                    .tag_location
+                    .end
+                    .as_ref()
+                    .unwrap_or(&self.tag_location.start)
+                    .1,
+            )?;
+        } else {
+            stringifier.write_optional_space()?;
+            stringifier.write_token("/", None, &self.tag_location.close)?;
+            stringifier.write_token(">", None, &self.tag_location.start.1)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -899,6 +907,59 @@ mod test {
         assert_eq!(
             output.as_str(),
             "<div a=\"{{123}}\" />\n<div\n    data:a=\"123\"\n    data:b=\"456\"\n/>\n",
+        );
+    }
+
+    #[test]
+    fn comment() {
+        let src = r#"<div> <!--TEST--> abc </div>"#;
+        let (template, _) = crate::parse::parse("TEST", src);
+        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, Default::default());
+        template.stringify_write(&mut stringifier).unwrap();
+        let (output, _) = stringifier.finish();
+        assert_eq!(
+            output.as_str(),
+            "<div>\n    <!--TEST-->\n    <block> abc </block>\n</div>\n",
+        );
+    }
+
+    #[test]
+    fn comment_minimized() {
+        let src = r#"<div> <!--TEST--> abc </div>"#;
+        let (template, _) = crate::parse::parse("TEST", src);
+        let options = StringifyOptions { minimize: true, ..Default::default() };
+        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, options);
+        template.stringify_write(&mut stringifier).unwrap();
+        let (output, _) = stringifier.finish();
+        assert_eq!(
+            output.as_str(),
+            "<div> abc </div>",
+        );
+    }
+
+    #[test]
+    fn line_end_comments() {
+        let src = r#"<div> abc <!-- 1 --> <span /> <!-- 2 --> <span> <!-- 3 --> </span> </div>"#;
+        let (template, _) = crate::parse::parse("TEST", src);
+        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, Default::default());
+        template.stringify_write(&mut stringifier).unwrap();
+        let (output, _) = stringifier.finish();
+        assert_eq!(
+            output.as_str(),
+            "<div>\n    <block> abc </block> <!-- 1 -->\n    <span /> <!-- 2 -->\n    <span>\n        <!-- 3 -->\n    </span>\n</div>\n",
+        );
+    }
+
+    #[test]
+    fn preserve_empty_lines_between_tags() {
+        let src = "<div> <span /> \n\n <span /> </div>";
+        let (template, _) = crate::parse::parse("TEST", src);
+        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, Default::default());
+        template.stringify_write(&mut stringifier).unwrap();
+        let (output, _) = stringifier.finish();
+        assert_eq!(
+            output.as_str(),
+            "<div>\n    <span />\n\n    <span />\n</div>\n",
         );
     }
 }

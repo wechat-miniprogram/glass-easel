@@ -24,9 +24,6 @@ pub struct StringifyOptions {
     /// 
     /// Note that lines may exceed this limit when it is not possible.
     pub line_width_limit: u32,
-
-    /// Ignore spacing information in source code.
-    pub ignore_source_spacing: bool, // FIXME support this
 }
 
 impl Default for StringifyOptions {
@@ -38,7 +35,6 @@ impl Default for StringifyOptions {
             tab_size: 4,
             use_tab_character: false,
             line_width_limit: 100,
-            ignore_source_spacing: false,
         }
     }
 }
