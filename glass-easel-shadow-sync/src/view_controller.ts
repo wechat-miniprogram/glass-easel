@@ -370,25 +370,37 @@ export class ViewController {
   setAttribute(element: Element, name: string, value: any): void {
     const { _glassEasel } = this
     const Component = _glassEasel.Component
-    const camelName = dashToCamelCase(name)
-    if (element instanceof Component && _glassEasel.Component.hasProperty(element, camelName)) {
-      element.replaceDataOnPath([camelName], value)
-      element.applyDataUpdates()
-    } else {
-      element.updateAttribute(name, value)
+    if (Component.isComponent(element)) {
+      const camelName = dashToCamelCase(name)
+      const dataProxy = Component.getDataProxy(element)
+      if (dataProxy.replaceProperty(camelName, value)) {
+        dataProxy.applyDataUpdates(true)
+        return
+      }
+      if (element.hasExternalClass(name)) {
+        element.setExternalClass(name, value)
+        return
+      }
     }
+    element.updateAttribute(name, value)
   }
 
   removeAttribute(element: Element, name: string): void {
     const { _glassEasel } = this
     const Component = _glassEasel.Component
-    const camelName = dashToCamelCase(name)
-    if (Component.isComponent(element) && Component.hasProperty(element, camelName)) {
-      element.replaceDataOnPath([camelName], undefined)
-      element.applyDataUpdates()
-    } else {
-      element.removeAttribute(name)
+    if (Component.isComponent(element)) {
+      const camelName = dashToCamelCase(name)
+      const dataProxy = Component.getDataProxy(element)
+      if (dataProxy.replaceProperty(camelName, undefined)) {
+        dataProxy.applyDataUpdates(true)
+        return
+      }
+      if (element.hasExternalClass(name)) {
+        element.setExternalClass(name, '')
+        return
+      }
     }
+    element.removeAttribute(name)
   }
 
   setDataset(element: Element, name: string, value: unknown): void {

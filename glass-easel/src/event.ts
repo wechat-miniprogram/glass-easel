@@ -441,7 +441,7 @@ export class Event<TDetail> {
         }
         atTarget = false
         this.eventPhase = EventPhase.BubblingPhase
-        if (currentTarget._$eventTarget) {
+        if (currentTarget._$eventTarget && !eventBubblingControl.stopped) {
           this.callListener(currentTarget, mark, target, false)
         }
         return bubbles && !eventBubblingControl.stopped

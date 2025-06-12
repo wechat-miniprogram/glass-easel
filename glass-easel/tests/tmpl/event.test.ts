@@ -484,7 +484,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect(eventOrder).toStrictEqual([3, 4])
   })
 
-  it('event phrase', () => {
+  test('event phrase', () => {
     const def = glassEasel.registerElement({
       template: tmpl(`
         <div id="a" bind:customEv="evA">
@@ -514,7 +514,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
   })
 
   if (testBackend === domBackend) {
-    it('prevent default', () => {
+    test('prevent default', () => {
       const events: string[] = []
       const def = glassEasel.registerElement({
         template: tmpl(`
@@ -544,6 +544,107 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       domElemC.dispatchEvent(event)
       expect(events).toStrictEqual(['b', 'c'])
       expect(event.defaultPrevented).toBe(true)
+    })
+
+    test('stop propagation in native-rendering elements', () => {
+      let op: string[] = []
+      let breakpoints: string[] = []
+      const comp = glassEasel.registerElement({
+        options: {
+          externalComponent: true,
+        },
+        template: tmpl(`
+          <div id="a" bind:customEv="evA">
+            <div id="b" bind:customEv="evB">
+              <slot />
+            </div>
+          </div>
+        `),
+        listeners: {
+          'this.customEv': 'evThis',
+          customEv: 'evShadowRoot',
+        },
+        methods: {
+          evThis() {
+            op.push('this')
+            return !breakpoints.includes('this')
+          },
+          evShadowRoot() {
+            op.push('shadowRoot')
+            return !breakpoints.includes('shadowRoot')
+          },
+          evA() {
+            op.push('a')
+            return !breakpoints.includes('a')
+          },
+          evB() {
+            op.push('b')
+            return !breakpoints.includes('b')
+          },
+        },
+      })
+      const root = glassEasel.registerElement({
+        using: {
+          comp,
+        },
+        template: tmpl(`
+          <comp id="comp" bind:customEv="evComp">
+            <div id="c" bind:customEv="evC" />
+          </comp>
+        `),
+        methods: {
+          evComp() {
+            op.push('comp')
+            return !breakpoints.includes('comp')
+          },
+          evC() {
+            op.push('c')
+            return !breakpoints.includes('c')
+          },
+        },
+      })
+      const elem = glassEasel.Component.createWithContext('root', root.general(), testBackend)
+      const c = elem.$.c as glassEasel.Element
+
+      op = []
+      breakpoints = []
+      glassEasel.triggerEvent(
+        c,
+        'customEv',
+        {},
+        { bubbles: true, composed: true, capturePhase: true },
+      )
+      expect(op).toStrictEqual(['c', 'b', 'a', 'shadowRoot', 'this', 'comp'])
+
+      op = []
+      breakpoints = ['shadowRoot']
+      glassEasel.triggerEvent(
+        c,
+        'customEv',
+        {},
+        { bubbles: true, composed: true, capturePhase: true },
+      )
+      expect(op).toStrictEqual(['c', 'b', 'a', 'shadowRoot'])
+
+      op = []
+      breakpoints = ['b']
+      glassEasel.triggerEvent(
+        c,
+        'customEv',
+        {},
+        { bubbles: true, composed: true, capturePhase: true },
+      )
+      expect(op).toStrictEqual(['c', 'b'])
+
+      op = []
+      breakpoints = ['c']
+      glassEasel.triggerEvent(
+        c,
+        'customEv',
+        {},
+        { bubbles: true, composed: true, capturePhase: true },
+      )
+      expect(op).toStrictEqual(['c'])
     })
   }
 }

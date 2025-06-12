@@ -210,6 +210,42 @@ describe('backend', () => {
     viewButton.triggerEvent('tap', { foo: 'foo' })
     expect(ops).toEqual([{ foo: 'foo' }])
   })
+  test('sync setModelListener', () => {
+    viewComponentSpace.setGlobalUsingComponent(
+      'wx-input',
+      viewComponentSpace.defineComponent({
+        is: 'wx-input',
+        properties: {
+          value: {
+            type: String,
+            value: '',
+          },
+        },
+      }) as glassEasel.GeneralComponentDefinition,
+    )
+
+    const rootDef = componentSpace.defineComponent({
+      template: tmpl(`
+        <wx-input model:value="{{value}}"></wx-input>
+      `),
+      data: {
+        value: '123',
+      },
+    })
+    const root = glassEasel.Component.createWithContext('root', rootDef, shadowDomBackend)
+    root.destroyBackendElementOnDetach()
+    const input = root.getShadowRoot()!.childNodes[0]!
+    const inputOnView = getViewNode(input) as glassEasel.GeneralComponent
+
+    expect(domHtml(root)).toEqual('<wx-input></wx-input>')
+    matchElementWithDom(root)
+
+    expect(inputOnView.data.value).toEqual('123')
+
+    inputOnView.setData({ value: '456' })
+    expect(inputOnView.data.value).toEqual('456')
+    expect(root.data.value).toEqual('456')
+  })
   test('external structure on lifetimes', () => {
     viewComponentSpace.setGlobalUsingComponent(
       'wx-button',
