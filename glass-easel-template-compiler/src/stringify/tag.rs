@@ -156,20 +156,56 @@ impl StringifyBlock for Vec<Node> {
         while let Some(item) = item_iter.next() {
             stringifier.new_scope_space(|stringifier| {
                 stringifier.write_line(|stringifier| {
-                    item.stringify_write(stringifier)?;
-                    let Some(peek) = item_iter.peek() else {
-                        return Ok(());
-                    };
-                    if let Node::Comment(comment) = peek {
-                        if comment.location.start.line == item.location_end().line {
-                            stringifier.write_str(r#" "#)?;
-                            item_iter.next().unwrap().stringify_write(stringifier)?;
-                            return Ok(());
+                    // for text node, write an empty comment
+                    if !stringifier.minimize() {
+                        if let Node::Text(_) = item {
+                            stringifier.write_str("<!---->")?;
                         }
                     }
-                    if peek.location_start().line.saturating_sub(item.location_end().line) > 1 {
-                        stringifier.write_str("\n")?;
-                        return Ok(());
+
+                    // write the text node it self
+                    item.stringify_write(stringifier)?;
+
+                    // write following text nodes and comments in the same line
+                    if !stringifier.minimize() {
+                        let mut end_item = item;
+                        while let Some(peek) = item_iter.peek() {
+
+                            // for text nodes, write it
+                            if let Node::Text(_) = peek {
+                                end_item = item_iter.next().unwrap();
+                                end_item.stringify_write(stringifier)?;
+                                continue;
+                            }
+
+                            // for comments in the same line, write it
+                            if let Node::Comment(comment) = peek {
+                                if comment.location.start.line == item.location_end().line {
+                                    if let Node::Text(_) = end_item {
+                                        // empty
+                                    } else {
+                                        stringifier.write_str(r#" "#)?;
+                                    }
+                                    end_item = item_iter.next().unwrap();
+                                    end_item.stringify_write(stringifier)?;
+                                    continue;
+                                }
+                            }
+
+                            break;
+                        }
+
+                        // if ends with text node, write an empty comment
+                        if let Node::Text(_) = end_item {
+                            stringifier.write_str("<!---->")?;
+                        }
+
+                        // write an empty line if there is line gap in the source code
+                        if let Some(peek) = item_iter.peek() {
+                            if peek.location_start().line.saturating_sub(end_item.location_end().line) > 1 {
+                                stringifier.write_str("\n")?;
+                            }
+                        };
                     }
                     Ok(())
                 })
@@ -182,16 +218,13 @@ impl StringifyBlock for Vec<Node> {
 impl StringifyLine for Node {
     fn stringify_write<'s, 't, 'u, W: FmtWrite>(&self, stringifier: &mut StringifierLine<'s, 't, 'u, W>) -> FmtResult {
         match self {
-            Node::Text(value) => {
-                stringifier.write_str(r#"<block>"#)?;
-                value.stringify_write(stringifier)?;
-                stringifier.write_str(r#"</block>"#)?;
-                Ok(())
-            }
+            Node::Text(value) => value.stringify_write(stringifier),
             Node::Element(element) => element.stringify_write(stringifier),
             Node::Comment(comment) => {
-                let full_text = format!("<!--{}-->", comment.content);
-                stringifier.write_token(&full_text, None, &comment.location)?;
+                if !stringifier.minimize() {
+                    let full_text = format!("<!--{}-->", comment.content);
+                    stringifier.write_token(&full_text, None, &comment.location)?;
+                }
                 Ok(())
             }
             Node::UnknownMetaTag(t) => {
@@ -878,7 +911,20 @@ mod test {
         let (output, _) = stringifier.finish();
         assert_eq!(
             output.as_str(),
-            "<block> text </block>\n<div>\n    <block> text </block>\n    <span />\n</div>\n",
+            "<!----> text <!---->\n<div>\n    <!----> text <!---->\n    <span />\n</div>\n",
+        );
+    }
+
+    #[test]
+    fn comment_around_text_node() {
+        let src = r#"<!----> text <!---->"#;
+        let (template, _) = crate::parse::parse("TEST", src);
+        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, Default::default());
+        template.stringify_write(&mut stringifier).unwrap();
+        let (output, _) = stringifier.finish();
+        assert_eq!(
+            output.as_str(),
+            "<!----> text <!---->\n",
         );
     }
 
@@ -919,13 +965,13 @@ mod test {
         let (output, _) = stringifier.finish();
         assert_eq!(
             output.as_str(),
-            "<div>\n    <!--TEST-->\n    <block> abc </block>\n</div>\n",
+            "<div>\n    <!--TEST--> abc <!---->\n</div>\n",
         );
     }
 
     #[test]
     fn comment_minimized() {
-        let src = r#"<div> <!--TEST--> abc </div>"#;
+        let src = r#"<div> <!--TEST--> <span /> </div>"#;
         let (template, _) = crate::parse::parse("TEST", src);
         let options = StringifyOptions { minimize: true, ..Default::default() };
         let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, options);
@@ -933,7 +979,7 @@ mod test {
         let (output, _) = stringifier.finish();
         assert_eq!(
             output.as_str(),
-            "<div> abc </div>",
+            "<div><span/></div>",
         );
     }
 
@@ -946,7 +992,7 @@ mod test {
         let (output, _) = stringifier.finish();
         assert_eq!(
             output.as_str(),
-            "<div>\n    <block> abc </block> <!-- 1 -->\n    <span /> <!-- 2 -->\n    <span>\n        <!-- 3 -->\n    </span>\n</div>\n",
+            "<div>\n    <!----> abc <!-- 1 -->\n    <span /> <!-- 2 -->\n    <span>\n        <!-- 3 -->\n    </span>\n</div>\n",
         );
     }
 
