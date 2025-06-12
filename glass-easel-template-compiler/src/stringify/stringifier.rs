@@ -176,12 +176,6 @@ impl<'s, 't, W: FmtWrite> StringifierBlock<'s, 't, W> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum StringifierLineState {
-    Normal,
-    LineStart,
-}
-
 pub struct StringifierLine<'s, 't, 'u, W: FmtWrite> {
     block: &'u mut StringifierBlock<'s, 't, W>,
     state: StringifierLineState,
@@ -206,6 +200,17 @@ impl<'s, 't, 'u, W: FmtWrite> StringifierLine<'s, 't, 'u, W> {
     pub(super) fn write_str(&mut self, s: &str) -> FmtResult {
         self.state = StringifierLineState::Normal;
         self.block.top.write_str(s)
+    }
+
+    pub(super) fn write_str_state(&mut self, s: &str, state: StringifierLineState) -> FmtResult {
+        if !self.minimize() {
+            if self.state.need_sep(state) && !s.starts_with(' ') {
+                self.write_str(" ")?;
+            }
+        }
+        let ret = self.block.top.write_str(s)?;
+        self.state = state;
+        Ok(ret)
     }
 
     pub(super) fn add_scope(&mut self, name: &CompactString) -> &CompactString {
@@ -236,6 +241,23 @@ impl<'s, 't, 'u, W: FmtWrite> StringifierLine<'s, 't, 'u, W> {
         }
         self.write_str(dest_text)?;
         Ok(())
+    }
+
+    pub(super) fn write_token_state(
+        &mut self,
+        dest_text: &str,
+        source_text: Option<&str>,
+        location: &Range<Position>,
+        state: StringifierLineState,
+    ) -> FmtResult {
+        if !self.minimize() {
+            if self.state.need_sep(state) && !dest_text.starts_with(' ') {
+                self.write_str(" ")?;
+            }
+        }
+        let ret = self.write_token(dest_text, source_text, location)?;
+        self.state = state;
+        Ok(ret)
     }
 
     pub(super) fn write_str_name_quoted(&mut self, n: &StrName) -> FmtResult {
@@ -303,6 +325,45 @@ impl<'s, 't, 'u, W: FmtWrite> StringifierLine<'s, 't, 'u, W> {
         self.block.write_indent()?;
         self.state = StringifierLineState::LineStart;
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum StringifierLineState {
+    Normal,
+    LineStart,
+    DoubleBraceStart,
+    DoubleBraceEnd,
+    ParenCall,
+    ParenStart,
+    ParenEnd,
+    BraceStart,
+    BraceEnd,
+    NoSpaceAround,
+    NoSpaceAfter,
+    NoSpaceBefore,
+}
+
+impl StringifierLineState {
+    fn need_sep(self, other: Self) -> bool {
+        match (self, other) {
+            (Self::LineStart, _) => false,
+            (_, Self::DoubleBraceStart) => false,
+            (Self::DoubleBraceEnd, _) => false,
+            (Self::DoubleBraceStart, _) => true,
+            (_, Self::DoubleBraceEnd) => true,
+            (Self::BraceStart, _) => true,
+            (_, Self::BraceEnd) => true,
+            (Self::ParenCall, _) => false,
+            (_, Self::ParenCall) => false,
+            (Self::ParenStart, _) => false,
+            (_, Self::ParenEnd) => false,
+            (Self::NoSpaceAround, _) => false,
+            (_, Self::NoSpaceAround) => false,
+            (Self::NoSpaceAfter, _) => false,
+            (_, Self::NoSpaceBefore) => false,
+            _ => true,
+        }
     }
 }
 

@@ -837,60 +837,30 @@ impl StringifyLine for Value {
             }
             Self::Dynamic {
                 expression,
-                double_brace_location,
+                double_brace_location: _,
                 binding_map_keys: _,
             } => {
-                fn split_expression<'s, 't, 'u, W: FmtWrite>( // FIXME better expression wrap
-                    expr: &Expression,
-                    stringifier: &mut StringifierLine<'s, 't, 'u, W>,
-                    start_location: &Range<Position>,
-                    end_location: &Range<Position>,
-                ) -> FmtResult {
-                    match expr {
-                        Expression::LitStr { value, location } => {
-                            stringifier.write_token(&escape_html_body(value), None, location)?;
-                            return Ok(());
-                        }
-                        Expression::ToStringWithoutUndefined { value, location } => {
-                            stringifier.write_token("{{", None, &start_location)?;
-                            StringifyLine::stringify_write(&**value, stringifier)?;
-                            stringifier.write_token("}}", None, &location)?;
-                            return Ok(());
-                        }
-                        Expression::Plus {
-                            left,
-                            right,
-                            location,
-                        } => {
-                            let split = if let Expression::ToStringWithoutUndefined { .. }
-                            | Expression::LitStr { .. } = &**left
-                            {
-                                true
-                            } else if let Expression::ToStringWithoutUndefined { .. }
-                            | Expression::LitStr { .. } = &**right
-                            {
-                                true
-                            } else {
-                                false
-                            };
-                            if split {
-                                split_expression(&left, stringifier, start_location, location)?;
-                                split_expression(&right, stringifier, location, end_location)?;
+                expression.for_each_static_or_dynamic_part(
+                    |value, location| {
+                        match value {
+                            Expression::LitStr { value, location } => {
+                                stringifier.write_token(&escape_html_body(value), None, location)?;
+                                return Ok(());
+                            }
+                            Expression::ToStringWithoutUndefined { value, location } => {
+                                stringifier.write_token_state("{{", None, &location, StringifierLineState::DoubleBraceStart)?;
+                                StringifyLine::stringify_write(&**value, stringifier)?;
+                                stringifier.write_token_state("}}", None, &location, StringifierLineState::DoubleBraceEnd)?;
+                                return Ok(());
+                            }
+                            _ => {
+                                stringifier.write_token_state("{{", None, &location, StringifierLineState::DoubleBraceStart)?;
+                                StringifyLine::stringify_write(value, stringifier)?;
+                                stringifier.write_token_state("}}", None, &location, StringifierLineState::DoubleBraceEnd)?;
                                 return Ok(());
                             }
                         }
-                        _ => {}
-                    }
-                    stringifier.write_token("{{", None, &start_location)?;
-                    StringifyLine::stringify_write(&*expr, stringifier)?;
-                    stringifier.write_token("}}", None, &end_location)?;
-                    Ok(())
-                }
-                split_expression(
-                    &expression,
-                    stringifier,
-                    &double_brace_location.0,
-                    &double_brace_location.1,
+                    },
                 )?;
             }
         }
@@ -932,13 +902,13 @@ mod test {
     fn meta_tag() {
         let src = r#"<!META a={{123}}> <!META data:a="123" data:b="456">"#;
         let (template, _) = crate::parse::parse("TEST", src);
-        let options = StringifyOptions { line_width_limit: 20, ..Default::default() };
+        let options = StringifyOptions { line_width_limit: 30, ..Default::default() };
         let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, options);
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(
             output.as_str(),
-            "<!META a=\"{{123}}\">\n<!META\n    data:a=\"123\"\n    data:b=\"456\"\n>\n",
+            "<!META a=\"{{ 123 }}\">\n<!META\n    data:a=\"123\"\n    data:b=\"456\"\n>\n",
         );
     }
 
@@ -946,13 +916,13 @@ mod test {
     fn normal_tag() {
         let src = r#"<div a={{123}} /> <div data:a="123" data:b="456" />"#;
         let (template, _) = crate::parse::parse("TEST", src);
-        let options = StringifyOptions { line_width_limit: 20, ..Default::default() };
+        let options = StringifyOptions { line_width_limit: 30, ..Default::default() };
         let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, options);
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(
             output.as_str(),
-            "<div a=\"{{123}}\" />\n<div\n    data:a=\"123\"\n    data:b=\"456\"\n/>\n",
+            "<div a=\"{{ 123 }}\" />\n<div\n    data:a=\"123\"\n    data:b=\"456\"\n/>\n",
         );
     }
 
