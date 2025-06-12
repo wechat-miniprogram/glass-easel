@@ -83,6 +83,45 @@ export class BaseBehaviorBuilder<
     return this as any
   }
 
+  /** Use another behavior */
+  behavior<
+    UData extends DataList,
+    UProperty extends PropertyList,
+    UMethod extends MethodList,
+    UChainingFilter extends ChainingFilterType,
+    UComponentExport,
+    UExtraThisFields extends DataList,
+  >(
+    behavior: Behavior<
+      UData,
+      UProperty,
+      UMethod,
+      UChainingFilter,
+      UComponentExport,
+      UExtraThisFields
+    >,
+  ): ResolveBehaviorBuilder<
+    BaseBehaviorBuilder<
+      TPrevData,
+      TData & UData,
+      TProperty & UProperty,
+      TMethod & UMethod,
+      UChainingFilter,
+      TPendingChainingFilter,
+      UComponentExport,
+      TExtraThisFields & UExtraThisFields
+    >,
+    UChainingFilter
+  > {
+    this._$parents.push(behavior)
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    this._$ = this._$.behavior(behavior._$)
+    if (behavior._$chainingFilter) {
+      return behavior._$chainingFilter(this as any)
+    }
+    return this as any
+  }
+
   data<T extends DataList>(
     gen: () => typeUtils.NewFieldList<AllData<TData, TProperty>, T>,
   ): ResolveBehaviorBuilder<
@@ -250,7 +289,9 @@ export class BaseBehaviorBuilder<
       ThisType<Component<TData, TProperty, TMethod, TComponentExport, TExtraThisFields>>,
   ): ResolveBehaviorBuilder<this, TChainingFilter> {
     const target =
-      rel.target instanceof Behavior || rel.target instanceof ComponentType
+      rel.target instanceof Behavior ||
+      rel.target instanceof ComponentType ||
+      rel.target instanceof TraitBehavior
         ? rel.target._$
         : rel.target
     this._$.relation(name, {
@@ -304,18 +345,10 @@ export class BaseBehaviorBuilder<
       listener,
     }) {
       const relationInit = ((rel: RelationParams | TraitRelationParams<any>) => {
-        if (rel.target instanceof TraitBehavior) {
-          return relation({
-            target: rel.target._$,
-            type: rel.type,
-            linked: rel.linked,
-            linkChanged: rel.linkChanged,
-            unlinked: rel.unlinked,
-            linkFailed: rel.linkFailed,
-          } as any)
-        }
         const target =
-          rel.target instanceof Behavior || rel.target instanceof ComponentType
+          rel.target instanceof Behavior ||
+          rel.target instanceof ComponentType ||
+          rel.target instanceof TraitBehavior
             ? rel.target._$
             : rel.target
         return relation({
@@ -484,7 +517,20 @@ export class BaseBehaviorBuilder<
       for (let i = 0; i < keys.length; i += 1) {
         const name = keys[i]!
         const rel = rawRelations[name]!
-        inner.relation(name, rel)
+        const target =
+          rel.target instanceof Behavior ||
+          rel.target instanceof ComponentType ||
+          rel.target instanceof TraitBehavior
+            ? rel.target._$
+            : rel.target
+        inner.relation(name, {
+          target,
+          type: rel.type,
+          linked: rel.linked,
+          linkChanged: rel.linkChanged,
+          unlinked: rel.unlinked,
+          linkFailed: rel.linkFailed,
+        } as any)
       }
     }
     if (externalClasses) inner.externalClasses(externalClasses)

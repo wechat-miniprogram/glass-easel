@@ -366,13 +366,13 @@ describe('partial update', () => {
       })
     })
     expect(getP()).toStrictEqual(['A', 'B', 'C'])
-    expect(execArr).toStrictEqual(['A', 'B', 'C'])
+    expect(execArr).toStrictEqual(['B', 'A', 'C'])
     execArr = []
     comp.groupUpdates(() => {
       comp.replaceDataOnPath(['list', 1, 'k'], 3)
     })
     expect(getP()).toStrictEqual(['A', 'B', 'C'])
-    expect(execArr).toStrictEqual(['A', 'B'])
+    expect(execArr).toStrictEqual(['B', 'A'])
     execArr = []
     comp.groupUpdates(() => {
       comp.replaceDataOnPath(['list', 2, 'k'], 4)
@@ -386,7 +386,7 @@ describe('partial update', () => {
       })
     })
     expect(getP()).toStrictEqual(['A', 'B', 'C'])
-    expect(execArr).toStrictEqual(['B', 'C'])
+    expect(execArr).toStrictEqual(['C', 'B'])
   })
 
   test('should be able to do list-splice update (without key)', () => {
@@ -448,6 +448,80 @@ describe('partial update', () => {
     execArr = []
     comp.groupUpdates(() => {
       comp.spliceArrayDataOnPath(['list'], 0, 2, ['G'])
+    })
+    expect(getP()).toStrictEqual(['G', 'E'])
+    expect(execArr).toStrictEqual(['G', 'E'])
+  })
+
+  test('should be able to do list-splice update (with invalid key)', () => {
+    let execArr = [] as string[]
+    const childCompDef = componentSpace
+      .define()
+      .property('p', String)
+      .observer('p', function () {
+        execArr.push(this.data.p)
+      })
+      .registerComponent()
+    const compDef = componentSpace
+      .define()
+      .usingComponents({
+        child: childCompDef.general(),
+      })
+      .template(
+        tmpl(`
+        <child wx:for="{{list}}" wx:key="index" p="{{item}}" />
+      `),
+      )
+      .data(() => ({
+        list: ['A', 'B', 'C'],
+      }))
+      .registerComponent()
+    const comp = execWithWarn(1, () =>
+      glassEasel.Component.createWithContext('root', compDef, domBackend),
+    )
+    glassEasel.Element.pretendAttached(comp)
+    const getP = () => {
+      const ret = [] as string[]
+      comp
+        .getShadowRoot()!
+        .childNodes[0]!.asElement()!
+        .childNodes.forEach((child) => {
+          ret.push(child.asElement()!.childNodes[0]!.asInstanceOf(childCompDef)!.data.p)
+        })
+      return ret
+    }
+    expect(getP()).toStrictEqual(['A', 'B', 'C'])
+    expect(execArr).toStrictEqual(['A', 'B', 'C'])
+    execArr = []
+    execWithWarn(1, () => {
+      comp.groupUpdates(() => {
+        comp.spliceArrayDataOnPath(['list'], 1, 1, ['D', 'Z'])
+        comp.spliceArrayDataOnPath(['list'], 2, 1, ['E'])
+      })
+    })
+    expect(getP()).toStrictEqual(['A', 'D', 'E', 'C'])
+    expect(execArr).toStrictEqual(['C', 'A', 'D', 'E'])
+    execArr = []
+    execWithWarn(1, () => {
+      comp.groupUpdates(() => {
+        comp.spliceArrayDataOnPath(['list'], 100, 0, ['F'])
+      })
+    })
+    expect(getP()).toStrictEqual(['A', 'D', 'E', 'C', 'F'])
+    expect(execArr).toStrictEqual(['F', 'A', 'D', 'E', 'C'])
+    execArr = []
+    execWithWarn(1, () => {
+      comp.groupUpdates(() => {
+        comp.spliceArrayDataOnPath(['list'], 3, 3, [])
+      })
+    })
+    expect(getP()).toStrictEqual(['A', 'D', 'E'])
+    expect(execArr).toStrictEqual(['A', 'D', 'E'])
+    execArr = []
+    execWithWarn(1, () => {
+      comp.groupUpdates(() => {
+        comp.spliceArrayDataOnPath(['list'], 0, 2, ['G'])
+      })
     })
     expect(getP()).toStrictEqual(['G', 'E'])
     expect(execArr).toStrictEqual(['G', 'E'])
@@ -538,7 +612,7 @@ describe('partial update', () => {
       })
     })
     expect(getP()).toStrictEqual(['G', 'D', 'E', 'GG'])
-    expect(execArr).toStrictEqual(['G', 'GG'])
+    expect(execArr).toStrictEqual(['GG', 'G'])
     execArr = []
     execWithWarn(1, () => {
       comp.groupUpdates(() => {
@@ -546,7 +620,7 @@ describe('partial update', () => {
       })
     })
     expect(getP()).toStrictEqual(['G', 'E', 'GG'])
-    expect(execArr).toStrictEqual([])
+    expect(execArr).toStrictEqual(['G', 'GG'])
   })
 
   test('should be able to do list-splice update (with key and using index)', () => {

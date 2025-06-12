@@ -131,8 +131,7 @@ describe('define', () => {
         relations: {
           invalid: {
             type: 'parent',
-            // FIXME the target should accept wrapped behaviors
-            target: traitBeh._$,
+            target: traitBeh,
           },
         },
         externalClasses: [],
