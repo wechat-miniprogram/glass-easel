@@ -1,6 +1,6 @@
 use std::fmt::{Result as FmtResult, Write as FmtWrite};
 
-use super::{Stringifier, Stringify};
+use super::stringifier::*;
 use crate::{
     escape::gen_lit_str,
     parse::expr::{ArrayFieldKind, Expression, ObjectFieldKind},
@@ -76,16 +76,16 @@ impl ExpressionLevel {
     }
 }
 
-fn expression_strigify_write<'s, W: FmtWrite>(
+fn expression_strigify_write<W: FmtWrite>(
     expression: &Expression,
-    stringifier: &mut Stringifier<'s, W>,
+    stringifier: &mut StringifierLine<W>,
     accept_level: ExpressionLevel,
 ) -> FmtResult {
     let cur_level = ExpressionLevel::from_expression(expression);
     if cur_level > accept_level {
-        stringifier.write_str("(")?;
+        stringifier.write_str_state("(", StringifierLineState::ParenStart)?;
         expression_strigify_write(expression, stringifier, ExpressionLevel::Cond)?;
-        stringifier.write_str(")")?;
+        stringifier.write_str_state(")", StringifierLineState::ParenEnd)?;
         return Ok(());
     }
     match expression {
@@ -93,42 +93,42 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             stringifier.write_scope_name(*index, location)?;
         }
         Expression::DataField { name, location } => {
-            stringifier.write_token(name, Some(name), location)?;
+            stringifier.write_token_state(name, Some(name), location, StringifierLineState::Normal)?;
         }
         Expression::ToStringWithoutUndefined { .. } => {
             panic!("illegal expression");
         }
 
         Expression::LitUndefined { location } => {
-            stringifier.write_token("undefined", None, location)?;
+            stringifier.write_token_state("undefined", None, location, StringifierLineState::Normal)?;
         }
         Expression::LitNull { location } => {
-            stringifier.write_token("null", None, location)?;
+            stringifier.write_token_state("null", None, location, StringifierLineState::Normal)?;
         }
         Expression::LitStr { value, location } => {
             let quoted = gen_lit_str(&value);
-            stringifier.write_token(&format!(r#"{}"#, quoted), None, &location)?;
+            stringifier.write_token_state(&format!(r#"{}"#, quoted), None, &location, StringifierLineState::Normal)?;
         }
         Expression::LitInt { value, location } => {
             let value = value.to_string();
-            stringifier.write_token(&value, None, location)?;
+            stringifier.write_token_state(&value, None, location, StringifierLineState::Normal)?;
         }
         Expression::LitFloat { value, location } => {
             let value = value.to_string();
-            stringifier.write_token(&value, None, location)?;
+            stringifier.write_token_state(&value, None, location, StringifierLineState::Normal)?;
         }
         Expression::LitBool { value, location } => {
             let value = if *value { "true" } else { "false" };
-            stringifier.write_token(value, None, location)?;
+            stringifier.write_token_state(value, None, location, StringifierLineState::Normal)?;
         }
         Expression::LitObj {
             fields,
             brace_location,
         } => {
-            stringifier.write_token("{", None, &brace_location.0)?;
+            stringifier.write_token_state("{", None, &brace_location.0, StringifierLineState::BraceStart)?;
             for (index, field) in fields.iter().enumerate() {
                 if index > 0 {
-                    stringifier.write_str(",")?;
+                    stringifier.write_str_state(",", StringifierLineState::NoSpaceBefore)?;
                 }
                 match field {
                     ObjectFieldKind::Named {
@@ -139,54 +139,55 @@ fn expression_strigify_write<'s, W: FmtWrite>(
                     } => {
                         let is_shortcut = match value {
                             Expression::ScopeRef { index, .. } => {
-                                stringifier.get_scope_name(*index) == name.as_str()
+                                stringifier.block().get_scope_name(*index) == name.as_str()
                             }
                             Expression::DataField { name: x, .. } => x == name,
                             _ => false,
                         };
-                        stringifier.write_token(name, None, location)?;
+                        stringifier.write_token_state(name, None, location, StringifierLineState::Normal)?;
                         if !is_shortcut {
-                            stringifier.write_token(
+                            stringifier.write_token_state(
                                 ":",
                                 None,
                                 colon_location.as_ref().unwrap_or(location),
+                                StringifierLineState::NoSpaceBefore,
                             )?;
                             expression_strigify_write(value, stringifier, ExpressionLevel::Cond)?;
                         }
                     }
                     ObjectFieldKind::Spread { location, value } => {
-                        stringifier.write_token("...", None, location)?;
+                        stringifier.write_token_state("...", None, location, StringifierLineState::NoSpaceAfter)?;
                         expression_strigify_write(value, stringifier, ExpressionLevel::Cond)?;
                     }
                 }
             }
-            stringifier.write_token("}", None, &brace_location.1)?;
+            stringifier.write_token_state("}", None, &brace_location.1, StringifierLineState::BraceEnd)?;
         }
         Expression::LitArr {
             fields,
             bracket_location,
         } => {
-            stringifier.write_token("[", None, &bracket_location.0)?;
+            stringifier.write_token_state("[", None, &bracket_location.0, StringifierLineState::NoSpaceAfter)?;
             for (index, field) in fields.iter().enumerate() {
                 if index > 0 {
-                    stringifier.write_str(",")?;
+                    stringifier.write_str_state(",", StringifierLineState::NoSpaceBefore)?;
                 }
                 match field {
                     ArrayFieldKind::Normal { value } => {
                         expression_strigify_write(value, stringifier, ExpressionLevel::Cond)?;
                     }
                     ArrayFieldKind::Spread { location, value } => {
-                        stringifier.write_token("...", None, location)?;
+                        stringifier.write_token_state("...", None, location, StringifierLineState::NoSpaceAfter)?;
                         expression_strigify_write(value, stringifier, ExpressionLevel::Cond)?;
                     }
                     ArrayFieldKind::EmptySlot => {
                         if index == fields.len() - 1 {
-                            stringifier.write_str(",")?;
+                            stringifier.write_str_state(",", StringifierLineState::NoSpaceBefore)?;
                         }
                     }
                 }
             }
-            stringifier.write_token("]", None, &bracket_location.1)?;
+            stringifier.write_token_state("]", None, &bracket_location.1, StringifierLineState::ParenEnd)?;
         }
 
         Expression::StaticMember {
@@ -196,8 +197,8 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             field_location,
         } => {
             expression_strigify_write(obj, stringifier, ExpressionLevel::Member)?;
-            stringifier.write_token(".", None, dot_location)?;
-            stringifier.write_token(&field_name, Some(&field_name), field_location)?;
+            stringifier.write_token_state(".", None, dot_location, StringifierLineState::NoSpaceAround)?;
+            stringifier.write_token_state(&field_name, Some(&field_name), field_location, StringifierLineState::Normal)?;
         }
         Expression::DynamicMember {
             obj,
@@ -205,9 +206,9 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             bracket_location,
         } => {
             expression_strigify_write(obj, stringifier, ExpressionLevel::Member)?;
-            stringifier.write_token("[", None, &bracket_location.0)?;
+            stringifier.write_token_state("[", None, &bracket_location.0, StringifierLineState::ParenCall)?;
             expression_strigify_write(&field_name, stringifier, ExpressionLevel::Cond)?;
-            stringifier.write_token("]", None, &bracket_location.1)?;
+            stringifier.write_token_state("]", None, &bracket_location.1, StringifierLineState::ParenEnd)?;
         }
         Expression::FuncCall {
             func,
@@ -215,38 +216,38 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             paren_location,
         } => {
             expression_strigify_write(func, stringifier, ExpressionLevel::Member)?;
-            stringifier.write_token("(", None, &paren_location.0)?;
+            stringifier.write_token_state("(", None, &paren_location.0, StringifierLineState::ParenCall)?;
             for (index, arg) in args.iter().enumerate() {
                 if index > 0 {
-                    stringifier.write_str(",")?;
+                    stringifier.write_str_state(",", StringifierLineState::NoSpaceBefore)?;
                 }
                 expression_strigify_write(&arg, stringifier, ExpressionLevel::Cond)?;
             }
-            stringifier.write_token(")", None, &paren_location.1)?;
+            stringifier.write_token_state(")", None, &paren_location.1, StringifierLineState::ParenEnd)?;
         }
 
         Expression::Reverse { value, location } => {
-            stringifier.write_token("!", None, location)?;
+            stringifier.write_token_state("!", None, location, StringifierLineState::NoSpaceAfter)?;
             expression_strigify_write(&value, stringifier, ExpressionLevel::Unary)?;
         }
         Expression::BitReverse { value, location } => {
-            stringifier.write_token("~", None, location)?;
+            stringifier.write_token_state("~", None, location, StringifierLineState::NoSpaceAfter)?;
             expression_strigify_write(&value, stringifier, ExpressionLevel::Unary)?;
         }
         Expression::Positive { value, location } => {
-            stringifier.write_token(" +", None, location)?;
+            stringifier.write_token_state(" +", None, location, StringifierLineState::NoSpaceAround)?;
             expression_strigify_write(&value, stringifier, ExpressionLevel::Unary)?;
         }
         Expression::Negative { value, location } => {
-            stringifier.write_token(" -", None, location)?;
+            stringifier.write_token_state(" -", None, location, StringifierLineState::NoSpaceAround)?;
             expression_strigify_write(&value, stringifier, ExpressionLevel::Unary)?;
         }
         Expression::TypeOf { value, location } => {
-            stringifier.write_token(" typeof ", None, location)?;
+            stringifier.write_token_state(" typeof ", None, location, StringifierLineState::NoSpaceAround)?;
             expression_strigify_write(&value, stringifier, ExpressionLevel::Unary)?;
         }
         Expression::Void { value, location } => {
-            stringifier.write_token(" void ", None, location)?;
+            stringifier.write_token_state(" void ", None, location, StringifierLineState::NoSpaceAround)?;
             expression_strigify_write(&value, stringifier, ExpressionLevel::Unary)?;
         }
 
@@ -256,7 +257,7 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             location,
         } => {
             expression_strigify_write(&left, stringifier, ExpressionLevel::Multiply)?;
-            stringifier.write_token("*", None, location)?;
+            stringifier.write_token_state("*", None, location, StringifierLineState::Normal)?;
             expression_strigify_write(&right, stringifier, ExpressionLevel::Unary)?;
         }
         Expression::Divide {
@@ -265,7 +266,7 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             location,
         } => {
             expression_strigify_write(&left, stringifier, ExpressionLevel::Multiply)?;
-            stringifier.write_token("/", None, location)?;
+            stringifier.write_token_state("/", None, location, StringifierLineState::Normal)?;
             expression_strigify_write(&right, stringifier, ExpressionLevel::Unary)?;
         }
         Expression::Remainer {
@@ -274,7 +275,7 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             location,
         } => {
             expression_strigify_write(&left, stringifier, ExpressionLevel::Multiply)?;
-            stringifier.write_token("%", None, location)?;
+            stringifier.write_token_state("%", None, location, StringifierLineState::Normal)?;
             expression_strigify_write(&right, stringifier, ExpressionLevel::Unary)?;
         }
 
@@ -284,7 +285,7 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             location,
         } => {
             expression_strigify_write(&left, stringifier, ExpressionLevel::Plus)?;
-            stringifier.write_token("+", None, location)?;
+            stringifier.write_token_state("+", None, location, StringifierLineState::Normal)?;
             expression_strigify_write(&right, stringifier, ExpressionLevel::Multiply)?;
         }
         Expression::Minus {
@@ -293,7 +294,7 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             location,
         } => {
             expression_strigify_write(&left, stringifier, ExpressionLevel::Plus)?;
-            stringifier.write_token("-", None, location)?;
+            stringifier.write_token_state("-", None, location, StringifierLineState::Normal)?;
             expression_strigify_write(&right, stringifier, ExpressionLevel::Multiply)?;
         }
 
@@ -303,7 +304,7 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             location,
         } => {
             expression_strigify_write(&left, stringifier, ExpressionLevel::Shift)?;
-            stringifier.write_token("<<", None, location)?;
+            stringifier.write_token_state("<<", None, location, StringifierLineState::Normal)?;
             expression_strigify_write(&right, stringifier, ExpressionLevel::Plus)?;
         }
         Expression::RightShift {
@@ -312,7 +313,7 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             location,
         } => {
             expression_strigify_write(&left, stringifier, ExpressionLevel::Shift)?;
-            stringifier.write_token(">>", None, location)?;
+            stringifier.write_token_state(">>", None, location, StringifierLineState::Normal)?;
             expression_strigify_write(&right, stringifier, ExpressionLevel::Plus)?;
         }
         Expression::UnsignedRightShift {
@@ -321,7 +322,7 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             location,
         } => {
             expression_strigify_write(&left, stringifier, ExpressionLevel::Shift)?;
-            stringifier.write_token(">>>", None, location)?;
+            stringifier.write_token_state(">>>", None, location, StringifierLineState::Normal)?;
             expression_strigify_write(&right, stringifier, ExpressionLevel::Plus)?;
         }
 
@@ -331,7 +332,7 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             location,
         } => {
             expression_strigify_write(&left, stringifier, ExpressionLevel::Comparison)?;
-            stringifier.write_token("<", None, location)?;
+            stringifier.write_token_state("<", None, location, StringifierLineState::Normal)?;
             expression_strigify_write(&right, stringifier, ExpressionLevel::Shift)?;
         }
         Expression::Lte {
@@ -340,7 +341,7 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             location,
         } => {
             expression_strigify_write(&left, stringifier, ExpressionLevel::Comparison)?;
-            stringifier.write_token("<=", None, location)?;
+            stringifier.write_token_state("<=", None, location, StringifierLineState::Normal)?;
             expression_strigify_write(&right, stringifier, ExpressionLevel::Shift)?;
         }
         Expression::Gt {
@@ -349,7 +350,7 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             location,
         } => {
             expression_strigify_write(&left, stringifier, ExpressionLevel::Comparison)?;
-            stringifier.write_token(">", None, location)?;
+            stringifier.write_token_state(">", None, location, StringifierLineState::Normal)?;
             expression_strigify_write(&right, stringifier, ExpressionLevel::Shift)?;
         }
         Expression::Gte {
@@ -358,7 +359,7 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             location,
         } => {
             expression_strigify_write(&left, stringifier, ExpressionLevel::Comparison)?;
-            stringifier.write_token(">=", None, location)?;
+            stringifier.write_token_state(">=", None, location, StringifierLineState::Normal)?;
             expression_strigify_write(&right, stringifier, ExpressionLevel::Shift)?;
         }
         Expression::InstanceOf {
@@ -367,7 +368,7 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             location,
         } => {
             expression_strigify_write(&left, stringifier, ExpressionLevel::Comparison)?;
-            stringifier.write_token(" instanceof ", None, location)?;
+            stringifier.write_token_state(" instanceof ", None, location, StringifierLineState::NoSpaceAround)?;
             expression_strigify_write(&right, stringifier, ExpressionLevel::Shift)?;
         }
 
@@ -377,7 +378,7 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             location,
         } => {
             expression_strigify_write(&left, stringifier, ExpressionLevel::Eq)?;
-            stringifier.write_token("==", None, location)?;
+            stringifier.write_token_state("==", None, location, StringifierLineState::Normal)?;
             expression_strigify_write(&right, stringifier, ExpressionLevel::Comparison)?;
         }
         Expression::Ne {
@@ -386,7 +387,7 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             location,
         } => {
             expression_strigify_write(&left, stringifier, ExpressionLevel::Eq)?;
-            stringifier.write_token("!=", None, location)?;
+            stringifier.write_token_state("!=", None, location, StringifierLineState::Normal)?;
             expression_strigify_write(&right, stringifier, ExpressionLevel::Comparison)?;
         }
         Expression::EqFull {
@@ -395,7 +396,7 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             location,
         } => {
             expression_strigify_write(&left, stringifier, ExpressionLevel::Eq)?;
-            stringifier.write_token("===", None, location)?;
+            stringifier.write_token_state("===", None, location, StringifierLineState::Normal)?;
             expression_strigify_write(&right, stringifier, ExpressionLevel::Comparison)?;
         }
         Expression::NeFull {
@@ -404,7 +405,7 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             location,
         } => {
             expression_strigify_write(&left, stringifier, ExpressionLevel::Eq)?;
-            stringifier.write_token("!==", None, location)?;
+            stringifier.write_token_state("!==", None, location, StringifierLineState::Normal)?;
             expression_strigify_write(&right, stringifier, ExpressionLevel::Comparison)?;
         }
 
@@ -414,7 +415,7 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             location,
         } => {
             expression_strigify_write(&left, stringifier, ExpressionLevel::BitAnd)?;
-            stringifier.write_token("&", None, location)?;
+            stringifier.write_token_state("&", None, location, StringifierLineState::Normal)?;
             expression_strigify_write(&right, stringifier, ExpressionLevel::Eq)?;
         }
 
@@ -424,7 +425,7 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             location,
         } => {
             expression_strigify_write(&left, stringifier, ExpressionLevel::BitXor)?;
-            stringifier.write_token("^", None, location)?;
+            stringifier.write_token_state("^", None, location, StringifierLineState::Normal)?;
             expression_strigify_write(&right, stringifier, ExpressionLevel::BitAnd)?;
         }
 
@@ -434,7 +435,7 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             location,
         } => {
             expression_strigify_write(&left, stringifier, ExpressionLevel::BitOr)?;
-            stringifier.write_token("|", None, location)?;
+            stringifier.write_token_state("|", None, location, StringifierLineState::Normal)?;
             expression_strigify_write(&right, stringifier, ExpressionLevel::BitXor)?;
         }
 
@@ -444,7 +445,7 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             location,
         } => {
             expression_strigify_write(&left, stringifier, ExpressionLevel::LogicAnd)?;
-            stringifier.write_token("&&", None, location)?;
+            stringifier.write_token_state("&&", None, location, StringifierLineState::Normal)?;
             expression_strigify_write(&right, stringifier, ExpressionLevel::BitOr)?;
         }
 
@@ -454,7 +455,7 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             location,
         } => {
             expression_strigify_write(&left, stringifier, ExpressionLevel::LogicOr)?;
-            stringifier.write_token("||", None, location)?;
+            stringifier.write_token_state("||", None, location, StringifierLineState::Normal)?;
             expression_strigify_write(&right, stringifier, ExpressionLevel::LogicAnd)?;
         }
         Expression::NullishCoalescing {
@@ -463,7 +464,7 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             location,
         } => {
             expression_strigify_write(&left, stringifier, ExpressionLevel::LogicOr)?;
-            stringifier.write_token("??", None, location)?;
+            stringifier.write_token_state("??", None, location, StringifierLineState::Normal)?;
             expression_strigify_write(&right, stringifier, ExpressionLevel::LogicAnd)?;
         }
 
@@ -475,17 +476,162 @@ fn expression_strigify_write<'s, W: FmtWrite>(
             colon_location,
         } => {
             expression_strigify_write(&cond, stringifier, ExpressionLevel::LogicOr)?;
-            stringifier.write_token("?", None, question_location)?;
+            stringifier.write_token_state("?", None, question_location, StringifierLineState::Normal)?;
             expression_strigify_write(&true_br, stringifier, ExpressionLevel::Cond)?;
-            stringifier.write_token(":", None, colon_location)?;
+            stringifier.write_token_state(":", None, colon_location, StringifierLineState::Normal)?;
             expression_strigify_write(&false_br, stringifier, ExpressionLevel::Cond)?;
         }
     }
     Ok(())
 }
 
+impl StringifyLine for Expression {
+    fn stringify_write<'s, 't, 'u, W: FmtWrite>(&self, stringifier: &mut StringifierLine<'s, 't, 'u, W>) -> FmtResult {
+        expression_strigify_write(self, stringifier, ExpressionLevel::Cond)
+    }
+}
+
+#[cfg(test)]
 impl Stringify for Expression {
     fn stringify_write<'s, W: FmtWrite>(&self, stringifier: &mut Stringifier<'s, W>) -> FmtResult {
-        expression_strigify_write(self, stringifier, ExpressionLevel::Cond)
+        stringifier.block(|stringifier| {
+            stringifier.line(self)
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn case(src: &str) {
+        let (template, _) = crate::parse::parse("TEST", src);
+        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, Default::default());
+        template.stringify_write(&mut stringifier).unwrap();
+        let (stringify_result, _sourcemap) = stringifier.finish();
+        assert_eq!(stringify_result.as_str(), &format!("{}\n", src));
+    }
+
+    #[test]
+    fn ident() {
+        case("{{ foo }}");
+    }
+
+    #[test]
+    fn lit_str() {
+        case(r#"{{ 1 + "foo" + 1 }}"#);
+    }
+
+    #[test]
+    fn lit_obj() {
+        case(r#"{{ { a: 1, b: 2, ...c } }}"#);
+    }
+
+    #[test]
+    fn lit_arr() {
+        case(r#"{{ [a, b, ...c] }}"#);
+    }
+
+    #[test]
+    fn paren() {
+        case(r#"{{ a * (b + c) }}"#);
+    }
+
+    #[test]
+    fn static_member() {
+        case(r#"{{ a.b }}"#);
+    }
+
+    #[test]
+    fn dynamic_member() {
+        case(r#"{{ a[b] }}"#);
+    }
+
+    #[test]
+    fn func_call() {
+        case(r#"{{ a(b, c) }}"#);
+    }
+
+    #[test]
+    fn reverse() {
+        case(r#"{{ !a }}"#);
+    }
+
+    #[test]
+    fn bit_reverse() {
+        case(r#"{{ ~a }}"#);
+    }
+
+    #[test]
+    fn positive() {
+        case(r#"{{ +a }}"#);
+    }
+
+    #[test]
+    fn negative() {
+        case(r#"{{ -a }}"#);
+    }
+
+    #[test]
+    fn type_of() {
+        case(r#"{{ typeof a }}"#);
+    }
+
+    #[test]
+    fn void() {
+        case(r#"{{ void a }}"#);
+    }
+
+    #[test]
+    fn multiply() {
+        case(r#"{{ a * b / c % d }}"#);
+    }
+
+    #[test]
+    fn plus() {
+        case(r#"{{ a + b - c }}"#);
+    }
+
+    #[test]
+    fn shift() {
+        case(r#"{{ a << 1 }}"#);
+        case(r#"{{ a >> 1 }}"#);
+        case(r#"{{ a >>> 1 }}"#);
+    }
+
+    #[test]
+    fn comparison() {
+        case(r#"{{ a < b }}"#);
+        case(r#"{{ a > b }}"#);
+        case(r#"{{ a <= b }}"#);
+        case(r#"{{ a >= b }}"#);
+        case(r#"{{ a == b }}"#);
+        case(r#"{{ a === b }}"#);
+        case(r#"{{ a != b }}"#);
+        case(r#"{{ a !== b }}"#);
+    }
+
+    #[test]
+    fn and_or() {
+        case(r#"{{ a && 1 }}"#);
+        case(r#"{{ a || 1 }}"#);
+        case(r#"{{ a & 1 }}"#);
+        case(r#"{{ a | 1 }}"#);
+        case(r#"{{ a ^ 1 }}"#);
+    }
+
+    #[test]
+    fn instance_of() {
+        case(r#"{{ a instanceof b }}"#);
+    }
+
+    #[test]
+    fn nullish_coalescing() {
+        case(r#"{{ a ?? b }}"#);
+    }
+
+    #[test]
+    fn cond() {
+        case(r#"{{ a ? b : c }}"#);
     }
 }

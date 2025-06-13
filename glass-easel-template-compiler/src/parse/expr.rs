@@ -1204,6 +1204,74 @@ impl Expression {
         }
     }
 
+    /// Split the expression into static and dynamic parts.
+    /// 
+    /// While parsing, text content and attribute values that has "partial" expressions
+    /// will be parsed to an `Value` with static and dynamic parts.
+    /// 
+    /// For example, `Hello {{ var }}!` can be split into 3 parts:
+    /// 
+    /// * static part `Hello `;
+    /// * dynamic part `{{ var }}`;
+    /// * static part `!`.
+    /// 
+    /// They are called back through `part` in order.
+    /// The static part is wrapped in an `Expression::LitStr`,
+    /// while the dynamic part is wrapped in an `Expression::ToStringWithoutUndefined`.
+    /// Other `Expression` variants suggest the expression is invalid.
+    /// The second argument of the `part` is the location of static part or `{{ ... }}`.
+    /// 
+    /// The function ends when any callback returns `Err`.
+    pub fn for_each_static_or_dynamic_part<E>(
+        &self,
+        mut part: impl FnMut(&Expression, Range<Position>) -> Result<(), E>,
+    ) -> Result<(), E> {
+        self.for_each_static_or_dynamic_part_rec(&mut part)
+    }
+
+    fn for_each_static_or_dynamic_part_rec<E>(
+        &self,
+        part: &mut impl FnMut(&Expression, Range<Position>) -> Result<(), E>,
+    ) -> Result<(), E> {
+        match self {
+            Expression::LitStr { value: _, location } => {
+                part(self, location.clone())?;
+                Ok(())
+            }
+            Expression::ToStringWithoutUndefined { value, location } => {
+                part(value, location.clone())?;
+                Ok(())
+            }
+            Expression::Plus {
+                left,
+                right,
+                location: _,
+            } => {
+                let split = if let Expression::ToStringWithoutUndefined { .. }
+                    | Expression::LitStr { .. } = &**left
+                {
+                    true
+                } else if let Expression::ToStringWithoutUndefined { .. }
+                    | Expression::LitStr { .. } = &**right
+                {
+                    true
+                } else {
+                    false
+                };
+                if split {
+                    left.for_each_static_or_dynamic_part_rec(part)?;
+                    right.for_each_static_or_dynamic_part_rec(part)?;
+                } else {
+                    part(self, self.location())?;
+                }
+                Ok(())
+            }
+            _ => {
+                part(self, self.location())
+            }
+        }
+    }
+
     pub(super) fn convert_scopes(&mut self, scopes: &[(CompactString, Range<Position>)]) {
         let index = if let Self::DataField { name, location } = self {
             scopes
@@ -2090,8 +2158,11 @@ mod test {
             let r: Vec<_> = parsed
                 .sub_expressions()
                 .map(|x| {
-                    let mut stringifier =
-                        crate::stringify::Stringifier::new(String::new(), "test", src);
+                    let options = crate::stringify::StringifyOptions {
+                        minimize: true,
+                        ..Default::default()
+                    };
+                    let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, options);
                     x.stringify_write(&mut stringifier).unwrap();
                     let (s, _) = stringifier.finish();
                     s
