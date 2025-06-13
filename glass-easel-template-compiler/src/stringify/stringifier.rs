@@ -49,7 +49,7 @@ impl<'s, W: FmtWrite> Stringifier<'s, W> {
         (self.w, sourcemap)
     }
 
-    pub fn run(&mut self, s: impl Stringify) -> FmtResult {
+    pub fn run(&mut self, s: &impl Stringify) -> FmtResult {
         s.stringify_write(self)
     }
 
@@ -120,13 +120,13 @@ impl<'s, 't, W: FmtWrite> StringifierBlock<'s, 't, W> {
         ret
     }
 
-    pub(super) fn sub_block(&mut self, t: &impl StringifyBlock) -> FmtResult {
+    pub(super) fn write_sub_block(&mut self, f: impl FnOnce(&mut StringifierBlock<W>) -> FmtResult) -> FmtResult {
         let mut b = StringifierBlock {
             top: self.top,
             indent_level: self.indent_level + 1,
             scope_names: self.scope_names,
         };
-        t.stringify_write(&mut b)
+        f(&mut b)
     }
 
     fn write_indent(&mut self) -> FmtResult {
@@ -317,14 +317,18 @@ impl<'s, 't, 'u, W: FmtWrite> StringifierLine<'s, 't, 'u, W> {
         Ok(())
     }
 
-    pub(super) fn sub_block(&mut self, t: &impl StringifyBlock) -> FmtResult {
+    pub(super) fn write_sub_block(&mut self, f: impl FnOnce(&mut StringifierBlock<W>) -> FmtResult) -> FmtResult {
         if !self.block.top.options.minimize {
             self.write_str("\n")?;
         }
-        self.block.sub_block(t)?;
+        self.block.write_sub_block(f)?;
         self.block.write_indent()?;
         self.state = StringifierLineState::LineStart;
         Ok(())
+    }
+
+    pub(super) fn sub_block(&mut self, t: &impl StringifyBlock) -> FmtResult {
+        self.write_sub_block(|stringifier| t.stringify_write(stringifier))
     }
 }
 

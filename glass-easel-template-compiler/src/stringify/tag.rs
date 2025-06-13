@@ -116,7 +116,12 @@ impl Stringify for Template {
                     stringifier.write_str_name_quoted(&t.name)?;
                     if !t.content.is_empty() {
                         stringifier.write_str(r#">"#)?;
-                        stringifier.inline(&t.content)?;
+                        children_inline_stringify_write(
+                            &t.content,
+                            t.tag_location.start.1.end,
+                            t.tag_location.end.as_ref().unwrap_or(&t.tag_location.start).0.start,
+                            stringifier,
+                        )?;
                         stringifier.write_token(
                             r#"<"#,
                             None,
@@ -140,79 +145,102 @@ impl Stringify for Template {
             if stringifier.current_position().line_col_utf16() == (0, 0)
                 && is_children_single_text(&self.content, !stringifier.minimize()).is_some()
             {
-                stringifier.line(&self.content)?;
-            } else {
+                stringifier.write_line(|stringifier| {
+                    children_inline_stringify_write(
+                        &self.content,
+                        self.content.first().unwrap().location_end(),
+                        self.content.last().unwrap().location_start(),
+                        stringifier,
+                    )
+                })?;
+            } else if self.content.len() > 0 {
                 stringifier.empty_seperation_line()?;
-                StringifyBlock::stringify_write(&self.content, stringifier)?;
+                children_stringify_write(
+                    &self.content,
+                    self.content.first().unwrap().location_end(),
+                    self.content.last().unwrap().location_start(),
+                    stringifier,
+                )?;
             }
             Ok(())
         })
     }
 }
 
-impl StringifyBlock for Vec<Node> {
-    fn stringify_write<'s, 't, W: FmtWrite>(&self, stringifier: &mut StringifierBlock<'s, 't, W>) -> FmtResult {
-        let mut item_iter = self.iter().peekable();
-        while let Some(item) = item_iter.next() {
-            stringifier.new_scope_space(|stringifier| {
-                stringifier.write_line(|stringifier| {
-                    // for text node, write an empty comment
-                    if !stringifier.minimize() {
-                        if let Node::Text(_) = item {
-                            stringifier.write_str("<!---->")?;
-                        }
+fn children_stringify_write<'s, 't, W: FmtWrite>(
+    children: &[Node],
+    parent_start: Position,
+    parent_end: Position,
+    stringifier: &mut StringifierBlock<'s, 't, W>,
+) -> FmtResult {
+    let mut last_end_position = parent_start;
+    let mut item_iter = children.iter().peekable();
+    while let Some(item) = item_iter.next() {
+        stringifier.new_scope_space(|stringifier| {
+            // write an empty line if there is line gap in the source code
+            if !stringifier.minimize() {
+                if item.location_start().line.saturating_sub(last_end_position.line) > 1 {
+                    stringifier.empty_seperation_line()?;
+                }
+            }
+
+            stringifier.write_line(|stringifier| {
+                // for text node, write an empty comment
+                if !stringifier.minimize() {
+                    if let Node::Text(_) = item {
+                        stringifier.write_str("<!---->")?;
                     }
+                }
 
-                    // write the text node it self
-                    item.stringify_write(stringifier)?;
+                // write the text node it self
+                item.stringify_write(stringifier)?;
 
-                    // write following text nodes and comments in the same line
-                    if !stringifier.minimize() {
-                        let mut end_item = item;
-                        while let Some(peek) = item_iter.peek() {
+                // write following text nodes and comments in the same line
+                if !stringifier.minimize() {
+                    let mut end_item = item;
+                    while let Some(peek) = item_iter.peek() {
 
-                            // for text nodes, write it
-                            if let Node::Text(_) = peek {
+                        // for text nodes, write it
+                        if let Node::Text(_) = peek {
+                            end_item = item_iter.next().unwrap();
+                            end_item.stringify_write(stringifier)?;
+                            continue;
+                        }
+
+                        // for comments in the same line, write it
+                        if let Node::Comment(comment) = peek {
+                            if comment.location.start.line == item.location_end().line {
+                                if let Node::Text(_) = end_item {
+                                    // empty
+                                } else {
+                                    stringifier.write_str(r#" "#)?;
+                                }
                                 end_item = item_iter.next().unwrap();
                                 end_item.stringify_write(stringifier)?;
                                 continue;
                             }
-
-                            // for comments in the same line, write it
-                            if let Node::Comment(comment) = peek {
-                                if comment.location.start.line == item.location_end().line {
-                                    if let Node::Text(_) = end_item {
-                                        // empty
-                                    } else {
-                                        stringifier.write_str(r#" "#)?;
-                                    }
-                                    end_item = item_iter.next().unwrap();
-                                    end_item.stringify_write(stringifier)?;
-                                    continue;
-                                }
-                            }
-
-                            break;
                         }
 
-                        // if ends with text node, write an empty comment
-                        if let Node::Text(_) = end_item {
-                            stringifier.write_str("<!---->")?;
-                        }
-
-                        // write an empty line if there is line gap in the source code
-                        if let Some(peek) = item_iter.peek() {
-                            if peek.location_start().line.saturating_sub(end_item.location_end().line) > 1 {
-                                stringifier.write_str("\n")?;
-                            }
-                        };
+                        break;
                     }
-                    Ok(())
-                })
-            })?;
-        }
-        Ok(())
+
+                    // if ends with text node, write an empty comment
+                    if let Node::Text(_) = end_item {
+                        stringifier.write_str("<!---->")?;
+                    }
+                    last_end_position = end_item.location_end();
+                }
+                Ok(())
+            })
+        })?;
     }
+
+    if !stringifier.minimize() {
+        if parent_end.line.saturating_sub(last_end_position.line) > 1 {
+            stringifier.empty_seperation_line()?;
+        }
+    }
+    Ok(())
 }
 
 impl StringifyLine for Node {
@@ -249,13 +277,18 @@ impl StringifyLine for Node {
     }
 }
 
-impl StringifyLine for Vec<Node> {
-    fn stringify_write<'s, 't, 'u, W: FmtWrite>(&self, stringifier: &mut StringifierLine<'s, 't, 'u, W>) -> FmtResult {
-        if let Some(value) = is_children_single_text(self, !stringifier.minimize()) {
-            value.stringify_write(stringifier)
-        } else {
-            stringifier.sub_block(self)
-        }
+fn children_inline_stringify_write<'s, 't, 'u, W: FmtWrite>(
+    children: &[Node],
+    parent_start: Position,
+    parent_end: Position,
+    stringifier: &mut StringifierLine<'s, 't, 'u, W>,
+) -> FmtResult {
+    if let Some(value) = is_children_single_text(children, !stringifier.minimize()) {
+        value.stringify_write(stringifier)
+    } else {
+        stringifier.write_sub_block(|stringifier| {
+            children_stringify_write(children, parent_start, parent_end, stringifier)
+        })
     }
 }
 
@@ -527,7 +560,7 @@ impl StringifyLine for Element {
                 stringifier.list(&list)?;
                 if !is_children_empty(children, !stringifier.minimize()) {
                     stringifier.write_token(">", None, &self.tag_location.start.1)?;
-                    stringifier.inline(children)?;
+                    children_inline_stringify_write(children, loc.start, loc.end, stringifier)?;
                     stringifier.write_token(
                         "<",
                         None,
@@ -565,7 +598,7 @@ impl StringifyLine for Element {
                 stringifier.list(&list)?;
                 if !is_children_empty(children, !stringifier.minimize()) {
                     stringifier.write_token(">", None, &self.tag_location.start.1)?;
-                    stringifier.inline(children)?;
+                    children_inline_stringify_write(children, loc.start, loc.end, stringifier)?;
                     stringifier.write_token(
                         "<",
                         None,
@@ -778,7 +811,12 @@ impl StringifyLine for Element {
         let children = self.children().unwrap_or(&empty_children);
         if !is_children_empty(children, !stringifier.minimize()) {
             stringifier.write_token(">", None, &self.tag_location.start.1)?;
-            stringifier.inline(children)?;
+            children_inline_stringify_write(
+                children,
+                self.tag_location.start.1.end,
+                self.tag_location.end.as_ref().unwrap_or(&self.tag_location.start).0.start,
+                stringifier,
+            )?;
             stringifier.write_token(
                 "<",
                 None,
@@ -968,14 +1006,14 @@ mod test {
 
     #[test]
     fn preserve_empty_lines_between_tags() {
-        let src = "<div> <span /> \n\n <span /> </div>";
+        let src = "<div> \n\n <span /> \n\n <span /> \n\n </div>";
         let (template, _) = crate::parse::parse("TEST", src);
         let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, Default::default());
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(
             output.as_str(),
-            "<div>\n    <span />\n\n    <span />\n</div>\n",
+            "<div>\n\n    <span />\n\n    <span />\n\n</div>\n",
         );
     }
 }
