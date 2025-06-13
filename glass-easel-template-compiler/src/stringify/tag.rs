@@ -1,5 +1,7 @@
 use std::{
-    borrow::Cow, fmt::{Result as FmtResult, Write as FmtWrite}, ops::Range
+    borrow::Cow,
+    fmt::{Result as FmtResult, Write as FmtWrite},
+    ops::Range,
 };
 
 use compact_str::CompactString;
@@ -119,7 +121,12 @@ impl Stringify for Template {
                         children_inline_stringify_write(
                             &t.content,
                             t.tag_location.start.1.end,
-                            t.tag_location.end.as_ref().unwrap_or(&t.tag_location.start).0.start,
+                            t.tag_location
+                                .end
+                                .as_ref()
+                                .unwrap_or(&t.tag_location.start)
+                                .0
+                                .start,
                             stringifier,
                         )?;
                         stringifier.write_token(
@@ -179,7 +186,12 @@ fn children_stringify_write<'s, 't, W: FmtWrite>(
         stringifier.new_scope_space(|stringifier| {
             // write an empty line if there is line gap in the source code
             if !stringifier.minimize() {
-                if item.location_start().line.saturating_sub(last_end_position.line) > 1 {
+                if item
+                    .location_start()
+                    .line
+                    .saturating_sub(last_end_position.line)
+                    > 1
+                {
                     stringifier.empty_seperation_line()?;
                 }
             }
@@ -199,7 +211,6 @@ fn children_stringify_write<'s, 't, W: FmtWrite>(
                 if !stringifier.minimize() {
                     let mut end_item = item;
                     while let Some(peek) = item_iter.peek() {
-
                         // for text nodes, write it
                         if let Node::Text(_) = peek {
                             end_item = item_iter.next().unwrap();
@@ -244,7 +255,10 @@ fn children_stringify_write<'s, 't, W: FmtWrite>(
 }
 
 impl StringifyLine for Node {
-    fn stringify_write<'s, 't, 'u, W: FmtWrite>(&self, stringifier: &mut StringifierLine<'s, 't, 'u, W>) -> FmtResult {
+    fn stringify_write<'s, 't, 'u, W: FmtWrite>(
+        &self,
+        stringifier: &mut StringifierLine<'s, 't, 'u, W>,
+    ) -> FmtResult {
         match self {
             Node::Text(value) => value.stringify_write(stringifier),
             Node::Element(element) => element.stringify_write(stringifier),
@@ -263,12 +277,14 @@ impl StringifyLine for Node {
                     }
                     stringifier.write_ident(name, true)?;
                 }
-                let list: Vec<_> = t.attributes.iter().map(|attr| {
-                    WriteAttrItem::CustomAttr {
+                let list: Vec<_> = t
+                    .attributes
+                    .iter()
+                    .map(|attr| WriteAttrItem::CustomAttr {
                         name: &attr.colon_separated_name,
                         value: attr.value.as_ref(),
-                    }
-                }).collect();
+                    })
+                    .collect();
                 stringifier.list(&list)?;
                 stringifier.write_str(r#">"#)?;
                 Ok(())
@@ -310,7 +326,9 @@ fn is_children_single_text(children: &[Node], preserve_comment: bool) -> Option<
         match n {
             Node::Comment(..) if !preserve_comment => {}
             Node::Text(x) => {
-                if ret.is_some() { return None; }
+                if ret.is_some() {
+                    return None;
+                }
                 ret = Some(x)
             }
             Node::Comment(..) | Node::Element(..) | Node::UnknownMetaTag(..) => {
@@ -339,7 +357,11 @@ fn write_slot_and_slot_values<'a, 's, 't, 'u, W: FmtWrite>(
         list.push(WriteAttrItem::SlotValue { attr, scope_name });
     }
     if let Some((loc, value)) = slot.as_ref() {
-        list.push(WriteAttrItem::NamedAttr { name: "slot", location: loc.clone(), value });
+        list.push(WriteAttrItem::NamedAttr {
+            name: "slot",
+            location: loc.clone(),
+            value,
+        });
     }
 }
 
@@ -356,12 +378,19 @@ fn write_common_attributes_without_slot<'a>(
         marks,
     } = common;
     if let Some((loc, value)) = id.as_ref() {
-        list.push(WriteAttrItem::NamedAttr { name: "id", location: loc.clone(), value });
+        list.push(WriteAttrItem::NamedAttr {
+            name: "id",
+            location: loc.clone(),
+            value,
+        });
     }
     for attr in data.iter() {
         let prefix = (
             "data",
-            attr.prefix_location.as_ref().unwrap_or(&attr.name.location).clone(),
+            attr.prefix_location
+                .as_ref()
+                .unwrap_or(&attr.name.location)
+                .clone(),
         );
         let item = WriteAttrItem::Attr {
             prefix: Some(prefix),
@@ -374,7 +403,10 @@ fn write_common_attributes_without_slot<'a>(
     for attr in marks.iter() {
         let prefix = (
             "mark",
-            attr.prefix_location.as_ref().unwrap_or(&attr.name.location).clone(),
+            attr.prefix_location
+                .as_ref()
+                .unwrap_or(&attr.name.location)
+                .clone(),
         );
         let item = WriteAttrItem::Attr {
             prefix: Some(prefix),
@@ -452,9 +484,16 @@ enum WriteAttrItem<'a> {
 }
 
 impl StringifyLine for WriteAttrItem<'_> {
-    fn stringify_write<'s, 't, 'u, W: FmtWrite>(&self, stringifier: &mut StringifierLine<'s, 't, 'u, W>) -> FmtResult {
+    fn stringify_write<'s, 't, 'u, W: FmtWrite>(
+        &self,
+        stringifier: &mut StringifierLine<'s, 't, 'u, W>,
+    ) -> FmtResult {
         match self {
-            Self::NamedAttr { name, location, value } => {
+            Self::NamedAttr {
+                name,
+                location,
+                value,
+            } => {
                 stringifier.write_token(name, Some(name), location)?;
                 if !is_empty_value(value) {
                     stringifier.write_str(r#"=""#)?;
@@ -462,14 +501,23 @@ impl StringifyLine for WriteAttrItem<'_> {
                     stringifier.write_str(r#"""#)?;
                 }
             }
-            Self::NamedStaticAttr { name, location, value } => {
+            Self::NamedStaticAttr {
+                name,
+                location,
+                value,
+            } => {
                 stringifier.write_token(name, Some(name), location)?;
                 if value.name.len() > 0 {
                     stringifier.write_str(r#"="#)?;
                     stringifier.write_str_name_quoted(value)?;
                 }
             }
-            Self::Attr { prefix, name, value, respect_none_value } => {
+            Self::Attr {
+                prefix,
+                name,
+                value,
+                respect_none_value,
+            } => {
                 if let Some((p, loc)) = prefix {
                     stringifier.write_token(p, None, loc)?;
                     stringifier.write_str(":")?;
@@ -488,7 +536,11 @@ impl StringifyLine for WriteAttrItem<'_> {
                     stringifier.write_str(r#"""#)?;
                 }
             }
-            Self::StaticAttr { prefix, name, value } => {
+            Self::StaticAttr {
+                prefix,
+                name,
+                value,
+            } => {
                 if let Some((p, loc)) = prefix {
                     stringifier.write_token(p, None, loc)?;
                     stringifier.write_str(":")?;
@@ -506,7 +558,11 @@ impl StringifyLine for WriteAttrItem<'_> {
                     attr.prefix_location.as_ref().unwrap_or(&attr.name.location),
                 )?;
                 stringifier.write_str(":")?;
-                stringifier.write_token(&attr.name.name, Some(&attr.name.name), &attr.name.location)?;
+                stringifier.write_token(
+                    &attr.name.name,
+                    Some(&attr.name.name),
+                    &attr.name.location,
+                )?;
                 if scope_name != &attr.name.name {
                     stringifier.write_str(r#"="#)?;
                     stringifier.write_str_name_quoted(&StrName {
@@ -537,7 +593,10 @@ impl StringifyLine for WriteAttrItem<'_> {
 impl StringifyItem for WriteAttrItem<'_> {}
 
 impl StringifyLine for Element {
-    fn stringify_write<'s, 't, 'u, W: FmtWrite>(&self, stringifier: &mut StringifierLine<'s, 't, 'u, W>) -> FmtResult {
+    fn stringify_write<'s, 't, 'u, W: FmtWrite>(
+        &self,
+        stringifier: &mut StringifierLine<'s, 't, 'u, W>,
+    ) -> FmtResult {
         // handle `wx:if`
         if let ElementKind::If {
             branches,
@@ -554,9 +613,11 @@ impl StringifyLine for Element {
                 } else {
                     "wx:elif"
                 };
-                let list = [
-                    WriteAttrItem::NamedAttr { name, location: loc.clone(), value },
-                ];
+                let list = [WriteAttrItem::NamedAttr {
+                    name,
+                    location: loc.clone(),
+                    value,
+                }];
                 stringifier.list(&list)?;
                 if !is_children_empty(children, !stringifier.minimize()) {
                     stringifier.write_token(">", None, &self.tag_location.start.1)?;
@@ -592,9 +653,10 @@ impl StringifyLine for Element {
             if let Some((loc, children)) = else_branch.as_ref() {
                 stringifier.write_token("<", None, &self.tag_location.start.0)?;
                 stringifier.write_str("block")?;
-                let list = [
-                    WriteAttrItem::NameOnly { name: "wx:else", location: loc.clone() },
-                ];
+                let list = [WriteAttrItem::NameOnly {
+                    name: "wx:else",
+                    location: loc.clone(),
+                }];
                 stringifier.list(&list)?;
                 if !is_children_empty(children, !stringifier.minimize()) {
                     stringifier.write_token(">", None, &self.tag_location.start.1)?;
@@ -647,7 +709,12 @@ impl StringifyLine for Element {
                 common,
             } => {
                 stringifier.write_ident(&tag_name, true)?;
-                write_slot_and_slot_values(stringifier, &mut attr_list, &common.slot, &common.slot_value_refs);
+                write_slot_and_slot_values(
+                    stringifier,
+                    &mut attr_list,
+                    &common.slot,
+                    &common.slot_value_refs,
+                );
                 match class {
                     ClassAttribute::None => {}
                     ClassAttribute::String(location, value) => {
@@ -669,7 +736,8 @@ impl StringifyLine for Element {
                     StyleAttribute::None => {}
                     StyleAttribute::String(location, value) => {
                         attr_list.push(WriteAttrItem::Attr {
-                            prefix: None, name: Cow::Owned(Ident {
+                            prefix: None,
+                            name: Cow::Owned(Ident {
                                 name: "style".into(),
                                 location: location.clone(),
                             }),
@@ -698,7 +766,10 @@ impl StringifyLine for Element {
                 for attr in change_attributes.iter() {
                     let prefix = (
                         "change",
-                        attr.prefix_location.as_ref().unwrap_or(&attr.name.location).clone(),
+                        attr.prefix_location
+                            .as_ref()
+                            .unwrap_or(&attr.name.location)
+                            .clone(),
                     );
                     attr_list.push(WriteAttrItem::Attr {
                         prefix: Some(prefix),
@@ -710,7 +781,10 @@ impl StringifyLine for Element {
                 for attr in worklet_attributes.iter() {
                     let prefix = (
                         "worklet",
-                        attr.prefix_location.as_ref().unwrap_or(&attr.name.location).clone(),
+                        attr.prefix_location
+                            .as_ref()
+                            .unwrap_or(&attr.name.location)
+                            .clone(),
                     );
                     attr_list.push(WriteAttrItem::StaticAttr {
                         prefix: Some(prefix),
@@ -721,7 +795,10 @@ impl StringifyLine for Element {
                 for attr in generics.iter() {
                     let prefix = (
                         "generic",
-                        attr.prefix_location.as_ref().unwrap_or(&attr.name.location).clone(),
+                        attr.prefix_location
+                            .as_ref()
+                            .unwrap_or(&attr.name.location)
+                            .clone(),
                     );
                     attr_list.push(WriteAttrItem::StaticAttr {
                         prefix: Some(prefix),
@@ -732,7 +809,10 @@ impl StringifyLine for Element {
                 for attr in extra_attr.iter() {
                     let prefix = (
                         "extra-attr",
-                        attr.prefix_location.as_ref().unwrap_or(&attr.name.location).clone(),
+                        attr.prefix_location
+                            .as_ref()
+                            .unwrap_or(&attr.name.location)
+                            .clone(),
                     );
                     attr_list.push(WriteAttrItem::StaticAttr {
                         prefix: Some(prefix),
@@ -758,15 +838,31 @@ impl StringifyLine for Element {
                 children: _,
             } => {
                 stringifier.write_str("block")?;
-                attr_list.push(WriteAttrItem::NamedAttr { name: "wx:for", location: list.0.clone(), value: &list.1 });
+                attr_list.push(WriteAttrItem::NamedAttr {
+                    name: "wx:for",
+                    location: list.0.clone(),
+                    value: &list.1,
+                });
                 if item_name.1.name.as_str() != DEFAULT_FOR_ITEM_SCOPE_NAME {
-                    attr_list.push(WriteAttrItem::NamedStaticAttr { name: "wx:for-item", location: item_name.0.clone(), value: &item_name.1 });
+                    attr_list.push(WriteAttrItem::NamedStaticAttr {
+                        name: "wx:for-item",
+                        location: item_name.0.clone(),
+                        value: &item_name.1,
+                    });
                 }
                 if index_name.1.name.as_str() != DEFAULT_FOR_INDEX_SCOPE_NAME {
-                    attr_list.push(WriteAttrItem::NamedStaticAttr { name: "wx:for-index", location: index_name.0.clone(), value: &index_name.1 });
+                    attr_list.push(WriteAttrItem::NamedStaticAttr {
+                        name: "wx:for-index",
+                        location: index_name.0.clone(),
+                        value: &index_name.1,
+                    });
                 }
                 if !key.1.name.is_empty() {
-                    attr_list.push(WriteAttrItem::NamedStaticAttr { name: "wx:key", location: key.0.clone(), value: &key.1 });
+                    attr_list.push(WriteAttrItem::NamedStaticAttr {
+                        name: "wx:key",
+                        location: key.0.clone(),
+                        value: &key.1,
+                    });
                 }
                 stringifier.add_scope(&item_name.1.name);
                 stringifier.add_scope(&index_name.1.name);
@@ -774,14 +870,26 @@ impl StringifyLine for Element {
             ElementKind::If { .. } => unreachable!(),
             ElementKind::TemplateRef { target, data } => {
                 stringifier.write_str("template")?;
-                attr_list.push(WriteAttrItem::NamedAttr { name: "is", location: target.0.clone(), value: &target.1 });
+                attr_list.push(WriteAttrItem::NamedAttr {
+                    name: "is",
+                    location: target.0.clone(),
+                    value: &target.1,
+                });
                 if !data.1.is_empty() {
-                    attr_list.push(WriteAttrItem::NamedAttr { name: "data", location: data.0.clone(), value: &data.1 });
+                    attr_list.push(WriteAttrItem::NamedAttr {
+                        name: "data",
+                        location: data.0.clone(),
+                        value: &data.1,
+                    });
                 }
             }
             ElementKind::Include { path } => {
                 stringifier.write_str("include")?;
-                attr_list.push(WriteAttrItem::NamedStaticAttr { name: "src", location: path.0.clone(), value: &path.1 })
+                attr_list.push(WriteAttrItem::NamedStaticAttr {
+                    name: "src",
+                    location: path.0.clone(),
+                    value: &path.1,
+                })
             }
             ElementKind::Slot {
                 name,
@@ -789,9 +897,18 @@ impl StringifyLine for Element {
                 common,
             } => {
                 stringifier.write_str("slot")?;
-                write_slot_and_slot_values(stringifier, &mut attr_list, &common.slot, &common.slot_value_refs);
+                write_slot_and_slot_values(
+                    stringifier,
+                    &mut attr_list,
+                    &common.slot,
+                    &common.slot_value_refs,
+                );
                 if !name.1.is_empty() {
-                    attr_list.push(WriteAttrItem::NamedAttr { name: "name", location: name.0.clone(), value: &name.1 });
+                    attr_list.push(WriteAttrItem::NamedAttr {
+                        name: "name",
+                        location: name.0.clone(),
+                        value: &name.1,
+                    });
                 }
                 for attr in values.iter() {
                     attr_list.push(WriteAttrItem::Attr {
@@ -814,7 +931,12 @@ impl StringifyLine for Element {
             children_inline_stringify_write(
                 children,
                 self.tag_location.start.1.end,
-                self.tag_location.end.as_ref().unwrap_or(&self.tag_location.start).0.start,
+                self.tag_location
+                    .end
+                    .as_ref()
+                    .unwrap_or(&self.tag_location.start)
+                    .0
+                    .start,
                 stringifier,
             )?;
             stringifier.write_token(
@@ -867,7 +989,10 @@ impl StringifyLine for Element {
 }
 
 impl StringifyLine for Value {
-    fn stringify_write<'s, 't, 'u, W: FmtWrite>(&self, stringifier: &mut StringifierLine<'s, 't, 'u, W>) -> FmtResult {
+    fn stringify_write<'s, 't, 'u, W: FmtWrite>(
+        &self,
+        stringifier: &mut StringifierLine<'s, 't, 'u, W>,
+    ) -> FmtResult {
         match self {
             Self::Static { value, location } => {
                 let quoted = escape_html_body(&value);
@@ -878,28 +1003,44 @@ impl StringifyLine for Value {
                 double_brace_location: _,
                 binding_map_keys: _,
             } => {
-                expression.for_each_static_or_dynamic_part(
-                    |value, location| {
-                        match value {
-                            Expression::LitStr { value, location } => {
-                                stringifier.write_token(&escape_html_body(value), None, location)?;
-                                return Ok(());
-                            }
-                            Expression::ToStringWithoutUndefined { value, location } => {
-                                stringifier.write_token_state("{{", None, &location, StringifierLineState::DoubleBraceStart)?;
-                                StringifyLine::stringify_write(&**value, stringifier)?;
-                                stringifier.write_token_state("}}", None, &location, StringifierLineState::DoubleBraceEnd)?;
-                                return Ok(());
-                            }
-                            _ => {
-                                stringifier.write_token_state("{{", None, &location, StringifierLineState::DoubleBraceStart)?;
-                                StringifyLine::stringify_write(value, stringifier)?;
-                                stringifier.write_token_state("}}", None, &location, StringifierLineState::DoubleBraceEnd)?;
-                                return Ok(());
-                            }
-                        }
-                    },
-                )?;
+                expression.for_each_static_or_dynamic_part(|value, location| match value {
+                    Expression::LitStr { value, location } => {
+                        stringifier.write_token(&escape_html_body(value), None, location)?;
+                        return Ok(());
+                    }
+                    Expression::ToStringWithoutUndefined { value, location } => {
+                        stringifier.write_token_state(
+                            "{{",
+                            None,
+                            &location,
+                            StringifierLineState::DoubleBraceStart,
+                        )?;
+                        StringifyLine::stringify_write(&**value, stringifier)?;
+                        stringifier.write_token_state(
+                            "}}",
+                            None,
+                            &location,
+                            StringifierLineState::DoubleBraceEnd,
+                        )?;
+                        return Ok(());
+                    }
+                    _ => {
+                        stringifier.write_token_state(
+                            "{{",
+                            None,
+                            &location,
+                            StringifierLineState::DoubleBraceStart,
+                        )?;
+                        StringifyLine::stringify_write(value, stringifier)?;
+                        stringifier.write_token_state(
+                            "}}",
+                            None,
+                            &location,
+                            StringifierLineState::DoubleBraceEnd,
+                        )?;
+                        return Ok(());
+                    }
+                })?;
             }
         }
         Ok(())
@@ -914,7 +1055,8 @@ mod test {
     fn text_node() {
         let src = r#" text <div> text <span/> </div>"#;
         let (template, _) = crate::parse::parse("TEST", src);
-        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, Default::default());
+        let mut stringifier =
+            crate::stringify::Stringifier::new(String::new(), "test", src, Default::default());
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(
@@ -927,21 +1069,23 @@ mod test {
     fn comment_around_text_node() {
         let src = r#"<!----> text <!---->"#;
         let (template, _) = crate::parse::parse("TEST", src);
-        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, Default::default());
+        let mut stringifier =
+            crate::stringify::Stringifier::new(String::new(), "test", src, Default::default());
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
-        assert_eq!(
-            output.as_str(),
-            "<!----> text <!---->\n",
-        );
+        assert_eq!(output.as_str(), "<!----> text <!---->\n",);
     }
 
     #[test]
     fn meta_tag() {
         let src = r#"<!META a={{123}}> <!META data:a="123" data:b="456">"#;
         let (template, _) = crate::parse::parse("TEST", src);
-        let options = StringifyOptions { line_width_limit: 30, ..Default::default() };
-        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, options);
+        let options = StringifyOptions {
+            line_width_limit: 30,
+            ..Default::default()
+        };
+        let mut stringifier =
+            crate::stringify::Stringifier::new(String::new(), "test", src, options);
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(
@@ -954,8 +1098,12 @@ mod test {
     fn normal_tag() {
         let src = r#"<div a={{123}} /> <div data:a="123" data:b="456" />"#;
         let (template, _) = crate::parse::parse("TEST", src);
-        let options = StringifyOptions { line_width_limit: 30, ..Default::default() };
-        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, options);
+        let options = StringifyOptions {
+            line_width_limit: 30,
+            ..Default::default()
+        };
+        let mut stringifier =
+            crate::stringify::Stringifier::new(String::new(), "test", src, options);
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(
@@ -968,7 +1116,8 @@ mod test {
     fn comment() {
         let src = r#"<div> <!--TEST--> abc </div>"#;
         let (template, _) = crate::parse::parse("TEST", src);
-        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, Default::default());
+        let mut stringifier =
+            crate::stringify::Stringifier::new(String::new(), "test", src, Default::default());
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(
@@ -981,21 +1130,23 @@ mod test {
     fn comment_minimized() {
         let src = r#"<div> <!--TEST--> <span /> </div>"#;
         let (template, _) = crate::parse::parse("TEST", src);
-        let options = StringifyOptions { minimize: true, ..Default::default() };
-        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, options);
+        let options = StringifyOptions {
+            minimize: true,
+            ..Default::default()
+        };
+        let mut stringifier =
+            crate::stringify::Stringifier::new(String::new(), "test", src, options);
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
-        assert_eq!(
-            output.as_str(),
-            "<div><span/></div>",
-        );
+        assert_eq!(output.as_str(), "<div><span/></div>",);
     }
 
     #[test]
     fn line_end_comments() {
         let src = r#"<div> abc <!-- 1 --> <span /> <!-- 2 --> <span> <!-- 3 --> </span> </div>"#;
         let (template, _) = crate::parse::parse("TEST", src);
-        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, Default::default());
+        let mut stringifier =
+            crate::stringify::Stringifier::new(String::new(), "test", src, Default::default());
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(
@@ -1008,7 +1159,8 @@ mod test {
     fn preserve_empty_lines_between_tags() {
         let src = "<div> \n\n <span /> \n\n <span /> \n\n </div>";
         let (template, _) = crate::parse::parse("TEST", src);
-        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, Default::default());
+        let mut stringifier =
+            crate::stringify::Stringifier::new(String::new(), "test", src, Default::default());
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(

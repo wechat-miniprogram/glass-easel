@@ -1205,22 +1205,22 @@ impl Expression {
     }
 
     /// Split the expression into static and dynamic parts.
-    /// 
+    ///
     /// While parsing, text content and attribute values that has "partial" expressions
     /// will be parsed to an `Value` with static and dynamic parts.
-    /// 
+    ///
     /// For example, `Hello {{ var }}!` can be split into 3 parts:
-    /// 
+    ///
     /// * static part `Hello `;
     /// * dynamic part `{{ var }}`;
     /// * static part `!`.
-    /// 
+    ///
     /// They are called back through `part` in order.
     /// The static part is wrapped in an `Expression::LitStr`,
     /// while the dynamic part is wrapped in an `Expression::ToStringWithoutUndefined`.
     /// Other `Expression` variants suggest the expression is invalid.
     /// The second argument of the `part` is the location of static part or `{{ ... }}`.
-    /// 
+    ///
     /// The function ends when any callback returns `Err`.
     pub fn for_each_static_or_dynamic_part<E>(
         &self,
@@ -1248,11 +1248,11 @@ impl Expression {
                 location: _,
             } => {
                 let split = if let Expression::ToStringWithoutUndefined { .. }
-                    | Expression::LitStr { .. } = &**left
+                | Expression::LitStr { .. } = &**left
                 {
                     true
                 } else if let Expression::ToStringWithoutUndefined { .. }
-                    | Expression::LitStr { .. } = &**right
+                | Expression::LitStr { .. } = &**right
                 {
                     true
                 } else {
@@ -1266,9 +1266,7 @@ impl Expression {
                 }
                 Ok(())
             }
-            _ => {
-                part(self, self.location())
-            }
+            _ => part(self, self.location()),
         }
     }
 
@@ -2162,7 +2160,8 @@ mod test {
                         minimize: true,
                         ..Default::default()
                     };
-                    let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, options);
+                    let mut stringifier =
+                        crate::stringify::Stringifier::new(String::new(), "test", src, options);
                     x.stringify_write(&mut stringifier).unwrap();
                     let (s, _) = stringifier.finish();
                     s

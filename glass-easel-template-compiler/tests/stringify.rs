@@ -1,4 +1,4 @@
-use glass_easel_template_compiler::{TmplGroup, stringify::Stringifier};
+use glass_easel_template_compiler::{stringify::Stringifier, TmplGroup};
 
 #[test]
 fn stringifier() {
@@ -10,5 +10,8 @@ fn stringifier() {
     Stringifier::new(&mut out, "a", SRC_A, Default::default())
         .run(tmpl)
         .unwrap();
-    assert_eq!(out, "<!META>\n<div>\n    <span> Hello world! </span>\n</div>\n");
+    assert_eq!(
+        out,
+        "<!META>\n<div>\n    <span> Hello world! </span>\n</div>\n"
+    );
 }

@@ -1,11 +1,13 @@
 use std::{
-    fmt::{Result as FmtResult, Write as FmtWrite}, ops::Range
+    fmt::{Result as FmtResult, Write as FmtWrite},
+    ops::Range,
 };
 
 use compact_str::CompactString;
 pub use sourcemap::SourceMap;
 use sourcemap::SourceMapBuilder;
 
+use super::StringifyOptions;
 use crate::{
     escape::escape_html_quote,
     parse::{
@@ -13,7 +15,6 @@ use crate::{
         Position, TemplateStructure,
     },
 };
-use super::StringifyOptions;
 
 pub struct Stringifier<'s, W: FmtWrite> {
     w: W,
@@ -53,8 +54,15 @@ impl<'s, W: FmtWrite> Stringifier<'s, W> {
         s.stringify_write(self)
     }
 
-    pub(super) fn block(&mut self, f: impl FnOnce(&mut StringifierBlock<'s, '_, W>) -> FmtResult) -> FmtResult {
-        let mut b = StringifierBlock { top: self, indent_level: 0, scope_names: &mut vec![] };
+    pub(super) fn block(
+        &mut self,
+        f: impl FnOnce(&mut StringifierBlock<'s, '_, W>) -> FmtResult,
+    ) -> FmtResult {
+        let mut b = StringifierBlock {
+            top: self,
+            indent_level: 0,
+            scope_names: &mut vec![],
+        };
         let ret = f(&mut b);
         ret
     }
@@ -82,7 +90,10 @@ pub struct StringifierBlock<'s, 't, W: FmtWrite> {
 
 impl<'s, 't, W: FmtWrite> StringifierBlock<'s, 't, W> {
     pub(super) fn current_position(&self) -> Position {
-        Position { line: self.top.line, utf16_col: self.top.utf16_col }
+        Position {
+            line: self.top.line,
+            utf16_col: self.top.utf16_col,
+        }
     }
 
     pub(super) fn minimize(&self) -> bool {
@@ -106,7 +117,10 @@ impl<'s, 't, W: FmtWrite> StringifierBlock<'s, 't, W> {
             .unwrap_or("__INVALID_SCOPE_NAME__")
     }
 
-    pub(super) fn new_scope_space(&mut self, f: impl FnOnce(&mut StringifierBlock<'s, '_, W>) -> FmtResult) -> FmtResult {
+    pub(super) fn new_scope_space(
+        &mut self,
+        f: impl FnOnce(&mut StringifierBlock<'s, '_, W>) -> FmtResult,
+    ) -> FmtResult {
         let scope_names_len = self.scope_names.len();
         let ret = {
             let mut b = StringifierBlock {
@@ -120,7 +134,10 @@ impl<'s, 't, W: FmtWrite> StringifierBlock<'s, 't, W> {
         ret
     }
 
-    pub(super) fn write_sub_block(&mut self, f: impl FnOnce(&mut StringifierBlock<W>) -> FmtResult) -> FmtResult {
+    pub(super) fn write_sub_block(
+        &mut self,
+        f: impl FnOnce(&mut StringifierBlock<W>) -> FmtResult,
+    ) -> FmtResult {
         let mut b = StringifierBlock {
             top: self.top,
             indent_level: self.indent_level + 1,
@@ -144,7 +161,10 @@ impl<'s, 't, W: FmtWrite> StringifierBlock<'s, 't, W> {
         Ok(())
     }
 
-    pub(super) fn write_line(&mut self, f: impl FnOnce(&mut StringifierLine<'s, 't, '_, W>) -> FmtResult) -> FmtResult {
+    pub(super) fn write_line(
+        &mut self,
+        f: impl FnOnce(&mut StringifierLine<'s, 't, '_, W>) -> FmtResult,
+    ) -> FmtResult {
         self.write_indent()?;
         {
             let mut b = StringifierLine {
@@ -161,7 +181,7 @@ impl<'s, 't, W: FmtWrite> StringifierBlock<'s, 't, W> {
 
     pub(super) fn empty_seperation_line(&mut self) -> FmtResult {
         if self.top.line == 0 {
-            return Ok(())
+            return Ok(());
         }
         if !self.top.options.minimize {
             self.top.write_str("\n")?;
@@ -170,9 +190,7 @@ impl<'s, 't, W: FmtWrite> StringifierBlock<'s, 't, W> {
     }
 
     pub(super) fn line(&mut self, t: &impl StringifyLine) -> FmtResult {
-        self.write_line(|s| {
-            t.stringify_write(s)
-        })
+        self.write_line(|s| t.stringify_write(s))
     }
 }
 
@@ -217,7 +235,11 @@ impl<'s, 't, 'u, W: FmtWrite> StringifierLine<'s, 't, 'u, W> {
         self.block.add_scope(name)
     }
 
-    pub(super) fn write_scope_name(&mut self, index: usize, location: &Range<Position>) -> FmtResult {
+    pub(super) fn write_scope_name(
+        &mut self,
+        index: usize,
+        location: &Range<Position>,
+    ) -> FmtResult {
         let name = self.block.get_scope_name(index).to_string();
         self.write_token(&name, Some(&name), location)
     }
@@ -300,7 +322,10 @@ impl<'s, 't, 'u, W: FmtWrite> StringifierLine<'s, 't, 'u, W> {
                 items: &'a [T],
             }
             impl<'a, T: StringifyItem> StringifyBlock for List<'a, T> {
-                fn stringify_write<'s, 't, W: FmtWrite>(&self, stringifier: &mut StringifierBlock<'s, 't, W>) -> FmtResult {
+                fn stringify_write<'s, 't, W: FmtWrite>(
+                    &self,
+                    stringifier: &mut StringifierBlock<'s, 't, W>,
+                ) -> FmtResult {
                     for item in self.items {
                         stringifier.line(item)?;
                     }
@@ -317,7 +342,10 @@ impl<'s, 't, 'u, W: FmtWrite> StringifierLine<'s, 't, 'u, W> {
         Ok(())
     }
 
-    pub(super) fn write_sub_block(&mut self, f: impl FnOnce(&mut StringifierBlock<W>) -> FmtResult) -> FmtResult {
+    pub(super) fn write_sub_block(
+        &mut self,
+        f: impl FnOnce(&mut StringifierBlock<W>) -> FmtResult,
+    ) -> FmtResult {
         if !self.block.top.options.minimize {
             self.write_str("\n")?;
         }
@@ -376,11 +404,17 @@ pub trait Stringify {
 }
 
 pub trait StringifyBlock {
-    fn stringify_write<'s, 't, W: FmtWrite>(&self, stringifier: &mut StringifierBlock<'s, 't, W>) -> FmtResult;
+    fn stringify_write<'s, 't, W: FmtWrite>(
+        &self,
+        stringifier: &mut StringifierBlock<'s, 't, W>,
+    ) -> FmtResult;
 }
 
 pub trait StringifyLine {
-    fn stringify_write<'s, 't, 'u, W: FmtWrite>(&self, stringifier: &mut StringifierLine<'s, 't, 'u, W>) -> FmtResult;
+    fn stringify_write<'s, 't, 'u, W: FmtWrite>(
+        &self,
+        stringifier: &mut StringifierLine<'s, 't, 'u, W>,
+    ) -> FmtResult;
 }
 
 pub trait StringifyItem: StringifyLine + Sized {
@@ -402,11 +436,8 @@ pub trait StringifyItem: StringifyLine + Sized {
             source_path: stringifier.source_path,
             options: stringifier.options,
         };
-        top.block(|block| {
-            block.write_line(|stringifier| {
-                stringifier.inline(self)
-            })
-        }).ok()?;
+        top.block(|block| block.write_line(|stringifier| stringifier.inline(self)))
+            .ok()?;
         Some(top.w.count)
     }
 }

@@ -808,9 +808,12 @@ impl Element {
                                 "for-index" => AttrPrefixKind::WxForIndex(x.location()),
                                 "for-item" => AttrPrefixKind::WxForItem(x.location()),
                                 "for-items" => {
-                                    ps.add_warning(ParseErrorKind::DeprecatedAttribute, x.location());
+                                    ps.add_warning(
+                                        ParseErrorKind::DeprecatedAttribute,
+                                        x.location(),
+                                    );
                                     AttrPrefixKind::WxFor(x.location())
-                                },
+                                }
                                 "key" => AttrPrefixKind::WxKey(x.location()),
                                 _ => AttrPrefixKind::Invalid(segs.first().unwrap().location()),
                             },
@@ -4139,7 +4142,8 @@ mod test {
             minimize: true,
             ..Default::default()
         };
-        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, options);
+        let mut stringifier =
+            crate::stringify::Stringifier::new(String::new(), "test", src, options);
         template.stringify_write(&mut stringifier).unwrap();
         let (stringify_result, _sourcemap) = stringifier.finish();
         assert_eq!(stringify_result.as_str(), expect);

@@ -128,7 +128,11 @@ impl TmplGroup {
     }
 
     #[wasm_bindgen(js_name = "getInlineScriptStartLine")]
-    pub fn get_inline_script_start_line(&self, path: &str, module_name: &str) -> Result<u32, JsError> {
+    pub fn get_inline_script_start_line(
+        &self,
+        path: &str,
+        module_name: &str,
+    ) -> Result<u32, JsError> {
         let start_line = self.group.inline_script_start_line(path, module_name)?;
         Ok(start_line)
     }

@@ -1,4 +1,3 @@
-
 /// The options for the stringifier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StringifyOptions {
@@ -9,7 +8,7 @@ pub struct StringifyOptions {
     pub mangling: bool,
 
     /// Output minimized code or not.
-    /// 
+    ///
     /// If `true`, other options about formatting are ignored.
     /// Comments are also skipped.
     pub minimize: bool,
@@ -21,7 +20,7 @@ pub struct StringifyOptions {
     pub use_tab_character: bool,
 
     /// The preferred max line width.
-    /// 
+    ///
     /// Note that lines may exceed this limit when it is not possible.
     pub line_width_limit: u32,
 }
@@ -47,23 +46,27 @@ mod test {
     fn source_map_disabled() {
         let src = r#"<div />"#;
         let (template, _) = crate::parse::parse("TEST", src);
-        let options = StringifyOptions { ..Default::default() };
-        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, options);
+        let options = StringifyOptions {
+            ..Default::default()
+        };
+        let mut stringifier =
+            crate::stringify::Stringifier::new(String::new(), "test", src, options);
         template.stringify_write(&mut stringifier).unwrap();
         let (output, sourcemap) = stringifier.finish();
         assert!(sourcemap.is_none());
-        assert_eq!(
-            output.as_str(),
-            "<div />\n",
-        );
+        assert_eq!(output.as_str(), "<div />\n",);
     }
 
     #[test]
     fn tab_size() {
         let src = r#"<div><span><a/></span></div>"#;
         let (template, _) = crate::parse::parse("TEST", src);
-        let options = StringifyOptions { tab_size: 2, ..Default::default() };
-        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, options);
+        let options = StringifyOptions {
+            tab_size: 2,
+            ..Default::default()
+        };
+        let mut stringifier =
+            crate::stringify::Stringifier::new(String::new(), "test", src, options);
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(
@@ -76,8 +79,12 @@ mod test {
     fn use_tab_character() {
         let src = r#"<div><span><a/></span></div>"#;
         let (template, _) = crate::parse::parse("TEST", src);
-        let options = StringifyOptions { use_tab_character: true, ..Default::default() };
-        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, options);
+        let options = StringifyOptions {
+            use_tab_character: true,
+            ..Default::default()
+        };
+        let mut stringifier =
+            crate::stringify::Stringifier::new(String::new(), "test", src, options);
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(
@@ -90,8 +97,12 @@ mod test {
     fn line_width_limit() {
         let src = r#"<div data:a="this is a long string"></div><div data:a="but short"></div>"#;
         let (template, _) = crate::parse::parse("TEST", src);
-        let options = StringifyOptions { line_width_limit: 30, ..Default::default() };
-        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, options);
+        let options = StringifyOptions {
+            line_width_limit: 30,
+            ..Default::default()
+        };
+        let mut stringifier =
+            crate::stringify::Stringifier::new(String::new(), "test", src, options);
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(
@@ -109,8 +120,13 @@ mod test {
             </template>
         "#;
         let (template, _) = crate::parse::parse("TEST", src);
-        let options = StringifyOptions { source_map: true, minimize: true, ..Default::default() };
-        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, options);
+        let options = StringifyOptions {
+            source_map: true,
+            minimize: true,
+            ..Default::default()
+        };
+        let mut stringifier =
+            crate::stringify::Stringifier::new(String::new(), "test", src, options);
         template.stringify_write(&mut stringifier).unwrap();
         let (output, sourcemap) = stringifier.finish();
         assert_eq!(
@@ -163,8 +179,12 @@ mod test {
             </template>
         "#;
         let (template, _) = crate::parse::parse("TEST", src);
-        let options = StringifyOptions { source_map: true, ..Default::default() };
-        let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, options);
+        let options = StringifyOptions {
+            source_map: true,
+            ..Default::default()
+        };
+        let mut stringifier =
+            crate::stringify::Stringifier::new(String::new(), "test", src, options);
         template.stringify_write(&mut stringifier).unwrap();
         let (output, sourcemap) = stringifier.finish();
         assert_eq!(
