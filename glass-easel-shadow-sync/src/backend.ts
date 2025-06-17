@@ -499,8 +499,9 @@ export class ShadowDomBackendContext implements GlassEaselBackend.Context {
     channel.onEvent(
       (type, detail, options) => this._createEvent!(type, detail, options),
       (event, currentTargetId, mark, targetId, isCapture) => {
-        const currentTarget = this._elementIdMap[currentTargetId]!.__wxElement as Element
-        const target = this._elementIdMap[targetId]!.__wxElement as Element
+        const currentTarget = this._elementIdMap[currentTargetId]?.__wxElement as Element
+        const target = this._elementIdMap[targetId]?.__wxElement as Element
+        if (!currentTarget || !target) return
 
         this._triggerEvent!(event, currentTarget, mark, target, isCapture)
       },
