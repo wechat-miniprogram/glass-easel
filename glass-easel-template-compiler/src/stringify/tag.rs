@@ -456,7 +456,7 @@ enum WriteAttrItem<'a> {
     NamedStaticAttr {
         name: &'a str,
         location: Range<Position>,
-        value: &'a StrName,
+        value: Cow<'a, StrName>,
     },
     Attr {
         prefix: Option<(&'a str, Range<Position>)>,
@@ -706,6 +706,7 @@ impl StringifyLine for Element {
                 children: _,
                 generics,
                 extra_attr,
+                let_vars,
                 common,
             } => {
                 stringifier.write_ident(&tag_name, true)?;
@@ -715,6 +716,29 @@ impl StringifyLine for Element {
                     &common.slot,
                     &common.slot_value_refs,
                 );
+                for attr in let_vars.iter() {
+                    let scope_name = stringifier.add_scope(&attr.name.name);
+                    let prefix = (
+                        "let",
+                        attr.prefix_location
+                            .as_ref()
+                            .unwrap_or(&attr.name.location)
+                            .clone(),
+                    );
+                    attr_list.push(WriteAttrItem::Attr {
+                        prefix: Some(prefix),
+                        name: if scope_name != &attr.name.name {
+                            Cow::Owned(Ident {
+                                name: scope_name.clone(),
+                                location: attr.name.location(),
+                            })
+                        } else {
+                            Cow::Borrowed(&attr.name)
+                        },
+                        value: attr.value.as_ref(),
+                        respect_none_value: false,
+                    });
+                }
                 match class {
                     ClassAttribute::None => {}
                     ClassAttribute::String(location, value) => {
@@ -826,9 +850,25 @@ impl StringifyLine for Element {
                 children: _,
                 slot,
                 slot_value_refs,
+                let_vars,
             } => {
                 stringifier.write_str("block")?;
                 write_slot_and_slot_values(stringifier, &mut attr_list, slot, slot_value_refs);
+                for attr in let_vars.iter() {
+                    let prefix = (
+                        "let",
+                        attr.prefix_location
+                            .as_ref()
+                            .unwrap_or(&attr.name.location)
+                            .clone(),
+                    );
+                    attr_list.push(WriteAttrItem::Attr {
+                        prefix: Some(prefix),
+                        name: Cow::Borrowed(&attr.name),
+                        value: attr.value.as_ref(),
+                        respect_none_value: false,
+                    });
+                }
             }
             ElementKind::For {
                 list,
@@ -843,29 +883,43 @@ impl StringifyLine for Element {
                     location: list.0.clone(),
                     value: &list.1,
                 });
-                if item_name.1.name.as_str() != DEFAULT_FOR_ITEM_SCOPE_NAME {
+                let item_scope_name = stringifier.add_scope(&item_name.1.name);
+                if item_scope_name.as_str() != DEFAULT_FOR_ITEM_SCOPE_NAME {
                     attr_list.push(WriteAttrItem::NamedStaticAttr {
                         name: "wx:for-item",
                         location: item_name.0.clone(),
-                        value: &item_name.1,
+                        value: if item_scope_name != &item_name.1.name {
+                            Cow::Owned(StrName {
+                                name: item_scope_name.clone(),
+                                location: item_name.1.location(),
+                            })
+                        } else {
+                            Cow::Borrowed(&item_name.1)
+                        },
                     });
                 }
-                if index_name.1.name.as_str() != DEFAULT_FOR_INDEX_SCOPE_NAME {
+                let index_scope_name = stringifier.add_scope(&index_name.1.name);
+                if index_scope_name.as_str() != DEFAULT_FOR_INDEX_SCOPE_NAME {
                     attr_list.push(WriteAttrItem::NamedStaticAttr {
                         name: "wx:for-index",
                         location: index_name.0.clone(),
-                        value: &index_name.1,
+                        value: if index_scope_name != &index_name.1.name {
+                            Cow::Owned(StrName {
+                                name: index_scope_name.clone(),
+                                location: index_name.1.location(),
+                            })
+                        } else {
+                            Cow::Borrowed(&index_name.1)
+                        },
                     });
                 }
                 if !key.1.name.is_empty() {
                     attr_list.push(WriteAttrItem::NamedStaticAttr {
                         name: "wx:key",
                         location: key.0.clone(),
-                        value: &key.1,
+                        value: Cow::Borrowed(&key.1),
                     });
                 }
-                stringifier.add_scope(&item_name.1.name);
-                stringifier.add_scope(&index_name.1.name);
             }
             ElementKind::If { .. } => unreachable!(),
             ElementKind::TemplateRef { target, data } => {
@@ -888,7 +942,7 @@ impl StringifyLine for Element {
                 attr_list.push(WriteAttrItem::NamedStaticAttr {
                     name: "src",
                     location: path.0.clone(),
-                    value: &path.1,
+                    value: Cow::Borrowed(&path.1),
                 })
             }
             ElementKind::Slot {

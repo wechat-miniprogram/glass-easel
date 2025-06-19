@@ -528,6 +528,7 @@ impl Element {
                 children,
                 generics,
                 extra_attr,
+                let_vars,
                 common,
             } => {
                 let slot_kind = SlotKind::new(&common.slot, w, scopes)?;
@@ -666,6 +667,7 @@ impl Element {
             }
             ElementKind::Pure {
                 children,
+                let_vars,
                 slot,
                 slot_value_refs: _,
             } => {
