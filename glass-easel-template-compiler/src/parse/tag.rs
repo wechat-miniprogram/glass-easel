@@ -106,7 +106,7 @@ impl Template {
                 binding_map_collector: BindingMapCollector::new(),
             };
             for node in &mut sub.content {
-                node.init_scopes_and_binding_map_keys(&mut sas);
+                node.init_scopes_and_binding_map_keys(ps, &mut sas);
             }
         }
         let mut sas = ScopeAnalyzeState {
@@ -122,7 +122,7 @@ impl Template {
             binding_map_collector: BindingMapCollector::new(),
         };
         for node in &mut content {
-            node.init_scopes_and_binding_map_keys(&mut sas);
+            node.init_scopes_and_binding_map_keys(ps, &mut sas);
         }
         globals.binding_map_collector = sas.binding_map_collector;
 
@@ -372,13 +372,13 @@ impl Node {
         }
     }
 
-    fn init_scopes_and_binding_map_keys(&mut self, sas: &mut ScopeAnalyzeState) {
+    fn init_scopes_and_binding_map_keys(&mut self, ps: &mut ParseState, sas: &mut ScopeAnalyzeState) {
         match self {
             Self::Text(value) => {
                 value.init_scopes_and_binding_map_keys(sas, false);
             }
             Self::Element(x) => {
-                x.init_scopes_and_binding_map_keys(sas);
+                x.init_scopes_and_binding_map_keys(ps, sas);
             }
             Self::Comment(..) | Self::UnknownMetaTag(..) => {}
         }
@@ -526,6 +526,19 @@ impl Element {
         match &self.kind {
             ElementKind::Normal { let_vars, .. } | ElementKind::Pure { let_vars, .. } => {
                 Some(let_vars.iter())
+            }
+            ElementKind::Slot { .. }
+            | ElementKind::For { .. }
+            | ElementKind::If { .. }
+            | ElementKind::TemplateRef { .. }
+            | ElementKind::Include { .. } => None,
+        }
+    }
+
+    pub fn let_var_refs_mut(&mut self) -> Option<impl Iterator<Item = &mut Attribute>> {
+        match &mut self.kind {
+            ElementKind::Normal { let_vars, .. } | ElementKind::Pure { let_vars, .. } => {
+                Some(let_vars.iter_mut())
             }
             ElementKind::Slot { .. }
             | ElementKind::For { .. }
@@ -2495,7 +2508,7 @@ impl Element {
         }
     }
 
-    fn init_scopes_and_binding_map_keys(&mut self, sas: &mut ScopeAnalyzeState) {
+    fn init_scopes_and_binding_map_keys(&mut self, ps: &mut ParseState, sas: &mut ScopeAnalyzeState) {
         // disable binding-map globally if there is an `include` tag
         let should_globally_disabled = match &self.kind {
             ElementKind::Include { .. } => true,
@@ -2535,10 +2548,20 @@ impl Element {
         }
 
         // scopes introduced by `let:`
+        let original_scope_len = sas.scopes.len();
         if let Some(let_var_refs) = self.let_var_refs() {
             for attr in let_var_refs {
                 sas.scopes
                     .push((attr.name.name.clone(), attr.name.location.clone()));
+            }
+        }
+        if let Some(let_var_refs_mut) = self.let_var_refs_mut() {
+            for (i, attr) in let_var_refs_mut.enumerate() {
+                if let Some(value) = attr.value.as_ref() {
+                    if !value.validate_scopes(ps, sas, original_scope_len + i) {
+                        attr.value = None;
+                    }
+                }
             }
         }
 
@@ -2573,7 +2596,7 @@ impl Element {
             | ElementKind::Pure { children, .. }
             | ElementKind::For { children, .. } => {
                 for child in children {
-                    child.init_scopes_and_binding_map_keys(sas);
+                    child.init_scopes_and_binding_map_keys(ps, sas);
                 }
             }
             ElementKind::If {
@@ -2582,12 +2605,12 @@ impl Element {
             } => {
                 for (_, _, children) in branches {
                     for child in children {
-                        child.init_scopes_and_binding_map_keys(sas);
+                        child.init_scopes_and_binding_map_keys(ps, sas);
                     }
                 }
                 if let Some((_, children)) = else_branch {
                     for child in children {
-                        child.init_scopes_and_binding_map_keys(sas);
+                        child.init_scopes_and_binding_map_keys(ps, sas);
                     }
                 }
             }
@@ -3478,6 +3501,23 @@ impl Value {
         ret
     }
 
+    fn validate_scopes(
+        &self,
+        ps: &mut ParseState,
+        sas: &ScopeAnalyzeState,
+        limit: usize,
+    ) -> bool {
+        match self {
+            Self::Static { .. } => true,
+            Self::Dynamic {
+                expression,
+                ..
+            } => {
+                expression.validate_scopes(ps, &sas.scopes, limit)
+            }
+        }
+    }
+
     fn init_scopes_and_binding_map_keys(
         &mut self,
         sas: &mut ScopeAnalyzeState,
@@ -3839,6 +3879,8 @@ mod test {
         );
         case!("<div let:a-b='{{a}}'></div>", r#"<div let:aB="{{a}}"/>"#);
         case!("<div let:a></div>", r#"<div let:a/>"#, ParseErrorKind::MissingAttributeValue, 9..10);
+        case!("<div let:a='{{a}}'></div>", r#"<div let:a/>"#, ParseErrorKind::UninitializedScope, 14..15);
+        case!("<div let:a='{{b}}' let:b=''></div>", r#"<div let:a let:b/>"#, ParseErrorKind::UninitializedScope, 14..15);
     }
 
     #[test]
@@ -3883,6 +3925,7 @@ mod test {
         );
         case!("<block slot='a'></block>", r#"<block slot="a"/>"#);
         case!("<block slot:a-b></block>", r#"<block slot:aB/>"#);
+        case!("<block let:a-b='{{a}}'></block>", r#"<block let:aB="{{a}}"/>"#);
     }
 
     #[test]
@@ -4305,8 +4348,15 @@ mod test {
 
     #[test]
     fn let_var_scope() {
-        let src = r#"<div let:e="{{ c }}" let:c="{{ a + b }}" let:d="{{ c }}">{{ c + d }}</div>"#;
-        let expect = r#"<div let:_$0="{{_$1}}" let:_$1="{{a+b}}" let:_$2="{{_$1}}">{{_$1+_$2}}</div>"#;
+        let src = r#"<div let:c="{{ a + b }}" let:d="{{ c }}">{{ c + d }}</div>"#;
+        let expect = r#"<div let:_$0="{{a+b}}" let:_$1="{{_$0}}">{{_$0+_$1}}</div>"#;
+        check_with_mangling(src, expect);
+    }
+
+    #[test]
+    fn mix_slot_value_ref_and_let_var_scope() {
+        let src = r#"<div let:c="{{ a + b }}" slot:a>{{ c + a }}</div>"#;
+        let expect = r#"<div slot:a="_$0" let:_$1="{{_$0+b}}">{{_$1+_$0}}</div>"#;
         check_with_mangling(src, expect);
     }
 }

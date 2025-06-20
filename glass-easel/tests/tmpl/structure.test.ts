@@ -1366,6 +1366,61 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     matchElementWithDom(elem)
   })
 
+  test('let variable', () => {
+    const def = glassEasel
+      .registerElement({
+        template: tmpl(`
+          <div data:a="{{a}}" data:b="{{b}}" data:c="{{c}}" let:a="" let:b="{{d}}" let:c="{{b * 10}}">
+            <span>{{c}}</span>
+          </div>
+        `),
+        data: {
+          d: 123,
+        },
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    glassEasel.Element.pretendAttached(elem)
+    const div = elem.getShadowRoot()!.childNodes[0]!.asElement()!
+    expect(domHtml(elem)).toBe('<div><span>1230</span></div>')
+    expect(div.dataset.a).toBe('')
+    expect(div.dataset.b).toBe(123)
+    expect(div.dataset.c).toBe(1230)
+    matchElementWithDom(elem)
+    elem.setData({
+      d: 456,
+    })
+    expect(domHtml(elem)).toBe('<div><span>4560</span></div>')
+    expect(div.dataset.a).toBe('')
+    expect(div.dataset.b).toBe(456)
+    expect(div.dataset.c).toBe(4560)
+    matchElementWithDom(elem)
+  })
+
+  test('let variable on block', () => {
+    const def = glassEasel
+      .registerElement({
+        template: tmpl(`
+          <block let:c="{{d * 10}}">
+            <span>{{c}}</span>
+          </block>
+        `),
+        data: {
+          d: 123,
+        },
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe('<span>1230</span>')
+    matchElementWithDom(elem)
+    elem.setData({
+      d: 456,
+    })
+    expect(domHtml(elem)).toBe('<span>4560</span>')
+    matchElementWithDom(elem)
+  })
+
   test('tag name cases', () => {
     const def = glassEasel
       .registerElement({

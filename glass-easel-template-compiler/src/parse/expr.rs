@@ -1270,6 +1270,31 @@ impl Expression {
         }
     }
 
+    pub(super) fn validate_scopes(&self, ps: &mut ParseState, scopes: &[(CompactString, Range<Position>)], limit: usize) -> bool {
+        let index = if let Self::DataField { name, location } = self {
+            scopes
+                .iter()
+                .enumerate()
+                .rev()
+                .find_map(|(i, x)| (x.0 == name).then_some((i, location.clone())))
+        } else {
+            None
+        };
+        if let Some((index, location)) = index {
+            if index >= limit {
+                ps.add_warning(ParseErrorKind::UninitializedScope, location);
+                return false;
+            }
+            return true;
+        }
+        for sub in self.sub_expressions() {
+            if !sub.validate_scopes(ps, scopes, limit) {
+                return false;
+            }
+        }
+        true
+    }
+
     pub(super) fn convert_scopes(&mut self, scopes: &[(CompactString, Range<Position>)]) {
         let index = if let Self::DataField { name, location } = self {
             scopes

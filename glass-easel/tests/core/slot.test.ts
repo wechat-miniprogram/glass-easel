@@ -1158,6 +1158,47 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         matchElementWithDom(parentElem)
       })
 
+      test('should support slot props with let-var', () => {
+        const child = componentSpace
+          .define()
+          .options({ dynamicSlots: true })
+          .data(() => ({
+            c: 123,
+          }))
+          .definition({
+            template: tmpl('<slot c="{{c}}" />'),
+          })
+          .registerComponent()
+
+        const parent = componentSpace
+          .define()
+          .usingComponents({ child })
+          .definition({
+            template: tmpl(`
+              <child>
+                <block let:d="{{c}}" slot:c>
+                  <s>{{d}}</s>
+                </block>
+              </child>
+            `),
+          })
+          .registerComponent()
+
+        const parentElem = glassEasel.Component.createWithContext(
+          'root',
+          parent.general(),
+          testBackend,
+        ).asInstanceOf(parent)!
+        const childElem = parentElem.getShadowRoot()!.childNodes[0]!.asInstanceOf(child)!
+
+        expect(domHtml(parentElem)).toBe('<child><s>123</s></child>')
+        matchElementWithDom(parentElem)
+
+        childElem.setData({ c: 456 })
+        expect(domHtml(parentElem)).toBe('<child><s>456</s></child>')
+        matchElementWithDom(parentElem)
+      })
+
       test('should support duplicate slot props', () => {
         let ops: Array<[number, string]> = []
 

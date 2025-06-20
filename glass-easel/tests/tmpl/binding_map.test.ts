@@ -225,6 +225,31 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       elem.setData({ a: 100, b: 200 })
       expect(domHtml(elem)).toBe('<div>100</div><div>2</div>')
     })
+
+    test('ignore fields with usage in let-var position', () => {
+      const def = glassEasel.registerElement({
+        template: tmpl(
+          `
+            <div>{{a}}</div>
+            <div>{{b}}</div>
+            <block let:c="{{b}}"></block>
+          `,
+          { updateMode: 'bindingMap' },
+        ),
+        data: {
+          a: 1,
+          b: 2,
+        },
+      })
+      const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
+      expect(domHtml(elem)).toBe('<div>1</div><div>2</div>')
+      elem.setData({ b: 20 })
+      expect(domHtml(elem)).toBe('<div>1</div><div>2</div>')
+      elem.setData({ a: 10 })
+      expect(domHtml(elem)).toBe('<div>10</div><div>2</div>')
+      elem.setData({ a: 100, b: 200 })
+      expect(domHtml(elem)).toBe('<div>100</div><div>2</div>')
+    })
   })
 }
 
