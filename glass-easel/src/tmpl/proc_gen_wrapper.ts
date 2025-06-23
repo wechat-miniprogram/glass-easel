@@ -91,14 +91,17 @@ const dashToCamelCase = (dash: string): string => {
   return ret
 }
 
-export type ProcGen = (
-  wrapper: ProcGenWrapper,
-  isCreation: boolean,
-  data: DataValue,
-  dataUpdatePathTree: UpdatePathTreeRoot,
-) => {
-  C: DefineChildren
-  B?: { [field: string]: BindingMapGen[] }
+export interface ProcGen {
+  (wrapper: ProcGenWrapper, isCreation: true, data: DataValue): {
+    C: DefineChildren
+    B?: { [field: string]: BindingMapGen[] }
+  }
+  (
+    wrapper: ProcGenWrapper,
+    isCreation: false,
+    data: DataValue,
+    dataUpdatePathTree: UpdatePathTreeNode,
+  ): { C: DefineChildren }
 }
 
 export type ProcGenEnv = {
@@ -182,12 +185,12 @@ export class ProcGenWrapper {
 
   create(data: DataValue): { [field: string]: BindingMapGen[] } | undefined {
     const { shadowRoot, procGen } = this
-    const children = procGen(this, true, data, undefined)
+    const children = procGen(this, true, data)
     this.handleChildrenCreationAndInsert(children.C, shadowRoot, undefined, undefined)
     return children.B
   }
 
-  update(data: DataValue, dataUpdatePathTree: UpdatePathTreeRoot): void {
+  update(data: DataValue, dataUpdatePathTree: UpdatePathTreeNode): void {
     const { shadowRoot, procGen } = this
     const children = procGen(this, false, data, dataUpdatePathTree)
     this.handleChildrenUpdate(children.C, shadowRoot, undefined, undefined)

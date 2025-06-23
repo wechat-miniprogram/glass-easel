@@ -113,7 +113,19 @@ impl Template {
                                                         bmc,
                                                         group,
                                                         &self.path,
-                                                    )
+                                                    )?;
+                                                    w.expr_stmt(|w| {
+                                                        write!(w, "C=!1")?;
+                                                        Ok(())
+                                                    })?;
+                                                    w.expr_stmt(|w| {
+                                                        write!(w, "U=Object.create(null)")?;
+                                                        Ok(())
+                                                    })?;
+                                                    w.expr_stmt(|w| {
+                                                        write!(w, "K=!1")?;
+                                                        Ok(())
+                                                    })
                                                 })
                                             },
                                         )?;
@@ -266,7 +278,7 @@ impl Node {
 
     fn to_proc_gen_define_children_content_inner<W: std::fmt::Write>(
         list: &[Self],
-        var_slot_map: &Option<HashMap<String, (JsIdent, JsIdent)>>,
+        var_slot_map: Option<&HashMap<String, (JsIdent, JsIdent)>>,
         w: &mut JsFunctionScopeWriter<W>,
         scopes: &mut Vec<ScopeVar>,
         bmc: &BindingMapCollector,
@@ -372,13 +384,20 @@ impl Node {
                 }
                 Node::to_proc_gen_define_children_content_inner(
                     list,
-                    &Some(var_slot_map),
+                    Some(&var_slot_map),
                     w,
                     scopes,
                     bmc,
                     group,
                     cur_path,
-                )
+                )?;
+                for (_, var_update_path_tree) in var_slot_map.values() {
+                    w.expr_stmt(|w| {
+                        write!(w, "{}=undefined", var_update_path_tree)?;
+                        Ok(())
+                    })?;
+                }
+                Ok(())
             })?;
             w.expr_stmt(|w| {
                 write!(w, "{}", &writer.finish())?;
@@ -386,7 +405,7 @@ impl Node {
             })
         } else {
             Node::to_proc_gen_define_children_content_inner(
-                list, &None, w, scopes, bmc, group, cur_path,
+                list, None, w, scopes, bmc, group, cur_path,
             )
         }
     }
@@ -509,6 +528,20 @@ impl Element {
         Ok(())
     }
 
+    fn pop_scopes_and_reset_update_path_tree<W: std::fmt::Write>(
+        w: &mut JsFunctionScopeWriter<W>,
+        scopes: &mut Vec<ScopeVar>,
+    ) -> Result<(), TmplError> {
+        let ScopeVar { var: _, update_path_tree, lvalue_path: _ } = scopes.pop().unwrap();
+        if let Some(update_path_tree) = update_path_tree {
+            w.expr_stmt(|w| {
+                write!(w, "{}=undefined", update_path_tree)?;
+                Ok(())
+            })?;
+        }
+        Ok(())
+    }
+
     fn write_let_vars<W: std::fmt::Write>(
         w: &mut JsFunctionScopeWriter<W>,
         scopes: &mut Vec<ScopeVar>,
@@ -547,9 +580,8 @@ impl Element {
                         },
                     };
                     w.expr_stmt(|w| {
-                        write!(w, "{}=U?", update_path_tree_var_name)?;
+                        write!(w, "{}=C||K?undefined:", update_path_tree_var_name)?;
                         p.lvalue_state_expr(w, scopes, false)?;
-                        write!(w, ":undefined")?;
                         Ok(())
                     })?;
                     w.expr_stmt(|w| {
@@ -572,13 +604,15 @@ impl Element {
         Ok(let_vars.len())
     }
 
-    fn clear_let_vars(
+    fn clear_let_vars<W: std::fmt::Write>(
+        w: &mut JsFunctionScopeWriter<W>,
         scopes: &mut Vec<ScopeVar>,
         count: usize,
-    ) {
+    ) -> Result<(), TmplError> {
         for _ in 0..count {
-            scopes.pop();
+            Self::pop_scopes_and_reset_update_path_tree(w, scopes)?;
         }
+        Ok(())
     }
 
     pub(crate) fn to_proc_gen<W: std::fmt::Write>(
@@ -737,7 +771,7 @@ impl Element {
                     write!(w, ")")?;
                     Ok(())
                 })?;
-                Self::clear_let_vars(scopes, let_vars);
+                Self::clear_let_vars(w, scopes, let_vars)?;
                 Ok(())
             }
             ElementKind::Pure {
@@ -775,7 +809,7 @@ impl Element {
                     write!(w, ")")?;
                     Ok(())
                 })?;
-                Self::clear_let_vars(scopes, let_vars);
+                Self::clear_let_vars(w, scopes, let_vars)?;
                 Ok(())
             }
             ElementKind::If {
@@ -993,7 +1027,11 @@ impl Element {
                                             bmc,
                                             group,
                                             cur_path,
-                                        )
+                                        )?;
+
+                                        Self::pop_scopes_and_reset_update_path_tree(w, scopes)?;
+                                        Self::pop_scopes_and_reset_update_path_tree(w, scopes)?;
+                                        Ok(())
                                     })?;
 
                                     w.expr_stmt(|w| {
@@ -1004,8 +1042,6 @@ impl Element {
                             )
                         },
                     )?;
-                    scopes.pop();
-                    scopes.pop();
                     Ok(ident)
                 })?;
                 w.expr_stmt(|w| {
@@ -1018,14 +1054,14 @@ impl Element {
                             p.value_expr(w)?;
                             write!(
                                 w,
-                                ",{},U?",
+                                ",{},C||K?undefined:",
                                 match key.1.name.as_str() {
                                     "" => "null".into(),
                                     key => gen_lit_str(key),
                                 }
                             )?;
                             p.lvalue_state_expr(w, scopes, false)?;
-                            write!(w, ":undefined,")?;
+                            write!(w, ",")?;
                             if lvalue_path_from_data_scope.is_some() {
                                 p.lvalue_path(w, scopes, None)?;
                             } else {
@@ -1084,9 +1120,9 @@ impl Element {
                                         var_key, var_target, var_target
                                     )?;
                                     p.value_expr(w)?;
-                                    write!(w, ",K||(U?")?;
+                                    write!(w, ",K||(C?Object.create(null):")?;
                                     p.lvalue_state_expr(w, scopes, true)?;
-                                    write!(w, ":Object.create(null))).C(C,T,E,B,F,S,J)")?;
+                                    write!(w, ")).C(C,T,E,B,F,S,J)")?;
                                     Ok(())
                                 })
                             }

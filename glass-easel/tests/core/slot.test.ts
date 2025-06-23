@@ -1158,6 +1158,114 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         matchElementWithDom(parentElem)
       })
 
+      test('should support slot props of array', () => {
+        const child = componentSpace
+          .define()
+          .options({ dynamicSlots: true })
+          .data(() => ({
+            c: [123, 456, 789],
+          }))
+          .definition({
+            template: tmpl('<slot c="{{c}}" />'),
+          })
+          .registerComponent()
+
+        const parent = componentSpace
+          .define()
+          .usingComponents({ child })
+          .definition({
+            template: tmpl(`
+              <child>
+                <block slot:c>
+                  <s wx:for="{{c}}">{{item}}</s>
+                </block>
+              </child>
+            `),
+          })
+          .registerComponent()
+
+        const parentElem = glassEasel.Component.createWithContext(
+          'root',
+          parent.general(),
+          testBackend,
+        ).asInstanceOf(parent)!
+        const childElem = parentElem.getShadowRoot()!.childNodes[0]!.asInstanceOf(child)!
+
+        expect(domHtml(parentElem)).toBe('<child><s>123</s><s>456</s><s>789</s></child>')
+        matchElementWithDom(parentElem)
+
+        childElem.setData({ c: [456] })
+        expect(domHtml(parentElem)).toBe('<child><s>456</s></child>')
+        matchElementWithDom(parentElem)
+      })
+
+      test('should support slot props inside wx:for and proper updates', () => {
+        let updateCount = 0
+
+        const itemChild = componentSpace
+          .define()
+          .property('p', Number)
+          .observer('p', () => {
+            updateCount += 1
+          })
+          .registerComponent()
+
+        const child = componentSpace
+          .define()
+          .options({ dynamicSlots: true })
+          .data(() => ({
+            c: 123,
+          }))
+          .definition({
+            template: tmpl('<slot c="{{c}}" />'),
+          })
+          .registerComponent()
+
+        const parent = componentSpace
+          .define()
+          .options({ writeIdToDOM: false })
+          .usingComponents({ child, item: itemChild })
+          .data(() => ({
+            list: [1],
+          }))
+          .definition({
+            template: tmpl(`
+              <child id="a" wx:for="{{ list }}">
+                <block slot:c>
+                  <item p="{{ item }}">{{ item }}</item>
+                </block>
+              </child>
+            `),
+          })
+          .registerComponent()
+
+        const parentElem = glassEasel.Component.createWithContext(
+          'root',
+          parent.general(),
+          testBackend,
+        ).asInstanceOf(parent)!
+        const childElem = parentElem.getShadowRoot()!.getElementById('a')!.asInstanceOf(child)!
+
+        expect(domHtml(parentElem)).toBe('<child><item>1</item></child>')
+        matchElementWithDom(parentElem)
+        expect(updateCount).toBe(1)
+
+        childElem.setData({ c: 456 })
+        expect(domHtml(parentElem)).toBe('<child><item>1</item></child>')
+        matchElementWithDom(parentElem)
+        expect(updateCount).toBe(1)
+
+        parentElem.setData({ list: [2] })
+        expect(domHtml(parentElem)).toBe('<child><item>2</item></child>')
+        matchElementWithDom(parentElem)
+        expect(updateCount).toBe(2)
+
+        childElem.setData({ c: 789 })
+        expect(domHtml(parentElem)).toBe('<child><item>2</item></child>')
+        matchElementWithDom(parentElem)
+        expect(updateCount).toBe(2)
+      })
+
       test('should support slot props with let-var', () => {
         const child = componentSpace
           .define()
@@ -1197,6 +1305,142 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         childElem.setData({ c: 456 })
         expect(domHtml(parentElem)).toBe('<child><s>456</s></child>')
         matchElementWithDom(parentElem)
+      })
+
+      test('should support slot props inside let-var and proper updates', () => {
+        let updateCount = 0
+
+        const itemChild = componentSpace
+          .define()
+          .template(tmpl(`{{ p }}`))
+          .property('p', Number)
+          .observer('p', () => {
+            updateCount += 1
+          })
+          .registerComponent()
+
+        const child = componentSpace
+          .define()
+          .options({ dynamicSlots: true })
+          .data(() => ({
+            c: 123,
+          }))
+          .definition({
+            template: tmpl('<slot c="{{c}}" />'),
+          })
+          .registerComponent()
+
+        const parent = componentSpace
+          .define()
+          .options({ writeIdToDOM: false })
+          .usingComponents({ child, item: itemChild })
+          .data(() => ({
+            list: [1],
+          }))
+          .definition({
+            template: tmpl(`
+              <child id="a" let:p="{{ list[0] }}">
+                <block slot:c>
+                  <item p="{{ p }}" />
+                </block>
+              </child>
+            `),
+          })
+          .registerComponent()
+
+        const parentElem = glassEasel.Component.createWithContext(
+          'root',
+          parent.general(),
+          testBackend,
+        ).asInstanceOf(parent)!
+        const childElem = parentElem.getShadowRoot()!.getElementById('a')!.asInstanceOf(child)!
+
+        expect(domHtml(parentElem)).toBe('<child><item>1</item></child>')
+        matchElementWithDom(parentElem)
+        expect(updateCount).toBe(1)
+
+        childElem.setData({ c: 456 })
+        expect(domHtml(parentElem)).toBe('<child><item>1</item></child>')
+        matchElementWithDom(parentElem)
+        expect(updateCount).toBe(1)
+
+        parentElem.setData({ list: [2] })
+        expect(domHtml(parentElem)).toBe('<child><item>2</item></child>')
+        matchElementWithDom(parentElem)
+        expect(updateCount).toBe(2)
+
+        childElem.setData({ c: 789 })
+        expect(domHtml(parentElem)).toBe('<child><item>2</item></child>')
+        matchElementWithDom(parentElem)
+        expect(updateCount).toBe(2)
+      })
+
+      test('should support nested slot props and proper updates', () => {
+        let updateCount = 0
+
+        const itemChild = componentSpace
+          .define()
+          .template(tmpl(`{{ p }}`))
+          .property('p', Number)
+          .observer('p', () => {
+            updateCount += 1
+          })
+          .registerComponent()
+
+        const child = componentSpace
+          .define()
+          .options({ dynamicSlots: true, virtualHost: true })
+          .data(() => ({
+            c: 123,
+          }))
+          .definition({
+            template: tmpl('<slot c="{{c}}" />'),
+          })
+          .registerComponent()
+
+        const parent = componentSpace
+          .define()
+          .options({ writeIdToDOM: false })
+          .usingComponents({ child, item: itemChild })
+          .definition({
+            template: tmpl(`
+              <child id="a">
+                <child id="b" slot:c="p">
+                  <block slot:c>
+                    <item p="{{ p }}" />
+                  </block>
+                </child>
+              </child>
+            `),
+          })
+          .registerComponent()
+
+        const parentElem = glassEasel.Component.createWithContext(
+          'root',
+          parent.general(),
+          testBackend,
+        ).asInstanceOf(parent)!
+        const outer = parentElem.getShadowRoot()!.getElementById('a')!.asInstanceOf(child)!
+        const inner = parentElem.getShadowRoot()!.getElementById('b')!.asInstanceOf(child)!
+
+        expect(domHtml(parentElem)).toBe('<item>123</item>')
+        matchElementWithDom(parentElem)
+        expect(updateCount).toBe(1)
+
+        inner.setData({ c: 456 })
+        expect(domHtml(parentElem)).toBe('<item>123</item>')
+        matchElementWithDom(parentElem)
+        expect(updateCount).toBe(1)
+
+        outer.setData({ c: 654 })
+        expect(domHtml(parentElem)).toBe('<item>654</item>')
+        matchElementWithDom(parentElem)
+        expect(updateCount).toBe(2)
+
+        inner.setData({ c: 789 })
+        expect(domHtml(parentElem)).toBe('<item>654</item>')
+        matchElementWithDom(parentElem)
+        expect(updateCount).toBe(2)
       })
 
       test('should support duplicate slot props', () => {
