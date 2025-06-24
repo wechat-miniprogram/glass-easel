@@ -502,6 +502,8 @@ pub enum ParseErrorKind {
     EmptyExpression,
     InvalidEndTag,
     DeprecatedAttribute,
+    IncompatibleWithWxAttribute,
+    UninitializedScope,
 }
 
 impl ParseErrorKind {
@@ -539,6 +541,8 @@ impl ParseErrorKind {
             Self::EmptyExpression => "the expression is empty",
             Self::InvalidEndTag => "invalid end tag",
             Self::DeprecatedAttribute => "this attribute is deprecated",
+            Self::IncompatibleWithWxAttribute => "this attribute is incompatible with wx:* attribute",
+            Self::UninitializedScope => "this variable is uninitialized",
         }
     }
 
@@ -576,6 +580,8 @@ impl ParseErrorKind {
             Self::EmptyExpression => ParseErrorLevel::Warn,
             Self::InvalidEndTag => ParseErrorLevel::Warn,
             Self::DeprecatedAttribute => ParseErrorLevel::Warn,
+            Self::IncompatibleWithWxAttribute => ParseErrorLevel::Error,
+            Self::UninitializedScope => ParseErrorLevel::Error,
         }
     }
 }

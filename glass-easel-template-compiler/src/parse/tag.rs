@@ -106,7 +106,7 @@ impl Template {
                 binding_map_collector: BindingMapCollector::new(),
             };
             for node in &mut sub.content {
-                node.init_scopes_and_binding_map_keys(&mut sas);
+                node.init_scopes_and_binding_map_keys(ps, &mut sas);
             }
         }
         let mut sas = ScopeAnalyzeState {
@@ -122,7 +122,7 @@ impl Template {
             binding_map_collector: BindingMapCollector::new(),
         };
         for node in &mut content {
-            node.init_scopes_and_binding_map_keys(&mut sas);
+            node.init_scopes_and_binding_map_keys(ps, &mut sas);
         }
         globals.binding_map_collector = sas.binding_map_collector;
 
@@ -372,13 +372,13 @@ impl Node {
         }
     }
 
-    fn init_scopes_and_binding_map_keys(&mut self, sas: &mut ScopeAnalyzeState) {
+    fn init_scopes_and_binding_map_keys(&mut self, ps: &mut ParseState, sas: &mut ScopeAnalyzeState) {
         match self {
             Self::Text(value) => {
                 value.init_scopes_and_binding_map_keys(sas, false);
             }
             Self::Element(x) => {
-                x.init_scopes_and_binding_map_keys(sas);
+                x.init_scopes_and_binding_map_keys(ps, sas);
             }
             Self::Comment(..) | Self::UnknownMetaTag(..) => {}
         }
@@ -406,11 +406,13 @@ pub enum ElementKind {
         children: Vec<Node>,
         generics: Vec<StaticAttribute>,
         extra_attr: Vec<StaticAttribute>,
+        let_vars: Vec<Attribute>,
         common: CommonElementAttributes,
     },
     #[non_exhaustive]
     Pure {
         children: Vec<Node>,
+        let_vars: Vec<Attribute>,
         slot: Option<(Range<Position>, Value)>,
         slot_value_refs: Vec<StaticAttribute>,
     },
@@ -520,6 +522,32 @@ impl Element {
         }
     }
 
+    pub fn let_var_refs(&self) -> Option<impl Iterator<Item = &Attribute>> {
+        match &self.kind {
+            ElementKind::Normal { let_vars, .. } | ElementKind::Pure { let_vars, .. } => {
+                Some(let_vars.iter())
+            }
+            ElementKind::Slot { .. }
+            | ElementKind::For { .. }
+            | ElementKind::If { .. }
+            | ElementKind::TemplateRef { .. }
+            | ElementKind::Include { .. } => None,
+        }
+    }
+
+    pub fn let_var_refs_mut(&mut self) -> Option<impl Iterator<Item = &mut Attribute>> {
+        match &mut self.kind {
+            ElementKind::Normal { let_vars, .. } | ElementKind::Pure { let_vars, .. } => {
+                Some(let_vars.iter_mut())
+            }
+            ElementKind::Slot { .. }
+            | ElementKind::For { .. }
+            | ElementKind::If { .. }
+            | ElementKind::TemplateRef { .. }
+            | ElementKind::Include { .. } => None,
+        }
+    }
+
     fn for_each_value_mut(&mut self, mut f: impl FnMut(&mut Value, bool)) {
         match &mut self.kind {
             ElementKind::Normal {
@@ -532,8 +560,14 @@ impl Element {
                 children: _,
                 generics: _,
                 extra_attr: _,
+                let_vars,
                 common,
             } => {
+                for attr in let_vars {
+                    if let Some(value) = attr.value.as_mut() {
+                        f(value, false);
+                    }
+                }
                 for attr in attributes {
                     if let Some(value) = attr.value.as_mut() {
                         f(value, false);
@@ -566,9 +600,15 @@ impl Element {
             }
             ElementKind::Pure {
                 children: _,
+                let_vars,
                 slot,
                 slot_value_refs: _,
             } => {
+                for attr in let_vars {
+                    if let Some(value) = attr.value.as_mut() {
+                        f(value, false);
+                    }
+                }
                 if let Some(slot) = slot {
                     f(&mut slot.1, true);
                 }
@@ -649,6 +689,7 @@ impl Element {
         let mut element = match tag_name_str {
             "block" => ElementKind::Pure {
                 children: vec![],
+                let_vars: vec![],
                 slot: None,
                 slot_value_refs: vec![],
             },
@@ -692,6 +733,7 @@ impl Element {
                 children: vec![],
                 generics: vec![],
                 extra_attr: vec![],
+                let_vars: vec![],
                 common: Default::default(),
             },
         };
@@ -760,6 +802,7 @@ impl Element {
                     Generic(Range<Position>),
                     ExtraAttr(Range<Position>),
                     SlotDataRef(Range<Position>),
+                    LetVar(Range<Position>),
                     Invalid(Range<Position>),
                 }
                 let mut segs = Ident::parse_colon_separated(ps);
@@ -833,6 +876,7 @@ impl Element {
                             "generic" => AttrPrefixKind::Generic(x.location()),
                             "extra-attr" => AttrPrefixKind::ExtraAttr(x.location()),
                             "slot" => AttrPrefixKind::SlotDataRef(x.location()),
+                            "let" => AttrPrefixKind::LetVar(x.location()),
                             _ => AttrPrefixKind::Invalid(x.location()),
                         },
                     }
@@ -885,6 +929,7 @@ impl Element {
                     AttrPrefixKind::Generic(_) => AttrPrefixParseKind::StaticStr,
                     AttrPrefixKind::ExtraAttr(_) => AttrPrefixParseKind::StaticStr,
                     AttrPrefixKind::SlotDataRef(_) => AttrPrefixParseKind::ScopeName,
+                    AttrPrefixKind::LetVar(_) => AttrPrefixParseKind::Value,
                     AttrPrefixKind::Invalid(_) => AttrPrefixParseKind::Value,
                 };
 
@@ -893,7 +938,8 @@ impl Element {
                     AttrPrefixKind::Model(_)
                     | AttrPrefixKind::Change(_)
                     | AttrPrefixKind::Worklet(_)
-                    | AttrPrefixKind::SlotDataRef(_) => Ident {
+                    | AttrPrefixKind::SlotDataRef(_)
+                    | AttrPrefixKind::LetVar(_) => Ident {
                         name: dash_to_camel(&attr_name.name),
                         location: attr_name.location,
                     },
@@ -1433,6 +1479,9 @@ impl Element {
                                         attr_name.location,
                                     );
                                 } else {
+                                    if value.is_none() {
+                                        ps.add_warning(ParseErrorKind::MissingAttributeValue, attr_name.location.clone());
+                                    }
                                     change_attributes.push(Attribute {
                                         name: attr_name,
                                         value,
@@ -1817,6 +1866,38 @@ impl Element {
                             ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
                         }
                     },
+                    AttrPrefixKind::LetVar(prefix_location) => match &mut element {
+                        ElementKind::Normal { let_vars, .. } | ElementKind::Pure { let_vars, .. } => {
+                            if let AttrPrefixParseResult::Value(value) = attr_value {
+                                if let_vars
+                                    .iter()
+                                    .find(|attr| attr.name.name_eq(&attr_name))
+                                    .is_some()
+                                {
+                                    ps.add_warning(
+                                        ParseErrorKind::DuplicatedAttribute,
+                                        attr_name.location,
+                                    );
+                                } else {
+                                    if value.is_none() {
+                                        ps.add_warning(ParseErrorKind::MissingAttributeValue, attr_name.location.clone());
+                                    }
+                                    let_vars.push(Attribute {
+                                        name: attr_name,
+                                        value,
+                                        prefix_location: Some(prefix_location),
+                                    });
+                                }
+                            }
+                        }
+                        ElementKind::Slot { .. }
+                        | ElementKind::For { .. }
+                        | ElementKind::If { .. }
+                        | ElementKind::TemplateRef { .. }
+                        | ElementKind::Include { .. } => {
+                            ps.add_warning(ParseErrorKind::InvalidAttribute, attr_name.location);
+                        }
+                    },
                     AttrPrefixKind::Invalid(_) => {}
                 }
             } else {
@@ -1898,6 +1979,7 @@ impl Element {
             if invalid {
                 element = ElementKind::Pure {
                     children: vec![],
+                    let_vars: vec![],
                     slot: None,
                     slot_value_refs: vec![],
                 };
@@ -2007,39 +2089,57 @@ impl Element {
             IfCondition::None
         };
 
-        // disable scopes in child node of virtual nodes
-        let slot_value_refs = match &mut element {
-            ElementKind::Normal {
-                common:
-                    CommonElementAttributes {
-                        slot_value_refs, ..
-                    },
-                ..
-            }
-            | ElementKind::Pure {
-                slot_value_refs, ..
-            }
-            | ElementKind::Slot {
-                common:
-                    CommonElementAttributes {
-                        slot_value_refs, ..
-                    },
-                ..
-            } => Some(slot_value_refs),
-            ElementKind::For { .. }
-            | ElementKind::If { .. }
-            | ElementKind::TemplateRef { .. }
-            | ElementKind::Include { .. } => None,
+        // check imcompatibility with wx:* attributes
+        let has_wx_attributes = match (&if_condition, &for_list) {
+            (IfCondition::None, ForList::None) => false,
+            _ => true,
         };
-        if let Some(slot_value_refs) = slot_value_refs {
-            let valid = match (&if_condition, &for_list) {
-                (IfCondition::None, ForList::None) => true,
-                _ => false,
+        if has_wx_attributes {
+            let slot_value_refs = match &mut element {
+                ElementKind::Normal {
+                    common:
+                        CommonElementAttributes {
+                            slot_value_refs, ..
+                        },
+                    ..
+                }
+                | ElementKind::Pure {
+                    slot_value_refs, ..
+                }
+                | ElementKind::Slot {
+                    common:
+                        CommonElementAttributes {
+                            slot_value_refs, ..
+                        },
+                    ..
+                } => Some(slot_value_refs),
+                ElementKind::For { .. }
+                | ElementKind::If { .. }
+                | ElementKind::TemplateRef { .. }
+                | ElementKind::Include { .. } => None,
             };
-            if !valid {
+            if let Some(slot_value_refs) = slot_value_refs {
                 for attr in slot_value_refs.drain(..) {
                     ps.add_warning(
-                        ParseErrorKind::InvalidAttribute,
+                        ParseErrorKind::IncompatibleWithWxAttribute,
+                        attr.prefix_location.unwrap(),
+                    );
+                }
+            }
+            let let_vars = match &mut element {
+                ElementKind::Normal { let_vars, .. } | ElementKind::Pure { let_vars, .. } => {
+                    Some(let_vars)
+                }
+                ElementKind::Slot { .. }
+                | ElementKind::For { .. }
+                | ElementKind::If { .. }
+                | ElementKind::TemplateRef { .. }
+                | ElementKind::Include { .. } => None,
+            };
+            if let Some(let_vars) = let_vars {
+                for attr in let_vars.drain(..) {
+                    ps.add_warning(
+                        ParseErrorKind::IncompatibleWithWxAttribute,
                         attr.prefix_location.unwrap(),
                     );
                 }
@@ -2254,10 +2354,11 @@ impl Element {
                 match &mut element.kind {
                     ElementKind::Pure {
                         children,
+                        let_vars,
                         slot,
                         slot_value_refs,
                     } => {
-                        if slot.is_some() || slot_value_refs.len() > 0 {
+                        if slot.is_some() || slot_value_refs.len() > 0 || let_vars.len() > 0 {
                             // empty
                         } else {
                             return std::mem::replace(children, vec![]);
@@ -2407,8 +2508,8 @@ impl Element {
         }
     }
 
-    fn init_scopes_and_binding_map_keys(&mut self, sas: &mut ScopeAnalyzeState) {
-        // disable globally if there is an `include` tag
+    fn init_scopes_and_binding_map_keys(&mut self, ps: &mut ParseState, sas: &mut ScopeAnalyzeState) {
+        // disable binding-map globally if there is an `include` tag
         let should_globally_disabled = match &self.kind {
             ElementKind::Include { .. } => true,
             ElementKind::Normal { .. }
@@ -2424,7 +2525,9 @@ impl Element {
 
         // update dynamic tree state
         let self_dynamic_tree = match &self.kind {
-            ElementKind::Normal { .. } | ElementKind::Pure { .. } => false,
+            ElementKind::Normal { let_vars, .. } | ElementKind::Pure { let_vars, .. } => {
+                !let_vars.is_empty()
+            }
             ElementKind::For { .. }
             | ElementKind::If { .. }
             | ElementKind::TemplateRef { .. }
@@ -2441,6 +2544,24 @@ impl Element {
             for attr in slot_value_refs {
                 sas.scopes
                     .push((attr.value.name.clone(), attr.value.location.clone()));
+            }
+        }
+
+        // scopes introduced by `let:`
+        let original_scope_len = sas.scopes.len();
+        if let Some(let_var_refs) = self.let_var_refs() {
+            for attr in let_var_refs {
+                sas.scopes
+                    .push((attr.name.name.clone(), attr.name.location.clone()));
+            }
+        }
+        if let Some(let_var_refs_mut) = self.let_var_refs_mut() {
+            for (i, attr) in let_var_refs_mut.enumerate() {
+                if let Some(value) = attr.value.as_ref() {
+                    if !value.validate_scopes(ps, sas, original_scope_len + i) {
+                        attr.value = None;
+                    }
+                }
             }
         }
 
@@ -2475,7 +2596,7 @@ impl Element {
             | ElementKind::Pure { children, .. }
             | ElementKind::For { children, .. } => {
                 for child in children {
-                    child.init_scopes_and_binding_map_keys(sas);
+                    child.init_scopes_and_binding_map_keys(ps, sas);
                 }
             }
             ElementKind::If {
@@ -2484,12 +2605,12 @@ impl Element {
             } => {
                 for (_, _, children) in branches {
                     for child in children {
-                        child.init_scopes_and_binding_map_keys(sas);
+                        child.init_scopes_and_binding_map_keys(ps, sas);
                     }
                 }
                 if let Some((_, children)) = else_branch {
                     for child in children {
-                        child.init_scopes_and_binding_map_keys(sas);
+                        child.init_scopes_and_binding_map_keys(ps, sas);
                     }
                 }
             }
@@ -3380,6 +3501,23 @@ impl Value {
         ret
     }
 
+    fn validate_scopes(
+        &self,
+        ps: &mut ParseState,
+        sas: &ScopeAnalyzeState,
+        limit: usize,
+    ) -> bool {
+        match self {
+            Self::Static { .. } => true,
+            Self::Dynamic {
+                expression,
+                ..
+            } => {
+                expression.validate_scopes(ps, &sas.scopes, limit)
+            }
+        }
+    }
+
     fn init_scopes_and_binding_map_keys(
         &mut self,
         sas: &mut ScopeAnalyzeState,
@@ -3693,6 +3831,7 @@ mod test {
         case!("<div model:a=''></div>", r#"<div model:a=""/>"#);
         case!("<div model:a></div>", r#"<div model:a/>"#);
         case!("<div change:a='fn'></div>", r#"<div change:a="fn"/>"#);
+        case!("<div change:a></div>", r#"<div change:a/>"#, ParseErrorKind::MissingAttributeValue, 12..13);
         case!("<div change:a=''></div>", r#"<div change:a/>"#);
         case!("<div worklet:a='fn'></div>", r#"<div worklet:a="fn"/>"#);
         case!("<div worklet:a=''></div>", r#"<div worklet:a/>"#);
@@ -3738,6 +3877,10 @@ mod test {
             ParseErrorKind::InvalidScopeName,
             13..15
         );
+        case!("<div let:a-b='{{a}}'></div>", r#"<div let:aB="{{a}}"/>"#);
+        case!("<div let:a></div>", r#"<div let:a/>"#, ParseErrorKind::MissingAttributeValue, 9..10);
+        case!("<div let:a='{{a}}'></div>", r#"<div let:a/>"#, ParseErrorKind::UninitializedScope, 14..15);
+        case!("<div let:a='{{b}}' let:b=''></div>", r#"<div let:a let:b/>"#, ParseErrorKind::UninitializedScope, 14..15);
     }
 
     #[test]
@@ -3782,6 +3925,7 @@ mod test {
         );
         case!("<block slot='a'></block>", r#"<block slot="a"/>"#);
         case!("<block slot:a-b></block>", r#"<block slot:aB/>"#);
+        case!("<block let:a-b='{{a}}'></block>", r#"<block let:aB="{{a}}"/>"#);
     }
 
     #[test]
@@ -4152,7 +4296,7 @@ mod test {
     #[test]
     fn for_if_scope() {
         let src = r#"<block wx:if="{{ item }}" wx:for="{{ item }}">{{ index }}</block>"#;
-        let expect = r#"<block wx:for="{{item}}"><block wx:if="{{_$0}}">{{_$1}}</block></block>"#;
+        let expect = r#"<block wx:for="{{item}}" wx:for-item="_$0" wx:for-index="_$1"><block wx:if="{{_$0}}">{{_$1}}</block></block>"#;
         check_with_mangling(src, expect);
     }
 
@@ -4161,37 +4305,37 @@ mod test {
         let src = r#"
             <div wx:for="{{list}}" hidden="{{item}}" change:hidden="{{item}}" data:a="{{index}}"/>
         "#;
-        let expect = r#"<block wx:for="{{list}}"><div hidden="{{_$0}}" change:hidden="{{_$0}}" data:a="{{_$1}}"/></block>"#;
+        let expect = r#"<block wx:for="{{list}}" wx:for-item="_$0" wx:for-index="_$1"><div hidden="{{_$0}}" change:hidden="{{_$0}}" data:a="{{_$1}}"/></block>"#;
         check_with_mangling(src, expect);
         let src = r#"
             <block wx:for="{{list}}">
                 <div wx:for="{{item}}" />
             </block>
         "#;
-        let expect = r#"<block wx:for="{{list}}"><block wx:for="{{_$0}}"><div/></block></block>"#;
+        let expect = r#"<block wx:for="{{list}}" wx:for-item="_$0" wx:for-index="_$1"><block wx:for="{{_$0}}" wx:for-item="_$2" wx:for-index="_$3"><div/></block></block>"#;
         check_with_mangling(src, expect);
         let src = r#"
             <block wx:for="{{list}}">
                 <block wx:if="{{item}}" />
             </block>
         "#;
-        let expect = r#"<block wx:for="{{list}}"><block wx:if="{{_$0}}"/></block>"#;
+        let expect = r#"<block wx:for="{{list}}" wx:for-item="_$0" wx:for-index="_$1"><block wx:if="{{_$0}}"/></block>"#;
         check_with_mangling(src, expect);
         let src = r#"
             <template wx:for="{{list}}" is="{{index}}" data="{{item}}" />
         "#;
         let expect =
-            r#"<block wx:for="{{list}}"><template is="{{_$1}}" data="{{{item:_$0}}}"/></block>"#;
+            r#"<block wx:for="{{list}}" wx:for-item="_$0" wx:for-index="_$1"><template is="{{_$1}}" data="{{{item:_$0}}}"/></block>"#;
         check_with_mangling(src, expect);
         let src = r#"
             <include wx:for="{{list}}" src="a" />
         "#;
-        let expect = r#"<block wx:for="{{list}}"><include src="a"/></block>"#;
+        let expect = r#"<block wx:for="{{list}}" wx:for-item="_$0" wx:for-index="_$1"><include src="a"/></block>"#;
         check_with_mangling(src, expect);
         let src = r#"
             <slot wx:for="{{list}}" name="{{index}}" />
         "#;
-        let expect = r#"<block wx:for="{{list}}"><slot name="{{_$1}}"/></block>"#;
+        let expect = r#"<block wx:for="{{list}}" wx:for-item="_$0" wx:for-index="_$1"><slot name="{{_$1}}"/></block>"#;
         check_with_mangling(src, expect);
     }
 
@@ -4199,6 +4343,20 @@ mod test {
     fn slot_value_ref_scope() {
         let src = r#"<div slot:a slot:b="c" data:a="{{ a + b + c }}">{{ a + b + c }}</div>"#;
         let expect = r#"<div slot:a="_$0" slot:b="_$1" data:a="{{_$0+b+_$1}}">{{_$0+b+_$1}}</div>"#;
+        check_with_mangling(src, expect);
+    }
+
+    #[test]
+    fn let_var_scope() {
+        let src = r#"<div let:c="{{ a + b }}" let:d="{{ c }}">{{ c + d }}</div>"#;
+        let expect = r#"<div let:_$0="{{a+b}}" let:_$1="{{_$0}}">{{_$0+_$1}}</div>"#;
+        check_with_mangling(src, expect);
+    }
+
+    #[test]
+    fn mix_slot_value_ref_and_let_var_scope() {
+        let src = r#"<div let:c="{{ a + b }}" slot:a>{{ c + a }}</div>"#;
+        let expect = r#"<div slot:a="_$0" let:_$1="{{_$0+b}}">{{_$1+_$0}}</div>"#;
         check_with_mangling(src, expect);
     }
 }

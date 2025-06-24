@@ -1220,6 +1220,22 @@ pub(crate) struct ExpressionProcGen {
 }
 
 impl ExpressionProcGen {
+    pub(crate) fn is_lvalue_path_from_data_scope(&self, scopes: &Vec<ScopeVar>) -> Option<bool> {
+        let has_model_lvalue_path = self.has_model_lvalue_path(scopes);
+        let has_script_lvalue_path = self.has_script_lvalue_path(scopes);
+        if has_model_lvalue_path && has_script_lvalue_path {
+            // simply drop it if we cannot decide it is script or not
+            // this may happens when conditional expression is used
+            None
+        } else if has_model_lvalue_path {
+            Some(true)
+        } else if has_script_lvalue_path {
+            Some(false)
+        } else {
+            None
+        }
+    }
+
     pub(crate) fn has_model_lvalue_path(&self, scopes: &Vec<ScopeVar>) -> bool {
         if let PathAnalysisState::InPath(psl) = &self.pas {
             psl.is_legal_lvalue_path(scopes, Some(true))

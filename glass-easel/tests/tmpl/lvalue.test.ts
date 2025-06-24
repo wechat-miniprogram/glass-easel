@@ -186,6 +186,43 @@ describe('model value binding', () => {
     expect(domHtml(elem)).toBe('<comp>789:Z</comp>')
   })
 
+  test('model value binding for let variables', () => {
+    const subComp = glassEasel.registerElement({
+      template: tmpl('{{propB}}:{{propA}}'),
+      properties: {
+        propA: String,
+        propB: Number,
+      },
+    })
+    const def = glassEasel.registerElement({
+      using: {
+        comp: subComp.general(),
+      },
+      template: tmpl(`
+        <block let:item="{{list[0]}}">
+          <comp id="comp" model:prop-a="{{ item.a }}" model:prop-b="{{ item.b }}"></comp>
+        </block>
+      `),
+      data: {
+        list: [
+          {
+            a: 'X',
+            b: 123,
+          },
+        ],
+      },
+    })
+    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const comp = elem.getShadowRoot()!.getElementById('comp')! as glassEasel.GeneralComponent
+    expect(domHtml(elem)).toBe('<comp>123:X</comp>')
+    comp.setData({ propA: 'X0', propB: 1230 })
+    expect(domHtml(elem)).toBe('<comp>1230:X0</comp>')
+    expect(elem.data.list).toEqual([{ a: 'X0', b: 1230 }])
+    expect(elem.data.list).toEqual([{ a: 'X0', b: 1230 }])
+    elem.setData({ list: [{ a: 'Z', b: 789 }] })
+    expect(domHtml(elem)).toBe('<comp>789:Z</comp>')
+  })
+
   test('invalid model value binding for items', () => {
     const subComp = glassEasel.registerElement({
       template: tmpl('{{propA}}'),

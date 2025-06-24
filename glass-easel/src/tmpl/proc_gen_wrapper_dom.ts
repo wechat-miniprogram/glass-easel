@@ -73,7 +73,7 @@ export class ProcGenWrapperDom {
 
   create(data: DataValue): { [field: string]: BindingMapGen[] } | undefined {
     const { shadowRoot, procGen } = this
-    const children = procGen(this as unknown as ProcGenWrapper, true, data, undefined)
+    const children = procGen(this as unknown as ProcGenWrapper, true, data)
     this.handleChildrenCreation(
       children.C as unknown as DefineChildren,
       shadowRoot.shadowRootElement as HTMLElement,
