@@ -748,7 +748,7 @@ impl Element {
         let mut wx_key: Option<(Range<Position>, StrName)> = None;
         let mut template_name: Option<(Range<Position>, StrName)> = None;
         let mut script_module: Option<(Range<Position>, StrName)> = None;
-        let mut class_attrs: Vec<(Range<Position>, Ident, Value)> = vec![];
+        let mut class_attrs: Vec<(Range<Position>, Ident, Option<Value>)> = vec![];
         let mut style_attrs: Vec<(Range<Position>, Ident, Value)> = vec![];
         loop {
             ps.skip_whitespace();
@@ -1606,7 +1606,6 @@ impl Element {
                                         attr_name.location,
                                     );
                                 } else {
-                                    let value = unwrap_option_value_for_attr(ps, value, &attr_name);
                                     class_attrs.push((prefix_location, attr_name, value));
                                 }
                             }
@@ -1623,7 +1622,7 @@ impl Element {
                     AttrPrefixKind::Style(prefix_location) => match &mut element {
                         ElementKind::Normal { .. } => {
                             if let AttrPrefixParseResult::Value(value) = attr_value {
-                                if class_attrs
+                                if style_attrs
                                     .iter()
                                     .find(|(_, x, _)| x.name_eq(&attr_name))
                                     .is_some()
@@ -1936,8 +1935,64 @@ impl Element {
             _ => unreachable!(),
         };
 
-        // validate class & style attributes
-        // TODO support `class:xxx` and `style:xxx`
+        // validate class attributes
+        if !class_attrs.is_empty() {
+            match &mut element {
+                ElementKind::Normal { class, .. } => {
+                    match class {
+                        ClassAttribute::None => {}
+                        ClassAttribute::String(name_location, value) => {
+                            match value {
+                                Value::Static { value, location } => {
+                                    let mut classes: Vec<Ident> = vec![];
+                                    for item in value.split_whitespace() {
+                                        let str_name = StrName {
+                                            name: item.into(),
+                                            location: location.clone(),
+                                        };
+                                        let Some(ident) = str_name.to_css_compatible_ident() else {
+                                            classes.clear();
+                                            ps.add_warning(ParseErrorKind::InvalidClassNames, str_name.location);
+                                            break;
+                                        };
+                                        if class_attrs.iter().find(|x| x.1.name_eq(&ident)).is_some()
+                                            || classes.iter().find(|x| x.name_eq(&ident)).is_some()
+                                        {
+                                            classes.clear();
+                                            ps.add_warning(ParseErrorKind::DuplicatedClassNames, str_name.location);
+                                            break;
+                                        }
+                                        classes.push(ident);
+                                    }
+                                    for ident in classes {
+                                        class_attrs.push((name_location.clone(), ident, None));
+                                    }
+                                }
+                                Value::Dynamic { expression, .. } => {
+                                    ps.add_warning(
+                                        ParseErrorKind::IncompatibleWithClassColonAttributes,
+                                        expression.location(),
+                                    );
+                                }
+                            }
+                        }
+                        ClassAttribute::Multiple(..) => unreachable!(),
+                    }
+                    *class = ClassAttribute::Multiple(class_attrs);
+                }
+                ElementKind::Slot { .. }
+                | ElementKind::Pure { .. }
+                | ElementKind::For { .. }
+                | ElementKind::If { .. }
+                | ElementKind::TemplateRef { .. }
+                | ElementKind::Include { .. } => {
+                    unreachable!()
+                }
+            }
+        }
+
+        // validate style attributes
+        // TODO
 
         // check `<template name>` and validate `<template is data>`
         if let ElementKind::TemplateRef { target, data } = &element {
@@ -2920,7 +2975,7 @@ impl StaticAttribute {
 pub enum ClassAttribute {
     None,
     String(Range<Position>, Value),
-    Multiple(Vec<(Ident, Value)>),
+    Multiple(Vec<(Range<Position>, Ident, Option<Value>)>),
 }
 
 #[derive(Debug, Clone)]
@@ -2975,6 +3030,14 @@ impl Ident {
 
     fn is_js_following_char(ch: char) -> bool {
         Self::is_start_char(ch) || ('0'..='9').contains(&ch)
+    }
+
+    fn is_css_start_char(ch: char) -> bool {
+        ('a'..='z').contains(&ch) || ('A'..='Z').contains(&ch) || ch == '_'
+    }
+
+    fn is_css_following_char(ch: char) -> bool {
+        Self::is_start_char(ch) || ('0'..='9').contains(&ch) || ch == '-'
     }
 
     fn has_uppercase(&self) -> bool {
@@ -3076,6 +3139,22 @@ impl StrName {
         }
         for ch in chars {
             if !Ident::is_following_char(ch) {
+                return None;
+            }
+        }
+        Some(Ident {
+            name: self.name.clone(),
+            location: self.location(),
+        })
+    }
+
+    pub fn to_css_compatible_ident(&self) -> Option<Ident> {
+        let mut chars = self.name.chars();
+        if !Ident::is_css_start_char(chars.next()?) {
+            return None;
+        }
+        for ch in chars {
+            if !Ident::is_css_following_char(ch) {
                 return None;
             }
         }
@@ -3215,6 +3294,17 @@ impl StrName {
             None => false,
             Some(ch) if !Ident::is_js_start_char(ch) => false,
             Some(_) => chars.find(|ch| !Ident::is_js_following_char(*ch)).is_none(),
+        }
+    }
+
+    /// Check whether the name is a valid class name.
+    pub fn is_valid_class_name(&self) -> bool {
+        let mut chars = self.name.chars();
+        let first = chars.next();
+        match first {
+            None => false,
+            Some(ch) if !Ident::is_css_start_char(ch) => false,
+            Some(_) => chars.find(|ch| !Ident::is_css_following_char(*ch)).is_none(),
         }
     }
 }
