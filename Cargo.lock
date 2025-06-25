@@ -378,6 +378,7 @@ dependencies = [
  "clap 2.34.0",
  "compact_str",
  "console_log",
+ "cssparser",
  "entities",
  "env_logger",
  "js-sys",

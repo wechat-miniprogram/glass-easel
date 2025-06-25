@@ -578,8 +578,12 @@ impl Element {
                     ClassAttribute::String(_, value) => {
                         f(value, false);
                     }
-                    ClassAttribute::Multiple(_) => {
-                        todo!();
+                    ClassAttribute::Multiple(x) => {
+                        for (_, _, value) in x {
+                            if let Some(value) = value.as_mut() {
+                                f(value, false);
+                            }
+                        }
                     }
                 }
                 match style {
@@ -587,8 +591,10 @@ impl Element {
                     StyleAttribute::String(_, value) => {
                         f(value, false);
                     }
-                    StyleAttribute::Multiple(_) => {
-                        todo!();
+                    StyleAttribute::Multiple(x) => {
+                        for (_, _, value) in x {
+                            f(value, false);
+                        }
                     }
                 }
                 for attr in change_attributes {
@@ -1964,9 +1970,7 @@ impl Element {
                                         }
                                         classes.push(ident);
                                     }
-                                    for ident in classes {
-                                        class_attrs.push((name_location.clone(), ident, None));
-                                    }
+                                    class_attrs.splice(0..0, classes.into_iter().map(|ident| (name_location.clone(), ident, None)));
                                 }
                                 Value::Dynamic { expression, .. } => {
                                     ps.add_warning(
@@ -1992,7 +1996,66 @@ impl Element {
         }
 
         // validate style attributes
-        // TODO
+        if !style_attrs.is_empty() {
+            match &mut element {
+                ElementKind::Normal { style, .. } => {
+                    match style {
+                        StyleAttribute::None => {}
+                        StyleAttribute::String(name_location, value) => {
+                            match value {
+                                Value::Static { value, location } => {
+                                    let mut styles: Vec<(Ident, CompactString)> = vec![];
+                                    let res = split_inline_style_str(&value, |name, value| {
+                                        let str_name = StrName {
+                                            name: name.into(),
+                                            location: location.clone(),
+                                        };
+                                        let Some(ident) = str_name.to_css_compatible_ident() else {
+                                            styles.clear();
+                                            ps.add_warning(ParseErrorKind::InvalidInlineStyleString, str_name.location);
+                                            return false;
+                                        };
+                                        if style_attrs.iter().find(|x| x.1.name_eq(&ident)).is_some()
+                                            || styles.iter().find(|x| x.0.name_eq(&ident)).is_some()
+                                        {
+                                            styles.clear();
+                                            ps.add_warning(ParseErrorKind::DuplicatedStylePropertyNames, str_name.location);
+                                            return false;
+                                        }
+                                        styles.push((ident, CompactString::new(value)));
+                                        true
+                                    });
+                                    if let Err(pos) = res {
+                                        let pos = location.start.add_offset(pos);
+                                        ps.add_warning(ParseErrorKind::InvalidInlineStyleString, pos..pos);
+                                    } else {
+                                        style_attrs.splice(0..0, styles.into_iter().map(|(ident, value)| {
+                                            (name_location.clone(), ident, Value::Static { value, location: location.clone() })
+                                        }));
+                                    }
+                                }
+                                Value::Dynamic { expression, .. } => {
+                                    ps.add_warning(
+                                        ParseErrorKind::IncompatibleWithStyleColonAttributes,
+                                        expression.location(),
+                                    );
+                                }
+                            }
+                        }
+                        StyleAttribute::Multiple(..) => unreachable!(),
+                    }
+                    *style = StyleAttribute::Multiple(style_attrs);
+                }
+                ElementKind::Slot { .. }
+                | ElementKind::Pure { .. }
+                | ElementKind::For { .. }
+                | ElementKind::If { .. }
+                | ElementKind::TemplateRef { .. }
+                | ElementKind::Include { .. } => {
+                    unreachable!()
+                }
+            }
+        }
 
         // check `<template name>` and validate `<template is data>`
         if let ElementKind::TemplateRef { target, data } = &element {
@@ -2983,7 +3046,7 @@ pub enum ClassAttribute {
 pub enum StyleAttribute {
     None,
     String(Range<Position>, Value),
-    Multiple(Vec<(Ident, Value)>),
+    Multiple(Vec<(Range<Position>, Ident, Value)>),
 }
 
 #[derive(Debug, Clone)]
@@ -3033,11 +3096,11 @@ impl Ident {
     }
 
     fn is_css_start_char(ch: char) -> bool {
-        ('a'..='z').contains(&ch) || ('A'..='Z').contains(&ch) || ch == '_'
+        ('a'..='z').contains(&ch) || ('A'..='Z').contains(&ch) || ch == '_' || ch == '-'
     }
 
     fn is_css_following_char(ch: char) -> bool {
-        Self::is_start_char(ch) || ('0'..='9').contains(&ch) || ch == '-'
+        Self::is_start_char(ch) || ('0'..='9').contains(&ch)
     }
 
     fn has_uppercase(&self) -> bool {
@@ -3681,6 +3744,38 @@ impl Script {
     }
 }
 
+fn split_inline_style_str(
+    s: &str,
+    mut f: impl FnMut(&str, &str) -> bool,
+) -> Result<bool, Position> {
+    fn conv_pos(x: cssparser::BasicParseError) -> Position {
+        Position { line: x.location.line, utf16_col: x.location.column - 1 }
+    }
+    let mut input = cssparser::ParserInput::new(s);
+    let mut parser = cssparser::Parser::new(&mut input);
+    while !parser.is_exhausted() {
+        parser.skip_whitespace();
+        let name = parser.expect_ident().map_err(conv_pos)?.clone();
+        parser.skip_whitespace();
+        parser.expect_colon().map_err(conv_pos)?;
+        parser.skip_whitespace();
+        let value_start = parser.position().byte_index();
+        let mut cur = value_start;
+        while !parser.is_exhausted() {
+            match parser.next().map_err(conv_pos)? {
+                cssparser::Token::Semicolon => break,
+                _ => {}
+            }
+            cur = parser.position().byte_index();
+        }
+        let value = &s[value_start..cur];
+        if !f(&name, value) {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -3971,6 +4066,28 @@ mod test {
         case!("<div let:a></div>", r#"<div let:a/>"#, ParseErrorKind::MissingAttributeValue, 9..10);
         case!("<div let:a='{{a}}'></div>", r#"<div let:a/>"#, ParseErrorKind::UninitializedScope, 14..15);
         case!("<div let:a='{{b}}' let:b=''></div>", r#"<div let:a let:b/>"#, ParseErrorKind::UninitializedScope, 14..15);
+    }
+
+    #[test]
+    fn class_attrs() {
+        case!("<div class:c='{{c}}' class:-b></div>", r#"<div class:c="{{c}}" class:-b/>"#);
+        case!("<div class:c='{{c}}' class='a -b'></div>", r#"<div class:a class:-b class:c="{{c}}"/>"#);
+        case!("<div class='{{b}}' class:c></div>", r#"<div class:c/>"#, ParseErrorKind::IncompatibleWithClassColonAttributes, 14..15);
+        case!("<div class='a {{b}}' class:c></div>", r#"<div class:c/>"#, ParseErrorKind::IncompatibleWithClassColonAttributes, 12..19);
+        case!("<div class='a .b' class:c></div>", r#"<div class:c/>"#, ParseErrorKind::InvalidClassNames, 12..16);
+        case!("<div class='a a' class:c></div>", r#"<div class:c/>"#, ParseErrorKind::DuplicatedClassNames, 12..15);
+        case!("<div class='a b' class:a class:c></div>", r#"<div class:a class:c/>"#, ParseErrorKind::DuplicatedClassNames, 12..15);
+    }
+
+    #[test]
+    fn style_attrs() {
+        case!("<div style:c='{{c}}' style:-b></div>", r#"<div style:c="{{c}}" style:-b/>"#, ParseErrorKind::MissingAttributeValue, 27..29);
+        case!("<div style:c='{{c}}' style=' a: 1; -b: a b '></div>", r#"<div style:a="1" style:-b="a b" style:c="{{c}}"/>"#);
+        case!("<div style='{{b}}' style:c='c'></div>", r#"<div style:c="c"/>"#, ParseErrorKind::IncompatibleWithStyleColonAttributes, 14..15);
+        case!("<div style='a {{b}}' style:c='c'></div>", r#"<div style:c="c"/>"#, ParseErrorKind::IncompatibleWithStyleColonAttributes, 12..19);
+        case!("<div style='a: 1; .b' style:c='c'></div>", r#"<div style:c="c"/>"#, ParseErrorKind::InvalidInlineStyleString, 18..18);
+        case!("<div style='a: 1; a: 2;' style:c='c'></div>", r#"<div style:c="c"/>"#, ParseErrorKind::DuplicatedStylePropertyNames, 12..23);
+        case!("<div style='a: 1; b:' style:a='c' style:c='a'></div>", r#"<div style:a="c" style:c="a"/>"#, ParseErrorKind::DuplicatedStylePropertyNames, 12..20);
     }
 
     #[test]
