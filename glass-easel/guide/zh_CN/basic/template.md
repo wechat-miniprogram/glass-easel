@@ -131,7 +131,7 @@ data: {
 <div class="age age-big" />
 ```
 
-后面也可以加上一个数据绑定，如果表达式值非真则这个 class 无效，例如：
+后面也可以加上一个数据绑定，当表达式值非真时，这个 class 失效，例如：
 
 ```xml
 <div class:age="{{ true }}" class:age-big="{{ false }}" />
