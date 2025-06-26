@@ -61,6 +61,8 @@ type TmplArgs = {
       oldValue: unknown
     }
   }
+  staticClasses?: string[] // [class1, class2, ...]
+  styleNameValues?: string[] // [name1, value1, name2, value2, ...]
 }
 export type TmplDevArgs = {
   A?: string[] // active attributes
@@ -999,12 +1001,89 @@ export class ProcGenWrapper {
         elem.setExternalClass('class', v)
       }
     }
-    elem.setNodeClass(v)
+    elem.setNodeClass(v as any)
     this.tryCallPropertyChangeListener(elem, 'class', v)
   }
 
-  // set style or property named `style`
+  // set a list of classes and use previous value if an item is null
+  e = (elem: Element, classNames: (string | null)[]) => {
+    const tmplArgs = getTmplArgs(elem)
+    if (!tmplArgs.staticClasses) tmplArgs.staticClasses = new Array(classNames.length)
+    const arr = tmplArgs.staticClasses
+    for (let i = 0; i < classNames.length; i += 1) {
+      const item = classNames[i]
+      if (typeof item === 'string') {
+        arr[i] = item
+      }
+    }
+    elem.setNodeClassList(arr)
+    this.tryCallPropertyChangeListener(elem, 'class', arr)
+  }
+
+  // set a single class in the list of classes
+  ei = (elem: Element, index: number, className: string) => {
+    const tmplArgs = getTmplArgs(elem)
+    if (!tmplArgs.staticClasses) tmplArgs.staticClasses = []
+    const arr = tmplArgs.staticClasses
+    arr[index] = className
+    elem.setNodeClassList(arr)
+    this.tryCallPropertyChangeListener(elem, 'class', arr)
+  }
+
+  // set style (or property named `style`)
   y = (elem: Element, v: string) => {
+    if (isComponent(elem) && Component.hasProperty(elem, 'style')) {
+      const nodeDataProxy = Component.getDataProxy(elem)
+      const camelName = dashToCamelCase('style')
+      nodeDataProxy.replaceProperty(camelName, v)
+    } else {
+      elem.setNodeStyle(dataValueToString(v), StyleSegmentIndex.MAIN)
+    }
+    this.tryCallPropertyChangeListener(elem, 'style', v)
+  }
+
+  // set a list of styles and use previous value if an item is null
+  w = (elem: Element, styles: (string | null)[]) => {
+    const tmplArgs = getTmplArgs(elem)
+    if (!tmplArgs.styleNameValues) tmplArgs.styleNameValues = new Array(styles.length)
+    const arr = tmplArgs.styleNameValues
+    let v = ''
+    for (let i = 0; i < styles.length; i += 2) {
+      const name = styles[i]
+      let value = styles[i + 1]
+      if (typeof value === 'string') {
+        arr[i] = name as string
+        arr[i + 1] = value
+      } else {
+        value = arr[i + 1]
+      }
+      v += `${name}:${value};`
+    }
+    if (isComponent(elem) && Component.hasProperty(elem, 'style')) {
+      const nodeDataProxy = Component.getDataProxy(elem)
+      const camelName = dashToCamelCase('style')
+      nodeDataProxy.replaceProperty(camelName, v)
+    } else {
+      elem.setNodeStyle(dataValueToString(v), StyleSegmentIndex.MAIN)
+    }
+    this.tryCallPropertyChangeListener(elem, 'style', v)
+  }
+
+  // set a single style value in the list of styles
+  wi = (elem: Element, valueIndex: number, newValue: string) => {
+    const tmplArgs = getTmplArgs(elem)
+    if (!tmplArgs.styleNameValues) tmplArgs.styleNameValues = []
+    const arr = tmplArgs.styleNameValues
+    const nvIndex = valueIndex * 2
+    let v = ''
+    for (let i = 0; i < arr.length; i += 2) {
+      if (i === nvIndex) {
+        arr[i + 1] = newValue
+      }
+      const name = arr[i]
+      const value = arr[i + 1]
+      v += `${name}:${value};`
+    }
     if (isComponent(elem) && Component.hasProperty(elem, 'style')) {
       const nodeDataProxy = Component.getDataProxy(elem)
       const camelName = dashToCamelCase('style')

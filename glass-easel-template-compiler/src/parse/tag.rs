@@ -3100,7 +3100,7 @@ impl Ident {
     }
 
     fn is_css_following_char(ch: char) -> bool {
-        Self::is_start_char(ch) || ('0'..='9').contains(&ch)
+        Self::is_css_start_char(ch) || ('0'..='9').contains(&ch)
     }
 
     fn has_uppercase(&self) -> bool {
@@ -4082,7 +4082,7 @@ mod test {
     #[test]
     fn style_attrs() {
         case!("<div style:c='{{c}}' style:-b></div>", r#"<div style:c="{{c}}" style:-b/>"#, ParseErrorKind::MissingAttributeValue, 27..29);
-        case!("<div style:c='{{c}}' style=' a: 1; -b: a b '></div>", r#"<div style:a="1" style:-b="a b" style:c="{{c}}"/>"#);
+        case!("<div style:c='{{c}}' style=' a: 1; -b-b: a b '></div>", r#"<div style:a="1" style:-b-b="a b" style:c="{{c}}"/>"#);
         case!("<div style='{{b}}' style:c='c'></div>", r#"<div style:c="c"/>"#, ParseErrorKind::IncompatibleWithStyleColonAttributes, 14..15);
         case!("<div style='a {{b}}' style:c='c'></div>", r#"<div style:c="c"/>"#, ParseErrorKind::IncompatibleWithStyleColonAttributes, 12..19);
         case!("<div style='a: 1; .b' style:c='c'></div>", r#"<div style:c="c"/>"#, ParseErrorKind::InvalidInlineStyleString, 18..18);

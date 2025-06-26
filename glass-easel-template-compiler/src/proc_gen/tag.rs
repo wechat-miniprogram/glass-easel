@@ -704,14 +704,108 @@ impl Element {
                             ClassAttribute::String(_, value) => {
                                 write_attribute_value(w, "L", value, scopes, bmc)?;
                             }
-                            ClassAttribute::Multiple(..) => unimplemented!(),
+                            ClassAttribute::Multiple(x) => {
+                                let mut p_list = Vec::with_capacity(x.len());
+                                for (_, name, value) in x.iter() {
+                                    match value.as_ref() {
+                                        Some(Value::Dynamic { expression, double_brace_location: _, binding_map_keys: _ }) => {
+                                            let p = expression.to_proc_gen_prepare(w, scopes)?;
+                                            p_list.push((name, Some(p)));
+                                        }
+                                        None | Some(Value::Static { .. }) => {
+                                            p_list.push((name, None));
+                                        }
+                                    }
+                                }
+                                w.expr_stmt(|w| {
+                                    write!(w, "R.e(N,[")?;
+                                    for (i, (name, p)) in p_list.iter().enumerate() {
+                                        if i > 0 { write!(w, ",")?; }
+                                        if let Some(p) = p {
+                                            write!(w, "C||K||")?;
+                                            p.lvalue_state_expr(w, scopes, false)?;
+                                            write!(w, "?")?;
+                                            p.value_expr(w)?;
+                                            write!(w, r#"?{}:"":null"#, gen_lit_str(&name.name))?;
+                                        } else {
+                                            write!(w, "{}", gen_lit_str(&name.name))?;
+                                        }
+                                    }
+                                    write!(w, "])")?;
+                                    Ok(())
+                                })?;
+                                for (i, (_, name, value)) in x.iter().enumerate() {
+                                    if let Some(Value::Dynamic { expression, double_brace_location: _, binding_map_keys: Some(binding_map_keys) }) = value {
+                                        if !binding_map_keys.is_empty(bmc) {
+                                            binding_map_keys.to_proc_gen_write_map(w, bmc, |w| {
+                                                let p = expression.to_proc_gen_prepare(w, scopes)?;
+                                                w.expr_stmt(|w| {
+                                                    write!(w, "R.ei(N,{},", i)?;
+                                                    p.value_expr(w)?;
+                                                    write!(w, r#"?{}:"")"#, gen_lit_str(&name.name))?;
+                                                    Ok(())
+                                                })
+                                            })?;
+                                        }
+                                    }
+                                }
+                            },
                         }
                         match style {
                             StyleAttribute::None => {}
                             StyleAttribute::String(_, value) => {
                                 write_attribute_value(w, "R.y", value, scopes, bmc)?;
                             }
-                            StyleAttribute::Multiple(..) => unimplemented!(),
+                            StyleAttribute::Multiple(x) => {
+                                let mut p_list = Vec::with_capacity(x.len());
+                                for (_, name, value) in x.iter() {
+                                    match value {
+                                        Value::Dynamic { expression, double_brace_location: _, binding_map_keys: _ } => {
+                                            let p = expression.to_proc_gen_prepare(w, scopes)?;
+                                            p_list.push((name, StaticStrOrProcGen::Dynamic(p)));
+                                        }
+                                        Value::Static { value, location: _ } => {
+                                            p_list.push((name, StaticStrOrProcGen::Static(&value)));
+                                        }
+                                    }
+                                }
+                                w.expr_stmt(|w| {
+                                    write!(w, "R.w(N,[")?;
+                                    for (i, (name, p)) in p_list.iter().enumerate() {
+                                        if i > 0 { write!(w, ",")?; }
+                                        write!(w, "{},", gen_lit_str(&name.name))?;
+                                        match p {
+                                            StaticStrOrProcGen::Dynamic(p) => {
+                                                write!(w, "C||K||")?;
+                                                p.lvalue_state_expr(w, scopes, false)?;
+                                                write!(w, "?Y(")?;
+                                                p.value_expr(w)?;
+                                                write!(w, "):null")?;
+                                            }
+                                            StaticStrOrProcGen::Static(value) => {
+                                                write!(w, "{}", gen_lit_str(value))?;
+                                            }
+                                        }
+                                    }
+                                    write!(w, "])")?;
+                                    Ok(())
+                                })?;
+                                for (i, (_, _, value)) in x.iter().enumerate() {
+                                    if let Value::Dynamic { expression, double_brace_location: _, binding_map_keys: Some(binding_map_keys) } = value {
+                                        if !binding_map_keys.is_empty(bmc) {
+                                            binding_map_keys.to_proc_gen_write_map(w, bmc, |w| {
+                                                let p = expression.to_proc_gen_prepare(w, scopes)?;
+                                                w.expr_stmt(|w| {
+                                                    write!(w, "R.wi(N,{},Y(", i)?;
+                                                    p.value_expr(w)?;
+                                                    write!(w, "))")?;
+                                                    Ok(())
+                                                })
+                                            })?;
+                                        }
+                                    }
+                                }
+                            }
                         }
                         for attr in worklet_attributes.iter() {
                             attr.to_proc_gen_as_worklet_property(w, scopes, bmc)?;
