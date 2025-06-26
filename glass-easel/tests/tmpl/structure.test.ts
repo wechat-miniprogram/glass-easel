@@ -1974,6 +1974,156 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     matchElementWithDom(elem)
   })
 
+  test('class list syntax (virtual-tree update)', () => {
+    const cs = new glassEasel.ComponentSpace()
+    const def = cs
+      .defineComponent({
+        data: () => ({
+          classA: false,
+          classB: true,
+        }),
+        template: tmpl(
+          `
+            <div class:c />
+            <div class:a="{{classA}}" class:c class:-b="{{classB}}" class="-d" />
+          `,
+          { updateMode: 'virtualTree' },
+        ),
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe('<div class="c"></div><div class="-d c -b"></div>')
+    matchElementWithDom(elem)
+    elem.setData({
+      classA: true,
+      classB: false,
+    })
+    expect(domHtml(elem)).toBe('<div class="c"></div><div class="-d c a"></div>')
+    matchElementWithDom(elem)
+    elem.setData({
+      classA: false,
+      classB: true,
+    })
+    expect(domHtml(elem)).toBe('<div class="c"></div><div class="-d c -b"></div>')
+    matchElementWithDom(elem)
+  })
+
+  test('class list syntax (binding-map update)', () => {
+    const cs = new glassEasel.ComponentSpace()
+    const def = cs
+      .defineComponent({
+        data: () => ({
+          classA: false,
+          classB: true,
+        }),
+        template: tmpl(
+          `
+            <div class:c />
+            <div class:a="{{classA}}" class:c class:-b="{{classB}}" class="-d" />
+          `,
+          { updateMode: 'bindingMap' },
+        ),
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe('<div class="c"></div><div class="-d c -b"></div>')
+    matchElementWithDom(elem)
+    elem.setData({
+      classA: true,
+      classB: false,
+    })
+    expect(domHtml(elem)).toBe('<div class="c"></div><div class="-d c a"></div>')
+    matchElementWithDom(elem)
+    elem.setData({
+      classA: false,
+      classB: true,
+    })
+    expect(domHtml(elem)).toBe('<div class="c"></div><div class="-d c -b"></div>')
+    matchElementWithDom(elem)
+  })
+
+  test('style list syntax (virtual-tree update)', () => {
+    const cs = new glassEasel.ComponentSpace()
+    const def = cs
+      .defineComponent({
+        data: () => ({
+          fontSize: 16,
+          c: null as string | null,
+        }),
+        template: tmpl(
+          `
+            <div style:color="red" />
+            <div style:font-size="{{ fontSize }}px" style:color="red" style:-wx-color="{{ c }}" style="-wx-font: serif" />
+          `,
+          { updateMode: 'virtualTree' },
+        ),
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe(
+      '<div style="color:red;"></div><div style="-wx-font:serif;font-size:16px;color:red;-wx-color:;"></div>',
+    )
+    matchElementWithDom(elem)
+    elem.setData({
+      fontSize: 20,
+      c: 'blue',
+    })
+    expect(domHtml(elem)).toBe(
+      '<div style="color:red;"></div><div style="-wx-font:serif;font-size:20px;color:red;-wx-color:blue;"></div>',
+    )
+    matchElementWithDom(elem)
+    elem.setData({
+      c: null,
+    })
+    expect(domHtml(elem)).toBe(
+      '<div style="color:red;"></div><div style="-wx-font:serif;font-size:20px;color:red;-wx-color:;"></div>',
+    )
+    matchElementWithDom(elem)
+  })
+
+  test('style list syntax (binding-map update)', () => {
+    const cs = new glassEasel.ComponentSpace()
+    const def = cs
+      .defineComponent({
+        data: () => ({
+          fontSize: 16,
+          c: null as string | null,
+        }),
+        template: tmpl(
+          `
+            <div style:color="red" />
+            <div style:font-size="{{ fontSize }}px" style:color="red" style:-wx-color="{{ c }}" style="-wx-font: serif" />
+          `,
+          { updateMode: 'bindingMap' },
+        ),
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe(
+      '<div style="color:red;"></div><div style="-wx-font:serif;font-size:16px;color:red;-wx-color:;"></div>',
+    )
+    matchElementWithDom(elem)
+    elem.setData({
+      fontSize: 20,
+      c: 'blue',
+    })
+    expect(domHtml(elem)).toBe(
+      '<div style="color:red;"></div><div style="-wx-font:serif;font-size:20px;color:red;-wx-color:blue;"></div>',
+    )
+    matchElementWithDom(elem)
+    elem.setData({
+      c: null,
+    })
+    expect(domHtml(elem)).toBe(
+      '<div style="color:red;"></div><div style="-wx-font:serif;font-size:20px;color:red;-wx-color:;"></div>',
+    )
+    matchElementWithDom(elem)
+  })
+
   test('pass object to child components', () => {
     const cs = new glassEasel.ComponentSpace()
     let ops = 0

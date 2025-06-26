@@ -503,7 +503,15 @@ export class ClassList {
     return false
   }
 
-  /** Set class string */
+  /**
+   * Set class string
+   *
+   * Returns `false` if the not success.
+   * Although this method accepts `string[]`, it contains a deprecated behavior (use `setClassNameList` in this case).
+   * */
+  setClassNames(names: string, segmentIndex?: StyleSegmentIndex): boolean
+  /** @deprecated */
+  setClassNames(names: string[], segmentIndex?: StyleSegmentIndex): boolean
   setClassNames(
     names: string | string[],
     segmentIndex: StyleSegmentIndex = StyleSegmentIndex.MAIN,
@@ -521,6 +529,17 @@ export class ClassList {
 
     if (useFasterAdd) return this._$fasterAddUpdateResolvedNames()
 
+    return this._$updateResolvedNames()
+  }
+
+  /** Set class list */
+  setClassNameList(
+    names: string[],
+    segmentIndex: StyleSegmentIndex = StyleSegmentIndex.MAIN,
+  ): boolean {
+    const useFasterAdd = this._$rawNames.length === 0
+    this._$rawNames[segmentIndex] = names.filter((name) => name !== '')
+    if (useFasterAdd) return this._$fasterAddUpdateResolvedNames()
     return this._$updateResolvedNames()
   }
 

@@ -752,8 +752,15 @@ impl StringifyLine for Element {
                             respect_none_value: false,
                         });
                     }
-                    ClassAttribute::Multiple(..) => {
-                        todo!()
+                    ClassAttribute::Multiple(list) => {
+                        for (prefix_location, name, value) in list {
+                            attr_list.push(WriteAttrItem::Attr {
+                                prefix: Some(("class", prefix_location.clone())),
+                                name: Cow::Borrowed(name),
+                                value: value.as_ref(),
+                                respect_none_value: true,
+                            });
+                        }
                     }
                 }
                 match style {
@@ -769,8 +776,15 @@ impl StringifyLine for Element {
                             respect_none_value: false,
                         });
                     }
-                    StyleAttribute::Multiple(..) => {
-                        todo!()
+                    StyleAttribute::Multiple(list) => {
+                        for (prefix_location, name, value) in list {
+                            attr_list.push(WriteAttrItem::Attr {
+                                prefix: Some(("style", prefix_location.clone())),
+                                name: Cow::Borrowed(name),
+                                value: Some(value),
+                                respect_none_value: false,
+                            });
+                        }
                     }
                 }
                 for attr in attributes.iter() {
