@@ -1270,7 +1270,12 @@ impl Expression {
         }
     }
 
-    pub(super) fn validate_scopes(&self, ps: &mut ParseState, scopes: &[(CompactString, Range<Position>)], limit: usize) -> bool {
+    pub(super) fn validate_scopes(
+        &self,
+        ps: &mut ParseState,
+        scopes: &[(CompactString, Range<Position>)],
+        limit: usize,
+    ) -> bool {
         let index = if let Self::DataField { name, location } = self {
             scopes
                 .iter()

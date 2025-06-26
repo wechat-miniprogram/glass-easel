@@ -372,7 +372,11 @@ impl Node {
         }
     }
 
-    fn init_scopes_and_binding_map_keys(&mut self, ps: &mut ParseState, sas: &mut ScopeAnalyzeState) {
+    fn init_scopes_and_binding_map_keys(
+        &mut self,
+        ps: &mut ParseState,
+        sas: &mut ScopeAnalyzeState,
+    ) {
         match self {
             Self::Text(value) => {
                 value.init_scopes_and_binding_map_keys(sas, false);
@@ -1486,7 +1490,10 @@ impl Element {
                                     );
                                 } else {
                                     if value.is_none() {
-                                        ps.add_warning(ParseErrorKind::MissingAttributeValue, attr_name.location.clone());
+                                        ps.add_warning(
+                                            ParseErrorKind::MissingAttributeValue,
+                                            attr_name.location.clone(),
+                                        );
                                     }
                                     change_attributes.push(Attribute {
                                         name: attr_name,
@@ -1872,7 +1879,8 @@ impl Element {
                         }
                     },
                     AttrPrefixKind::LetVar(prefix_location) => match &mut element {
-                        ElementKind::Normal { let_vars, .. } | ElementKind::Pure { let_vars, .. } => {
+                        ElementKind::Normal { let_vars, .. }
+                        | ElementKind::Pure { let_vars, .. } => {
                             if let AttrPrefixParseResult::Value(value) = attr_value {
                                 if let_vars
                                     .iter()
@@ -1885,7 +1893,10 @@ impl Element {
                                     );
                                 } else {
                                     if value.is_none() {
-                                        ps.add_warning(ParseErrorKind::MissingAttributeValue, attr_name.location.clone());
+                                        ps.add_warning(
+                                            ParseErrorKind::MissingAttributeValue,
+                                            attr_name.location.clone(),
+                                        );
                                     }
                                     let_vars.push(Attribute {
                                         name: attr_name,
@@ -1947,39 +1958,48 @@ impl Element {
                 ElementKind::Normal { class, .. } => {
                     match class {
                         ClassAttribute::None => {}
-                        ClassAttribute::String(name_location, value) => {
-                            match value {
-                                Value::Static { value, location } => {
-                                    let mut classes: Vec<Ident> = vec![];
-                                    for item in value.split_whitespace() {
-                                        let str_name = StrName {
-                                            name: item.into(),
-                                            location: location.clone(),
-                                        };
-                                        let Some(ident) = str_name.to_css_compatible_ident() else {
-                                            classes.clear();
-                                            ps.add_warning(ParseErrorKind::InvalidClassNames, str_name.location);
-                                            break;
-                                        };
-                                        if class_attrs.iter().find(|x| x.1.name_eq(&ident)).is_some()
-                                            || classes.iter().find(|x| x.name_eq(&ident)).is_some()
-                                        {
-                                            classes.clear();
-                                            ps.add_warning(ParseErrorKind::DuplicatedClassNames, str_name.location);
-                                            break;
-                                        }
-                                        classes.push(ident);
+                        ClassAttribute::String(name_location, value) => match value {
+                            Value::Static { value, location } => {
+                                let mut classes: Vec<Ident> = vec![];
+                                for item in value.split_whitespace() {
+                                    let str_name = StrName {
+                                        name: item.into(),
+                                        location: location.clone(),
+                                    };
+                                    let Some(ident) = str_name.to_css_compatible_ident() else {
+                                        classes.clear();
+                                        ps.add_warning(
+                                            ParseErrorKind::InvalidClassNames,
+                                            str_name.location,
+                                        );
+                                        break;
+                                    };
+                                    if class_attrs.iter().find(|x| x.1.name_eq(&ident)).is_some()
+                                        || classes.iter().find(|x| x.name_eq(&ident)).is_some()
+                                    {
+                                        classes.clear();
+                                        ps.add_warning(
+                                            ParseErrorKind::DuplicatedClassNames,
+                                            str_name.location,
+                                        );
+                                        break;
                                     }
-                                    class_attrs.splice(0..0, classes.into_iter().map(|ident| (name_location.clone(), ident, None)));
+                                    classes.push(ident);
                                 }
-                                Value::Dynamic { expression, .. } => {
-                                    ps.add_warning(
-                                        ParseErrorKind::IncompatibleWithClassColonAttributes,
-                                        expression.location(),
-                                    );
-                                }
+                                class_attrs.splice(
+                                    0..0,
+                                    classes
+                                        .into_iter()
+                                        .map(|ident| (name_location.clone(), ident, None)),
+                                );
                             }
-                        }
+                            Value::Dynamic { expression, .. } => {
+                                ps.add_warning(
+                                    ParseErrorKind::IncompatibleWithClassColonAttributes,
+                                    expression.location(),
+                                );
+                            }
+                        },
                         ClassAttribute::Multiple(..) => unreachable!(),
                     }
                     *class = ClassAttribute::Multiple(class_attrs);
@@ -2001,47 +2021,64 @@ impl Element {
                 ElementKind::Normal { style, .. } => {
                     match style {
                         StyleAttribute::None => {}
-                        StyleAttribute::String(name_location, value) => {
-                            match value {
-                                Value::Static { value, location } => {
-                                    let mut styles: Vec<(Ident, CompactString)> = vec![];
-                                    let res = split_inline_style_str(&value, |name, value| {
-                                        let str_name = StrName {
-                                            name: name.into(),
-                                            location: location.clone(),
-                                        };
-                                        let Some(ident) = str_name.to_css_compatible_ident() else {
-                                            styles.clear();
-                                            ps.add_warning(ParseErrorKind::InvalidInlineStyleString, str_name.location);
-                                            return false;
-                                        };
-                                        if style_attrs.iter().find(|x| x.1.name_eq(&ident)).is_some()
-                                            || styles.iter().find(|x| x.0.name_eq(&ident)).is_some()
-                                        {
-                                            styles.clear();
-                                            ps.add_warning(ParseErrorKind::DuplicatedStylePropertyNames, str_name.location);
-                                            return false;
-                                        }
-                                        styles.push((ident, CompactString::new(value)));
-                                        true
-                                    });
-                                    if let Err(pos) = res {
-                                        let pos = location.start.add_offset(pos);
-                                        ps.add_warning(ParseErrorKind::InvalidInlineStyleString, pos..pos);
-                                    } else {
-                                        style_attrs.splice(0..0, styles.into_iter().map(|(ident, value)| {
-                                            (name_location.clone(), ident, Value::Static { value, location: location.clone() })
-                                        }));
+                        StyleAttribute::String(name_location, value) => match value {
+                            Value::Static { value, location } => {
+                                let mut styles: Vec<(Ident, CompactString)> = vec![];
+                                let res = split_inline_style_str(&value, |name, value| {
+                                    let str_name = StrName {
+                                        name: name.into(),
+                                        location: location.clone(),
+                                    };
+                                    let Some(ident) = str_name.to_css_compatible_ident() else {
+                                        styles.clear();
+                                        ps.add_warning(
+                                            ParseErrorKind::InvalidInlineStyleString,
+                                            str_name.location,
+                                        );
+                                        return false;
+                                    };
+                                    if style_attrs.iter().find(|x| x.1.name_eq(&ident)).is_some()
+                                        || styles.iter().find(|x| x.0.name_eq(&ident)).is_some()
+                                    {
+                                        styles.clear();
+                                        ps.add_warning(
+                                            ParseErrorKind::DuplicatedStylePropertyNames,
+                                            str_name.location,
+                                        );
+                                        return false;
                                     }
-                                }
-                                Value::Dynamic { expression, .. } => {
+                                    styles.push((ident, CompactString::new(value)));
+                                    true
+                                });
+                                if let Err(pos) = res {
+                                    let pos = location.start.add_offset(pos);
                                     ps.add_warning(
-                                        ParseErrorKind::IncompatibleWithStyleColonAttributes,
-                                        expression.location(),
+                                        ParseErrorKind::InvalidInlineStyleString,
+                                        pos..pos,
+                                    );
+                                } else {
+                                    style_attrs.splice(
+                                        0..0,
+                                        styles.into_iter().map(|(ident, value)| {
+                                            (
+                                                name_location.clone(),
+                                                ident,
+                                                Value::Static {
+                                                    value,
+                                                    location: location.clone(),
+                                                },
+                                            )
+                                        }),
                                     );
                                 }
                             }
-                        }
+                            Value::Dynamic { expression, .. } => {
+                                ps.add_warning(
+                                    ParseErrorKind::IncompatibleWithStyleColonAttributes,
+                                    expression.location(),
+                                );
+                            }
+                        },
                         StyleAttribute::Multiple(..) => unreachable!(),
                     }
                     *style = StyleAttribute::Multiple(style_attrs);
@@ -2626,7 +2663,11 @@ impl Element {
         }
     }
 
-    fn init_scopes_and_binding_map_keys(&mut self, ps: &mut ParseState, sas: &mut ScopeAnalyzeState) {
+    fn init_scopes_and_binding_map_keys(
+        &mut self,
+        ps: &mut ParseState,
+        sas: &mut ScopeAnalyzeState,
+    ) {
         // disable binding-map globally if there is an `include` tag
         let should_globally_disabled = match &self.kind {
             ElementKind::Include { .. } => true,
@@ -3367,7 +3408,9 @@ impl StrName {
         match first {
             None => false,
             Some(ch) if !Ident::is_css_start_char(ch) => false,
-            Some(_) => chars.find(|ch| !Ident::is_css_following_char(*ch)).is_none(),
+            Some(_) => chars
+                .find(|ch| !Ident::is_css_following_char(*ch))
+                .is_none(),
         }
     }
 }
@@ -3654,20 +3697,10 @@ impl Value {
         ret
     }
 
-    fn validate_scopes(
-        &self,
-        ps: &mut ParseState,
-        sas: &ScopeAnalyzeState,
-        limit: usize,
-    ) -> bool {
+    fn validate_scopes(&self, ps: &mut ParseState, sas: &ScopeAnalyzeState, limit: usize) -> bool {
         match self {
             Self::Static { .. } => true,
-            Self::Dynamic {
-                expression,
-                ..
-            } => {
-                expression.validate_scopes(ps, &sas.scopes, limit)
-            }
+            Self::Dynamic { expression, .. } => expression.validate_scopes(ps, &sas.scopes, limit),
         }
     }
 
@@ -3749,7 +3782,10 @@ fn split_inline_style_str(
     mut f: impl FnMut(&str, &str) -> bool,
 ) -> Result<bool, Position> {
     fn conv_pos(x: cssparser::BasicParseError) -> Position {
-        Position { line: x.location.line, utf16_col: x.location.column - 1 }
+        Position {
+            line: x.location.line,
+            utf16_col: x.location.column - 1,
+        }
     }
     let mut input = cssparser::ParserInput::new(s);
     let mut parser = cssparser::Parser::new(&mut input);
@@ -4016,7 +4052,12 @@ mod test {
         case!("<div model:a=''></div>", r#"<div model:a=""/>"#);
         case!("<div model:a></div>", r#"<div model:a/>"#);
         case!("<div change:a='fn'></div>", r#"<div change:a="fn"/>"#);
-        case!("<div change:a></div>", r#"<div change:a/>"#, ParseErrorKind::MissingAttributeValue, 12..13);
+        case!(
+            "<div change:a></div>",
+            r#"<div change:a/>"#,
+            ParseErrorKind::MissingAttributeValue,
+            12..13
+        );
         case!("<div change:a=''></div>", r#"<div change:a/>"#);
         case!("<div worklet:a='fn'></div>", r#"<div worklet:a="fn"/>"#);
         case!("<div worklet:a=''></div>", r#"<div worklet:a/>"#);
@@ -4063,31 +4104,110 @@ mod test {
             13..15
         );
         case!("<div let:a-b='{{a}}'></div>", r#"<div let:aB="{{a}}"/>"#);
-        case!("<div let:a></div>", r#"<div let:a/>"#, ParseErrorKind::MissingAttributeValue, 9..10);
-        case!("<div let:a='{{a}}'></div>", r#"<div let:a/>"#, ParseErrorKind::UninitializedScope, 14..15);
-        case!("<div let:a='{{b}}' let:b=''></div>", r#"<div let:a let:b/>"#, ParseErrorKind::UninitializedScope, 14..15);
+        case!(
+            "<div let:a></div>",
+            r#"<div let:a/>"#,
+            ParseErrorKind::MissingAttributeValue,
+            9..10
+        );
+        case!(
+            "<div let:a='{{a}}'></div>",
+            r#"<div let:a/>"#,
+            ParseErrorKind::UninitializedScope,
+            14..15
+        );
+        case!(
+            "<div let:a='{{b}}' let:b=''></div>",
+            r#"<div let:a let:b/>"#,
+            ParseErrorKind::UninitializedScope,
+            14..15
+        );
     }
 
     #[test]
     fn class_attrs() {
-        case!("<div class:c='{{c}}' class:-b></div>", r#"<div class:c="{{c}}" class:-b/>"#);
-        case!("<div class:c='{{c}}' class='a -b'></div>", r#"<div class:a class:-b class:c="{{c}}"/>"#);
-        case!("<div class='{{b}}' class:c></div>", r#"<div class:c/>"#, ParseErrorKind::IncompatibleWithClassColonAttributes, 14..15);
-        case!("<div class='a {{b}}' class:c></div>", r#"<div class:c/>"#, ParseErrorKind::IncompatibleWithClassColonAttributes, 12..19);
-        case!("<div class='a .b' class:c></div>", r#"<div class:c/>"#, ParseErrorKind::InvalidClassNames, 12..16);
-        case!("<div class='a a' class:c></div>", r#"<div class:c/>"#, ParseErrorKind::DuplicatedClassNames, 12..15);
-        case!("<div class='a b' class:a class:c></div>", r#"<div class:a class:c/>"#, ParseErrorKind::DuplicatedClassNames, 12..15);
+        case!(
+            "<div class:c='{{c}}' class:-b></div>",
+            r#"<div class:c="{{c}}" class:-b/>"#
+        );
+        case!(
+            "<div class:c='{{c}}' class='a -b'></div>",
+            r#"<div class:a class:-b class:c="{{c}}"/>"#
+        );
+        case!(
+            "<div class='{{b}}' class:c></div>",
+            r#"<div class:c/>"#,
+            ParseErrorKind::IncompatibleWithClassColonAttributes,
+            14..15
+        );
+        case!(
+            "<div class='a {{b}}' class:c></div>",
+            r#"<div class:c/>"#,
+            ParseErrorKind::IncompatibleWithClassColonAttributes,
+            12..19
+        );
+        case!(
+            "<div class='a .b' class:c></div>",
+            r#"<div class:c/>"#,
+            ParseErrorKind::InvalidClassNames,
+            12..16
+        );
+        case!(
+            "<div class='a a' class:c></div>",
+            r#"<div class:c/>"#,
+            ParseErrorKind::DuplicatedClassNames,
+            12..15
+        );
+        case!(
+            "<div class='a b' class:a class:c></div>",
+            r#"<div class:a class:c/>"#,
+            ParseErrorKind::DuplicatedClassNames,
+            12..15
+        );
     }
 
     #[test]
     fn style_attrs() {
-        case!("<div style:c='{{c}}' style:-b></div>", r#"<div style:c="{{c}}" style:-b/>"#, ParseErrorKind::MissingAttributeValue, 27..29);
-        case!("<div style:c='{{c}}' style=' a: 1; -b-b: a b '></div>", r#"<div style:a="1" style:-b-b="a b" style:c="{{c}}"/>"#);
-        case!("<div style='{{b}}' style:c='c'></div>", r#"<div style:c="c"/>"#, ParseErrorKind::IncompatibleWithStyleColonAttributes, 14..15);
-        case!("<div style='a {{b}}' style:c='c'></div>", r#"<div style:c="c"/>"#, ParseErrorKind::IncompatibleWithStyleColonAttributes, 12..19);
-        case!("<div style='a: 1; .b' style:c='c'></div>", r#"<div style:c="c"/>"#, ParseErrorKind::InvalidInlineStyleString, 18..18);
-        case!("<div style='a: 1; a: 2;' style:c='c'></div>", r#"<div style:c="c"/>"#, ParseErrorKind::DuplicatedStylePropertyNames, 12..23);
-        case!("<div style='a: 1; b:' style:a='c' style:c='a'></div>", r#"<div style:a="c" style:c="a"/>"#, ParseErrorKind::DuplicatedStylePropertyNames, 12..20);
+        case!(
+            "<div style:c='{{c}}' style:-b></div>",
+            r#"<div style:c="{{c}}" style:-b/>"#,
+            ParseErrorKind::MissingAttributeValue,
+            27..29
+        );
+        case!(
+            "<div style:c='{{c}}' style=' a: 1; -b-b: a b '></div>",
+            r#"<div style:a="1" style:-b-b="a b" style:c="{{c}}"/>"#
+        );
+        case!(
+            "<div style='{{b}}' style:c='c'></div>",
+            r#"<div style:c="c"/>"#,
+            ParseErrorKind::IncompatibleWithStyleColonAttributes,
+            14..15
+        );
+        case!(
+            "<div style='a {{b}}' style:c='c'></div>",
+            r#"<div style:c="c"/>"#,
+            ParseErrorKind::IncompatibleWithStyleColonAttributes,
+            12..19
+        );
+        case!(
+            "<div style='a: 1; .b' style:c='c'></div>",
+            r#"<div style:c="c"/>"#,
+            ParseErrorKind::InvalidInlineStyleString,
+            18..18
+        );
+        case!(
+            "<div style='a: 1; a: 2;' style:c='c'></div>",
+            r#"<div style:c="c"/>"#,
+            ParseErrorKind::DuplicatedStylePropertyNames,
+            12..23
+        );
+        case!(
+            "<div style='a: 1; b:' style:a='c' style:c='a'></div>",
+            r#"<div style:a="c" style:c="a"/>"#,
+            ParseErrorKind::DuplicatedStylePropertyNames,
+            12..20
+        );
     }
 
     #[test]
@@ -4132,7 +4252,10 @@ mod test {
         );
         case!("<block slot='a'></block>", r#"<block slot="a"/>"#);
         case!("<block slot:a-b></block>", r#"<block slot:aB/>"#);
-        case!("<block let:a-b='{{a}}'></block>", r#"<block let:aB="{{a}}"/>"#);
+        case!(
+            "<block let:a-b='{{a}}'></block>",
+            r#"<block let:aB="{{a}}"/>"#
+        );
     }
 
     #[test]
@@ -4531,8 +4654,7 @@ mod test {
         let src = r#"
             <template wx:for="{{list}}" is="{{index}}" data="{{item}}" />
         "#;
-        let expect =
-            r#"<block wx:for="{{list}}" wx:for-item="_$0" wx:for-index="_$1"><template is="{{_$1}}" data="{{{item:_$0}}}"/></block>"#;
+        let expect = r#"<block wx:for="{{list}}" wx:for-item="_$0" wx:for-index="_$1"><template is="{{_$1}}" data="{{{item:_$0}}}"/></block>"#;
         check_with_mangling(src, expect);
         let src = r#"
             <include wx:for="{{list}}" src="a" />
