@@ -2,11 +2,18 @@ import type * as glassEasel from 'glass-easel'
 import { type GeneralComponent } from './component'
 
 export type IntersectionObserverMargins = {
-  left: number
-  top: number
-  right: number
-  bottom: number
+  left?: number
+  top?: number
+  right?: number
+  bottom?: number
 }
+
+const normalizeMarginRect = (margins: IntersectionObserverMargins) => ({
+  left: margins.left || 0,
+  top: margins.top || 0,
+  right: margins.right || 0,
+  bottom: margins.bottom || 0,
+})
 
 const defaultMargins = {
   left: 0,
@@ -81,7 +88,7 @@ export class IntersectionObserver {
     if (!this._$margins) {
       throw new Error('`relativeTo` or `relativeToViewport` should be called before observe')
     }
-    const { left, top, right, bottom } = this._$margins
+    const { left, top, right, bottom } = normalizeMarginRect(this._$margins)
     const margin = `${top}px ${right}px ${bottom}px ${left}px`
     targets.forEach((target) => {
       let initial: number | null = this._$initialRatio
