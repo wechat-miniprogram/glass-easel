@@ -771,6 +771,10 @@ impl Element {
                                                             gen_lit_str(&name.name)
                                                         )?;
                                                         Ok(())
+                                                    })?;
+                                                    w.expr_stmt(|w| {
+                                                        write!(w, "E(N)")?;
+                                                        Ok(())
                                                     })
                                                 },
                                             )?;
@@ -842,6 +846,10 @@ impl Element {
                                                         write!(w, "R.wi(N,{},Y(", i)?;
                                                         p.value_expr(w)?;
                                                         write!(w, "))")?;
+                                                        Ok(())
+                                                    })?;
+                                                    w.expr_stmt(|w| {
+                                                        write!(w, "E(N)")?;
                                                         Ok(())
                                                     })
                                                 },

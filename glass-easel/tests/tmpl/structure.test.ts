@@ -1980,33 +1980,36 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       .defineComponent({
         data: () => ({
           classA: false,
-          classB: true,
         }),
         template: tmpl(
           `
             <div class:c />
-            <div class:a="{{classA}}" class:c class:-b="{{classB}}" class="-d" />
+            <div class:a="{{classA}}" class:c class:-b="{{!classA}}" class="-d" />
           `,
           { updateMode: 'virtualTree' },
         ),
       })
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    let changeCount = 0
+    glassEasel.MutationObserver.create(() => {
+      changeCount += 1
+    }).observe(elem.getShadowRoot()!.childNodes[1]!, { properties: true })
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<div class="c"></div><div class="-d c -b"></div>')
     matchElementWithDom(elem)
     elem.setData({
       classA: true,
-      classB: false,
     })
     expect(domHtml(elem)).toBe('<div class="c"></div><div class="-d c a"></div>')
     matchElementWithDom(elem)
+    expect(changeCount).toBe(1)
     elem.setData({
       classA: false,
-      classB: true,
     })
     expect(domHtml(elem)).toBe('<div class="c"></div><div class="-d c -b"></div>')
     matchElementWithDom(elem)
+    expect(changeCount).toBe(2)
   })
 
   test('class list syntax (binding-map update)', () => {
@@ -2015,33 +2018,36 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       .defineComponent({
         data: () => ({
           classA: false,
-          classB: true,
         }),
         template: tmpl(
           `
             <div class:c />
-            <div class:a="{{classA}}" class:c class:-b="{{classB}}" class="-d" />
+            <div class:a="{{classA}}" class:c class:-b="{{!classA}}" class="-d" />
           `,
           { updateMode: 'bindingMap' },
         ),
       })
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    let changeCount = 0
+    glassEasel.MutationObserver.create(() => {
+      changeCount += 1
+    }).observe(elem.getShadowRoot()!.childNodes[1]!, { properties: true })
     glassEasel.Element.pretendAttached(elem)
     expect(domHtml(elem)).toBe('<div class="c"></div><div class="-d c -b"></div>')
     matchElementWithDom(elem)
     elem.setData({
       classA: true,
-      classB: false,
     })
     expect(domHtml(elem)).toBe('<div class="c"></div><div class="-d c a"></div>')
     matchElementWithDom(elem)
+    expect(changeCount).toBe(1)
     elem.setData({
       classA: false,
-      classB: true,
     })
     expect(domHtml(elem)).toBe('<div class="c"></div><div class="-d c -b"></div>')
     matchElementWithDom(elem)
+    expect(changeCount).toBe(2)
   })
 
   test('style list syntax (virtual-tree update)', () => {
