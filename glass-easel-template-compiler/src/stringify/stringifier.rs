@@ -241,7 +241,7 @@ impl<'s, 't, 'u, W: FmtWrite> StringifierLine<'s, 't, 'u, W> {
         location: &Range<Position>,
     ) -> FmtResult {
         let name = self.block.get_scope_name(index).to_string();
-        self.write_token(&name, Some(&name), location)
+        self.write_token_state(&name, Some(&name), location, StringifierLineState::Normal)
     }
 
     pub(super) fn write_token(
