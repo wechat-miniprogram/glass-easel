@@ -4275,6 +4275,14 @@ mod test {
             r#"<div wx:for="{{a}}"> abc </div>"#
         );
         case!(
+            "<block wx:for='{{ a }}'> <div let:a='{{ 1 }}'> abc </div> </block>",
+            r#"<block wx:for="{{a}}"><div let:a="{{1}}"> abc </div></block>"#
+        );
+        case!(
+            "<block wx:for='{{ a }}'> <div slot:a> abc </div> </block>",
+            r#"<block wx:for="{{a}}"><div slot:a> abc </div></block>"#
+        );
+        case!(
             "<div wx:for='{{ a }}'> a </div>",
             r#"<div wx:for="{{a}}"> a </div>"#
         );
