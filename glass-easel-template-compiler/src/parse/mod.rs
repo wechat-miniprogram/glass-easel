@@ -423,6 +423,17 @@ impl Position {
     pub fn line_col_utf16<'s>(&self) -> (usize, usize) {
         (self.line as usize, self.utf16_col as usize)
     }
+
+    pub(crate) fn add_offset(&self, other: Self) -> Self {
+        Self {
+            line: self.line + other.line,
+            utf16_col: if other.line == 0 {
+                self.utf16_col + other.utf16_col
+            } else {
+                other.utf16_col
+            },
+        }
+    }
 }
 
 /// Template parsing error object.
@@ -504,6 +515,12 @@ pub enum ParseErrorKind {
     DeprecatedAttribute,
     IncompatibleWithWxAttribute,
     UninitializedScope,
+    InvalidClassNames,
+    DuplicatedClassNames,
+    IncompatibleWithClassColonAttributes,
+    InvalidInlineStyleString,
+    DuplicatedStylePropertyNames,
+    IncompatibleWithStyleColonAttributes,
 }
 
 impl ParseErrorKind {
@@ -541,8 +558,22 @@ impl ParseErrorKind {
             Self::EmptyExpression => "the expression is empty",
             Self::InvalidEndTag => "invalid end tag",
             Self::DeprecatedAttribute => "this attribute is deprecated",
-            Self::IncompatibleWithWxAttribute => "this attribute is incompatible with wx:* attribute",
+            Self::IncompatibleWithWxAttribute => {
+                "this attribute is incompatible with wx:* attribute"
+            }
             Self::UninitializedScope => "this variable is uninitialized",
+            Self::InvalidClassNames => "the class name list contains invalid identifiers",
+            Self::DuplicatedClassNames => "the class name list contains duplicated class names",
+            Self::IncompatibleWithClassColonAttributes => {
+                "class data bindings are incompatible with `class:` attributes"
+            }
+            Self::InvalidInlineStyleString => "the inline style is invalid",
+            Self::DuplicatedStylePropertyNames => {
+                "the inline style contains duplicated style property names"
+            }
+            Self::IncompatibleWithStyleColonAttributes => {
+                "style data bindings are incompatible with `style:` attributes"
+            }
         }
     }
 
@@ -582,6 +613,12 @@ impl ParseErrorKind {
             Self::DeprecatedAttribute => ParseErrorLevel::Warn,
             Self::IncompatibleWithWxAttribute => ParseErrorLevel::Error,
             Self::UninitializedScope => ParseErrorLevel::Error,
+            Self::InvalidClassNames => ParseErrorLevel::Error,
+            Self::DuplicatedClassNames => ParseErrorLevel::Error,
+            Self::IncompatibleWithClassColonAttributes => ParseErrorLevel::Error,
+            Self::InvalidInlineStyleString => ParseErrorLevel::Error,
+            Self::DuplicatedStylePropertyNames => ParseErrorLevel::Error,
+            Self::IncompatibleWithStyleColonAttributes => ParseErrorLevel::Error,
         }
     }
 }
