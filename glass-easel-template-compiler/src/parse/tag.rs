@@ -4680,7 +4680,8 @@ mod test {
         let src = r#"
             <slot wx:for="{{list}}" name="{{index}}" />
         "#;
-        let expect = r#"<slot wx:for="{{list}}" wx:for-item="_$0" wx:for-index="_$1" name="{{_$1}}"/>"#;
+        let expect =
+            r#"<slot wx:for="{{list}}" wx:for-item="_$0" wx:for-index="_$1" name="{{_$1}}"/>"#;
         check_with_mangling(src, expect);
     }
 

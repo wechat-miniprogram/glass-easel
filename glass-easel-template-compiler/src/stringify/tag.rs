@@ -339,13 +339,18 @@ fn is_children_single_text(children: &[Node], preserve_comment: bool) -> Option<
     ret
 }
 
-fn is_children_single_non_scope_element(children: &[Node], preserve_comment: bool) -> Option<&Element> {
+fn is_children_single_non_scope_element(
+    children: &[Node],
+    preserve_comment: bool,
+) -> Option<&Element> {
     let mut ret = None;
     for n in children {
         match n {
             Node::Comment(..) if !preserve_comment => {}
             Node::Element(x) => {
-                if ret.is_some() { return None; }
+                if ret.is_some() {
+                    return None;
+                }
                 if x.slot_value_refs().and_then(|mut x| x.next()).is_some() {
                     return None;
                 }
@@ -661,7 +666,9 @@ impl<'a> StringifyLine for ElementWithWx<'a> {
                     location: loc.clone(),
                     value,
                 }];
-                if let Some(child) = is_children_single_non_scope_element(&children, !stringifier.minimize()) {
+                if let Some(child) =
+                    is_children_single_non_scope_element(&children, !stringifier.minimize())
+                {
                     ElementWithWx::WithWx(child, &list).stringify_write(stringifier)?;
                 } else {
                     stringifier.write_token("<", None, &elem.tag_location.start.0)?;
@@ -704,7 +711,9 @@ impl<'a> StringifyLine for ElementWithWx<'a> {
                     name: "wx:else",
                     location: loc.clone(),
                 }];
-                if let Some(child) = is_children_single_non_scope_element(&children, !stringifier.minimize()) {
+                if let Some(child) =
+                    is_children_single_non_scope_element(&children, !stringifier.minimize())
+                {
                     ElementWithWx::WithWx(child, &list).stringify_write(stringifier)?;
                 } else {
                     stringifier.write_token("<", None, &elem.tag_location.start.0)?;
@@ -989,7 +998,9 @@ impl<'a> StringifyLine for ElementWithWx<'a> {
                         value: Cow::Borrowed(&key.1),
                     });
                 }
-                if let Some(child) = is_children_single_non_scope_element(&children, !stringifier.minimize()) {
+                if let Some(child) =
+                    is_children_single_non_scope_element(&children, !stringifier.minimize())
+                {
                     children_merged = true;
                     ElementWithWx::WithWx(child, &attr_list).stringify_write(stringifier)?;
                     attr_list.truncate(0);
