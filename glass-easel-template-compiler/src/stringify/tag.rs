@@ -261,7 +261,7 @@ impl StringifyLine for Node {
     ) -> FmtResult {
         match self {
             Node::Text(value) => value.stringify_write(stringifier),
-            Node::Element(element) => element.stringify_write(stringifier),
+            Node::Element(element) => ElementWithWx::NoWx(element).stringify_write(stringifier),
             Node::Comment(comment) => {
                 if !stringifier.minimize() {
                     let full_text = format!("<!--{}-->", comment.content);
@@ -332,6 +332,36 @@ fn is_children_single_text(children: &[Node], preserve_comment: bool) -> Option<
                 ret = Some(x)
             }
             Node::Comment(..) | Node::Element(..) | Node::UnknownMetaTag(..) => {
+                return None;
+            }
+        }
+    }
+    ret
+}
+
+fn is_children_single_non_scope_element(children: &[Node], preserve_comment: bool) -> Option<&Element> {
+    let mut ret = None;
+    for n in children {
+        match n {
+            Node::Comment(..) if !preserve_comment => {}
+            Node::Element(x) => {
+                if ret.is_some() { return None; }
+                if x.slot_value_refs().and_then(|mut x| x.next()).is_some() {
+                    return None;
+                }
+                if x.let_var_refs().and_then(|mut x| x.next()).is_some() {
+                    return None;
+                }
+                match x.kind {
+                    ElementKind::Normal { .. } | ElementKind::Slot { .. } => {
+                        ret = Some(x);
+                    }
+                    _ => {
+                        return None;
+                    }
+                }
+            }
+            Node::Comment(..) | Node::Text(..) | Node::UnknownMetaTag(..) => {
                 return None;
             }
         }
@@ -446,7 +476,7 @@ fn write_common_attributes_without_slot<'a>(
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum WriteAttrItem<'a> {
     NamedAttr {
         name: &'static str,
@@ -592,21 +622,34 @@ impl StringifyLine for WriteAttrItem<'_> {
 
 impl StringifyItem for WriteAttrItem<'_> {}
 
-impl StringifyLine for Element {
+enum ElementWithWx<'a> {
+    NoWx(&'a Element),
+    WithWx(&'a Element, &'a [WriteAttrItem<'a>]),
+}
+
+impl<'a> StringifyLine for ElementWithWx<'a> {
     fn stringify_write<'s, 't, 'u, W: FmtWrite>(
         &self,
         stringifier: &mut StringifierLine<'s, 't, 'u, W>,
     ) -> FmtResult {
+        let elem = match self {
+            Self::NoWx(elem) => elem,
+            Self::WithWx(elem, _) => elem,
+        };
+        let wx_items = match self {
+            Self::NoWx(_) => Default::default(),
+            Self::WithWx(_, items) => *items,
+        };
+
         // handle `wx:if`
         if let ElementKind::If {
             branches,
             else_branch,
-        } = &self.kind
+        } = &elem.kind
         {
+            debug_assert!(wx_items.is_empty());
             let mut is_first = true;
             for (loc, value, children) in branches {
-                stringifier.write_token("<", None, &self.tag_location.start.0)?;
-                stringifier.write_str("block")?;
                 let name = if is_first {
                     is_first = false;
                     "wx:if"
@@ -618,84 +661,94 @@ impl StringifyLine for Element {
                     location: loc.clone(),
                     value,
                 }];
-                stringifier.list(&list)?;
-                if !is_children_empty(children, !stringifier.minimize()) {
-                    stringifier.write_token(">", None, &self.tag_location.start.1)?;
-                    children_inline_stringify_write(children, loc.start, loc.end, stringifier)?;
-                    stringifier.write_token(
-                        "<",
-                        None,
-                        &self
-                            .tag_location
-                            .end
-                            .as_ref()
-                            .unwrap_or(&self.tag_location.start)
-                            .0,
-                    )?;
-                    stringifier.write_token("/", None, &self.tag_location.close)?;
-                    stringifier.write_str("block")?;
-                    stringifier.write_token(
-                        ">",
-                        None,
-                        &self
-                            .tag_location
-                            .end
-                            .as_ref()
-                            .unwrap_or(&self.tag_location.start)
-                            .1,
-                    )?;
+                if let Some(child) = is_children_single_non_scope_element(&children, !stringifier.minimize()) {
+                    ElementWithWx::WithWx(child, &list).stringify_write(stringifier)?;
                 } else {
-                    stringifier.write_optional_space()?;
-                    stringifier.write_token("/", None, &self.tag_location.close)?;
-                    stringifier.write_token(">", None, &self.tag_location.start.1)?;
+                    stringifier.write_token("<", None, &elem.tag_location.start.0)?;
+                    stringifier.write_str("block")?;
+                    stringifier.list(&list)?;
+                    if !is_children_empty(children, !stringifier.minimize()) {
+                        stringifier.write_token(">", None, &elem.tag_location.start.1)?;
+                        children_inline_stringify_write(children, loc.start, loc.end, stringifier)?;
+                        stringifier.write_token(
+                            "<",
+                            None,
+                            &elem
+                                .tag_location
+                                .end
+                                .as_ref()
+                                .unwrap_or(&elem.tag_location.start)
+                                .0,
+                        )?;
+                        stringifier.write_token("/", None, &elem.tag_location.close)?;
+                        stringifier.write_str("block")?;
+                        stringifier.write_token(
+                            ">",
+                            None,
+                            &elem
+                                .tag_location
+                                .end
+                                .as_ref()
+                                .unwrap_or(&elem.tag_location.start)
+                                .1,
+                        )?;
+                    } else {
+                        stringifier.write_optional_space()?;
+                        stringifier.write_token("/", None, &elem.tag_location.close)?;
+                        stringifier.write_token(">", None, &elem.tag_location.start.1)?;
+                    }
                 }
             }
             if let Some((loc, children)) = else_branch.as_ref() {
-                stringifier.write_token("<", None, &self.tag_location.start.0)?;
-                stringifier.write_str("block")?;
                 let list = [WriteAttrItem::NameOnly {
                     name: "wx:else",
                     location: loc.clone(),
                 }];
-                stringifier.list(&list)?;
-                if !is_children_empty(children, !stringifier.minimize()) {
-                    stringifier.write_token(">", None, &self.tag_location.start.1)?;
-                    children_inline_stringify_write(children, loc.start, loc.end, stringifier)?;
-                    stringifier.write_token(
-                        "<",
-                        None,
-                        &self
-                            .tag_location
-                            .end
-                            .as_ref()
-                            .unwrap_or(&self.tag_location.start)
-                            .0,
-                    )?;
-                    stringifier.write_token("/", None, &self.tag_location.close)?;
-                    stringifier.write_str("block")?;
-                    stringifier.write_token(
-                        ">",
-                        None,
-                        &self
-                            .tag_location
-                            .end
-                            .as_ref()
-                            .unwrap_or(&self.tag_location.start)
-                            .1,
-                    )?;
+                if let Some(child) = is_children_single_non_scope_element(&children, !stringifier.minimize()) {
+                    ElementWithWx::WithWx(child, &list).stringify_write(stringifier)?;
                 } else {
-                    stringifier.write_optional_space()?;
-                    stringifier.write_token("/", None, &self.tag_location.close)?;
-                    stringifier.write_token(">", None, &self.tag_location.start.1)?;
+                    stringifier.write_token("<", None, &elem.tag_location.start.0)?;
+                    stringifier.write_str("block")?;
+                    stringifier.list(&list)?;
+                    if !is_children_empty(children, !stringifier.minimize()) {
+                        stringifier.write_token(">", None, &elem.tag_location.start.1)?;
+                        children_inline_stringify_write(children, loc.start, loc.end, stringifier)?;
+                        stringifier.write_token(
+                            "<",
+                            None,
+                            &elem
+                                .tag_location
+                                .end
+                                .as_ref()
+                                .unwrap_or(&elem.tag_location.start)
+                                .0,
+                        )?;
+                        stringifier.write_token("/", None, &elem.tag_location.close)?;
+                        stringifier.write_str("block")?;
+                        stringifier.write_token(
+                            ">",
+                            None,
+                            &elem
+                                .tag_location
+                                .end
+                                .as_ref()
+                                .unwrap_or(&elem.tag_location.start)
+                                .1,
+                        )?;
+                    } else {
+                        stringifier.write_optional_space()?;
+                        stringifier.write_token("/", None, &elem.tag_location.close)?;
+                        stringifier.write_token(">", None, &elem.tag_location.start.1)?;
+                    }
                 }
             }
             return Ok(());
         }
 
         // write tag start
-        stringifier.write_token("<", None, &self.tag_location.start.0)?;
-        let mut attr_list = vec![];
-        match &self.kind {
+        let mut attr_list: Vec<WriteAttrItem> = vec![];
+        let mut children_merged = false;
+        match &elem.kind {
             ElementKind::Normal {
                 tag_name,
                 attributes,
@@ -709,7 +762,9 @@ impl StringifyLine for Element {
                 let_vars,
                 common,
             } => {
+                stringifier.write_token("<", None, &elem.tag_location.start.0)?;
                 stringifier.write_ident(&tag_name, true)?;
+                attr_list.extend(wx_items.iter().cloned());
                 write_slot_and_slot_values(
                     stringifier,
                     &mut attr_list,
@@ -866,6 +921,7 @@ impl StringifyLine for Element {
                 slot_value_refs,
                 let_vars,
             } => {
+                stringifier.write_token("<", None, &elem.tag_location.start.0)?;
                 stringifier.write_str("block")?;
                 write_slot_and_slot_values(stringifier, &mut attr_list, slot, slot_value_refs);
                 for attr in let_vars.iter() {
@@ -889,9 +945,8 @@ impl StringifyLine for Element {
                 item_name,
                 index_name,
                 key,
-                children: _,
+                children,
             } => {
-                stringifier.write_str("block")?;
                 attr_list.push(WriteAttrItem::NamedAttr {
                     name: "wx:for",
                     location: list.0.clone(),
@@ -934,9 +989,18 @@ impl StringifyLine for Element {
                         value: Cow::Borrowed(&key.1),
                     });
                 }
+                if let Some(child) = is_children_single_non_scope_element(&children, !stringifier.minimize()) {
+                    children_merged = true;
+                    ElementWithWx::WithWx(child, &attr_list).stringify_write(stringifier)?;
+                    attr_list.truncate(0);
+                } else {
+                    stringifier.write_token("<", None, &elem.tag_location.start.0)?;
+                    stringifier.write_str("block")?;
+                }
             }
             ElementKind::If { .. } => unreachable!(),
             ElementKind::TemplateRef { target, data } => {
+                stringifier.write_token("<", None, &elem.tag_location.start.0)?;
                 stringifier.write_str("template")?;
                 attr_list.push(WriteAttrItem::NamedAttr {
                     name: "is",
@@ -952,6 +1016,7 @@ impl StringifyLine for Element {
                 }
             }
             ElementKind::Include { path } => {
+                stringifier.write_token("<", None, &elem.tag_location.start.0)?;
                 stringifier.write_str("include")?;
                 attr_list.push(WriteAttrItem::NamedStaticAttr {
                     name: "src",
@@ -964,7 +1029,9 @@ impl StringifyLine for Element {
                 values,
                 common,
             } => {
+                stringifier.write_token("<", None, &elem.tag_location.start.0)?;
                 stringifier.write_str("slot")?;
+                attr_list.extend(wx_items.iter().cloned());
                 write_slot_and_slot_values(
                     stringifier,
                     &mut attr_list,
@@ -989,20 +1056,24 @@ impl StringifyLine for Element {
                 write_common_attributes_without_slot(&mut attr_list, common);
             }
         }
-        stringifier.list(&attr_list)?;
+        if !children_merged {
+            stringifier.list(&attr_list)?;
+        }
 
         // write tag body and end
         let empty_children = vec![];
-        let children = self.children().unwrap_or(&empty_children);
-        if !is_children_empty(children, !stringifier.minimize()) {
-            stringifier.write_token(">", None, &self.tag_location.start.1)?;
+        let children = elem.children().unwrap_or(&empty_children);
+        if children_merged {
+            // empty
+        } else if !is_children_empty(children, !stringifier.minimize()) {
+            stringifier.write_token(">", None, &elem.tag_location.start.1)?;
             children_inline_stringify_write(
                 children,
-                self.tag_location.start.1.end,
-                self.tag_location
+                elem.tag_location.start.1.end,
+                elem.tag_location
                     .end
                     .as_ref()
-                    .unwrap_or(&self.tag_location.start)
+                    .unwrap_or(&elem.tag_location.start)
                     .0
                     .start,
                 stringifier,
@@ -1010,15 +1081,15 @@ impl StringifyLine for Element {
             stringifier.write_token(
                 "<",
                 None,
-                &self
+                &elem
                     .tag_location
                     .end
                     .as_ref()
-                    .unwrap_or(&self.tag_location.start)
+                    .unwrap_or(&elem.tag_location.start)
                     .0,
             )?;
-            stringifier.write_token("/", None, &self.tag_location.close)?;
-            match &self.kind {
+            stringifier.write_token("/", None, &elem.tag_location.close)?;
+            match &elem.kind {
                 ElementKind::Normal { tag_name, .. } => {
                     stringifier.write_ident(&tag_name, false)?;
                 }
@@ -1039,17 +1110,17 @@ impl StringifyLine for Element {
             stringifier.write_token(
                 ">",
                 None,
-                &self
+                &elem
                     .tag_location
                     .end
                     .as_ref()
-                    .unwrap_or(&self.tag_location.start)
+                    .unwrap_or(&elem.tag_location.start)
                     .1,
             )?;
         } else {
             stringifier.write_optional_space()?;
-            stringifier.write_token("/", None, &self.tag_location.close)?;
-            stringifier.write_token(">", None, &self.tag_location.start.1)?;
+            stringifier.write_token("/", None, &elem.tag_location.close)?;
+            stringifier.write_token(">", None, &elem.tag_location.start.1)?;
         }
 
         Ok(())

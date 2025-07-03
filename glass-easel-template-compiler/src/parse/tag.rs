@@ -4271,8 +4271,20 @@ mod test {
             r#"<block wx:for="{{a}}"> abc </block>"#
         );
         case!(
+            "<block wx:for='{{ a }}'> <!-- abc --> <div> abc </div> </block>",
+            r#"<div wx:for="{{a}}"> abc </div>"#
+        );
+        case!(
+            "<block wx:for='{{ a }}'> <div let:a='{{ 1 }}'> abc </div> </block>",
+            r#"<block wx:for="{{a}}"><div let:a="{{1}}"> abc </div></block>"#
+        );
+        case!(
+            "<block wx:for='{{ a }}'> <div slot:a> abc </div> </block>",
+            r#"<block wx:for="{{a}}"><div slot:a> abc </div></block>"#
+        );
+        case!(
             "<div wx:for='{{ a }}'> a </div>",
-            r#"<block wx:for="{{a}}"><div> a </div></block>"#
+            r#"<div wx:for="{{a}}"> a </div>"#
         );
         case!(
             "<block wx:for='{{ a }}' wx:for-index='i' wx:for-item='j' wx:key='t'></block>",
@@ -4306,15 +4318,19 @@ mod test {
         );
         case!(
             "<block wx:if='{{a}}'> abc </block><div wx:else/>",
-            r#"<block wx:if="{{a}}"> abc </block><block wx:else><div/></block>"#
+            r#"<block wx:if="{{a}}"> abc </block><div wx:else/>"#
         );
         case!(
             "<block wx:if='{{a}}'> abc </block><div wx:elif='{{ b }}'/>",
-            r#"<block wx:if="{{a}}"> abc </block><block wx:elif="{{b}}"><div/></block>"#
+            r#"<block wx:if="{{a}}"> abc </block><div wx:elif="{{b}}"/>"#
         );
         case!(
             "<block wx:if='{{a}}'> abc </block><div wx:elif='{{ b }}'/><block wx:else>A</block>",
-            r#"<block wx:if="{{a}}"> abc </block><block wx:elif="{{b}}"><div/></block><block wx:else>A</block>"#
+            r#"<block wx:if="{{a}}"> abc </block><div wx:elif="{{b}}"/><block wx:else>A</block>"#
+        );
+        case!(
+            "<block wx:if='{{a}}'> <div/> </block> <block wx:elif='{{ b }}'> <div/> </block> <block wx:else> <div/> </block>",
+            r#"<div wx:if="{{a}}"/><div wx:elif="{{b}}"/><div wx:else/>"#
         );
         case!(
             "<block wx:elif='{{a}}'> abc </block>",
@@ -4336,7 +4352,7 @@ mod test {
         );
         case!(
             "<block wx:if=''/><div wx:for='' wx:else />",
-            r#"<block wx:if/><block wx:for><div/></block>"#,
+            r#"<block wx:if/><div wx:for/>"#,
             ParseErrorKind::InvalidAttribute,
             32..39
         );
@@ -4635,14 +4651,14 @@ mod test {
         let src = r#"
             <div wx:for="{{list}}" hidden="{{item}}" change:hidden="{{item}}" data:a="{{index}}"/>
         "#;
-        let expect = r#"<block wx:for="{{list}}" wx:for-item="_$0" wx:for-index="_$1"><div hidden="{{_$0}}" change:hidden="{{_$0}}" data:a="{{_$1}}"/></block>"#;
+        let expect = r#"<div wx:for="{{list}}" wx:for-item="_$0" wx:for-index="_$1" hidden="{{_$0}}" change:hidden="{{_$0}}" data:a="{{_$1}}"/>"#;
         check_with_mangling(src, expect);
         let src = r#"
             <block wx:for="{{list}}">
                 <div wx:for="{{item}}" />
             </block>
         "#;
-        let expect = r#"<block wx:for="{{list}}" wx:for-item="_$0" wx:for-index="_$1"><block wx:for="{{_$0}}" wx:for-item="_$2" wx:for-index="_$3"><div/></block></block>"#;
+        let expect = r#"<block wx:for="{{list}}" wx:for-item="_$0" wx:for-index="_$1"><div wx:for="{{_$0}}" wx:for-item="_$2" wx:for-index="_$3"/></block>"#;
         check_with_mangling(src, expect);
         let src = r#"
             <block wx:for="{{list}}">
@@ -4664,7 +4680,7 @@ mod test {
         let src = r#"
             <slot wx:for="{{list}}" name="{{index}}" />
         "#;
-        let expect = r#"<block wx:for="{{list}}" wx:for-item="_$0" wx:for-index="_$1"><slot name="{{_$1}}"/></block>"#;
+        let expect = r#"<slot wx:for="{{list}}" wx:for-item="_$0" wx:for-index="_$1" name="{{_$1}}"/>"#;
         check_with_mangling(src, expect);
     }
 
