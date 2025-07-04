@@ -131,9 +131,9 @@ describe('backend', () => {
   })
   test('hook template engine to sync', () => {
     viewComponentSpace.setGlobalUsingComponent(
-      'wx-input',
+      'wx-textarea',
       viewComponentSpace.defineComponent({
-        is: 'wx-input',
+        is: 'wx-textarea',
         externalClasses: ['placeholder-class'],
         properties: {
           disabled: Boolean,
@@ -143,15 +143,15 @@ describe('backend', () => {
           },
         },
         template: tmpl(
-          '<input disabled="{{disabled}}" maxlength="{{maxlength}}"></input><span class="placeholder-class"><slot /></span>',
+          '<textarea disabled="{{disabled}}" maxlength="{{maxlength}}"></textarea><span class="placeholder-class"><slot /></span>',
         ),
       }) as glassEasel.GeneralComponentDefinition,
     )
 
     componentSpace.setGlobalUsingComponent(
-      'wx-input',
+      'wx-textarea',
       componentSpace.defineComponent({
-        is: 'wx-input',
+        is: 'wx-textarea',
         options: {
           externalComponent: true,
           templateEngine: ShadowDomBackendContext.hookReflectTemplateEngine(),
@@ -173,7 +173,7 @@ describe('backend', () => {
     const ops: any[] = []
     const rootDef = componentSpace.defineComponent({
       template: tmpl(`
-        <wx-input disabled="{{disabled}}" bind:tap="handleTap" placeholder-class="{{placeholderClass}}">{{text}}</wx-input>
+        <wx-textarea disabled="{{disabled}}" bind:tap="handleTap" placeholder-class="{{placeholderClass}}">{{text}}</wx-textarea>
       `),
       data: {
         text: '123',
@@ -190,23 +190,23 @@ describe('backend', () => {
     root.destroyBackendElementOnDetach()
 
     expect(domHtml(root)).toEqual(
-      '<wx-input><input maxlength="140" disabled=""><span>123</span></wx-input>',
+      '<wx-textarea><textarea maxlength="140" disabled=""></textarea><span>123</span></wx-textarea>',
     )
 
     root.setData({ disabled: false })
-    expect(domHtml(root)).toEqual('<wx-input><input maxlength="140"><span>123</span></wx-input>')
+    expect(domHtml(root)).toEqual('<wx-textarea><textarea maxlength="140"></textarea><span>123</span></wx-textarea>')
 
     root.setData({ text: '23333' })
-    expect(domHtml(root)).toEqual('<wx-input><input maxlength="140"><span>23333</span></wx-input>')
+    expect(domHtml(root)).toEqual('<wx-textarea><textarea maxlength="140"></textarea><span>23333</span></wx-textarea>')
 
     root.setData({ placeholderClass: 'a' })
     expect(domHtml(root)).toEqual(
-      '<wx-input><input maxlength="140"><span class="a">23333</span></wx-input>',
+      '<wx-textarea><textarea maxlength="140"></textarea><span class="a">23333</span></wx-textarea>',
     )
 
-    const input = root.getShadowRoot()!.childNodes[0]!
+    const textarea = root.getShadowRoot()!.childNodes[0]!
 
-    const viewButton = getViewNode(input) as glassEasel.GeneralComponent
+    const viewButton = getViewNode(textarea) as glassEasel.GeneralComponent
     viewButton.triggerEvent('tap', { foo: 'foo' })
     expect(ops).toEqual([{ foo: 'foo' }])
   })
@@ -232,7 +232,12 @@ describe('backend', () => {
         value: '123',
       },
     })
-    const root = glassEasel.Component.createWithContext('root', rootDef, shadowDomBackend)
+    let root: any
+    try {
+      root = glassEasel.Component.createWithContext('root', rootDef, shadowDomBackend)
+    } catch (e) {
+      debugger
+    }
     root.destroyBackendElementOnDetach()
     const input = root.getShadowRoot()!.childNodes[0]!
     const inputOnView = getViewNode(input) as glassEasel.GeneralComponent
