@@ -570,10 +570,7 @@ export class Component<
           if (isDedicatedStyleScope) {
             const styleScopePrefix = ownerSpace.styleScopeManager.queryName(options.styleScope!)
             if (styleScopePrefix) {
-              backendElement.setAttribute(
-                'wx-host',
-                ownerSpace.styleScopeManager.queryName(options.styleScope!),
-              )
+              backendElement.setAttribute('wx-host', styleScopePrefix)
             }
           }
           if (ENV.DEV) performanceMeasureEnd()
@@ -657,11 +654,8 @@ export class Component<
     if (backendElement) {
       if (ENV.DEV) performanceMeasureStart('backend.associateValue')
       backendElement.__wxElement = comp
-      if (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext!.mode === BackendMode.Shadow)) {
-        ;(backendElement as backend.Element).associateValue(comp)
-      } else if (BM.COMPOSED || (BM.DYNAMIC && nodeTreeContext!.mode === BackendMode.Composed)) {
-        // FIXME temp for skyline
-        ;(backendElement as composedBackend.Element).associateValue?.(comp)
+      if (!(BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext!.mode === BackendMode.Domlike))) {
+        ;(backendElement as backend.Element | composedBackend.Element).associateValue(comp)
       } else {
         ;(nodeTreeContext as domlikeBackend.Context).associateValue(
           backendElement as domlikeBackend.Element,

@@ -77,9 +77,21 @@ type composedContext = composedBackend.Context | domlikeBackend.Context
 type composedElement = composedBackend.Element | domlikeBackend.Element
 
 type DestroyedBackendContext = { mode: BackendMode; destroyed: true; dropBackendAfterRelease: true }
-const DESTROYED_SHADOW_BACKEND_CONTEXT = { mode: BackendMode.Shadow, destroyed: true, dropBackendAfterRelease: true } as const
-const DESTROYED_COMPOSED_BACKEND_CONTEXT = { mode: BackendMode.Composed, destroyed: true, dropBackendAfterRelease: true } as const
-const DESTROYED_DOMLIKE_BACKEND_CONTEXT = { mode: BackendMode.Domlike, destroyed: true, dropBackendAfterRelease: true } as const
+const DESTROYED_SHADOW_BACKEND_CONTEXT = {
+  mode: BackendMode.Shadow,
+  destroyed: true,
+  dropBackendAfterRelease: true,
+} as const
+const DESTROYED_COMPOSED_BACKEND_CONTEXT = {
+  mode: BackendMode.Composed,
+  destroyed: true,
+  dropBackendAfterRelease: true,
+} as const
+const DESTROYED_DOMLIKE_BACKEND_CONTEXT = {
+  mode: BackendMode.Domlike,
+  destroyed: true,
+  dropBackendAfterRelease: true,
+} as const
 
 export type DoubleLinkedList<T> = {
   value: T
@@ -1254,33 +1266,12 @@ export class Element implements NodeCast {
         // for non-virtual children, use single child operation
         if (removal) {
           if (newChild) {
-            if (newChild._$backendElement && relChild!._$backendElement) {
-              if (ENV.DEV) performanceMeasureStart('backend.replaceChild')
-              if (BM.COMPOSED || (BM.DYNAMIC && context.mode === BackendMode.Composed)) {
-                // FIXME: skyline replaceChild is still exparser type
-                // revert back to replaceChild after skyline changes
-                const fragment = (context as composedBackend.Context).createFragment()
-                if ((newChild as Element)._$backendElement) {
-                  fragment.appendChild(
-                    (newChild as Element)._$backendElement as composedBackend.Element,
-                  )
-                }
-                if ((relChild as Element)._$backendElement) {
-                  ;(sharedNonVirtualParent as composedBackend.Element).spliceBefore(
-                    // since `TextNode` also has `backendElement` private field, just make it as `Element`
-                    // domlike backend also
-                    (relChild as Element)._$backendElement as composedBackend.Element,
-                    1,
-                    fragment,
-                  )
-                }
-              } else {
-                ;(sharedNonVirtualParent as composedBackend.Element).replaceChild(
-                  newChild._$backendElement as composedBackend.Element,
-                  relChild!._$backendElement as composedBackend.Element,
-                )
-              }
-            }
+            if (ENV.DEV) performanceMeasureStart('backend.replaceChild')
+            ;(sharedNonVirtualParent as composedBackend.Element).replaceChild(
+              newChild._$backendElement as composedBackend.Element,
+              relChild!._$backendElement as composedBackend.Element,
+            )
+            if (ENV.DEV) performanceMeasureEnd()
           } else {
             if (ENV.DEV) performanceMeasureStart('backend.removeChild')
             ;(sharedNonVirtualParent as composedBackend.Element).removeChild(
@@ -2473,21 +2464,12 @@ export class Element implements NodeCast {
           capture,
           mutLevel,
         )
-      } else if (BM.COMPOSED || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Composed)) {
-        const backendElement = this._$backendElement as composedBackend.Element
-        if (backendElement.setListenerStats) {
-          backendElement.setListenerStats(name, capture, mutLevel)
-        } else {
-          // FIXME: for skyline compatibility, remove this in the future
-          const defaultPrevented = mutLevel === MutLevel.Final
-          ;(
-            backendElement as unknown as {
-              setEventDefaultPrevented: (type: string, enabled: boolean) => void
-            }
-          ).setEventDefaultPrevented(name, defaultPrevented)
-        }
       } else {
-        ;(this._$backendElement as backend.Element).setListenerStats(name, capture, mutLevel)
+        ;(this._$backendElement as backend.Element | composedBackend.Element).setListenerStats(
+          name,
+          capture,
+          mutLevel,
+        )
       }
       if (ENV.DEV) performanceMeasureEnd()
     }

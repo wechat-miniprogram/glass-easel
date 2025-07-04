@@ -279,7 +279,7 @@ export class ClassList {
           let found = false
           for (let i = 0; i < newBackendNames.length; i += 1) {
             if (rawName === newBackendNames[i]) {
-              newBackendNamesCount[i]! += 1
+              newBackendNamesCount[i] += 1
               found = true
               break
             }
@@ -300,7 +300,7 @@ export class ClassList {
           this._$resolvePrefixes(rawName, (scopeId, className) => {
             for (let i = 0; i < newBackendNames.length; i += 1) {
               if (className === newBackendNames[i] && scopeId === newBackendNameScopes[i]) {
-                newBackendNamesCount[i]! += 1
+                newBackendNamesCount[i] += 1
                 return
               }
             }
@@ -399,7 +399,7 @@ export class ClassList {
     for (let j = 0; j < oldClassNames.length; j += 1) {
       if (name === oldClassNames[j] && scopeId === oldScopeIds[j]) {
         found = true
-        classNamesCount[j]! += 1
+        classNamesCount[j] += 1
         break
       }
     }
@@ -420,16 +420,15 @@ export class ClassList {
     const oldClassNames = this._$backendNames
     const oldScopeIds = this._$backendNameScopes
     const classNamesCount = this._$backendNamesCount
-    let index: number
-    for (index = 0; index < oldClassNames.length; index += 1) {
-      if (name === oldClassNames[index] && scopeId === oldScopeIds[index]) {
-        if (classNamesCount[index]! <= 1) {
-          oldClassNames.splice(index, 1)
-          oldScopeIds.splice(index, 1)
-          classNamesCount.splice(index, 1)
+    for (let j = 0; j < oldClassNames.length; j += 1) {
+      if (name === oldClassNames[j] && scopeId === oldScopeIds[j]) {
+        if (classNamesCount[j]! <= 1) {
+          oldClassNames.splice(j, 1)
+          oldScopeIds.splice(j, 1)
+          classNamesCount.splice(j, 1)
           this._$removeClassFromBackend(name, scopeId, backendElement)
         } else {
-          classNamesCount[index]! -= 1
+          classNamesCount[j]! -= 1
         }
         break
       }

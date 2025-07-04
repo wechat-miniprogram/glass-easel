@@ -121,11 +121,8 @@ export class NativeNode extends Element {
       }
       if (ENV.DEV) performanceMeasureStart('backend.associateValue')
       backendElement.__wxElement = node
-      if (BM.SHADOW || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Shadow)) {
-        ;(backendElement as backend.Element).associateValue(node)
-      } else if (BM.COMPOSED || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Composed)) {
-        // FIXME temp for skyline
-        ;(backendElement as backend.Element | composedBackend.Element).associateValue?.(node)
+      if (!(BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike))) {
+        ;(backendElement as backend.Element | composedBackend.Element).associateValue(node)
       } else {
         ;(owner.getBackendContext() as domlikeBackend.Context).associateValue(
           backendElement as domlikeBackend.Element,
@@ -221,7 +218,7 @@ export class NativeNode extends Element {
             listener,
           )
         } else {
-          ;(backendElement as backend.Element | composedBackend.Element).setModelBindingStat?.(
+          ;(backendElement as backend.Element | composedBackend.Element).setModelBindingStat(
             propName,
             listener,
           )
