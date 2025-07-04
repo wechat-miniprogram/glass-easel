@@ -232,12 +232,7 @@ describe('backend', () => {
         value: '123',
       },
     })
-    let root: any
-    try {
-      root = glassEasel.Component.createWithContext('root', rootDef, shadowDomBackend)
-    } catch (e) {
-      debugger
-    }
+    const root = glassEasel.Component.createWithContext('root', rootDef, shadowDomBackend)
     root.destroyBackendElementOnDetach()
     const input = root.getShadowRoot()!.childNodes[0]!
     const inputOnView = getViewNode(input) as glassEasel.GeneralComponent
