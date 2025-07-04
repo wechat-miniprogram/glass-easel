@@ -23,7 +23,7 @@ import { replayShadowBackend } from './replay'
 import { EmptyTemplateEngine } from './template_engine'
 import { initValues, updateValues, type IDGenerator } from './utils'
 
-export const enum ShadowDomElementType {
+export const enum ShadowSyncElementType {
   Fragment,
   Element,
   TextNode,
@@ -32,33 +32,33 @@ export const enum ShadowDomElementType {
   VirtualNode,
 }
 
-export class ShadowDomElement implements GlassEaselBackend.Element {
+export class ShadowSyncElement implements GlassEaselBackend.Element {
   public _id: number
 
   public __wxElement: Element | undefined
-  public shadowRoot: ShadowDomShadowRoot | undefined
+  public shadowRoot: ShadowSyncShadowRoot | undefined
 
   /** @internal */
   static _prepareElement(
-    context: ShadowDomBackendContext,
-    elem: ShadowDomElement,
+    context: ShadowSyncBackendContext,
+    elem: ShadowSyncElement,
     logicalName: string,
     stylingName: string,
-    ownerShadowRoot: ShadowDomShadowRoot,
-  ): ShadowDomElement {
+    ownerShadowRoot: ShadowSyncShadowRoot,
+  ): ShadowSyncElement {
     context.channel.createElement(elem._id, logicalName, stylingName, ownerShadowRoot._id)
     return elem
   }
 
   static createElement(
-    context: ShadowDomBackendContext,
+    context: ShadowSyncBackendContext,
     logicalName: string,
     stylingName: string,
-    ownerShadowRoot: ShadowDomShadowRoot,
-  ): ShadowDomElement {
-    return ShadowDomElement._prepareElement(
+    ownerShadowRoot: ShadowSyncShadowRoot,
+  ): ShadowSyncElement {
+    return ShadowSyncElement._prepareElement(
       context,
-      new ShadowDomElement(context, ShadowDomElementType.Element, ownerShadowRoot),
+      new ShadowSyncElement(context, ShadowSyncElementType.Element, ownerShadowRoot),
       logicalName,
       stylingName,
       ownerShadowRoot,
@@ -67,9 +67,9 @@ export class ShadowDomElement implements GlassEaselBackend.Element {
 
   /** @internal */
   static _prepareComponent(
-    context: ShadowDomBackendContext,
-    componentElement: ShadowDomElement,
-    shadowRoot: ShadowDomShadowRoot,
+    context: ShadowSyncBackendContext,
+    componentElement: ShadowSyncElement,
+    shadowRoot: ShadowSyncShadowRoot,
     tagName: string,
     external: boolean,
     virtualHost: boolean,
@@ -78,8 +78,8 @@ export class ShadowDomElement implements GlassEaselBackend.Element {
     externalClasses: string[] | undefined,
     slotMode: SlotMode | null,
     writeIdToDOM: boolean,
-    ownerShadowRoot: ShadowDomShadowRoot,
-  ): ShadowDomElement {
+    ownerShadowRoot: ShadowSyncShadowRoot,
+  ): ShadowSyncElement {
     context._checkStyleScope(styleScope)
     context._checkStyleScope(extraStyleScope)
     componentElement.shadowRoot = shadowRoot
@@ -100,7 +100,7 @@ export class ShadowDomElement implements GlassEaselBackend.Element {
   }
 
   static createComponent(
-    context: ShadowDomBackendContext,
+    context: ShadowSyncBackendContext,
     tagName: string,
     external: boolean,
     virtualHost: boolean,
@@ -109,12 +109,12 @@ export class ShadowDomElement implements GlassEaselBackend.Element {
     externalClasses: string[] | undefined,
     slotMode: SlotMode,
     writeIdToDOM: boolean,
-    ownerShadowRoot: ShadowDomShadowRoot,
-  ): ShadowDomElement {
-    return ShadowDomElement._prepareComponent(
+    ownerShadowRoot: ShadowSyncShadowRoot,
+  ): ShadowSyncElement {
+    return ShadowSyncElement._prepareComponent(
       context,
-      new ShadowDomElement(context, ShadowDomElementType.Component, ownerShadowRoot),
-      new ShadowDomShadowRoot(context),
+      new ShadowSyncElement(context, ShadowSyncElementType.Component, ownerShadowRoot),
+      new ShadowSyncShadowRoot(context),
       tagName,
       external,
       virtualHost,
@@ -129,23 +129,23 @@ export class ShadowDomElement implements GlassEaselBackend.Element {
 
   /** @internal */
   static _prepareTextNode(
-    context: ShadowDomBackendContext,
-    elem: ShadowDomElement,
+    context: ShadowSyncBackendContext,
+    elem: ShadowSyncElement,
     textContent: string,
-    ownerShadowRoot: ShadowDomShadowRoot,
-  ): ShadowDomElement {
+    ownerShadowRoot: ShadowSyncShadowRoot,
+  ): ShadowSyncElement {
     context.channel.createTextNode(elem._id, textContent, ownerShadowRoot._id)
     return elem
   }
 
   static createTextNode(
-    context: ShadowDomBackendContext,
+    context: ShadowSyncBackendContext,
     textContent: string,
-    ownerShadowRoot: ShadowDomShadowRoot,
-  ): ShadowDomElement {
-    return ShadowDomElement._prepareTextNode(
+    ownerShadowRoot: ShadowSyncShadowRoot,
+  ): ShadowSyncElement {
+    return ShadowSyncElement._prepareTextNode(
       context,
-      new ShadowDomElement(context, ShadowDomElementType.TextNode, ownerShadowRoot),
+      new ShadowSyncElement(context, ShadowSyncElementType.TextNode, ownerShadowRoot),
       textContent,
       ownerShadowRoot,
     )
@@ -153,38 +153,38 @@ export class ShadowDomElement implements GlassEaselBackend.Element {
 
   /** @internal */
   static _prepareVirtualNode(
-    context: ShadowDomBackendContext,
-    elem: ShadowDomElement,
+    context: ShadowSyncBackendContext,
+    elem: ShadowSyncElement,
     virtualName: string,
-    ownerShadowRoot: ShadowDomShadowRoot,
-  ): ShadowDomElement {
+    ownerShadowRoot: ShadowSyncShadowRoot,
+  ): ShadowSyncElement {
     context.channel.createVirtualNode(elem._id, virtualName, ownerShadowRoot._id)
     return elem
   }
 
   static createVirtualNode(
-    context: ShadowDomBackendContext,
+    context: ShadowSyncBackendContext,
     virtualName: string,
-    ownerShadowRoot: ShadowDomShadowRoot,
-  ): ShadowDomElement {
-    return ShadowDomElement._prepareVirtualNode(
+    ownerShadowRoot: ShadowSyncShadowRoot,
+  ): ShadowSyncElement {
+    return ShadowSyncElement._prepareVirtualNode(
       context,
-      new ShadowDomElement(context, ShadowDomElementType.VirtualNode, ownerShadowRoot),
+      new ShadowSyncElement(context, ShadowSyncElementType.VirtualNode, ownerShadowRoot),
       virtualName,
       ownerShadowRoot,
     )
   }
 
-  static createFragment(context: ShadowDomBackendContext): ShadowDomElement {
-    const elem = new ShadowDomElement(context, ShadowDomElementType.Fragment, null)
+  static createFragment(context: ShadowSyncBackendContext): ShadowSyncElement {
+    const elem = new ShadowSyncElement(context, ShadowSyncElementType.Fragment, null)
     context.channel.createFragment(elem._id)
     return elem
   }
 
   protected constructor(
-    protected _context: ShadowDomBackendContext,
-    public type: ShadowDomElementType,
-    public ownerShadowRoot: ShadowDomShadowRoot | null,
+    protected _context: ShadowSyncBackendContext,
+    public type: ShadowSyncElementType,
+    public ownerShadowRoot: ShadowSyncShadowRoot | null,
   ) {
     const id = (this._id = _context._genElementId())
     _context._setElementId(id, this)
@@ -199,35 +199,35 @@ export class ShadowDomElement implements GlassEaselBackend.Element {
     this._context.channel.associateValue(this._id, this._context.getAssociateValueInfo(v))
   }
 
-  getShadowRoot(): ShadowDomShadowRoot | undefined {
+  getShadowRoot(): ShadowSyncShadowRoot | undefined {
     return this.shadowRoot
   }
 
-  appendChild(child: ShadowDomElement): void {
+  appendChild(child: ShadowSyncElement): void {
     this._context.channel.appendChild(this._id, child._id)
   }
 
-  removeChild(child: ShadowDomElement): void {
+  removeChild(child: ShadowSyncElement): void {
     this._context.channel.removeChild(this._id, child._id)
   }
 
-  insertBefore(child: ShadowDomElement, before: ShadowDomElement): void {
+  insertBefore(child: ShadowSyncElement, before: ShadowSyncElement): void {
     this._context.channel.insertBefore(this._id, child._id, before._id)
   }
 
-  replaceChild(child: ShadowDomElement, oldChild: ShadowDomElement): void {
+  replaceChild(child: ShadowSyncElement, oldChild: ShadowSyncElement): void {
     this._context.channel.replaceChild(this._id, child._id, oldChild._id)
   }
 
-  spliceBefore(before: ShadowDomElement, deleteCount: number, list: ShadowDomElement): void {
+  spliceBefore(before: ShadowSyncElement, deleteCount: number, list: ShadowSyncElement): void {
     this._context.channel.spliceBefore(this._id, before._id, deleteCount, list._id)
   }
 
-  spliceAppend(list: ShadowDomElement): void {
+  spliceAppend(list: ShadowSyncElement): void {
     this._context.channel.spliceAppend(this._id, list._id)
   }
 
-  spliceRemove(start: ShadowDomElement, deleteCount: number): void {
+  spliceRemove(start: ShadowSyncElement, deleteCount: number): void {
     this._context.channel.spliceRemove(this._id, start._id, deleteCount)
   }
 
@@ -243,11 +243,11 @@ export class ShadowDomElement implements GlassEaselBackend.Element {
     this._context.channel.setSlotName(this._id, name)
   }
 
-  setSlotElement(slot: ShadowDomElement | null): void {
+  setSlotElement(slot: ShadowSyncElement | null): void {
     this._context.channel.setSlotElement(this._id, slot ? slot._id : slot)
   }
 
-  setExternalSlot(slot: ShadowDomElement): void {
+  setExternalSlot(slot: ShadowSyncElement): void {
     this._context.channel.setExternalSlot(this._id, slot._id)
   }
 
@@ -355,7 +355,7 @@ export class ShadowDomElement implements GlassEaselBackend.Element {
   }
 
   createIntersectionObserver(
-    relativeElement: ShadowDomElement | null,
+    relativeElement: ShadowSyncElement | null,
     relativeElementMargin: string,
     thresholds: number[],
     listener: (res: GlassEaselBackend.IntersectionStatus) => void,
@@ -396,21 +396,21 @@ export class ShadowDomElement implements GlassEaselBackend.Element {
   }
 }
 
-export class ShadowDomShadowRoot
-  extends ShadowDomElement
+export class ShadowSyncShadowRoot
+  extends ShadowSyncElement
   implements GlassEaselBackend.ShadowRootContext
 {
   /** @internal */
-  constructor(context: ShadowDomBackendContext) {
-    super(context, ShadowDomElementType.ShadowRoot, null)
+  constructor(context: ShadowSyncBackendContext) {
+    super(context, ShadowSyncElementType.ShadowRoot, null)
     this.ownerShadowRoot = this
   }
 
-  createElement(logicalName: string, stylingName: string): ShadowDomElement {
-    return ShadowDomElement.createElement(this._context, logicalName, stylingName, this)
+  createElement(logicalName: string, stylingName: string): ShadowSyncElement {
+    return ShadowSyncElement.createElement(this._context, logicalName, stylingName, this)
   }
-  createTextNode(content: string): ShadowDomElement {
-    return ShadowDomElement.createTextNode(this._context, content, this)
+  createTextNode(content: string): ShadowSyncElement {
+    return ShadowSyncElement.createTextNode(this._context, content, this)
   }
   createComponent(
     tagName: string,
@@ -421,8 +421,8 @@ export class ShadowDomShadowRoot
     externalClasses: string[] | undefined,
     slotMode: SlotMode,
     writeIdToDOM: boolean,
-  ): ShadowDomElement {
-    return ShadowDomElement.createComponent(
+  ): ShadowSyncElement {
+    return ShadowSyncElement.createComponent(
       this._context,
       tagName,
       external,
@@ -435,18 +435,18 @@ export class ShadowDomShadowRoot
       this,
     )
   }
-  createVirtualNode(virtualName: string): ShadowDomElement {
-    return ShadowDomElement.createVirtualNode(this._context, virtualName, this)
+  createVirtualNode(virtualName: string): ShadowSyncElement {
+    return ShadowSyncElement.createVirtualNode(this._context, virtualName, this)
   }
 }
 
-export class ShadowDomBackendContext implements GlassEaselBackend.Context {
+export class ShadowSyncBackendContext implements GlassEaselBackend.Context {
   mode: BackendMode.Shadow = 1
 
   private _elementIdGen: IDGenerator
-  private _elementIdMap: (ShadowDomElement | undefined)[] = []
+  private _elementIdMap: (ShadowSyncElement | undefined)[] = []
 
-  private _shadowRoot: ShadowDomShadowRoot
+  private _shadowRoot: ShadowSyncShadowRoot
 
   private _$registeredStyleSheets = [] as [string, unknown][]
   private _$appendedStyleSheets = [] as [number, string, number | undefined][]
@@ -486,7 +486,7 @@ export class ShadowDomBackendContext implements GlassEaselBackend.Context {
   ) {
     this._elementIdGen = idGenerator()
     this._traceIdGen = idGenerator()
-    this._shadowRoot = new ShadowDomShadowRoot(this)
+    this._shadowRoot = new ShadowSyncShadowRoot(this)
     this.initContext()
   }
 
@@ -519,7 +519,7 @@ export class ShadowDomBackendContext implements GlassEaselBackend.Context {
   getAssociateValueInfo(node: Node): Record<string, unknown> {
     const behavior = node.asGeneralComponent()?.getComponentDefinition().behavior
     return {
-      isReflect: behavior && ShadowDomBackendContext._reflectingComponentBehaviors.has(behavior),
+      isReflect: behavior && ShadowSyncBackendContext._reflectingComponentBehaviors.has(behavior),
     }
   }
 
@@ -602,12 +602,12 @@ export class ShadowDomBackendContext implements GlassEaselBackend.Context {
     this.channel.render(cb)
   }
 
-  getRootNode(): ShadowDomShadowRoot {
+  getRootNode(): ShadowSyncShadowRoot {
     return this._shadowRoot
   }
 
-  createFragment(): ShadowDomElement {
-    return ShadowDomElement.createFragment(this)
+  createFragment(): ShadowSyncElement {
+    return ShadowSyncElement.createFragment(this)
   }
 
   onEvent(
@@ -640,7 +640,7 @@ export class ShadowDomBackendContext implements GlassEaselBackend.Context {
     return this._elementIdGen.gen()
   }
 
-  _setElementId(id: number, elem: ShadowDomElement) {
+  _setElementId(id: number, elem: ShadowSyncElement) {
     this._elementIdMap[id] = elem
   }
 
@@ -683,41 +683,41 @@ export class ShadowDomBackendContext implements GlassEaselBackend.Context {
   replay(
     glassEasel: typeof import('glass-easel'),
     roots: Node[],
-    getShadowDomElement: (elem: Node) => ShadowDomElement,
+    getShadowSyncElement: (elem: Node) => ShadowSyncElement,
   ) {
     roots.forEach((root) => {
       replayShadowBackend(glassEasel, this, root, {
-        createElement: (ownerShadowRoot: ShadowDomShadowRoot, elem) => {
+        createElement: (ownerShadowRoot: ShadowSyncShadowRoot, elem) => {
           let be
           if (glassEasel.TextNode.isTextNode(elem)) {
-            be = ShadowDomElement._prepareTextNode(
+            be = ShadowSyncElement._prepareTextNode(
               this,
-              getShadowDomElement(elem),
+              getShadowSyncElement(elem),
               elem.textContent,
               ownerShadowRoot,
             )
           } else if (glassEasel.NativeNode.isNativeNode(elem)) {
-            be = ShadowDomElement._prepareElement(
+            be = ShadowSyncElement._prepareElement(
               this,
-              getShadowDomElement(elem),
+              getShadowSyncElement(elem),
               elem.is,
               elem.stylingName,
               ownerShadowRoot,
             )
           } else if (glassEasel.VirtualNode.isVirtualNode(elem)) {
             // shadowRoot is created by createComponent, ignore it
-            be = ShadowDomElement._prepareVirtualNode(
+            be = ShadowSyncElement._prepareVirtualNode(
               this,
-              getShadowDomElement(elem),
+              getShadowSyncElement(elem),
               elem.is,
               ownerShadowRoot,
             )
           } else if (glassEasel.Component.isComponent(elem)) {
             const options = elem.getComponentOptions()
-            be = ShadowDomElement._prepareComponent(
+            be = ShadowSyncElement._prepareComponent(
               this,
-              getShadowDomElement(elem),
-              getShadowDomElement(elem.getShadowRoot()!) as ShadowDomShadowRoot,
+              getShadowSyncElement(elem),
+              getShadowSyncElement(elem.getShadowRoot()!) as ShadowSyncShadowRoot,
               elem.tagName,
               elem.isExternal(),
               elem.isVirtual(),
@@ -734,7 +734,7 @@ export class ShadowDomBackendContext implements GlassEaselBackend.Context {
           return be
         },
       })
-      this._shadowRoot.appendChild(getShadowDomElement(root))
+      this._shadowRoot.appendChild(getShadowSyncElement(root))
     })
   }
 
@@ -752,7 +752,7 @@ export class ShadowDomBackendContext implements GlassEaselBackend.Context {
   ) {
     return class SyncTemplateEngine implements templateEngine.Template {
       static create(behavior: GeneralBehavior, componentOptions: NormalizedComponentOptions) {
-        ShadowDomBackendContext._reflectingComponentBehaviors.add(behavior)
+        ShadowSyncBackendContext._reflectingComponentBehaviors.add(behavior)
         return new SyncTemplateEngine(TemplateEngine.create(behavior, componentOptions))
       }
 
@@ -770,11 +770,11 @@ export class ShadowDomBackendContext implements GlassEaselBackend.Context {
         createShadowRoot: (component: GeneralComponent) => ShadowRoot,
       ): templateEngine.TemplateInstance {
         const context = elem.getBackendContext()
-        if (!(context instanceof ShadowDomBackendContext)) {
+        if (!(context instanceof ShadowSyncBackendContext)) {
           throw new Error('')
         }
         const { channel } = context
-        const backendElement = elem.getBackendElement() as ShadowDomElement
+        const backendElement = elem.getBackendElement() as ShadowSyncElement
         const actualInstance = this.template.createInstance(elem, createShadowRoot)
 
         const instance: templateEngine.TemplateInstance = {
@@ -807,9 +807,9 @@ export const hookBuilderToSyncData = <TBuilder extends GeneralBehaviorBuilder>(
 
   const getContextFromMethodCaller = (methodCaller: GeneralComponent) => {
     const component: GeneralComponent = methodCallerMap.get(methodCaller) || methodCaller
-    const context = component.getBackendContext() as ShadowDomBackendContext
-    const backendElement = component.getBackendElement() as ShadowDomElement
-    if (!(context instanceof ShadowDomBackendContext)) {
+    const context = component.getBackendContext() as ShadowSyncBackendContext
+    const backendElement = component.getBackendElement() as ShadowSyncElement
+    if (!(context instanceof ShadowSyncBackendContext)) {
       throw new Error('')
     }
     return { component, context, backendElement }
@@ -896,7 +896,7 @@ export const hookBuilderToSyncData = <TBuilder extends GeneralBehaviorBuilder>(
 }
 
 export const getNodeId = (node: Node) =>
-  (node.getBackendElement() as unknown as ShadowDomElement)._id
+  (node.getBackendElement() as unknown as ShadowSyncElement)._id
 
 export { Channel, ChannelEventType, MessageChannelDataSide } from './message_channel'
 export { ReplayHandler, replayShadowBackend } from './replay'

@@ -1,8 +1,8 @@
 import * as glassEasel from 'glass-easel'
 import {
   MessageChannelDataSide,
-  ShadowDomBackendContext,
-  ShadowDomElement,
+  ShadowSyncBackendContext,
+  ShadowSyncElement,
 } from '../../src/backend'
 import { getNodeId } from '../../src/message_channel'
 import { getLinearIdGenerator } from '../../src/utils'
@@ -10,8 +10,8 @@ import { MessageChannelViewSide, ViewController } from '../../src/view_controlle
 
 export { execWithWarn, multiTmpl, tmpl } from '../../../glass-easel/tests/base/env'
 ;(['tagName', 'nodeType', 'textContent', 'TEXT_NODE'] as (keyof Element)[]).forEach((key) => {
-  Object.defineProperty(ShadowDomElement.prototype, key, {
-    get(this: ShadowDomElement) {
+  Object.defineProperty(ShadowSyncElement.prototype, key, {
+    get(this: ShadowSyncElement) {
       return (
         (
           messageChannelViewSide.getNode(this._id) as glassEasel.Node
@@ -21,9 +21,9 @@ export { execWithWarn, multiTmpl, tmpl } from '../../../glass-easel/tests/base/e
   })
 })
 
-Object.defineProperties(ShadowDomElement.prototype, {
+Object.defineProperties(ShadowSyncElement.prototype, {
   getAttribute: {
-    get(this: ShadowDomElement) {
+    get(this: ShadowSyncElement) {
       const nodeOnView = (
         messageChannelViewSide.getNode(this._id) as glassEasel.Node
       ).getBackendElement() as unknown as Element
@@ -31,7 +31,7 @@ Object.defineProperties(ShadowDomElement.prototype, {
     },
   },
   parentNode: {
-    get(this: ShadowDomElement) {
+    get(this: ShadowSyncElement) {
       const parentNodeOnView = (
         (
           messageChannelViewSide.getNode(this._id) as glassEasel.Node
@@ -42,8 +42,8 @@ Object.defineProperties(ShadowDomElement.prototype, {
     },
   },
   childNodes: {
-    get(this: ShadowDomElement) {
-      const childNodes: ShadowDomElement[] = []
+    get(this: ShadowSyncElement) {
+      const childNodes: ShadowSyncElement[] = []
       const elementOnView = messageChannelViewSide.getNode(this._id) as glassEasel.Element
       elementOnView.forEachNonVirtualComposedChild((node) => {
         childNodes.push(shadowDomBackend._getElementId(getNodeId(node)!)!)
@@ -52,7 +52,7 @@ Object.defineProperties(ShadowDomElement.prototype, {
     },
   },
   innerHTML: {
-    get(this: ShadowDomElement) {
+    get(this: ShadowSyncElement) {
       const nodeOnView = (
         messageChannelViewSide.getNode(this._id) as glassEasel.Node
       ).getBackendElement() as unknown as Element
@@ -160,7 +160,7 @@ const createContext = (
     getLinearIdGenerator,
   )
 
-  const shadowDomBackend = new ShadowDomBackendContext(
+  const shadowDomBackend = new ShadowSyncBackendContext(
     messageChannelDataSide,
     dataComponentSpace.styleScopeManager,
     getLinearIdGenerator,
@@ -200,7 +200,7 @@ shadowDomBackend.onEvent(
 )
 
 export function getViewNode<T extends glassEasel.Node>(elem: T): T {
-  const shadowDomNode = elem.getBackendElement() as ShadowDomElement
+  const shadowDomNode = elem.getBackendElement() as ShadowSyncElement
 
   return messageChannelViewSide.getNode(shadowDomNode._id) as glassEasel.Node as T
 }

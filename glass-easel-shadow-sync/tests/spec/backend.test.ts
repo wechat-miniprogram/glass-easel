@@ -1,9 +1,9 @@
 import * as glassEasel from 'glass-easel'
 import { virtual as matchElementWithDom } from '../../../glass-easel/tests/base/match'
 import {
-  ShadowDomBackendContext,
+  ShadowSyncBackendContext,
   hookBuilderToSyncData,
-  type ShadowDomElement,
+  type ShadowSyncElement,
 } from '../../src/backend'
 import { getViewNode, shadowDomBackend, tmpl, viewComponentSpace } from '../base/env'
 
@@ -154,7 +154,7 @@ describe('backend', () => {
         is: 'wx-textarea',
         options: {
           externalComponent: true,
-          templateEngine: ShadowDomBackendContext.hookReflectTemplateEngine(),
+          templateEngine: ShadowSyncBackendContext.hookReflectTemplateEngine(),
         },
         properties: {
           disabled: Boolean,
@@ -288,7 +288,7 @@ describe('backend', () => {
       },
     })
     const root = glassEasel.Component.createWithContext('root', rootDef, shadowDomBackend)
-    shadowDomBackend.getRootNode().appendChild(root.getBackendElement() as ShadowDomElement)
+    shadowDomBackend.getRootNode().appendChild(root.getBackendElement() as ShadowSyncElement)
     glassEasel.Component.pretendAttached(root)
     root.destroyBackendElementOnDetach()
 
@@ -330,7 +330,7 @@ describe('backend', () => {
         is: 'list',
         options: {
           dynamicSlots: true,
-          templateEngine: ShadowDomBackendContext.hookReflectTemplateEngine(
+          templateEngine: ShadowSyncBackendContext.hookReflectTemplateEngine(
             glassEasel.template.getDefaultTemplateEngine(),
           ),
         },
@@ -371,7 +371,7 @@ describe('backend', () => {
       },
     })
     const root = glassEasel.Component.createWithContext('root', rootDef, shadowDomBackend)
-    shadowDomBackend.getRootNode().appendChild(root.getBackendElement() as ShadowDomElement)
+    shadowDomBackend.getRootNode().appendChild(root.getBackendElement() as ShadowSyncElement)
     glassEasel.Component.pretendAttached(root)
     root.destroyBackendElementOnDetach()
 
