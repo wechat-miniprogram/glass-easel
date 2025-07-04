@@ -237,6 +237,8 @@ export class Event<TDetail> {
   }
   /** @internal */
   private _$handleListenerReturn: ((ret: unknown) => boolean | void) | undefined
+  /** @internal */
+  private _$hasListener: boolean
 
   constructor(name: string, detail: TDetail, options: EventOptions = {}) {
     const ts = getCurrentTimeStamp()
@@ -253,6 +255,7 @@ export class Event<TDetail> {
     }
     this._$originalEvent = options.originalEvent
     this._$dispatched = false
+    this._$hasListener = false
     this._$handleListenerReturn = options.handleListenerReturn
     if (options.extraFields) {
       Object.assign(this, options.extraFields)
@@ -301,6 +304,10 @@ export class Event<TDetail> {
     return this._$eventBubblingControl.stopped
   }
 
+  hasListener() {
+    return this._$hasListener
+  }
+
   markMutated() {
     this._$eventBubblingControl.mutated = true
   }
@@ -339,8 +346,7 @@ export class Event<TDetail> {
       ? currentTarget.getMethodCaller() || currentTarget
       : currentTarget
     const ev = this.wrapShadowedEvent(targetCaller, mark, currentTargetCaller)
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    ;(this as any)._hasListeners = true
+    this._$hasListener ||= efa.funcArr.hasFunc()
     const ret = efa.funcArr.call(
       currentTargetCaller,
       [ev],

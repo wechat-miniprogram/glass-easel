@@ -72,6 +72,10 @@ export class FuncArrWithMeta<F extends GeneralFuncType, T> {
     return this._$arr
   }
 
+  hasFunc() {
+    return this._$arr !== null && this._$arr.length > 0
+  }
+
   add(func: F, data: T) {
     const item = { f: func, data }
     if (!this._$arr) this._$arr = [item]
