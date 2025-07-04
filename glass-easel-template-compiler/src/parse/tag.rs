@@ -3884,6 +3884,7 @@ mod test {
         case!("&nbsp;", "\u{A0}");
         case!("<div>&#x85;</div>", "<div>\u{85}</div>");
         case!("<div> &#x2028; </div>", "<div> \u{2028} </div>");
+        case!("{{ '\t' }}", r#"{{"\t"}}"#);
     }
 
     #[test]

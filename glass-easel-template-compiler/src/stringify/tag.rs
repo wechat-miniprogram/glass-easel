@@ -8,7 +8,7 @@ use compact_str::CompactString;
 
 use super::stringifier::*;
 use crate::{
-    escape::escape_html_body,
+    escape::{escape_html_body, gen_lit_str},
     parse::{
         expr::Expression,
         tag::{
@@ -1143,54 +1143,93 @@ impl StringifyLine for Value {
         &self,
         stringifier: &mut StringifierLine<'s, 't, 'u, W>,
     ) -> FmtResult {
+        let write_static_as_dynamic = |x: &str, location, stringifier: &mut StringifierLine<W>| {
+            stringifier.write_token_state(
+                "{{",
+                None,
+                location,
+                StringifierLineState::DoubleBraceStart,
+            )?;
+            let quoted = gen_lit_str(x);
+            stringifier.write_token_state(
+                &format!(r#"{}"#, quoted),
+                None,
+                location,
+                StringifierLineState::Normal,
+            )?;
+            stringifier.write_token_state(
+                "}}",
+                None,
+                location,
+                StringifierLineState::DoubleBraceEnd,
+            )?;
+            Ok(())
+        };
         match self {
             Self::Static { value, location } => {
-                let quoted = escape_html_body(&value);
-                stringifier.write_token(&format!("{}", quoted), None, &location)?;
+                if !value.is_empty() && value.chars().find(|x| !crate::parse::is_template_whitespace(*x)).is_none() {
+                    write_static_as_dynamic(&value, location, stringifier)?;
+                } else {
+                    let quoted = escape_html_body(&value);
+                    stringifier.write_token(&format!("{}", quoted), None, &location)?;
+                }
             }
             Self::Dynamic {
                 expression,
                 double_brace_location: _,
                 binding_map_keys: _,
             } => {
-                expression.for_each_static_or_dynamic_part(|value, location| match value {
-                    Expression::LitStr { value, location } => {
-                        stringifier.write_token(&escape_html_body(value), None, location)?;
-                        return Ok(());
+                let need_write_as_dynamic = if let Expression::LitStr { value, location } = &**expression {
+                    if !value.is_empty() && value.chars().find(|x| !crate::parse::is_template_whitespace(*x)).is_none() {
+                        Some((value, location))
+                    } else {
+                        None
                     }
-                    Expression::ToStringWithoutUndefined { value, location } => {
-                        stringifier.write_token_state(
-                            "{{",
-                            None,
-                            &location,
-                            StringifierLineState::DoubleBraceStart,
-                        )?;
-                        StringifyLine::stringify_write(&**value, stringifier)?;
-                        stringifier.write_token_state(
-                            "}}",
-                            None,
-                            &location,
-                            StringifierLineState::DoubleBraceEnd,
-                        )?;
-                        return Ok(());
-                    }
-                    _ => {
-                        stringifier.write_token_state(
-                            "{{",
-                            None,
-                            &location,
-                            StringifierLineState::DoubleBraceStart,
-                        )?;
-                        StringifyLine::stringify_write(value, stringifier)?;
-                        stringifier.write_token_state(
-                            "}}",
-                            None,
-                            &location,
-                            StringifierLineState::DoubleBraceEnd,
-                        )?;
-                        return Ok(());
-                    }
-                })?;
+                } else {
+                    None
+                };
+                if let Some((value, location)) = need_write_as_dynamic {
+                    write_static_as_dynamic(&value, location, stringifier)?;
+                } else {
+                    expression.for_each_static_or_dynamic_part(|value, location| match value {
+                        Expression::LitStr { value, location } => {
+                            stringifier.write_token(&escape_html_body(value), None, location)?;
+                            return Ok(());
+                        }
+                        Expression::ToStringWithoutUndefined { value, location } => {
+                            stringifier.write_token_state(
+                                "{{",
+                                None,
+                                &location,
+                                StringifierLineState::DoubleBraceStart,
+                            )?;
+                            StringifyLine::stringify_write(&**value, stringifier)?;
+                            stringifier.write_token_state(
+                                "}}",
+                                None,
+                                &location,
+                                StringifierLineState::DoubleBraceEnd,
+                            )?;
+                            return Ok(());
+                        }
+                        _ => {
+                            stringifier.write_token_state(
+                                "{{",
+                                None,
+                                &location,
+                                StringifierLineState::DoubleBraceStart,
+                            )?;
+                            StringifyLine::stringify_write(value, stringifier)?;
+                            stringifier.write_token_state(
+                                "}}",
+                                None,
+                                &location,
+                                StringifierLineState::DoubleBraceEnd,
+                            )?;
+                            return Ok(());
+                        }
+                    })?;
+                }
             }
         }
         Ok(())

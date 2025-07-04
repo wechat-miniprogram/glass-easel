@@ -46,7 +46,7 @@ macro_rules! case {
 pub mod expr;
 pub mod tag;
 
-const fn is_template_whitespace(c: char) -> bool {
+pub(crate) const fn is_template_whitespace(c: char) -> bool {
     match c {
         ' ' => true,
         '\x09'..='\x0D' => true,
