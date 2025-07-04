@@ -1167,7 +1167,12 @@ impl StringifyLine for Value {
         };
         match self {
             Self::Static { value, location } => {
-                if !value.is_empty() && value.chars().find(|x| !crate::parse::is_template_whitespace(*x)).is_none() {
+                if !value.is_empty()
+                    && value
+                        .chars()
+                        .find(|x| !crate::parse::is_template_whitespace(*x))
+                        .is_none()
+                {
                     write_static_as_dynamic(&value, location, stringifier)?;
                 } else {
                     let quoted = escape_html_body(&value);
@@ -1179,15 +1184,21 @@ impl StringifyLine for Value {
                 double_brace_location: _,
                 binding_map_keys: _,
             } => {
-                let need_write_as_dynamic = if let Expression::LitStr { value, location } = &**expression {
-                    if !value.is_empty() && value.chars().find(|x| !crate::parse::is_template_whitespace(*x)).is_none() {
-                        Some((value, location))
+                let need_write_as_dynamic =
+                    if let Expression::LitStr { value, location } = &**expression {
+                        if !value.is_empty()
+                            && value
+                                .chars()
+                                .find(|x| !crate::parse::is_template_whitespace(*x))
+                                .is_none()
+                        {
+                            Some((value, location))
+                        } else {
+                            None
+                        }
                     } else {
                         None
-                    }
-                } else {
-                    None
-                };
+                    };
                 if let Some((value, location)) = need_write_as_dynamic {
                     write_static_as_dynamic(&value, location, stringifier)?;
                 } else {
