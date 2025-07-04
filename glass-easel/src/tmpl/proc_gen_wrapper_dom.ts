@@ -25,6 +25,8 @@ type TmplArgs = {
   index?: number
   slotProps?: Record<string, [DataValue, DataPath | null, boolean]>
   slotPropsUpdatePathTree?: Record<string, UpdatePathTreeRoot>
+  staticClasses?: string[] // [class1, class2, ...]
+  styleNameValues?: string[] // [name1, value1, name2, value2, ...]
 }
 export type TmplNode = Node & { _$wxTmplArgs?: TmplArgs; _$wxTmplDevArgs?: TmplDevArgs }
 
@@ -73,7 +75,7 @@ export class ProcGenWrapperDom {
 
   create(data: DataValue): { [field: string]: BindingMapGen[] } | undefined {
     const { shadowRoot, procGen } = this
-    const children = procGen(this as unknown as ProcGenWrapper, true, data, undefined)
+    const children = procGen(this as unknown as ProcGenWrapper, true, data)
     this.handleChildrenCreation(
       children.C as unknown as DefineChildren,
       shadowRoot.shadowRootElement as HTMLElement,
@@ -165,8 +167,13 @@ export class ProcGenWrapperDom {
     noop()
   }
 
+  // set slot value
+  l() {
+    noop()
+  }
+
   // set id
-  i(elem: HTMLElement, v: string) {
+  i = (elem: HTMLElement, v: string) => {
     this.shadowRoot.idMap[v] = elem
   }
 
@@ -175,9 +182,29 @@ export class ProcGenWrapperDom {
     elem.setAttribute('class', v)
   }
 
+  // set a list of classes and use previous value if an item is null
+  e() {
+    noop()
+  }
+
+  // set a single class in the list of classes (should only be used in binding-map updates)
+  ei() {
+    noop()
+  }
+
   // set style or property named `style`
   y(elem: HTMLElement, v: string) {
     elem.setAttribute('style', v)
+  }
+
+  // set a list of styles and use previous value if an item is null
+  w() {
+    noop()
+  }
+
+  // set a single style value in the list of styles (should only be used in binding-map updates)
+  wi() {
+    noop()
   }
 
   // set dataset
@@ -191,7 +218,7 @@ export class ProcGenWrapperDom {
   }
 
   // set event handler
-  v(elem: HTMLElement, evName: string, v: string, final: boolean) {
+  v = (elem: HTMLElement, evName: string, v: string, final: boolean) => {
     const listener = (ev: ShadowedEvent<unknown>) => {
       const ret = this.shadowRoot.comp.callMethod(v, ev) as unknown
       if (final) return false
@@ -214,8 +241,13 @@ export class ProcGenWrapperDom {
   }
 
   // update a attribute
-  a(elem: HTMLElement, name: string, v: unknown) {
+  a = (elem: HTMLElement, name: string, v: unknown) => {
     this.r(elem, name, v)
+  }
+
+  // set a worklet directive value
+  wl() {
+    noop()
   }
 
   // add a change property binding
@@ -225,6 +257,11 @@ export class ProcGenWrapperDom {
 
   // set filter functions for change properties and event listeners
   setFnFilter() {
+    noop()
+  }
+
+  // set event listener wrapper
+  setEventListenerWrapper() {
     noop()
   }
 

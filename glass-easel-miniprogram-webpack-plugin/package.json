@@ -1,7 +1,7 @@
 {
   "name": "glass-easel-miniprogram-webpack-plugin",
   "description": "The webpack plugin of the glass-easel project for MiniProgram file structure",
-  "version": "0.12.1",
+  "version": "0.14.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/wechat-miniprogram/glass-easel.git"

@@ -1401,6 +1401,61 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     matchElementWithDom(elem)
   })
 
+  test('let variable', () => {
+    const def = glassEasel
+      .registerElement({
+        template: tmpl(`
+          <div data:a="{{a}}" data:b="{{b}}" data:c="{{c}}" let:a="" let:b="{{d}}" let:c="{{b * 10}}">
+            <span>{{c}}</span>
+          </div>
+        `),
+        data: {
+          d: 123,
+        },
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    glassEasel.Element.pretendAttached(elem)
+    const div = elem.getShadowRoot()!.childNodes[0]!.asElement()!
+    expect(domHtml(elem)).toBe('<div><span>1230</span></div>')
+    expect(div.dataset.a).toBe('')
+    expect(div.dataset.b).toBe(123)
+    expect(div.dataset.c).toBe(1230)
+    matchElementWithDom(elem)
+    elem.setData({
+      d: 456,
+    })
+    expect(domHtml(elem)).toBe('<div><span>4560</span></div>')
+    expect(div.dataset.a).toBe('')
+    expect(div.dataset.b).toBe(456)
+    expect(div.dataset.c).toBe(4560)
+    matchElementWithDom(elem)
+  })
+
+  test('let variable on block', () => {
+    const def = glassEasel
+      .registerElement({
+        template: tmpl(`
+          <block let:c="{{d * 10}}">
+            <span>{{c}}</span>
+          </block>
+        `),
+        data: {
+          d: 123,
+        },
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe('<span>1230</span>')
+    matchElementWithDom(elem)
+    elem.setData({
+      d: 456,
+    })
+    expect(domHtml(elem)).toBe('<span>4560</span>')
+    matchElementWithDom(elem)
+  })
+
   test('tag name cases', () => {
     const def = glassEasel
       .registerElement({
@@ -1950,6 +2005,162 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     })
     expect(domHtml(elem)).toBe(
       '<def wx-host="p"><sub class="p--static"><div class="p--static root pp--root dynamic pp--dynamic"></div></sub></def>',
+    )
+    matchElementWithDom(elem)
+  })
+
+  test('class list syntax (virtual-tree update)', () => {
+    const cs = new glassEasel.ComponentSpace()
+    const def = cs
+      .defineComponent({
+        data: () => ({
+          classA: false,
+        }),
+        template: tmpl(
+          `
+            <div class:c />
+            <div class:a="{{classA}}" class:c class:-b="{{!classA}}" class="-d" />
+          `,
+          { updateMode: 'virtualTree' },
+        ),
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    let changeCount = 0
+    glassEasel.MutationObserver.create(() => {
+      changeCount += 1
+    }).observe(elem.getShadowRoot()!.childNodes[1]!, { properties: true })
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe('<div class="c"></div><div class="-d c -b"></div>')
+    matchElementWithDom(elem)
+    elem.setData({
+      classA: true,
+    })
+    expect(domHtml(elem)).toBe('<div class="c"></div><div class="-d c a"></div>')
+    matchElementWithDom(elem)
+    expect(changeCount).toBe(1)
+    elem.setData({
+      classA: false,
+    })
+    expect(domHtml(elem)).toBe('<div class="c"></div><div class="-d c -b"></div>')
+    matchElementWithDom(elem)
+    expect(changeCount).toBe(2)
+  })
+
+  test('class list syntax (binding-map update)', () => {
+    const cs = new glassEasel.ComponentSpace()
+    const def = cs
+      .defineComponent({
+        data: () => ({
+          classA: false,
+        }),
+        template: tmpl(
+          `
+            <div class:c />
+            <div class:a="{{classA}}" class:c class:-b="{{!classA}}" class="-d" />
+          `,
+          { updateMode: 'bindingMap' },
+        ),
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    let changeCount = 0
+    glassEasel.MutationObserver.create(() => {
+      changeCount += 1
+    }).observe(elem.getShadowRoot()!.childNodes[1]!, { properties: true })
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe('<div class="c"></div><div class="-d c -b"></div>')
+    matchElementWithDom(elem)
+    elem.setData({
+      classA: true,
+    })
+    expect(domHtml(elem)).toBe('<div class="c"></div><div class="-d c a"></div>')
+    matchElementWithDom(elem)
+    expect(changeCount).toBe(1)
+    elem.setData({
+      classA: false,
+    })
+    expect(domHtml(elem)).toBe('<div class="c"></div><div class="-d c -b"></div>')
+    matchElementWithDom(elem)
+    expect(changeCount).toBe(2)
+  })
+
+  test('style list syntax (virtual-tree update)', () => {
+    const cs = new glassEasel.ComponentSpace()
+    const def = cs
+      .defineComponent({
+        data: () => ({
+          fontSize: 16,
+          c: null as string | null,
+        }),
+        template: tmpl(
+          `
+            <div style:color="red" />
+            <div style:font-size="{{ fontSize }}px" style:color="red" style:-wx-color="{{ c }}" style="-wx-font: serif" />
+          `,
+          { updateMode: 'virtualTree' },
+        ),
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe(
+      '<div style="color:red;"></div><div style="-wx-font:serif;font-size:16px;color:red;-wx-color:;"></div>',
+    )
+    matchElementWithDom(elem)
+    elem.setData({
+      fontSize: 20,
+      c: 'blue',
+    })
+    expect(domHtml(elem)).toBe(
+      '<div style="color:red;"></div><div style="-wx-font:serif;font-size:20px;color:red;-wx-color:blue;"></div>',
+    )
+    matchElementWithDom(elem)
+    elem.setData({
+      c: null,
+    })
+    expect(domHtml(elem)).toBe(
+      '<div style="color:red;"></div><div style="-wx-font:serif;font-size:20px;color:red;-wx-color:;"></div>',
+    )
+    matchElementWithDom(elem)
+  })
+
+  test('style list syntax (binding-map update)', () => {
+    const cs = new glassEasel.ComponentSpace()
+    const def = cs
+      .defineComponent({
+        data: () => ({
+          fontSize: 16,
+          c: null as string | null,
+        }),
+        template: tmpl(
+          `
+            <div style:color="red" />
+            <div style:font-size="{{ fontSize }}px" style:color="red" style:-wx-color="{{ c }}" style="-wx-font: serif" />
+          `,
+          { updateMode: 'bindingMap' },
+        ),
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe(
+      '<div style="color:red;"></div><div style="-wx-font:serif;font-size:16px;color:red;-wx-color:;"></div>',
+    )
+    matchElementWithDom(elem)
+    elem.setData({
+      fontSize: 20,
+      c: 'blue',
+    })
+    expect(domHtml(elem)).toBe(
+      '<div style="color:red;"></div><div style="-wx-font:serif;font-size:20px;color:red;-wx-color:blue;"></div>',
+    )
+    matchElementWithDom(elem)
+    elem.setData({
+      c: null,
+    })
+    expect(domHtml(elem)).toBe(
+      '<div style="color:red;"></div><div style="-wx-font:serif;font-size:20px;color:red;-wx-color:;"></div>',
     )
     matchElementWithDom(elem)
   })

@@ -71,6 +71,10 @@ type TmplArgs = {
       oldValue: unknown
     }
   }
+  staticClasses?: string[] // [class1, class2, ...]
+  staticClassesDirty?: boolean
+  styleNameValues?: string[] // [name1, value1, name2, value2, ...]
+  styleNameValuesDirty?: boolean
 }
 export type TmplDevArgs = {
   A?: string[] // active attributes
@@ -101,14 +105,17 @@ const dashToCamelCase = (dash: string): string => {
   return ret
 }
 
-export type ProcGen = (
-  wrapper: ProcGenWrapper,
-  isCreation: boolean,
-  data: DataValue,
-  dataUpdatePathTree: UpdatePathTreeRoot,
-) => {
-  C: DefineChildren
-  B?: { [field: string]: BindingMapGen[] }
+export interface ProcGen {
+  (wrapper: ProcGenWrapper, isCreation: true, data: DataValue): {
+    C: DefineChildren
+    B?: { [field: string]: BindingMapGen[] }
+  }
+  (
+    wrapper: ProcGenWrapper,
+    isCreation: false,
+    data: DataValue,
+    dataUpdatePathTree: UpdatePathTreeNode,
+  ): { C: DefineChildren }
 }
 
 export type ProcGenEnv = {
@@ -192,15 +199,35 @@ export class ProcGenWrapper {
 
   create(data: DataValue): { [field: string]: BindingMapGen[] } | undefined {
     const { shadowRoot, procGen } = this
-    const children = procGen(this, true, data, undefined)
+    const children = procGen(this, true, data)
     this.handleChildrenCreationAndInsert(children.C, shadowRoot, undefined, undefined)
     return children.B
   }
 
-  update(data: DataValue, dataUpdatePathTree: UpdatePathTreeRoot): void {
+  update(data: DataValue, dataUpdatePathTree: UpdatePathTreeNode): void {
     const { shadowRoot, procGen } = this
     const children = procGen(this, false, data, dataUpdatePathTree)
     this.handleChildrenUpdate(children.C, shadowRoot, undefined, undefined)
+  }
+
+  private endBindingMapUpdateForElement(elem: Element) {
+    const tmplArgs = (elem as TmplNode)._$wxTmplArgs
+    if (tmplArgs) {
+      if (tmplArgs.staticClassesDirty) {
+        tmplArgs.staticClassesDirty = false
+        this.applyClassListUpdates(elem)
+      }
+      if (tmplArgs.styleNameValuesDirty) {
+        tmplArgs.styleNameValuesDirty = false
+        this.applyStyleListUpdates(elem)
+      }
+    }
+    if (isComponent(elem)) {
+      if (elem.hasPendingChanges()) {
+        const nodeDataProxy = Component.getDataProxy(elem)
+        nodeDataProxy.applyDataUpdates(true)
+      }
+    }
   }
 
   bindingMapUpdate(
@@ -219,12 +246,7 @@ export class ProcGenWrapper {
         // eslint-disable-next-line no-loop-func
         (elem: Element) => {
           if (prevElement !== null && elem !== prevElement) {
-            if (isComponent(prevElement)) {
-              if (prevElement.hasPendingChanges()) {
-                const nodeDataProxy = Component.getDataProxy(prevElement)
-                nodeDataProxy.applyDataUpdates(true)
-              }
-            }
+            this.endBindingMapUpdateForElement(prevElement)
           }
           prevElement = elem
         },
@@ -235,12 +257,7 @@ export class ProcGenWrapper {
     }
     const elem = prevElement as Element | null
     if (elem !== null) {
-      if (isComponent(elem)) {
-        if (elem.hasPendingChanges()) {
-          const nodeDataProxy = Component.getDataProxy(elem)
-          nodeDataProxy.applyDataUpdates(true)
-        }
-      }
+      this.endBindingMapUpdateForElement(elem)
     }
     return true
   }
@@ -1006,12 +1023,84 @@ export class ProcGenWrapper {
         elem.setExternalClass('class', v)
       }
     }
-    elem.setNodeClass(v)
+    elem.setNodeClass(v as any)
     this.tryCallPropertyChangeListener(elem, 'class', v)
   }
 
-  // set style or property named `style`
+  // set a list of classes and use previous value if an item is null
+  e = (elem: Element, classNames: (string | null)[]) => {
+    const tmplArgs = getTmplArgs(elem)
+    if (!tmplArgs.staticClasses) tmplArgs.staticClasses = new Array(classNames.length)
+    const arr = tmplArgs.staticClasses
+    for (let i = 0; i < classNames.length; i += 1) {
+      const item = classNames[i]
+      if (typeof item === 'string') {
+        arr[i] = item
+      }
+    }
+    this.applyClassListUpdates(elem)
+  }
+
+  // set a single class in the list of classes (should only be used in binding-map updates)
+  ei = (elem: Element, index: number, className: string) => {
+    const tmplArgs = getTmplArgs(elem)
+    if (!tmplArgs.staticClasses) tmplArgs.staticClasses = []
+    const arr = tmplArgs.staticClasses
+    arr[index] = className
+    tmplArgs.staticClassesDirty = true
+  }
+
+  private applyClassListUpdates(elem: Element) {
+    const arr = getTmplArgs(elem).staticClasses!
+    elem.setNodeClassList(arr)
+    this.tryCallPropertyChangeListener(elem, 'class', arr)
+  }
+
+  // set style (or property named `style`)
   y = (elem: Element, v: string) => {
+    if (isComponent(elem) && Component.hasProperty(elem, 'style')) {
+      const nodeDataProxy = Component.getDataProxy(elem)
+      const camelName = dashToCamelCase('style')
+      nodeDataProxy.replaceProperty(camelName, v)
+    } else {
+      elem.setNodeStyle(dataValueToString(v), StyleSegmentIndex.MAIN)
+    }
+    this.tryCallPropertyChangeListener(elem, 'style', v)
+  }
+
+  // set a list of styles and use previous value if an item is null
+  w = (elem: Element, styles: (string | null)[]) => {
+    const tmplArgs = getTmplArgs(elem)
+    if (!tmplArgs.styleNameValues) tmplArgs.styleNameValues = new Array(styles.length)
+    const arr = tmplArgs.styleNameValues
+    for (let i = 0; i < styles.length; i += 2) {
+      const value = styles[i + 1]
+      if (typeof value === 'string') {
+        arr[i] = styles[i] as string
+        arr[i + 1] = value
+      }
+    }
+    this.applyStyleListUpdates(elem)
+  }
+
+  // set a single style value in the list of styles (should only be used in binding-map updates)
+  wi = (elem: Element, valueIndex: number, newValue: string) => {
+    const tmplArgs = getTmplArgs(elem)
+    if (!tmplArgs.styleNameValues) tmplArgs.styleNameValues = []
+    const arr = tmplArgs.styleNameValues
+    const nvIndex = valueIndex * 2
+    arr[nvIndex + 1] = newValue
+    tmplArgs.styleNameValuesDirty = true
+  }
+
+  private applyStyleListUpdates(elem: Element) {
+    const arr = getTmplArgs(elem).styleNameValues!
+    let v = ''
+    for (let i = 0; i < arr.length; i += 2) {
+      const name = arr[i]
+      const value = arr[i + 1]
+      v += `${name}:${value};`
+    }
     if (isComponent(elem) && Component.hasProperty(elem, 'style')) {
       const nodeDataProxy = Component.getDataProxy(elem)
       const camelName = dashToCamelCase('style')

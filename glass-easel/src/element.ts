@@ -496,10 +496,31 @@ export class Element implements NodeCast {
     return this._$virtual
   }
 
-  /** Set the node class */
+  /** Set the node class
+   *
+   * Although this method accepts `string[]`, it contains a deprecated behavior (see `setNodeClassList`).
+   */
+  setNodeClass(classNames: string, index?: StyleSegmentIndex): void
+  /** @deprecated */
+  setNodeClass(classNames: string[], index?: StyleSegmentIndex): void
   setNodeClass(classNames: string | string[], index: StyleSegmentIndex = StyleSegmentIndex.MAIN) {
     if (ENV.DEV) performanceMeasureStart('backend.setClass')
-    const changed = this.classList?.setClassNames(classNames, index)
+    const changed = this.classList?.setClassNames(classNames as any, index)
+    if (ENV.DEV) performanceMeasureEnd()
+    if (changed && this._$mutationObserverTarget) {
+      MutationObserverTarget.callAttrObservers(this, {
+        type: 'properties',
+        target: this,
+        nameType: 'basic',
+        attributeName: 'class',
+      })
+    }
+  }
+
+  /** Toggle the node class */
+  setNodeClassList(classNames: string[], index: StyleSegmentIndex = StyleSegmentIndex.MAIN) {
+    if (ENV.DEV) performanceMeasureStart('backend.setClass')
+    const changed = this.classList?.setClassNameList(classNames as any, index)
     if (ENV.DEV) performanceMeasureEnd()
     if (changed && this._$mutationObserverTarget) {
       MutationObserverTarget.callAttrObservers(this, {

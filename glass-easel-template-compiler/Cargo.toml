@@ -1,6 +1,6 @@
 [package]
 name = "glass-easel-template-compiler"
-version = "0.12.1"
+version = "0.14.0"
 authors = ["LastLeaf <bqfu@163.com>"]
 description = "The template compiler of the glass-easel project."
 license = "MIT"
@@ -22,6 +22,7 @@ js_bindings = []
 c_bindings = ["cbindgen"]
 
 [dependencies]
+cssparser = "0.34"
 entities = "1"
 lazy_static = "1"
 regex = "^1.10.4"

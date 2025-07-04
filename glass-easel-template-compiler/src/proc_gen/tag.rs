@@ -113,7 +113,19 @@ impl Template {
                                                         bmc,
                                                         group,
                                                         &self.path,
-                                                    )
+                                                    )?;
+                                                    w.expr_stmt(|w| {
+                                                        write!(w, "C=!1")?;
+                                                        Ok(())
+                                                    })?;
+                                                    w.expr_stmt(|w| {
+                                                        write!(w, "U=Object.create(null)")?;
+                                                        Ok(())
+                                                    })?;
+                                                    w.expr_stmt(|w| {
+                                                        write!(w, "K=!1")?;
+                                                        Ok(())
+                                                    })
                                                 })
                                             },
                                         )?;
@@ -266,7 +278,7 @@ impl Node {
 
     fn to_proc_gen_define_children_content_inner<W: std::fmt::Write>(
         list: &[Self],
-        var_slot_map: &Option<HashMap<String, (JsIdent, JsIdent)>>,
+        var_slot_map: Option<&HashMap<String, (JsIdent, JsIdent)>>,
         w: &mut JsFunctionScopeWriter<W>,
         scopes: &mut Vec<ScopeVar>,
         bmc: &BindingMapCollector,
@@ -372,13 +384,20 @@ impl Node {
                 }
                 Node::to_proc_gen_define_children_content_inner(
                     list,
-                    &Some(var_slot_map),
+                    Some(&var_slot_map),
                     w,
                     scopes,
                     bmc,
                     group,
                     cur_path,
-                )
+                )?;
+                for (_, var_update_path_tree) in var_slot_map.values() {
+                    w.expr_stmt(|w| {
+                        write!(w, "{}=undefined", var_update_path_tree)?;
+                        Ok(())
+                    })?;
+                }
+                Ok(())
             })?;
             w.expr_stmt(|w| {
                 write!(w, "{}", &writer.finish())?;
@@ -386,7 +405,7 @@ impl Node {
             })
         } else {
             Node::to_proc_gen_define_children_content_inner(
-                list, &None, w, scopes, bmc, group, cur_path,
+                list, None, w, scopes, bmc, group, cur_path,
             )
         }
     }
@@ -509,6 +528,101 @@ impl Element {
         Ok(())
     }
 
+    fn pop_scopes_and_reset_update_path_tree<W: std::fmt::Write>(
+        w: &mut JsFunctionScopeWriter<W>,
+        scopes: &mut Vec<ScopeVar>,
+    ) -> Result<(), TmplError> {
+        let ScopeVar {
+            var: _,
+            update_path_tree,
+            lvalue_path: _,
+        } = scopes.pop().unwrap();
+        if let Some(update_path_tree) = update_path_tree {
+            w.expr_stmt(|w| {
+                write!(w, "{}=undefined", update_path_tree)?;
+                Ok(())
+            })?;
+        }
+        Ok(())
+    }
+
+    fn write_let_vars<W: std::fmt::Write>(
+        w: &mut JsFunctionScopeWriter<W>,
+        scopes: &mut Vec<ScopeVar>,
+        let_vars: &[Attribute],
+    ) -> Result<usize, TmplError> {
+        for let_var in let_vars {
+            let var_name = w.declare_var_on_top_scope()?;
+            let (update_path_tree, lvalue_path) = match &let_var.value {
+                None => {
+                    w.expr_stmt(|w| {
+                        write!(w, "{}=undefined", var_name)?;
+                        Ok(())
+                    })?;
+                    (None, ScopeVarLvaluePath::Invalid)
+                }
+                Some(Value::Static { value, location: _ }) => {
+                    w.expr_stmt(|w| {
+                        write!(w, "{}={}", var_name, gen_lit_str(&value))?;
+                        Ok(())
+                    })?;
+                    (None, ScopeVarLvaluePath::Invalid)
+                }
+                Some(Value::Dynamic {
+                    expression,
+                    double_brace_location: _,
+                    binding_map_keys: _,
+                }) => {
+                    let update_path_tree_var_name = w.declare_var_on_top_scope()?;
+                    let p = expression.to_proc_gen_prepare(w, scopes)?;
+                    let is_lvalue_path_from_data_scope = p.is_lvalue_path_from_data_scope(scopes);
+                    let lvalue_path = match is_lvalue_path_from_data_scope {
+                        None => ScopeVarLvaluePath::Invalid,
+                        Some(from_data_scope) => ScopeVarLvaluePath::Var {
+                            var_name: w.declare_var_on_top_scope()?,
+                            from_data_scope,
+                        },
+                    };
+                    w.expr_stmt(|w| {
+                        write!(w, "{}=C||K?undefined:", update_path_tree_var_name)?;
+                        p.lvalue_state_expr(w, scopes, false)?;
+                        Ok(())
+                    })?;
+                    w.expr_stmt(|w| {
+                        write!(w, "{}=", var_name)?;
+                        p.value_expr(w)?;
+                        Ok(())
+                    })?;
+                    if let ScopeVarLvaluePath::Var { var_name, .. } = &lvalue_path {
+                        w.expr_stmt(|w| {
+                            write!(w, "{}=", var_name)?;
+                            p.lvalue_path(w, scopes, None)?;
+                            Ok(())
+                        })?;
+                    }
+                    (Some(update_path_tree_var_name), lvalue_path)
+                }
+            };
+            scopes.push(ScopeVar {
+                var: var_name,
+                update_path_tree,
+                lvalue_path,
+            });
+        }
+        Ok(let_vars.len())
+    }
+
+    fn clear_let_vars<W: std::fmt::Write>(
+        w: &mut JsFunctionScopeWriter<W>,
+        scopes: &mut Vec<ScopeVar>,
+        count: usize,
+    ) -> Result<(), TmplError> {
+        for _ in 0..count {
+            Self::pop_scopes_and_reset_update_path_tree(w, scopes)?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn to_proc_gen<W: std::fmt::Write>(
         &self,
         w: &mut JsFunctionScopeWriter<W>,
@@ -528,8 +642,10 @@ impl Element {
                 children,
                 generics,
                 extra_attr,
+                let_vars,
                 common,
             } => {
+                let let_vars = Self::write_let_vars(w, scopes, let_vars)?;
                 let slot_kind = SlotKind::new(&common.slot, w, scopes)?;
                 let (child_ident, var_slot_names) =
                     w.declare_var_on_top_scope_init(|w, ident| {
@@ -596,14 +712,152 @@ impl Element {
                             ClassAttribute::String(_, value) => {
                                 write_attribute_value(w, "L", value, scopes, bmc)?;
                             }
-                            ClassAttribute::Multiple(..) => unimplemented!(),
+                            ClassAttribute::Multiple(x) => {
+                                let mut p_list = Vec::with_capacity(x.len());
+                                for (_, name, value) in x.iter() {
+                                    match value.as_ref() {
+                                        Some(Value::Dynamic {
+                                            expression,
+                                            double_brace_location: _,
+                                            binding_map_keys: _,
+                                        }) => {
+                                            let p = expression.to_proc_gen_prepare(w, scopes)?;
+                                            p_list.push((name, Some(p)));
+                                        }
+                                        None | Some(Value::Static { .. }) => {
+                                            p_list.push((name, None));
+                                        }
+                                    }
+                                }
+                                w.expr_stmt(|w| {
+                                    write!(w, "R.e(N,[")?;
+                                    for (i, (name, p)) in p_list.iter().enumerate() {
+                                        if i > 0 {
+                                            write!(w, ",")?;
+                                        }
+                                        if let Some(p) = p {
+                                            write!(w, "C||K||")?;
+                                            p.lvalue_state_expr(w, scopes, false)?;
+                                            write!(w, "?")?;
+                                            p.value_expr(w)?;
+                                            write!(w, r#"?{}:"":null"#, gen_lit_str(&name.name))?;
+                                        } else {
+                                            write!(w, "{}", gen_lit_str(&name.name))?;
+                                        }
+                                    }
+                                    write!(w, "])")?;
+                                    Ok(())
+                                })?;
+                                for (i, (_, name, value)) in x.iter().enumerate() {
+                                    if let Some(Value::Dynamic {
+                                        expression,
+                                        double_brace_location: _,
+                                        binding_map_keys: Some(binding_map_keys),
+                                    }) = value
+                                    {
+                                        if !binding_map_keys.is_empty(bmc) {
+                                            binding_map_keys.to_proc_gen_write_map(
+                                                w,
+                                                bmc,
+                                                |w| {
+                                                    let p = expression
+                                                        .to_proc_gen_prepare(w, scopes)?;
+                                                    w.expr_stmt(|w| {
+                                                        write!(w, "R.ei(N,{},", i)?;
+                                                        p.value_expr(w)?;
+                                                        write!(
+                                                            w,
+                                                            r#"?{}:"")"#,
+                                                            gen_lit_str(&name.name)
+                                                        )?;
+                                                        Ok(())
+                                                    })?;
+                                                    w.expr_stmt(|w| {
+                                                        write!(w, "E(N)")?;
+                                                        Ok(())
+                                                    })
+                                                },
+                                            )?;
+                                        }
+                                    }
+                                }
+                            }
                         }
                         match style {
                             StyleAttribute::None => {}
                             StyleAttribute::String(_, value) => {
                                 write_attribute_value(w, "R.y", value, scopes, bmc)?;
                             }
-                            StyleAttribute::Multiple(..) => unimplemented!(),
+                            StyleAttribute::Multiple(x) => {
+                                let mut p_list = Vec::with_capacity(x.len());
+                                for (_, name, value) in x.iter() {
+                                    match value {
+                                        Value::Dynamic {
+                                            expression,
+                                            double_brace_location: _,
+                                            binding_map_keys: _,
+                                        } => {
+                                            let p = expression.to_proc_gen_prepare(w, scopes)?;
+                                            p_list.push((name, StaticStrOrProcGen::Dynamic(p)));
+                                        }
+                                        Value::Static { value, location: _ } => {
+                                            p_list.push((name, StaticStrOrProcGen::Static(&value)));
+                                        }
+                                    }
+                                }
+                                w.expr_stmt(|w| {
+                                    write!(w, "R.w(N,[")?;
+                                    for (i, (name, p)) in p_list.iter().enumerate() {
+                                        if i > 0 {
+                                            write!(w, ",")?;
+                                        }
+                                        write!(w, "{},", gen_lit_str(&name.name))?;
+                                        match p {
+                                            StaticStrOrProcGen::Dynamic(p) => {
+                                                write!(w, "C||K||")?;
+                                                p.lvalue_state_expr(w, scopes, false)?;
+                                                write!(w, "?Y(")?;
+                                                p.value_expr(w)?;
+                                                write!(w, "):null")?;
+                                            }
+                                            StaticStrOrProcGen::Static(value) => {
+                                                write!(w, "{}", gen_lit_str(value))?;
+                                            }
+                                        }
+                                    }
+                                    write!(w, "])")?;
+                                    Ok(())
+                                })?;
+                                for (i, (_, _, value)) in x.iter().enumerate() {
+                                    if let Value::Dynamic {
+                                        expression,
+                                        double_brace_location: _,
+                                        binding_map_keys: Some(binding_map_keys),
+                                    } = value
+                                    {
+                                        if !binding_map_keys.is_empty(bmc) {
+                                            binding_map_keys.to_proc_gen_write_map(
+                                                w,
+                                                bmc,
+                                                |w| {
+                                                    let p = expression
+                                                        .to_proc_gen_prepare(w, scopes)?;
+                                                    w.expr_stmt(|w| {
+                                                        write!(w, "R.wi(N,{},Y(", i)?;
+                                                        p.value_expr(w)?;
+                                                        write!(w, "))")?;
+                                                        Ok(())
+                                                    })?;
+                                                    w.expr_stmt(|w| {
+                                                        write!(w, "E(N)")?;
+                                                        Ok(())
+                                                    })
+                                                },
+                                            )?;
+                                        }
+                                    }
+                                }
+                            }
                         }
                         for attr in worklet_attributes.iter() {
                             attr.to_proc_gen_as_worklet_property(w, scopes, bmc)?;
@@ -662,13 +916,17 @@ impl Element {
                     }
                     write!(w, ")")?;
                     Ok(())
-                })
+                })?;
+                Self::clear_let_vars(w, scopes, let_vars)?;
+                Ok(())
             }
             ElementKind::Pure {
                 children,
+                let_vars,
                 slot,
                 slot_value_refs: _,
             } => {
+                let let_vars = Self::write_let_vars(w, scopes, let_vars)?;
                 let slot_kind = SlotKind::new(&slot, w, scopes)?;
                 let child_ident = w.declare_var_on_top_scope_init(|w, ident| {
                     Node::to_proc_gen_define_children(
@@ -696,7 +954,9 @@ impl Element {
                     slot_kind.write_as_extra_argument(w)?;
                     write!(w, ")")?;
                     Ok(())
-                })
+                })?;
+                Self::clear_let_vars(w, scopes, let_vars)?;
+                Ok(())
             }
             ElementKind::If {
                 branches,
@@ -833,21 +1093,7 @@ impl Element {
 
                 let lvalue_path_from_data_scope = match &list_expr {
                     ListExpr::Static(_) => None,
-                    ListExpr::Dynamic(p) => {
-                        let has_model_lvalue_path = p.has_model_lvalue_path(scopes);
-                        let has_script_lvalue_path = p.has_script_lvalue_path(scopes);
-                        if has_model_lvalue_path && has_script_lvalue_path {
-                            // simply drop it if we cannot decide it is script or not
-                            // this may happens when conditional expression is used
-                            None
-                        } else if has_model_lvalue_path {
-                            Some(true)
-                        } else if has_script_lvalue_path {
-                            Some(false)
-                        } else {
-                            None
-                        }
-                    }
+                    ListExpr::Dynamic(p) => p.is_lvalue_path_from_data_scope(scopes),
                 };
 
                 let child_ident = w.declare_var_on_top_scope_init(|w, ident| {
@@ -925,7 +1171,11 @@ impl Element {
                                             bmc,
                                             group,
                                             cur_path,
-                                        )
+                                        )?;
+
+                                        Self::pop_scopes_and_reset_update_path_tree(w, scopes)?;
+                                        Self::pop_scopes_and_reset_update_path_tree(w, scopes)?;
+                                        Ok(())
                                     })?;
 
                                     w.expr_stmt(|w| {
@@ -936,8 +1186,6 @@ impl Element {
                             )
                         },
                     )?;
-                    scopes.pop();
-                    scopes.pop();
                     Ok(ident)
                 })?;
                 w.expr_stmt(|w| {
@@ -950,14 +1198,14 @@ impl Element {
                             p.value_expr(w)?;
                             write!(
                                 w,
-                                ",{},U?",
+                                ",{},C||K?undefined:",
                                 match key.1.name.as_str() {
                                     "" => "null".into(),
                                     key => gen_lit_str(key),
                                 }
                             )?;
                             p.lvalue_state_expr(w, scopes, false)?;
-                            write!(w, ":undefined,")?;
+                            write!(w, ",")?;
                             if lvalue_path_from_data_scope.is_some() {
                                 p.lvalue_path(w, scopes, None)?;
                             } else {
@@ -1016,9 +1264,9 @@ impl Element {
                                         var_key, var_target, var_target
                                     )?;
                                     p.value_expr(w)?;
-                                    write!(w, ",K||(U?")?;
+                                    write!(w, ",K||(C?Object.create(null):")?;
                                     p.lvalue_state_expr(w, scopes, true)?;
-                                    write!(w, ":Object.create(null))).C(C,T,E,B,F,S,J)")?;
+                                    write!(w, ")).C(C,T,E,B,F,S,J)")?;
                                     Ok(())
                                 })
                             }
