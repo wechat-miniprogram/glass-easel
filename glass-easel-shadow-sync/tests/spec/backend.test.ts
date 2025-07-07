@@ -5,7 +5,7 @@ import {
   hookBuilderToSyncData,
   type ShadowSyncElement,
 } from '../../src/backend'
-import { getViewNode, shadowDomBackend, tmpl, viewComponentSpace } from '../base/env'
+import { getViewNode, shadowSyncBackend, tmpl, viewComponentSpace } from '../base/env'
 
 const componentSpace = new glassEasel.ComponentSpace()
 componentSpace.updateComponentOptions({
@@ -37,7 +37,7 @@ describe('backend', () => {
         text: '',
       },
     })
-    const elem = glassEasel.Component.createWithContext('root', rootDef, shadowDomBackend)
+    const elem = glassEasel.Component.createWithContext('root', rootDef, shadowSyncBackend)
     elem.destroyBackendElementOnDetach()
 
     expect(domHtml(elem)).toEqual('')
@@ -84,7 +84,7 @@ describe('backend', () => {
         },
       },
     })
-    const root = glassEasel.Component.createWithContext('root', rootDef, shadowDomBackend)
+    const root = glassEasel.Component.createWithContext('root', rootDef, shadowSyncBackend)
     root.destroyBackendElementOnDetach()
 
     expect(domHtml(root)).toEqual('<wx-button><button disabled="">123</button></wx-button>')
@@ -114,7 +114,7 @@ describe('backend', () => {
       `),
     })
 
-    const root = glassEasel.Component.createWithContext('root', compDef, shadowDomBackend)
+    const root = glassEasel.Component.createWithContext('root', compDef, shadowSyncBackend)
     root.destroyBackendElementOnDetach()
 
     const viewRoot = getViewNode(root) as glassEasel.GeneralComponent
@@ -186,7 +186,7 @@ describe('backend', () => {
         },
       },
     })
-    const root = glassEasel.Component.createWithContext('root', rootDef, shadowDomBackend)
+    const root = glassEasel.Component.createWithContext('root', rootDef, shadowSyncBackend)
     root.destroyBackendElementOnDetach()
 
     expect(domHtml(root)).toEqual(
@@ -232,7 +232,7 @@ describe('backend', () => {
         value: '123',
       },
     })
-    const root = glassEasel.Component.createWithContext('root', rootDef, shadowDomBackend)
+    const root = glassEasel.Component.createWithContext('root', rootDef, shadowSyncBackend)
     root.destroyBackendElementOnDetach()
     const input = root.getShadowRoot()!.childNodes[0]!
     const inputOnView = getViewNode(input) as glassEasel.GeneralComponent
@@ -287,8 +287,8 @@ describe('backend', () => {
         show: false,
       },
     })
-    const root = glassEasel.Component.createWithContext('root', rootDef, shadowDomBackend)
-    shadowDomBackend.getRootNode().appendChild(root.getBackendElement() as ShadowSyncElement)
+    const root = glassEasel.Component.createWithContext('root', rootDef, shadowSyncBackend)
+    shadowSyncBackend.getRootNode().appendChild(root.getBackendElement() as ShadowSyncElement)
     glassEasel.Component.pretendAttached(root)
     root.destroyBackendElementOnDetach()
 
@@ -370,8 +370,8 @@ describe('backend', () => {
         listArray,
       },
     })
-    const root = glassEasel.Component.createWithContext('root', rootDef, shadowDomBackend)
-    shadowDomBackend.getRootNode().appendChild(root.getBackendElement() as ShadowSyncElement)
+    const root = glassEasel.Component.createWithContext('root', rootDef, shadowSyncBackend)
+    shadowSyncBackend.getRootNode().appendChild(root.getBackendElement() as ShadowSyncElement)
     glassEasel.Component.pretendAttached(root)
     root.destroyBackendElementOnDetach()
 

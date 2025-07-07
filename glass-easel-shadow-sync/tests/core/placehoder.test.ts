@@ -1,6 +1,6 @@
 import * as coreEnv from 'glass-easel/tests/base/env'
-import { shadowDomBackend } from '../base/env'
+import { shadowSyncBackend } from '../base/env'
 
-;(coreEnv as any).shadowBackend = shadowDomBackend
+;(coreEnv as any).shadowBackend = shadowSyncBackend
 
 require('../../../glass-easel/tests/core/placeholder.test')

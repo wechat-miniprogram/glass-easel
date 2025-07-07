@@ -38,7 +38,7 @@ Object.defineProperties(ShadowSyncElement.prototype, {
         ).getBackendElement() as glassEasel.domlikeBackend.Element
       ).parentNode?.__wxElement
       if (!parentNodeOnView) return undefined
-      return shadowDomBackend._getElementId(getNodeId(parentNodeOnView)!)
+      return shadowSyncBackend._getElementId(getNodeId(parentNodeOnView)!)
     },
   },
   childNodes: {
@@ -46,7 +46,7 @@ Object.defineProperties(ShadowSyncElement.prototype, {
       const childNodes: ShadowSyncElement[] = []
       const elementOnView = messageChannelViewSide.getNode(this._id) as glassEasel.Element
       elementOnView.forEachNonVirtualComposedChild((node) => {
-        childNodes.push(shadowDomBackend._getElementId(getNodeId(node)!)!)
+        childNodes.push(shadowSyncBackend._getElementId(getNodeId(node)!)!)
       })
       return childNodes
     },
@@ -62,9 +62,50 @@ Object.defineProperties(ShadowSyncElement.prototype, {
   },
 })
 
-const createContext = (
+class Bridge {
+  private _subscribe: ((...args: any[]) => void) | null = null
+  public subscribe = (cb: (...args: any[]) => void): void => {
+    this._subscribe = cb
+  }
+  private _publish: ((args: readonly any[]) => void) | null = null
+  public publish = (args: readonly any[]): void => {
+    this._publish?.(args)
+  }
+  public connect(bridge: Bridge): void {
+    this._publish = bridge._subscribe
+    bridge._publish = this._subscribe
+  }
+  public disconnect(): void {
+    this._publish = null
+  }
+}
+
+const createDataContext = (dataComponentSpace: glassEasel.ComponentSpace) => {
+  const bridgeOnData = new Bridge()
+
+  const messageChannelDataSide = MessageChannelDataSide(
+    bridgeOnData.publish,
+    bridgeOnData.subscribe,
+    getLinearIdGenerator,
+  )
+
+  const shadowSyncBackend = new ShadowSyncBackendContext(
+    messageChannelDataSide,
+    dataComponentSpace.styleScopeManager,
+    getLinearIdGenerator,
+  )
+
+  return {
+    bridgeOnData,
+    messageChannelDataSide,
+    shadowSyncBackend,
+  }
+}
+
+export const createViewContext = (
+  rootNode: glassEasel.GeneralBackendElement,
+  backendContext: glassEasel.GeneralBackendContext,
   viewComponentSpace: glassEasel.ComponentSpace,
-  dataComponentSpace: glassEasel.ComponentSpace,
 ) => {
   const syncController = new (class extends ViewController {
     private _registeredStyleScope = new Set<number>()
@@ -126,55 +167,25 @@ const createContext = (
         cb,
       )
     }
-  })(
-    glassEasel,
-    document.body as unknown as glassEasel.domlikeBackend.Element,
-    domBackend,
-    viewComponentSpace,
-  )
+  })(glassEasel, rootNode, backendContext, viewComponentSpace)
 
-  const createBridge = () => {
-    let _cb: ((...args: any[]) => void) | null = null
-    const subscribe = (cb: (...args: any[]) => void) => {
-      _cb = cb
-    }
-    const publish = (args: readonly any[]): void => {
-      // console.log(ChannelEventType[args[0] as number], ...args.slice(1))
-      _cb?.(args)
-    }
-    return { subscribe, publish }
-  }
+  const bridgeOnView = new Bridge()
 
-  const bridgeToView = createBridge()
-  const bridgeToData = createBridge()
-
-  const messageChannelDataSide = MessageChannelDataSide(
-    bridgeToView.publish,
-    bridgeToData.subscribe,
-    getLinearIdGenerator,
-  )
   const messageChannelViewSide = MessageChannelViewSide(
-    bridgeToData.publish,
-    bridgeToView.subscribe,
+    bridgeOnView.publish,
+    bridgeOnView.subscribe,
     syncController,
-    getLinearIdGenerator,
-  )
-
-  const shadowDomBackend = new ShadowSyncBackendContext(
-    messageChannelDataSide,
-    dataComponentSpace.styleScopeManager,
     getLinearIdGenerator,
   )
 
   return {
-    messageChannelDataSide,
+    bridgeOnView,
     messageChannelViewSide,
     syncController,
-    shadowDomBackend,
   }
 }
 
-const domBackend = new glassEasel.CurrentWindowBackendContext()
+export const domBackend = new glassEasel.CurrentWindowBackendContext()
 
 domBackend.onEvent((target, type, detail, options) => {
   glassEasel.triggerEvent(target, type, detail, options)
@@ -187,12 +198,17 @@ viewComponentSpace.updateComponentOptions({
   writeFieldsToNode: true,
 })
 
-export const { messageChannelViewSide, syncController, shadowDomBackend } = createContext(
+export const { bridgeOnData, messageChannelDataSide, shadowSyncBackend } =
+  createDataContext(dataComponentSpace)
+export const { bridgeOnView, messageChannelViewSide, syncController } = createViewContext(
+  document.createElement('div') as unknown as glassEasel.domlikeBackend.Element,
+  domBackend,
   viewComponentSpace,
-  dataComponentSpace,
 )
 
-shadowDomBackend.onEvent(
+bridgeOnData.connect(bridgeOnView)
+
+shadowSyncBackend.onEvent(
   (type, detail, options) => new glassEasel.Event(type, detail, options),
   (event, currentTarget, mark, target, isCapture) => {
     event.callListener(currentTarget, mark, target, isCapture)
