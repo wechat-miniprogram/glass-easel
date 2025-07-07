@@ -513,6 +513,39 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect(event.eventPhase).toBe(glassEasel.EventPhase.None)
   })
 
+  test('has listeners', () => {
+    const def = glassEasel.registerElement({
+      template: tmpl(`
+        <div id="a">
+          <div id="b" catch:customEv="evB">
+            <div id="c" bind:customEv="evC" />
+          </div>
+        </div>
+      `),
+      methods: {
+        evB(e: glassEasel.ShadowedEvent<unknown>) {
+          expect(e.hasListener()).toBe(true)
+        },
+        evC(e: glassEasel.ShadowedEvent<unknown>) {
+          expect(e.hasListener()).toBe(true)
+        },
+      },
+    })
+    const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
+    const c = elem.getShadowRoot()!.getElementById('c')!
+    const a = elem.getShadowRoot()!.getElementById('a')!
+
+    const event = new glassEasel.Event('customEv', {}, { composed: true, capturePhase: true })
+    expect(event.hasListener()).toBe(false)
+    c.dispatchEvent(event)
+    expect(event.hasListener()).toBe(true)
+
+    const event1 = new glassEasel.Event('customEv', {}, { composed: true, capturePhase: true })
+    expect(event1.hasListener()).toBe(false)
+    a.dispatchEvent(event1)
+    expect(event1.hasListener()).toBe(false)
+  })
+
   if (testBackend === domBackend) {
     test('prevent default', () => {
       const events: string[] = []

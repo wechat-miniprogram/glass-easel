@@ -428,7 +428,7 @@ export class ClassList {
           classNamesCount.splice(j, 1)
           this._$removeClassFromBackend(name, scopeId, backendElement)
         } else {
-          classNamesCount[j]! -= 1
+          classNamesCount[j] -= 1
         }
         break
       }
