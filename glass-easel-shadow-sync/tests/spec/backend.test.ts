@@ -5,7 +5,13 @@ import {
   hookBuilderToSyncData,
   type ShadowSyncElement,
 } from '../../src/backend'
-import { getViewNode, shadowSyncBackend, tmpl, viewComponentSpace } from '../base/env'
+import {
+  getViewNode,
+  shadowSyncBackend,
+  syncController,
+  tmpl,
+  viewComponentSpace,
+} from '../base/env'
 
 const componentSpace = new glassEasel.ComponentSpace()
 componentSpace.updateComponentOptions({
@@ -194,10 +200,14 @@ describe('backend', () => {
     )
 
     root.setData({ disabled: false })
-    expect(domHtml(root)).toEqual('<wx-textarea><textarea maxlength="140"></textarea><span>123</span></wx-textarea>')
+    expect(domHtml(root)).toEqual(
+      '<wx-textarea><textarea maxlength="140"></textarea><span>123</span></wx-textarea>',
+    )
 
     root.setData({ text: '23333' })
-    expect(domHtml(root)).toEqual('<wx-textarea><textarea maxlength="140"></textarea><span>23333</span></wx-textarea>')
+    expect(domHtml(root)).toEqual(
+      '<wx-textarea><textarea maxlength="140"></textarea><span>23333</span></wx-textarea>',
+    )
 
     root.setData({ placeholderClass: 'a' })
     expect(domHtml(root)).toEqual(
@@ -404,5 +414,100 @@ describe('backend', () => {
     expect(domHtml(root)).toEqual('<list><li>2</li><li>3</li><li>4</li></list>')
     matchElementWithDom(root)
     matchElementWithDom(getViewNode(root))
+  })
+
+  test('wxs', () => {
+    const customHandler = jest.fn().mockReturnThis()
+
+    shadowSyncBackend.onWXSCallMethod((component, method, args) => {
+      component.callMethod(method, args)
+    })
+
+    syncController.setWXSListenerStats = (
+      element: glassEasel.Element,
+      eventName: string,
+      final: boolean,
+      mutated: boolean,
+      capture: boolean,
+      lvaluePath: (string | number)[],
+    ) => {
+      const isWXS =
+        lvaluePath?.[0] === glassEasel.template.GeneralLvaluePathPrefix.InlineScript ||
+        lvaluePath?.[0] === glassEasel.template.GeneralLvaluePathPrefix.Script
+      expect(isWXS).toBe(true)
+
+      if (lvaluePath[0] === glassEasel.template.GeneralLvaluePathPrefix.Script) {
+        const path = lvaluePath[1] as string
+        const key = lvaluePath[2] as string
+        return
+      } else if (lvaluePath[0] === glassEasel.template.GeneralLvaluePathPrefix.InlineScript) {
+        const wxmlFile = lvaluePath[1] as string
+        const module = lvaluePath[2] as string
+        const key = lvaluePath[3] as string
+        expect(wxmlFile).toBe('')
+        expect(module).toBe('w')
+        expect(key).toBe('customHandler')
+        syncController.setListenerStats(
+          element,
+          eventName,
+          capture,
+          final
+            ? glassEasel.EventMutLevel.Final
+            : mutated
+            ? glassEasel.EventMutLevel.Mut
+            : glassEasel.EventMutLevel.None,
+          function (this: glassEasel.GeneralComponent, ev: glassEasel.ShadowedEvent<unknown>) {
+            syncController.onWXSCallMethod(this.ownerShadowRoot!.getHostNode(), 'customHandler', [
+              true,
+            ])
+          },
+        )
+      } else {
+        throw new Error('unexpected lvalue path')
+      }
+    }
+
+    const def = glassEasel.registerElement({
+      template: tmpl(
+        `
+        <wxs module="w">module.exports = { customHandler: function () { throw new Error("should not call") } }</wxs>
+        <div
+          id="a"
+          bind:customEv="{{ w.customHandler }}"
+        ></div>
+      `,
+        {},
+        {
+          C: (elem, evName, listener, final, mutated, capture, generalLvaluePath) => {
+            const prefix = generalLvaluePath?.[0] as number | null | undefined
+            const isWxsHandler =
+              prefix === glassEasel.template.GeneralLvaluePathPrefix.Script ||
+              prefix === glassEasel.template.GeneralLvaluePathPrefix.InlineScript
+            if (isWxsHandler) {
+              ;(elem.getBackendElement() as ShadowSyncElement).setWXSListenerStats(
+                evName,
+                final,
+                mutated,
+                capture,
+                generalLvaluePath!,
+              )
+              return null
+            }
+
+            return (e) => listener.call(elem.ownerShadowRoot?.getHostNode().getMethodCaller(), e)
+          },
+        },
+      ),
+      methods: {
+        customHandler,
+      },
+    })
+    const elem = glassEasel.Component.createWithContext('root', def.general(), shadowSyncBackend)
+    const div = elem.getShadowRoot()!.getElementById('a')!
+
+    getViewNode(div).triggerEvent('customEv')
+    expect(customHandler).toHaveBeenCalledTimes(1)
+    expect(customHandler).toHaveBeenCalledWith([true])
+    expect(customHandler).toHaveReturnedWith(elem)
   })
 })
