@@ -845,9 +845,7 @@ impl Element {
                             (_, "slot") => AttrPrefixKind::Slot,
                             (ElementKind::Normal { .. }, "class") => AttrPrefixKind::ClassString,
                             (ElementKind::Normal { .. }, "style") => AttrPrefixKind::StyleString,
-                            (ElementKind::Normal { .. }, x) | (ElementKind::Slot { .. }, x)
-                                if x.starts_with("data-") =>
-                            {
+                            (ElementKind::Slot { .. }, x) if x.starts_with("data-") => {
                                 AttrPrefixKind::DataHyphen
                             }
                             _ => AttrPrefixKind::Normal,
@@ -4076,9 +4074,7 @@ mod test {
         case!("<div data:aB></div>", r#"<div data:aB/>"#);
         case!(
             "<div data-a-bC='fn'></div>",
-            r#"<div data:aBc="fn"/>"#,
-            ParseErrorKind::AvoidUppercaseLetters,
-            5..14
+            r#"<div data-a-bC="fn"/>"#
         );
         case!("<div generic:a='A'></div>", r#"<div generic:a="A"/>"#);
         case!(

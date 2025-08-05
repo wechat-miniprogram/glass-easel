@@ -1185,6 +1185,13 @@ export class ProcGenWrapper {
         }
       } else if (elem.hasExternalClass(name)) {
         elem.setExternalClass(name, v as string)
+      } else if (name.startsWith('data-')) {
+        // compatibilities for legacy data-* properties
+        if (nodeDataProxy.replaceProperty(name, v)) {
+          // empty
+        } else {
+          elem.setDataset(dashToCamelCase(name.slice(5).toLowerCase()), v)
+        }
       } else {
         // compatibilities for legacy event binding syntax
         if (!this.checkFallbackEventListener(elem, camelName, v, generalLvaluePath)) {
@@ -1196,7 +1203,9 @@ export class ProcGenWrapper {
         }
       }
     } else if (isNativeNode(elem)) {
-      if (this.fallbackListenerOnNativeNode) {
+      if (name.startsWith('data-')) {
+        elem.setDataset(dashToCamelCase(name.slice(5).toLowerCase()), v)
+      } else if (this.fallbackListenerOnNativeNode) {
         // compatibilities for legacy event binding syntax
         const camelName = dashToCamelCase(name)
         if (!this.checkFallbackEventListener(elem, camelName, v, generalLvaluePath)) {
