@@ -46,3 +46,16 @@ pub(crate) fn dash_to_camel(s: &str) -> CompactString {
     }
     camel_name
 }
+
+pub(crate) fn camel_to_dash(s: &str) -> CompactString {
+    let mut dash_name = CompactString::new("");
+    for c in s.chars() {
+        if c.is_ascii_uppercase() {
+            dash_name.push('-');
+            dash_name.push(c.to_ascii_lowercase());
+        } else {
+            dash_name.push(c);
+        }
+    }
+    dash_name
+}
