@@ -95,6 +95,11 @@ const dashToCamelCase = (dash: string): string => {
   return ret
 }
 
+const camelToDashCase = (dash: string): string => {
+  const ret = dash.replace(/[A-Z]/g, (s) => `-${s.toLowerCase()}`)
+  return ret
+}
+
 export interface ProcGen {
   (wrapper: ProcGenWrapper, isCreation: true, data: DataValue): {
     C: DefineChildren
@@ -1102,8 +1107,26 @@ export class ProcGenWrapper {
   }
 
   // set dataset
-  d = (elem: Element, name: string, v: unknown) => {
-    elem.setDataset(name, v)
+  d = (elem: Element, name: string, v: unknown, fallbackDataHyphen: boolean) => {
+    if (fallbackDataHyphen && isComponent(elem)) {
+      const nodeDataProxy = Component.getDataProxy(elem)
+      const fullName = `data${name[0]!.toUpperCase()}${name.slice(1)}`
+      if (nodeDataProxy.replaceProperty(fullName, v)) {
+        // empty
+      } else {
+        const fullDashName = `data-${camelToDashCase(name)}`
+        if (elem.hasExternalClass(fullDashName)) {
+          elem.setExternalClass(fullDashName, v as string)
+        } else if (nodeDataProxy.replaceProperty(fullDashName, v)) {
+          // leave for compatibilities
+        } else {
+          elem.setDataset(name, v)
+        }
+      }
+      this.tryCallPropertyChangeListener(elem, name, v)
+    } else {
+      elem.setDataset(name, v)
+    }
   }
 
   // set mark

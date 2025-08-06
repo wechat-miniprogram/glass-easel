@@ -8,7 +8,7 @@ use compact_str::CompactString;
 
 use super::stringifier::*;
 use crate::{
-    escape::{escape_html_body, gen_lit_str},
+    escape::{camel_to_dash, escape_html_body, gen_lit_str},
     parse::{
         expr::Expression,
         tag::{
@@ -420,20 +420,32 @@ fn write_common_attributes_without_slot<'a>(
         });
     }
     for attr in data.iter() {
-        let prefix = (
-            "data",
-            attr.prefix_location
-                .as_ref()
-                .unwrap_or(&attr.name.location)
-                .clone(),
-        );
-        let item = WriteAttrItem::Attr {
-            prefix: Some(prefix),
-            name: Cow::Borrowed(&attr.name),
-            value: attr.value.as_ref(),
-            respect_none_value: true,
-        };
-        list.push(item);
+        if let Some(prefix_location) = attr.prefix_location.clone() {
+            let prefix = (
+                "data",
+                prefix_location,
+            );
+            let item = WriteAttrItem::Attr {
+                prefix: Some(prefix),
+                name: Cow::Borrowed(&attr.name),
+                value: attr.value.as_ref(),
+                respect_none_value: true,
+            };
+            list.push(item);
+        } else {
+            let dash_name = CompactString::new_inline("data-") + &camel_to_dash(&attr.name.name);
+            let dash_ident = Ident {
+                name: dash_name,
+                location: attr.name.location.clone(),
+            };
+            let item = WriteAttrItem::Attr {
+                prefix: None,
+                name: Cow::Owned(dash_ident),
+                value: attr.value.as_ref(),
+                respect_none_value: true,
+            };
+            list.push(item);
+        }
     }
     for attr in marks.iter() {
         let prefix = (

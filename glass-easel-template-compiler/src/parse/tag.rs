@@ -846,10 +846,9 @@ impl Element {
                             (ElementKind::Normal { .. }, "class") => AttrPrefixKind::ClassString,
                             (ElementKind::Normal { .. }, "style") => AttrPrefixKind::StyleString,
                             (ElementKind::Normal { .. }, x) | (ElementKind::Slot { .. }, x)
-                                if x.starts_with("data-") =>
-                            {
-                                AttrPrefixKind::DataHyphen
-                            }
+                                if x.starts_with("data-") && x != "data-" => {
+                                    AttrPrefixKind::DataHyphen
+                                }
                             _ => AttrPrefixKind::Normal,
                         },
                         Some(x) => match x.name.as_str() {
@@ -1588,12 +1587,10 @@ impl Element {
                                         attr_name.location,
                                     );
                                 } else {
-                                    let prefix_location =
-                                        attr_name.location.start..attr_name.location.start;
                                     common.data.push(Attribute {
                                         name: attr_name,
                                         value,
-                                        prefix_location: Some(prefix_location),
+                                        prefix_location: None,
                                     });
                                 }
                             }
@@ -4076,7 +4073,7 @@ mod test {
         case!("<div data:aB></div>", r#"<div data:aB/>"#);
         case!(
             "<div data-a-bC='fn'></div>",
-            r#"<div data:aBc="fn"/>"#,
+            r#"<div data-a-bc="fn"/>"#,
             ParseErrorKind::AvoidUppercaseLetters,
             5..14
         );
@@ -4531,7 +4528,7 @@ mod test {
             6..12
         );
         case!("<slot mut-bind:a />", r#"<slot mut-bind:a/>"#);
-        case!("<slot data-a />", r#"<slot data:a/>"#);
+        case!("<slot data-a />", r#"<slot data-a/>"#);
         case!("<slot data:a='abc' />", r#"<slot data:a="abc"/>"#);
         case!("<slot mark:a />", r#"<slot mark:a/>"#);
         case!("<slot slot='a' />", r#"<slot slot="a"/>"#);
