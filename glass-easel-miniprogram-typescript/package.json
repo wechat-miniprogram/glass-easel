@@ -1,0 +1,36 @@
+{
+  "name": "glass-easel-miniprogram-typescript",
+  "description": "A checker for the glass-easel project in MiniProgram file structure",
+  "version": "0.13.0",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wechat-miniprogram/glass-easel.git"
+  },
+  "keywords": [
+    "glass-easel"
+  ],
+  "author": "wechat-miniprogram",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/wechat-miniprogram/glass-easel/issues"
+  },
+  "homepage": "https://github.com/wechat-miniprogram/glass-easel",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p .",
+    "lint": "eslint src/**/*.ts",
+    "start": "node dist/cli.js",
+    "build-and-start": "npm run build && node dist/cli.js"
+  },
+  "peerDependencies": {
+    "typescript": "^5.2.2"
+  },
+  "dependencies": {
+    "chalk": "4",
+    "glass-easel-stylesheet-compiler": "workspace:*",
+    "glass-easel-template-compiler": "workspace:*"
+  }
+}

@@ -166,6 +166,21 @@ importers:
         specifier: ^5.0.1
         version: 5.0.1(webpack@5.89.0)
 
+  glass-easel-miniprogram-typescript:
+    dependencies:
+      chalk:
+        specifier: '4'
+        version: 4.1.2
+      glass-easel-stylesheet-compiler:
+        specifier: workspace:*
+        version: link:../glass-easel-stylesheet-compiler
+      glass-easel-template-compiler:
+        specifier: workspace:*
+        version: link:../glass-easel-template-compiler
+      typescript:
+        specifier: ^5.2.2
+        version: 5.2.2
+
   glass-easel-miniprogram-webpack-plugin:
     dependencies:
       chalk:
@@ -5014,7 +5029,6 @@ packages:
     resolution: {integrity: sha512-mI4WrpHsbCIcwT9cF4FZvr80QUeKvsUsUvKDoR+X/7XHQH98xYD8YHZg7ANtz2GtZt/CBq2QJ0thkGJMHfqc1w==}
     engines: {node: '>=14.17'}
     hasBin: true
-    dev: true
 
   /unbox-primitive@1.0.2:
     resolution: {integrity: sha512-61pPlCD9h51VoreyJ0BReideM3MDKMKnh6+V9L08331ipq6Q8OFXZYiqP6n/tbHx4s5I9uRhcye6BrbkizkBDw==}

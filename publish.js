@@ -44,6 +44,7 @@ if (
 ;[
   'glass-easel',
   'glass-easel-miniprogram-adapter',
+  'glass-easel-miniprogram-typescript',
   'glass-easel-miniprogram-webpack-plugin',
 ].forEach((p) => {
   console.info(`Run eslint on ${p}`)
@@ -76,6 +77,7 @@ if (gitStatusRes.status !== 0 || gitStatusRes.stdout.length > 0) {
 ;[
   'glass-easel/package.json',
   'glass-easel-miniprogram-adapter/package.json',
+  'glass-easel-miniprogram-typescript/package.json',
   'glass-easel-miniprogram-webpack-plugin/package.json',
   'glass-easel-miniprogram-template/package.json',
   'glass-easel-template-compiler/package.json',
@@ -178,6 +180,17 @@ if (
   throw new Error('failed to compile glass-easel-miniprogram-adapter')
 }
 
+// compile glass-easel-miniprogram-typescript
+console.info('Compile glass-easel-miniprogram-typescript')
+if (
+  childProcess.spawnSync('npm', ['run', 'build'], {
+    cwd: 'glass-easel-miniprogram-typescript',
+    stdio: 'inherit',
+  }).status !== 0
+) {
+  throw new Error('failed to compile glass-easel-miniprogram-typescript')
+}
+
 // compile glass-easel-miniprogram-webpack-plugin
 console.info('Compile glass-easel-miniprogram-webpack-plugin')
 if (
@@ -259,6 +272,7 @@ if (
 ;[
   'glass-easel',
   'glass-easel-miniprogram-adapter',
+  'glass-easel-miniprogram-typescript',
   'glass-easel-miniprogram-webpack-plugin',
   'glass-easel-miniprogram-template',
 ].forEach((p) => {
