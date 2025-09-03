@@ -10,12 +10,16 @@ const { values } = parseArgs({
       short: 'p',
       default: '.',
     },
+    verbose: {
+      type: 'boolean',
+      short: 'v',
+    },
   },
   strict: true,
 })
 
 const server = new Server({
-  projectPath: values.path!,
+  projectPath: values.path,
   showTypeScriptMessages: true,
   onNewDiagnostics(diag) {
     // eslint-disable-next-line no-console

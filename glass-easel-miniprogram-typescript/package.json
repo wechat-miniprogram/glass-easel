@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "chalk": "4",
+    "chokidar": "^4.0.3",
     "glass-easel-stylesheet-compiler": "workspace:*",
     "glass-easel-template-compiler": "workspace:*"
   }

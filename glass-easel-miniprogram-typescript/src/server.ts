@@ -25,8 +25,9 @@ export type Diagnostic = {
 
 export type ServerOptions = {
   projectPath: string
-  showTypeScriptMessages?: boolean
   reportTypeScriptDiagnostics?: boolean
+  showTypeScriptMessages?: boolean
+  verboseMessages?: boolean
   onFirstScanDone?: (this: Server) => void
   onNewDiagnostics?: (diag: Diagnostic) => void
 }
@@ -35,45 +36,94 @@ export class Server {
   private onFirstScanDone: (this: Server) => void = () => {}
   private onNewDiagnostics: (diag: Diagnostic) => void = () => {}
   private options: ServerOptions
-  private tsWatcher: ts.WatchOfConfigFile<ts.SemanticDiagnosticsBuilderProgram>
+  private tsLangService: ts.LanguageService
 
   constructor(options: ServerOptions) {
     this.options = options
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+
+    // initialize ts language service
+    /* eslint-disable @typescript-eslint/unbound-method */
     const configPath = ts.findConfigFile(options.projectPath, ts.sys.fileExists, 'tsconfig.json')
-    if (configPath === undefined) {
-      throw new Error('tsconfig.json not found')
+    let config: ts.ParsedCommandLine
+    if (configPath !== undefined) {
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      const configFile = ts.readJsonConfigFile(configPath, ts.sys.readFile)
+      config = ts.parseJsonSourceFileConfigFileContent(
+        configFile,
+        {
+          useCaseSensitiveFileNames: false,
+          readDirectory: ts.sys.readDirectory,
+          fileExists: ts.sys.fileExists,
+          readFile: ts.sys.readFile,
+        },
+        configPath,
+        { noEmit: true },
+      )
+    } else {
+      const compilerOptions = ts.getDefaultCompilerOptions()
+      config = {
+        options: compilerOptions,
+        fileNames: [],
+        errors: [],
+      }
     }
-    const hostCreator = ts.createWatchCompilerHost(
-      configPath,
-      { noEmit: true },
-      ts.sys,
-      ts.createSemanticDiagnosticsBuilderProgram,
-      this.diagnosticReporter.bind(this),
-      this.watchStatusReporter.bind(this),
-      undefined,
-      undefined,
-    )
-    const origPostProgramCreate = hostCreator.afterProgramCreate?.bind(hostCreator)
-    hostCreator.afterProgramCreate = (program) => {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises, promise/catch-or-return
-      Promise.resolve().then(() => {
-        this.onFirstScanDone.call(this)
-        return undefined
-      })
-      origPostProgramCreate?.(program)
+    const servicesHost: ts.LanguageServiceHost = {
+      getCompilationSettings() {
+        return config.options
+      },
+      getScriptFileNames() {
+        // !!! TODO
+        console.info(config.fileNames)
+        return config.fileNames
+      },
+      getScriptVersion(fileName) {
+        // !!! TODO
+        return ''
+      },
+      getScriptSnapshot(fileName) {
+        // TODO
+      },
+      getCurrentDirectory() {
+        return process.cwd()
+      },
+      getDefaultLibFileName(options) {
+        return ts.getDefaultLibFilePath(options)
+      },
+      log(message) {
+        // eslint-disable-next-line no-console
+        console.log(message)
+      },
+      trace(message) {
+        // eslint-disable-next-line no-console
+        console.trace(message)
+      },
+      error(message) {
+        // eslint-disable-next-line no-console
+        console.error(message)
+      },
+      readDirectory: ts.sys.readDirectory,
+      readFile: ts.sys.readFile,
+      fileExists: ts.sys.fileExists,
+      getDirectories: ts.sys.getDirectories,
+      directoryExists: ts.sys.directoryExists,
     }
-    this.onFirstScanDone = options.onFirstScanDone ?? this.onFirstScanDone
-    this.onNewDiagnostics = options.onNewDiagnostics ?? this.onNewDiagnostics
-    this.tsWatcher = ts.createWatchProgram(hostCreator)
+    /* eslint-enable @typescript-eslint/unbound-method */
+    const docReg = ts.createDocumentRegistry()
+    this.tsLangService = ts.createLanguageService(servicesHost, docReg)
   }
 
   end() {
-    this.tsWatcher.close()
   }
 
   private logTsMessage(message: string) {
     if (this.options.showTypeScriptMessages) {
+      // eslint-disable-next-line no-console
+      console.log(chalk.gray(message))
+    }
+  }
+
+  private logVerboseMessage(message: string) {
+    if (this.options.verboseMessages) {
       // eslint-disable-next-line no-console
       console.log(chalk.gray(message))
     }
@@ -91,6 +141,7 @@ export class Server {
 
   // eslint-disable-next-line class-methods-use-this
   private diagnosticReporter(diagnostic: ts.Diagnostic) {
+    if (!this.options.reportTypeScriptDiagnostics) return
     const file = diagnostic.file
     if (!file) return
     const start = file.getLineAndCharacterOfPosition(diagnostic.start ?? 0)
