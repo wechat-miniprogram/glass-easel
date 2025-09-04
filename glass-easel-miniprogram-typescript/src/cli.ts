@@ -21,6 +21,7 @@ const { values } = parseArgs({
 const server = new Server({
   projectPath: values.path,
   showTypeScriptMessages: true,
+  scanAllComponents: true,
   onNewDiagnostics(diag) {
     // eslint-disable-next-line no-console
     console.log(chalk.gray(`${diag.file}:${diag.start.line}:${diag.start.character}`))

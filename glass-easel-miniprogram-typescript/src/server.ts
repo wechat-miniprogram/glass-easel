@@ -1,5 +1,6 @@
 import * as ts from 'typescript'
 import chalk from 'chalk'
+import { ProjectDirManager } from './project'
 
 export type Position = {
   line: number
@@ -28,6 +29,7 @@ export type ServerOptions = {
   reportTypeScriptDiagnostics?: boolean
   showTypeScriptMessages?: boolean
   verboseMessages?: boolean
+  scanAllComponents?: boolean
   onFirstScanDone?: (this: Server) => void
   onNewDiagnostics?: (diag: Diagnostic) => void
 }
@@ -37,6 +39,7 @@ export class Server {
   private onNewDiagnostics: (diag: Diagnostic) => void = () => {}
   private options: ServerOptions
   private tsLangService: ts.LanguageService
+  private projectDirManager: ProjectDirManager
 
   constructor(options: ServerOptions) {
     this.options = options
@@ -78,10 +81,11 @@ export class Server {
       },
       getScriptVersion(fileName) {
         // !!! TODO
+        console.info(fileName)
         return ''
       },
-      getScriptSnapshot(fileName) {
-        // TODO
+      getScriptSnapshot: (fileName) => {
+        this.virtualFs.getFileContent(fileName)
       },
       getCurrentDirectory() {
         return process.cwd()
@@ -110,9 +114,20 @@ export class Server {
     /* eslint-enable @typescript-eslint/unbound-method */
     const docReg = ts.createDocumentRegistry()
     this.tsLangService = ts.createLanguageService(servicesHost, docReg)
+
+    // initialize virtual file system
+    this.projectDirManager = new ProjectDirManager(
+      options.projectPath,
+      options.scanAllComponents || false,
+      () => {
+        this.onFirstScanDone.call(this)
+      },
+    )
   }
 
   end() {
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    this.projectDirManager.stop()
   }
 
   private logTsMessage(message: string) {

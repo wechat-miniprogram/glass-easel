@@ -1,11 +1,14 @@
-import fs from 'node:fs/promises'
+import fs from 'node:fs'
 import path from 'node:path'
 import chokidar, { type FSWatcher } from 'chokidar'
 
 type VirtualFile = {
   version: number
   content: string | null
+  contentOutdated: boolean
   overriddenContent: string | null
+  directDependencies: { [relPath: string]: true }
+  directDependants: { [relPath: string]: true }
 }
 
 type VirtualDirectory = {
@@ -13,29 +16,13 @@ type VirtualDirectory = {
   children: { [name: string]: VirtualFile | VirtualDirectory }
 }
 
-// determine if a path (relative to the code root) is a component
-const isCompPath = async (rootPath: string, relPath: string): Promise<boolean> => {
-  try {
-    const json = await fs.readFile(path.join(rootPath, `${relPath}.json`), { encoding: 'utf8' })
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const parsed = JSON.parse(json)
-    if (
-      typeof parsed === 'object' &&
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      (parsed.component === true || typeof parsed.usingComponents === 'object')
-    ) {
-      return true
-    }
-  } catch (e) {
-    /* empty */
-  }
-  return false
-}
-
-class VirtualFileSystem {
+export class VirtualFileSystem {
   private rootPath: string
   private root: VirtualDirectory
   private watcher: FSWatcher
+  onFileFound: (relPath: string) => void = () => {}
+  onTrackedFileRemoved: (relPath: string) => void = () => {}
+  onTrackedFileUpdated: (relPath: string) => void = () => {}
 
   constructor(rootPath: string, firstScanCallback: () => void) {
     this.rootPath = rootPath
@@ -46,29 +33,29 @@ class VirtualFileSystem {
     }
 
     // file added handling
-    const handleFileAdded = async (relPath: string) => {
-      const extName = path.extname(relPath)
-      if (extName === '.wxml') {
-        if (await isCompPath(relPath.slice(0, -extName.length))) {
-          this.onWxmlEntranceAdded(relPath)
-        }
-      }
+    const handleFileAdded = (relPath: string) => {
+      this.onFileFound(relPath)
     }
 
     // file removed handling
-    const handleFileRemoved = async (relPath: string) => {
-      const extName = path.extname(relPath)
-      if (extName === '.wxml') {
-        if (await isCompPath(relPath.slice(0, -extName.length))) {
-          this.onWxmlEntranceRemoved(relPath)
+    const handleFileRemoved = (relPath: string) => {
+      const entry = this.getFileEntry(relPath)
+      if (entry) {
+        entry.content = null
+        entry.contentOutdated = false
+        if (entry.overriddenContent === null) {
+          this.removeEntry(relPath)
         }
+        this.onTrackedFileRemoved(relPath)
       }
     }
 
     // file changed handling
-    const handleFileChanged = async (relPath: string) => {
-      if (this.trackingWxml.includes(relPath)) {
-        
+    const handleFileChanged = (relPath: string) => {
+      const entry = this.getFileEntry(relPath)
+      if (entry) {
+        entry.contentOutdated = true
+        this.onTrackedFileUpdated(relPath)
       }
     }
 
@@ -76,15 +63,12 @@ class VirtualFileSystem {
     this.watcher = chokidar.watch(rootPath, { ignoreInitial: false })
     this.watcher
       .on('add', (p) => {
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleFileAdded(p)
       })
       .on('unlink', (p) => {
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleFileRemoved(p)
       })
       .on('change', (p) => {
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleFileChanged(p)
       })
       .on('ready', () => {
@@ -136,7 +120,12 @@ class VirtualFileSystem {
     curDir.children[name] = {
       version: 0,
       content: null,
+      contentOutdated: false,
       overriddenContent: null,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      directDependencies: Object.create(null),
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      directDependants: Object.create(null),
     }
     return curDir.children[name] as VirtualFile
   }
@@ -164,16 +153,69 @@ class VirtualFileSystem {
     }
   }
 
-  // Overrides the content of a file
+  private loadFileContentFromDisk(relPath: string): VirtualFile | null {
+    let content: string
+    try {
+      content = fs.readFileSync(path.join(this.rootPath, relPath), { encoding: 'utf8' })
+    } catch (e) {
+      return null
+    }
+    if (content === null) return this.getFileEntry(relPath)
+    const entry = this.getOrCreateFileEntry(relPath)
+    if (entry.overriddenContent === null) {
+      entry.version += 1
+    }
+    entry.content = content
+    entry.contentOutdated = false
+    return entry
+  }
+
+  // Read the file content and start tracking
+  //
+  // This will try to load file content from disk if not present.
+  // The `relPath` should always be `/` seperated even on Windows.
+  trackFileContent(relPath: string): string | null {
+    let entry = this.getFileEntry(relPath)
+    if (!entry || (entry.contentOutdated && entry.overriddenContent === null)) {
+      entry = this.loadFileContentFromDisk(relPath)
+    }
+    return entry?.content ?? null
+  }
+
+  // TODO proper gc
+  // // Add a dependency to a file
+  // //
+  // // The `relPath` and `dependencyRelPath` should always be `/` seperated even on Windows.
+  // addDependency(relPath: string, dependencyRelPath: string) {
+  //   const src = this.getFileEntry(relPath)?.directDependencies
+  //   const dest = this.getFileEntry(dependencyRelPath)?.directDependants
+  //   if (!src || !dest) return
+  //   src[dependencyRelPath] = true
+  //   dest[relPath] = true
+  // }
+
+  // // Remove a dependency to a file
+  // //
+  // // The `relPath` and `dependencyRelPath` should always be `/` seperated even on Windows.
+  // removeDependency(relPath: string, dependencyRelPath: string) {
+  //   const src = this.getFileEntry(relPath)?.directDependencies
+  //   const dest = this.getFileEntry(dependencyRelPath)?.directDependants
+  //   if (!src || !dest) return
+  //   delete src[dependencyRelPath]
+  //   delete dest[relPath]
+  // }
+
+  // Overrides the content of a file (and also mark it as an entrance file)
   //
   // This also keep the file when the file is unlinked on dist.
   // The `relPath` should always be `/` seperated even on Windows.
   overrideFileContent(relPath: string, content: string) {
     const entry = this.getOrCreateFileEntry(relPath)
+    entry.version += 1
     entry.overriddenContent = content
   }
 
-  // Cancels the overrides of a file
+  // Cancels the corresponding `overrideFileContent` operation
   //
   // The `relPath` should always be `/` seperated even on Windows.
   cancelOverrideFileContent(relPath: string) {
@@ -183,6 +225,8 @@ class VirtualFileSystem {
       this.removeEntry(relPath)
       return
     }
+    if (entry.overriddenContent === null) return
+    entry.version += 1
     entry.overriddenContent = null
   }
 }
