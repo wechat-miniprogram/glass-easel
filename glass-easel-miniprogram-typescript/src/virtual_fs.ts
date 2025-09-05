@@ -7,8 +7,6 @@ type VirtualFile = {
   content: string | null
   contentOutdated: boolean
   overriddenContent: string | null
-  directDependencies: { [relPath: string]: true }
-  directDependants: { [relPath: string]: true }
 }
 
 type VirtualDirectory = {
@@ -21,6 +19,8 @@ export class VirtualFileSystem {
   private root: VirtualDirectory
   private watcher: FSWatcher
   onFileFound: (relPath: string) => void = () => {}
+  onFileUpdated: (relPath: string) => void = () => {}
+  onFileRemoved: (relPath: string) => void = () => {}
   onTrackedFileRemoved: (relPath: string) => void = () => {}
   onTrackedFileUpdated: (relPath: string) => void = () => {}
 
@@ -31,14 +31,19 @@ export class VirtualFileSystem {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       children: Object.create(null),
     }
+    const convFullPath = (fullPath: string) =>
+      path.relative(rootPath, fullPath).split(path.sep).join('/')
 
     // file added handling
-    const handleFileAdded = (relPath: string) => {
+    const handleFileAdded = (fullPath: string) => {
+      const relPath = convFullPath(fullPath)
       this.onFileFound(relPath)
     }
 
     // file removed handling
-    const handleFileRemoved = (relPath: string) => {
+    const handleFileRemoved = (fullPath: string) => {
+      const relPath = convFullPath(fullPath)
+      this.onFileRemoved(relPath)
       const entry = this.getFileEntry(relPath)
       if (entry) {
         entry.content = null
@@ -51,7 +56,9 @@ export class VirtualFileSystem {
     }
 
     // file changed handling
-    const handleFileChanged = (relPath: string) => {
+    const handleFileChanged = (fullPath: string) => {
+      const relPath = convFullPath(fullPath)
+      this.onFileUpdated(relPath)
       const entry = this.getFileEntry(relPath)
       if (entry) {
         entry.contentOutdated = true
@@ -85,14 +92,14 @@ export class VirtualFileSystem {
     let curDir = this.root
     for (let i = 0; i < parts.length - 2; i += 1) {
       const part = parts[i]!
-      if (!curDir.children[part] || !('children' in curDir.children[part])) {
+      if (!curDir.children[part] || !('children' in curDir.children[part]!)) {
         return null
       }
-      const child = curDir.children[part]
-      curDir = child
+      const child = curDir.children[part]!
+      curDir = child as VirtualDirectory
     }
     const name = parts[parts.length - 1]!
-    if (curDir.children[name] && 'content' in curDir.children[name]) {
+    if (curDir.children[name] && 'content' in curDir.children[name]!) {
       return curDir.children[name] as VirtualFile
     }
     return null
@@ -103,18 +110,18 @@ export class VirtualFileSystem {
     let curDir = this.root
     for (let i = 0; i < parts.length - 2; i += 1) {
       const part = parts[i]!
-      if (!curDir.children[part] || !('children' in curDir.children[part])) {
+      if (!curDir.children[part] || !('children' in curDir.children[part]!)) {
         curDir.children[part] = {
           version: 0,
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           children: Object.create(null),
         }
       }
-      const child = curDir.children[part]
-      curDir = child
+      const child = curDir.children[part]!
+      curDir = child as VirtualDirectory
     }
     const name = parts[parts.length - 1]!
-    if (curDir.children[name] && 'content' in curDir.children[name]) {
+    if (curDir.children[name] && 'content' in curDir.children[name]!) {
       return curDir.children[name] as VirtualFile
     }
     curDir.children[name] = {
@@ -122,10 +129,6 @@ export class VirtualFileSystem {
       content: null,
       contentOutdated: false,
       overriddenContent: null,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      directDependencies: Object.create(null),
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      directDependants: Object.create(null),
     }
     return curDir.children[name] as VirtualFile
   }
@@ -136,12 +139,12 @@ export class VirtualFileSystem {
     const mid: [string, VirtualDirectory][] = []
     for (let i = 0; i < parts.length - 2; i += 1) {
       const part = parts[i]!
-      if (!curDir.children[part] || !('children' in curDir.children[part])) {
+      if (!curDir.children[part] || !('children' in curDir.children[part]!)) {
         return
       }
       mid.push([part, curDir])
-      const child = curDir.children[part]
-      curDir = child
+      const child = curDir.children[part]!
+      curDir = child as VirtualDirectory
     }
     const name = parts[parts.length - 1]!
     delete curDir.children[name]
@@ -174,36 +177,27 @@ export class VirtualFileSystem {
   //
   // This will try to load file content from disk if not present.
   // The `relPath` should always be `/` seperated even on Windows.
-  trackFileContent(relPath: string): string | null {
+  trackFile(relPath: string): VirtualFile | null {
     let entry = this.getFileEntry(relPath)
     if (!entry || (entry.contentOutdated && entry.overriddenContent === null)) {
       entry = this.loadFileContentFromDisk(relPath)
     }
-    return entry?.content ?? null
+    return entry ?? null
   }
 
-  // TODO proper gc
-  // // Add a dependency to a file
-  // //
-  // // The `relPath` and `dependencyRelPath` should always be `/` seperated even on Windows.
-  // addDependency(relPath: string, dependencyRelPath: string) {
-  //   const src = this.getFileEntry(relPath)?.directDependencies
-  //   const dest = this.getFileEntry(dependencyRelPath)?.directDependants
-  //   if (!src || !dest) return
-  //   src[dependencyRelPath] = true
-  //   dest[relPath] = true
-  // }
-
-  // // Remove a dependency to a file
-  // //
-  // // The `relPath` and `dependencyRelPath` should always be `/` seperated even on Windows.
-  // removeDependency(relPath: string, dependencyRelPath: string) {
-  //   const src = this.getFileEntry(relPath)?.directDependencies
-  //   const dest = this.getFileEntry(dependencyRelPath)?.directDependants
-  //   if (!src || !dest) return
-  //   delete src[dependencyRelPath]
-  //   delete dest[relPath]
-  // }
+  // End the tracking of the file content
+  //
+  // The `relPath` should always be `/` seperated even on Windows.
+  endTrackFile(relPath: string) {
+    const entry = this.getFileEntry(relPath)
+    if (!entry) return
+    if (entry.overriddenContent === null) {
+      this.removeEntry(relPath)
+      return
+    }
+    entry.content = null
+    entry.contentOutdated = false
+  }
 
   // Overrides the content of a file (and also mark it as an entrance file)
   //

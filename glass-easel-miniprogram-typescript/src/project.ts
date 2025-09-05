@@ -1,6 +1,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { TmplGroup } from 'glass-easel-template-compiler'
 import { VirtualFileSystem } from './virtual_fs'
+
+// TODO check windows `relPath` sep
 
 // determine if a path (relative to the code root) is a component
 const isCompPath = (rootPath: string, relPath: string): boolean => {
@@ -23,6 +26,8 @@ const isCompPath = (rootPath: string, relPath: string): boolean => {
 
 export class ProjectDirManager {
   readonly vfs: VirtualFileSystem
+  private tmplGroup = new TmplGroup()
+  private entranceFiles = Object.create(null) as Record<string, true>
   onTrackedFileRemoved: (relPath: string) => void = () => {}
   onTrackedFileUpdated: (relPath: string) => void = () => {}
 
@@ -33,7 +38,8 @@ export class ProjectDirManager {
       const extName = path.extname(relPath)
       if (extName === '.wxml') {
         if (isCompPath(rootPath, relPath.slice(0, -extName.length))) {
-          this.vfs.trackFileContent(relPath)
+          this.vfs.trackFile(relPath)
+          this.entranceFiles[relPath] = true
         }
       }
     }
@@ -46,6 +52,40 @@ export class ProjectDirManager {
   }
 
   stop() {
+    this.tmplGroup.free()
     return this.vfs.stop()
+  }
+
+  getEntranceFiles() {
+    return Object.keys(this.entranceFiles)
+  }
+
+  getFileContent(relPath: string): string | null {
+    return this.vfs.trackFile(relPath)?.content ?? null
+  }
+
+  getFileVersion(relPath: string): number | null {
+    return this.vfs.trackFile(relPath)?.version ?? null
+  }
+
+  openFile(relPath: string, content: string) {
+    const extName = path.extname(relPath)
+    if (extName === '.wxml') {
+      this.vfs.overrideFileContent(relPath, content)
+      this.entranceFiles[relPath] = true
+    }
+  }
+
+  updateFile(relPath: string, content: string) {
+    if (this.entranceFiles[relPath]) {
+      this.vfs.overrideFileContent(relPath, content)
+    }
+  }
+
+  closeFile(relPath: string) {
+    if (this.entranceFiles[relPath]) {
+      delete this.entranceFiles[relPath]
+      this.vfs.cancelOverrideFileContent(relPath)
+    }
   }
 }

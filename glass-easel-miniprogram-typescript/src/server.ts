@@ -1,3 +1,4 @@
+import path from 'node:path'
 import * as ts from 'typescript'
 import chalk from 'chalk'
 import { ProjectDirManager } from './project'
@@ -35,18 +36,20 @@ export type ServerOptions = {
 }
 
 export class Server {
-  private onFirstScanDone: (this: Server) => void = () => {}
   private onNewDiagnostics: (diag: Diagnostic) => void = () => {}
   private options: ServerOptions
+  private projectPath: string
   private tsLangService: ts.LanguageService
   private projectDirManager: ProjectDirManager
 
   constructor(options: ServerOptions) {
     this.options = options
+    this.projectPath = path.join(process.cwd(), options.projectPath)
+    const rootFullPaths: string[] = []
 
     // initialize ts language service
     /* eslint-disable @typescript-eslint/unbound-method */
-    const configPath = ts.findConfigFile(options.projectPath, ts.sys.fileExists, 'tsconfig.json')
+    const configPath = ts.findConfigFile(this.projectPath, ts.sys.fileExists, 'tsconfig.json')
     let config: ts.ParsedCommandLine
     if (configPath !== undefined) {
       // eslint-disable-next-line @typescript-eslint/unbound-method
@@ -76,16 +79,18 @@ export class Server {
       },
       getScriptFileNames() {
         // !!! TODO
-        console.info(config.fileNames)
-        return config.fileNames
+        console.info('!!! getScriptFileNames', rootFullPaths)
+        return rootFullPaths
       },
-      getScriptVersion(fileName) {
+      getScriptVersion: (fileName) => {
         // !!! TODO
-        console.info(fileName)
-        return ''
+        console.info('!!! getScriptVersion', fileName)
+        return this.projectDirManager.getFileVersion(fileName)?.toString() ?? ''
       },
       getScriptSnapshot: (fileName) => {
-        this.virtualFs.getFileContent(fileName)
+        const content = this.projectDirManager.getFileContent(fileName)
+        if (content === null) return undefined
+        return ts.ScriptSnapshot.fromString(content)
       },
       getCurrentDirectory() {
         return process.cwd()
@@ -105,11 +110,26 @@ export class Server {
         // eslint-disable-next-line no-console
         console.error(message)
       },
-      readDirectory: ts.sys.readDirectory,
-      readFile: ts.sys.readFile,
-      fileExists: ts.sys.fileExists,
-      getDirectories: ts.sys.getDirectories,
-      directoryExists: ts.sys.directoryExists,
+      readDirectory: (path, extensions, exclude, include, depth) => {
+        console.info('!!! readDirectory', path, extensions, exclude, include, depth)
+        return ts.sys.readDirectory(path, extensions, exclude, include, depth)
+      },
+      readFile: (path, encoding) => {
+        console.info('!!! readFile', path, encoding)
+        return ts.sys.readFile(path, encoding)
+      },
+      fileExists: (path) => {
+        console.info('!!! fileExists', path, ts.sys.fileExists(path))
+        return ts.sys.fileExists(path)
+      },
+      getDirectories: (directoryName) => {
+        console.info('!!! getDirectories', directoryName)
+        return ts.sys.getDirectories(directoryName)
+      },
+      directoryExists: (directoryName) => {
+        console.info('!!! directoryExists', directoryName)
+        return ts.sys.directoryExists(directoryName)
+      },
     }
     /* eslint-enable @typescript-eslint/unbound-method */
     const docReg = ts.createDocumentRegistry()
@@ -117,10 +137,33 @@ export class Server {
 
     // initialize virtual file system
     this.projectDirManager = new ProjectDirManager(
-      options.projectPath,
+      this.projectPath,
       options.scanAllComponents || false,
       () => {
-        this.onFirstScanDone.call(this)
+        // collect all entrance files
+        if (options.scanAllComponents) {
+          this.projectDirManager.getEntranceFiles().forEach((relPath) => {
+            const extname = path.extname(relPath)
+            if (extname === '.wxml') {
+              this.logVerboseMessage(`Found component WXML: ${relPath}`)
+              const tsContent = this.projectDirManager.getFileContent(relPath)
+              if (tsContent !== null) {
+                const tsPath = `${relPath.slice(0, -extname.length)}.ts`
+                const fullPath = path.join(this.projectPath, tsPath)
+                rootFullPaths.push(fullPath)
+              }
+            }
+            // this.analyzeWxmlFile(relPath)
+          })
+        }
+
+        // run all ts files
+        rootFullPaths.forEach((relPath) => {
+          this.analyzeTsFile(relPath)
+        })
+
+        // callback
+        this.options?.onFirstScanDone?.call(this)
       },
     )
   }
@@ -128,6 +171,17 @@ export class Server {
   end() {
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     this.projectDirManager.stop()
+  }
+
+  private analyzeTsFile(fullPath: string) {
+    const services = this.tsLangService
+    const allDiagnostics = services
+      .getCompilerOptionsDiagnostics()
+      .concat(services.getSyntacticDiagnostics(fullPath))
+      .concat(services.getSemanticDiagnostics(fullPath))
+    allDiagnostics.forEach((diag) => {
+      this.diagnosticReporter(diag)
+    })
   }
 
   private logTsMessage(message: string) {
