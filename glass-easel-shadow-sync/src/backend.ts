@@ -394,6 +394,10 @@ export class ShadowSyncElement implements GlassEaselBackend.Element {
       lvaluePath,
     )
   }
+
+  callWxsPropChangeListener(newValue: any, oldValue: any, lvaluePath: (string | number)[]): void {
+    this._context.channel.callWXSPropChangeListener(this._id, newValue, oldValue, lvaluePath)
+  }
 }
 
 export class ShadowSyncShadowRoot

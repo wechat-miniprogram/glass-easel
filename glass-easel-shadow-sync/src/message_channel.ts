@@ -111,6 +111,7 @@ export const enum ChannelEventType {
   PERFORMANCE_STATS_CALLBACK,
 
   SET_WXS_LISTENER_STATS,
+  CALL_WXS_PROP_CHANGE_LISTENER,
   ON_WXS_CALL_METHOD,
 }
 
@@ -268,6 +269,7 @@ export type ChannelArgs = ExhaustiveChannelEvent<{
     boolean,
     (string | number)[],
   ]
+  [ChannelEventType.CALL_WXS_PROP_CHANGE_LISTENER]: [number, any, any, (string | number)[]]
   [ChannelEventType.ON_WXS_CALL_METHOD]: [number, string, string]
 }>
 
@@ -628,6 +630,7 @@ export const MessageChannelDataSide = (
     performanceEndTrace: (id: number, cb: (stats: { startTimestamp: number; endTimestamp: number }) => void,) => publish([ChannelEventType.PERFORMANCE_END_TRACE, id, callback2id(cb)]),
 
     setWXSListenerStats: (elementId: number, eventName: string, final: boolean, mutated: boolean, capture: boolean, lvaluePath: (string | number)[]) => publish([ChannelEventType.SET_WXS_LISTENER_STATS, elementId, eventName, final, mutated, capture, lvaluePath]),
+    callWXSPropChangeListener: (elementId: number, newValue: any, oldValue: any, lvaluePath: (string | number)[]) => publish([ChannelEventType.CALL_WXS_PROP_CHANGE_LISTENER, elementId, newValue, oldValue, lvaluePath]),
     onWXSCallMethod: (handler: (elementId: number, method: string, args: unknown[]) => void) => {
       handleWXSCallMethod = handler
     },
@@ -1252,6 +1255,12 @@ export const MessageChannelViewSide = (
           lvaluePath,
           eventHandler,
         )
+        break
+      }
+      case ChannelEventType.CALL_WXS_PROP_CHANGE_LISTENER: {
+        const [, elementId, newValue, oldValue, lvaluepath] = arg
+        const element = nodeMap[elementId]! as Element
+        controller.callWXSPropChangeListener(element, newValue, oldValue, lvaluepath)
         break
       }
       default:

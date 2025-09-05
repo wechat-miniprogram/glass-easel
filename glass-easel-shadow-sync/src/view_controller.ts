@@ -684,6 +684,10 @@ export class ViewController {
     )
   }
 
+  callWXSPropChangeListener(element: Element, newValue: any, oldValue: any, lvaluePath: (string | number)[]): void {
+    // To be override
+  }
+
   setWXSCallMethodHandler(handler: (element: Element, method: string, args: unknown[]) => void) {
     this._WXSCallMethodHandler = handler
   }
