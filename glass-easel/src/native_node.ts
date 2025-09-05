@@ -10,50 +10,16 @@ import { ClassList, StyleScopeManager } from './class_list'
 import { type DataValue, type ModelBindingListener } from './data_proxy'
 import { performanceMeasureEnd, performanceMeasureStart } from './dev_tools'
 import { Element } from './element'
-import { type EventListener } from './event'
 import { ENV, globalOptions } from './global_options'
 import { type ShadowRoot } from './shadow_root'
 import { NATIVE_NODE_SYMBOL, isNativeNode } from './type_symbol'
-import { type Lifetimes, type LifetimeFuncs } from './component'
-import { type GeneralBehavior } from './behavior'
-import { FuncArr, type GeneralFuncType } from './func_arr'
-
-export type NativeNodeAttributeFilter = (
-  // eslint-disable-next-line no-use-before-define
-  elem: NativeNode,
-  propName: string,
-  propValue: any,
-  callback: (res: any) => void,
-) => void
-
-export interface ExtendedNativeNodeDefinition {
-  lifetimes?: Partial<Lifetimes>
-  lifetimesFromBehaviors?: GeneralBehavior[]
-  attributeFilters?: Record<string, NativeNodeAttributeFilter>
-  eventListeners?: Record<
-    string,
-    {
-      capture?: boolean
-      handler: (elem: NativeNode, event: any) => boolean | void
-    }
-  >
-}
 
 export class NativeNode extends Element {
   [NATIVE_NODE_SYMBOL]: true
   is: string
   public stylingName: string
-  public _$listenerChangeCb?: (
-    isAdd: boolean,
-    name: string,
-    func: EventListener<unknown>,
-    options: EventListenerOptions | undefined,
-  ) => void
-  private _$attributeFilters: Record<string, NativeNodeAttributeFilter>
   /* @internal */
   private _$modelBindingListeners?: { [name: string]: ModelBindingListener }
-  /** @internal */
-  _$lifetimeFuncs: LifetimeFuncs
 
   /* @internal */
   /* istanbul ignore next */
@@ -70,7 +36,6 @@ export class NativeNode extends Element {
     tagName: string,
     owner: ShadowRoot,
     stylingName?: string,
-    extendedDefinition?: ExtendedNativeNodeDefinition,
     placeholderHandlerRemover?: () => void,
   ): NativeNode {
     const node = Object.create(NativeNode.prototype) as NativeNode
@@ -92,8 +57,6 @@ export class NativeNode extends Element {
     }
     node._$initialize(false, backendElement, owner, owner._$nodeTreeContext)
     node._$placeholderHandlerRemover = placeholderHandlerRemover
-    node._$attributeFilters = Object.create(null) as Record<string, NativeNodeAttributeFilter>
-    node._$lifetimeFuncs = Object.create(null) as LifetimeFuncs
     const ownerHost = owner.getHostNode()
     const ownerComponentOptions = ownerHost.getComponentOptions()
     const styleScope = ownerComponentOptions.styleScope ?? StyleScopeManager.globalScope()
@@ -132,69 +95,7 @@ export class NativeNode extends Element {
       if (ENV.DEV) performanceMeasureEnd()
     }
 
-    if (extendedDefinition !== undefined) {
-      if (extendedDefinition.attributeFilters !== undefined) {
-        node._$attributeFilters = extendedDefinition.attributeFilters
-      }
-
-      const lifetimesFromBehaviors = extendedDefinition.lifetimesFromBehaviors || []
-      lifetimesFromBehaviors.forEach((behavior) => {
-        behavior.prepare()
-        const lifetimes = behavior._$lifetimes
-        for (let i = 0; i < lifetimes.length; i += 1) {
-          const { name, func } = lifetimes[i]!
-          node._$addLifetimeFunc(name, func)
-        }
-      })
-
-      const lifetimes: Partial<Lifetimes> = extendedDefinition.lifetimes || {}
-      Object.entries(lifetimes).forEach(([name, func]) => {
-        node._$addLifetimeFunc(name, func)
-      })
-
-      const eventListeners = extendedDefinition.eventListeners || {}
-      Object.entries(eventListeners).forEach(([event, listener]) => {
-        const { handler, capture } = listener
-        node.addListener(event, (event) => handler(node, event), {
-          capture,
-        })
-      })
-    }
-
-    node.triggerLifetime('created', [])
-
     return node
-  }
-
-  callAttributeFilter(
-    propName: string,
-    propValue: any,
-    callback: (newName: any, newPropValue: any) => void,
-  ) {
-    const dashToCamelCase = (dash: string): string =>
-      dash.replace(/-(.|$)/g, (s) => (s[1] ? s[1].toUpperCase() : ''))
-    const camelCase = dashToCamelCase(propName)
-    if (typeof this._$attributeFilters[camelCase] !== 'function') {
-      callback(propName, propValue)
-      return
-    }
-    this._$attributeFilters[camelCase]!(this, camelCase, propValue, (newPropValue) =>
-      callback(camelCase, newPropValue),
-    )
-  }
-
-  private _$addLifetimeFunc(name: string, func: GeneralFuncType) {
-    if (this._$lifetimeFuncs[name]) {
-      this._$lifetimeFuncs[name]!.add(func)
-    } else {
-      const funcArr = (this._$lifetimeFuncs[name] = new FuncArr('lifetime'))
-      funcArr.add(func)
-    }
-  }
-
-  triggerLifetime(name: string, args: Parameters<GeneralFuncType>) {
-    const f = this._$lifetimeFuncs[name]
-    if (f) f.call(this, args, this.is)
   }
 
   setModelBindingListener(propName: string, listener: ModelBindingListener) {

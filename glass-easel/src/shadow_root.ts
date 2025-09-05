@@ -153,10 +153,9 @@ export class ShadowRoot extends VirtualNode {
     placeholderHandlerRemover: (() => void) | undefined,
     initPropValues?: (comp: NativeNode) => void,
   ): NativeNode {
-    const extendedDef = this._$host._$behavior.ownerSpace.getExtendedNativeNode(tagName)
     const ret = this._$hooks.createNativeNode(
       (tagName, stylingName) =>
-        NativeNode.create(tagName, this, stylingName, extendedDef, placeholderHandlerRemover),
+        NativeNode.create(tagName, this, stylingName, placeholderHandlerRemover),
       tagName,
       stylingName,
     )

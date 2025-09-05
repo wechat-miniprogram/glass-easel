@@ -1265,7 +1265,7 @@ export class Component<
    * Most cases should take a common method instead.
    */
   triggerLifetime(name: string, args: Parameters<GeneralFuncType>) {
-    const f = this._$lifetimeFuncs?.[name]
+    const f = this._$lifetimeFuncs[name]
     if (f) f.call(this._$methodCaller as any, args, this)
   }
 

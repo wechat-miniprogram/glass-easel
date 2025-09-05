@@ -31,7 +31,9 @@ export type ChangePropListener<T> = (
 
 export type ChangePropFilter = <T>(
   listener: ChangePropListener<T>,
-  generalLvaluePath?: DataPath | null,
+  generalLvaluePath: DataPath | null | undefined,
+  elem: Element,
+  propName: string,
 ) => ChangePropListener<T>
 
 export interface EventListenerWrapper {
@@ -1212,14 +1214,10 @@ export class ProcGenWrapper {
         // compatibilities for legacy event binding syntax
         const camelName = dashToCamelCase(name)
         if (!this.checkFallbackEventListener(elem, camelName, v, generalLvaluePath)) {
-          elem.callAttributeFilter(camelName, v, (propName, newPropValue) => {
-            elem.updateAttribute(propName, newPropValue)
-          })
+          elem.updateAttribute(name, v)
         }
       } else {
-        elem.callAttributeFilter(name, v, (propName, newPropValue) => {
-          elem.updateAttribute(propName, newPropValue)
-        })
+        elem.updateAttribute(name, v)
       }
       if (modelLvaluePath) {
         elem.setModelBindingListener(name, (value) => {
@@ -1260,7 +1258,7 @@ export class ProcGenWrapper {
       tmplArgs.changeProp = Object.create(null) as typeof tmplArgs.changeProp
     }
     tmplArgs.changeProp![name] = {
-      listener: this.changePropFilter(v, generalLvaluePath),
+      listener: this.changePropFilter(v, generalLvaluePath, elem, name),
       oldValue: undefined,
     }
   }

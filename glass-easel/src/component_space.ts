@@ -12,7 +12,6 @@ import {
   type GeneralComponent,
   type GeneralComponentDefinition,
 } from './component'
-import type { ExtendedNativeNodeDefinition } from './native_node'
 import {
   type ComponentInstance,
   type ComponentParams,
@@ -141,14 +140,6 @@ export class ComponentSpace {
     [path: string]: GeneralComponentDefinition | NativeNodeDefinition
   }
   /** @internal */
-  private _$extendedNativeList = Object.create(null) as {
-    [path: string]: ExtendedNativeNodeDefinition
-  }
-  /** @internal */
-  private _$pubExtendedNativeList = Object.create(null) as {
-    [path: string]: ExtendedNativeNodeDefinition
-  }
-  /** @internal */
   private _$importedSpaces = Object.create(null) as {
     [path: string]: {
       space: ComponentSpace
@@ -233,11 +224,6 @@ export class ComponentSpace {
   updateBaseSpace(baseSpace: ComponentSpace) {
     Object.assign(this._$list, baseSpace._$pubList)
     Object.assign(this._$behaviorList, baseSpace._$pubBehaviorList)
-    Object.assign(this._$extendedNativeList, baseSpace._$pubExtendedNativeList)
-  }
-
-  updateBaseExtendedNativeList(baseSpace: ComponentSpace) {
-    Object.assign(this._$extendedNativeList, baseSpace._$pubExtendedNativeList)
   }
 
   /**
@@ -452,14 +438,6 @@ export class ComponentSpace {
     this._$behaviorList[is] = beh
   }
 
-  registerExtendedNativeNode(tagName: string, def: ExtendedNativeNodeDefinition) {
-    this._$extendedNativeList[tagName] = def
-  }
-
-  getExtendedNativeNode(tagName: string) {
-    return this._$extendedNativeList[tagName]
-  }
-
   /**
    * Start a series of components and behaviors registration
    *
@@ -538,14 +516,6 @@ export class ComponentSpace {
       throw new Error(`There is no behavior "${is}" for aliasing`)
     }
     this._$pubBehaviorList[alias] = beh
-  }
-
-  exportExtendedNativeNode(tagName: string) {
-    const extendedNativeNode = this._$extendedNativeList[tagName]
-    if (!extendedNativeNode) {
-      throw new Error(`There is no extended native node "${tagName}" for aliasing`)
-    }
-    this._$pubExtendedNativeList[tagName] = extendedNativeNode
   }
 
   /** @internal */

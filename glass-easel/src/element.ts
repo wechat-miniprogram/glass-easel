@@ -564,8 +564,8 @@ export class Element implements NodeCast {
   }
 
   /** Set the node style */
-  setNodeStyle(styleSegment: string, index: StyleSegmentIndex = 0) {
-    if (index === 0 && this._$styleSegments[index] === styleSegment) return
+  setNodeStyle(styleSegment: string, index: StyleSegmentIndex = StyleSegmentIndex.MAIN) {
+    if (index === StyleSegmentIndex.MAIN && this._$styleSegments[index] === styleSegment) return
     this._$styleSegments[index] = styleSegment
     const style = this._$styleSegments.join(';')
     if (ENV.DEV) performanceMeasureStart('backend.setStyle')
@@ -613,8 +613,6 @@ export class Element implements NodeCast {
           }
           const shadowRoot = node.getShadowRoot()
           if (shadowRoot) callFunc(shadowRoot)
-        } else if (isNativeNode(node)) {
-          node.triggerLifetime('attached', [])
         }
         const childNodes = node.childNodes
         for (let i = 0; i < childNodes.length; i += 1) {
@@ -636,12 +634,8 @@ export class Element implements NodeCast {
         if (isComponent(node)) {
           const shadowRoot = node.getShadowRoot()
           if (shadowRoot) callFunc(shadowRoot)
-        }
-        node._$attached = false
-        if (isComponent(node) || isNativeNode(node)) {
+          node._$attached = false
           node.triggerLifetime('detached', [])
-        }
-        if (isComponent(node)) {
           if (node._$relation) {
             node._$relation.triggerLinkEvent(RelationType.ParentNonVirtualNode, true)
             node._$relation.triggerLinkEvent(RelationType.ParentComponent, true)
@@ -654,6 +648,8 @@ export class Element implements NodeCast {
               status: 'detached',
             })
           }
+        } else {
+          node._$attached = false
         }
       }
     }
@@ -2481,8 +2477,6 @@ export class Element implements NodeCast {
     this._$setListenerStats(name, finalChanged, options)
     if (isComponent(this) && this._$definition._$options.listenerChangeLifetimes) {
       this.triggerLifetime('listenerChange', [true, name, func, options])
-    } else if (isNativeNode(this) && typeof this._$listenerChangeCb === 'function') {
-      this._$listenerChangeCb.apply(this, [true, name, func, options])
     }
   }
 
@@ -2493,8 +2487,6 @@ export class Element implements NodeCast {
     this._$setListenerStats(name, finalChanged, options)
     if (isComponent(this) && this._$definition._$options.listenerChangeLifetimes) {
       this.triggerLifetime('listenerChange', [false, name, func, options])
-    } else if (isNativeNode(this) && typeof this._$listenerChangeCb === 'function') {
-      this._$listenerChangeCb.apply(this, [false, name, func, options])
     }
   }
 
