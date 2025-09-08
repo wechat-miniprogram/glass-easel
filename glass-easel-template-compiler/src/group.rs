@@ -510,6 +510,12 @@ impl TmplGroup {
         Ok(w.finish())
     }
 
+    /// Get a string that used to check TypeScript problems.
+    pub(crate) fn get_tmpl_converted_expr(&self, path: &str) -> Result<String, TmplError> {
+        let tree = self.get_tree(path)?;
+        Ok(crate::typescript::generate_tmpl_converted_expr(tree))
+    }
+
     /// Returns the number of templates in the group.
     pub fn len(&self) -> usize {
         self.trees.len()

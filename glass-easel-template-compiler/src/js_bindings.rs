@@ -199,6 +199,12 @@ impl TmplGroup {
     pub fn import_group(&mut self, group: &TmplGroup) {
         self.group.import_group(&group.group)
     }
+
+    #[wasm_bindgen(js_name = "getTmplConvertedExpr")]
+    #[doc(hidden)]
+    pub fn get_tmpl_converted_expr(&mut self, path: &str) -> Result<String, JsError> {
+        Ok(self.group.get_tmpl_converted_expr(path)?)
+    }
 }
 
 #[wasm_bindgen]

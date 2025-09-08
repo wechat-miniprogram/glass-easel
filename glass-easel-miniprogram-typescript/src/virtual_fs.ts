@@ -9,7 +9,7 @@ type VirtualFile = {
 }
 
 export class VirtualFileSystem {
-  private rootPath: string
+  readonly rootPath: string
   private files = Object.create(null) as Record<string, VirtualFile>
   private watcher: FSWatcher
   onFileFound: (fullPath: string) => void = () => {}

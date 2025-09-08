@@ -62,6 +62,14 @@ export class ProjectDirManager {
     return this.vfs.trackFile(fullPath)?.content ?? null
   }
 
+  getWxmlConvertedExpr(fullPath: string): string | null {
+    const content = this.getFileContent(fullPath)
+    if (!content) return null
+    const relPath = path.relative(this.vfs.rootPath, fullPath).split(path.sep).join('/')
+    this.tmplGroup.addTmpl(relPath, content)
+    return this.tmplGroup.getTmplConvertedExpr(relPath)
+  }
+
   getFileVersion(fullPath: string): number | null {
     return this.vfs.trackFile(fullPath)?.version ?? null
   }

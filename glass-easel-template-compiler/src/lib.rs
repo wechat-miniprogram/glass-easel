@@ -18,3 +18,4 @@ mod escape;
 mod js_bindings;
 mod path;
 mod proc_gen;
+mod typescript;
