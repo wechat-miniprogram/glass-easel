@@ -20,26 +20,25 @@ const { values } = parseArgs({
 
 const server = new Server({
   projectPath: values.path,
-  showTypeScriptMessages: true,
+  reportTypeScriptDiagnostics: true,
   scanAllComponents: true,
+  verboseMessages: values.verbose,
   onNewDiagnostics(diag) {
     // eslint-disable-next-line no-console
     console.log(chalk.gray(`${diag.file}:${diag.start.line}:${diag.start.character}`))
     if (diag.level === DiagnosticLevel.Error) {
       // eslint-disable-next-line no-console
-      console.error(chalk.red(diag.message))
+      console.error(chalk.red(diag.formattedMessage))
     } else if (diag.level === DiagnosticLevel.Warning) {
       // eslint-disable-next-line no-console
-      console.warn(chalk.yellow(diag.message))
+      console.warn(chalk.yellow(diag.formattedMessage))
     } else if (diag.level === DiagnosticLevel.Info) {
       // eslint-disable-next-line no-console
-      console.info(chalk.blue(diag.message))
+      console.info(chalk.blue(diag.formattedMessage))
     } else {
       // eslint-disable-next-line no-console
-      console.log(chalk.white(diag.message))
+      console.log(chalk.white(diag.formattedMessage))
     }
-    // eslint-disable-next-line no-console
-    console.log('')
   },
   onFirstScanDone() {
     server.end()
