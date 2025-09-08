@@ -82,13 +82,14 @@ export class Server {
         console.info('!!! getScriptFileNames', rootFullPaths)
         return rootFullPaths
       },
-      getScriptVersion: (fileName) => {
+      getScriptVersion: (fullPath) => {
         // !!! TODO
-        console.info('!!! getScriptVersion', fileName)
-        return this.projectDirManager.getFileVersion(fileName)?.toString() ?? ''
+        console.info('!!! getScriptVersion', fullPath)
+        return this.projectDirManager.getFileVersion(fullPath)?.toString() ?? ''
       },
-      getScriptSnapshot: (fileName) => {
-        const content = this.projectDirManager.getFileContent(fileName)
+      getScriptSnapshot: (fullPath) => {
+        console.info('!!! getSnapshot', fullPath)
+        const content = this.projectDirManager.getFileContent(fullPath)
         if (content === null) return undefined
         return ts.ScriptSnapshot.fromString(content)
       },
@@ -110,17 +111,17 @@ export class Server {
         // eslint-disable-next-line no-console
         console.error(message)
       },
-      readDirectory: (path, extensions, exclude, include, depth) => {
-        console.info('!!! readDirectory', path, extensions, exclude, include, depth)
-        return ts.sys.readDirectory(path, extensions, exclude, include, depth)
+      readDirectory: (fullPath, extensions, exclude, include, depth) => {
+        console.info('!!! readDirectory', fullPath, extensions, exclude, include, depth)
+        return ts.sys.readDirectory(fullPath, extensions, exclude, include, depth)
       },
-      readFile: (path, encoding) => {
-        console.info('!!! readFile', path, encoding)
-        return ts.sys.readFile(path, encoding)
+      readFile: (fullPath, encoding) => {
+        console.info('!!! readFile', fullPath, encoding)
+        return ts.sys.readFile(fullPath, encoding)
       },
-      fileExists: (path) => {
-        console.info('!!! fileExists', path, ts.sys.fileExists(path))
-        return ts.sys.fileExists(path)
+      fileExists: (fullPath) => {
+        console.info('!!! fileExists', fullPath, ts.sys.fileExists(fullPath))
+        return ts.sys.fileExists(fullPath)
       },
       getDirectories: (directoryName) => {
         console.info('!!! getDirectories', directoryName)
@@ -142,15 +143,14 @@ export class Server {
       () => {
         // collect all entrance files
         if (options.scanAllComponents) {
-          this.projectDirManager.getEntranceFiles().forEach((relPath) => {
-            const extname = path.extname(relPath)
+          this.projectDirManager.getEntranceFiles().forEach((fullPath) => {
+            const extname = path.extname(fullPath)
             if (extname === '.wxml') {
-              this.logVerboseMessage(`Found component WXML: ${relPath}`)
-              const tsContent = this.projectDirManager.getFileContent(relPath)
+              this.logVerboseMessage(`Found component WXML: ${fullPath}`)
+              const tsContent = this.projectDirManager.getFileContent(fullPath)
               if (tsContent !== null) {
-                const tsPath = `${relPath.slice(0, -extname.length)}.ts`
-                const fullPath = path.join(this.projectPath, tsPath)
-                rootFullPaths.push(fullPath)
+                const tsPath = `${fullPath.slice(0, -extname.length)}.ts`
+                rootFullPaths.push(tsPath)
               }
             }
             // this.analyzeWxmlFile(relPath)
@@ -158,8 +158,8 @@ export class Server {
         }
 
         // run all ts files
-        rootFullPaths.forEach((relPath) => {
-          this.analyzeTsFile(relPath)
+        rootFullPaths.forEach((fullPath) => {
+          this.analyzeTsFile(fullPath)
         })
 
         // callback

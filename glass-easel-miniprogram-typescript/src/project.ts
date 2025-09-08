@@ -3,12 +3,10 @@ import path from 'node:path'
 import { TmplGroup } from 'glass-easel-template-compiler'
 import { VirtualFileSystem } from './virtual_fs'
 
-// TODO check windows `relPath` sep
-
 // determine if a path (relative to the code root) is a component
-const isCompPath = (rootPath: string, relPath: string): boolean => {
+const isCompPath = (fullPath: string): boolean => {
   try {
-    const json = fs.readFileSync(path.join(rootPath, `${relPath}.json`), { encoding: 'utf8' })
+    const json = fs.readFileSync(`${fullPath}.json`, { encoding: 'utf8' })
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const parsed = JSON.parse(json)
     if (
@@ -28,26 +26,26 @@ export class ProjectDirManager {
   readonly vfs: VirtualFileSystem
   private tmplGroup = new TmplGroup()
   private entranceFiles = Object.create(null) as Record<string, true>
-  onTrackedFileRemoved: (relPath: string) => void = () => {}
-  onTrackedFileUpdated: (relPath: string) => void = () => {}
+  onTrackedFileRemoved: (fullPath: string) => void = () => {}
+  onTrackedFileUpdated: (fullPath: string) => void = () => {}
 
   constructor(rootPath: string, autoTrackAllComponents: boolean, firstScanCallback: () => void) {
     this.vfs = new VirtualFileSystem(rootPath, firstScanCallback)
-    this.vfs.onFileFound = (relPath) => {
+    this.vfs.onFileFound = (fullPath) => {
       if (!autoTrackAllComponents) return
-      const extName = path.extname(relPath)
+      const extName = path.extname(fullPath)
       if (extName === '.wxml') {
-        if (isCompPath(rootPath, relPath.slice(0, -extName.length))) {
-          this.vfs.trackFile(relPath)
-          this.entranceFiles[relPath] = true
+        if (isCompPath(fullPath.slice(0, -extName.length))) {
+          this.vfs.trackFile(fullPath)
+          this.entranceFiles[fullPath] = true
         }
       }
     }
-    this.vfs.onTrackedFileUpdated = (relPath) => {
-      this.onTrackedFileUpdated(relPath)
+    this.vfs.onTrackedFileUpdated = (fullPath) => {
+      this.onTrackedFileUpdated(fullPath)
     }
-    this.vfs.onTrackedFileRemoved = (relPath) => {
-      this.onTrackedFileRemoved(relPath)
+    this.vfs.onTrackedFileRemoved = (fullPath) => {
+      this.onTrackedFileRemoved(fullPath)
     }
   }
 
@@ -60,32 +58,32 @@ export class ProjectDirManager {
     return Object.keys(this.entranceFiles)
   }
 
-  getFileContent(relPath: string): string | null {
-    return this.vfs.trackFile(relPath)?.content ?? null
+  getFileContent(fullPath: string): string | null {
+    return this.vfs.trackFile(fullPath)?.content ?? null
   }
 
-  getFileVersion(relPath: string): number | null {
-    return this.vfs.trackFile(relPath)?.version ?? null
+  getFileVersion(fullPath: string): number | null {
+    return this.vfs.trackFile(fullPath)?.version ?? null
   }
 
-  openFile(relPath: string, content: string) {
-    const extName = path.extname(relPath)
+  openFile(fullPath: string, content: string) {
+    const extName = path.extname(fullPath)
     if (extName === '.wxml') {
-      this.vfs.overrideFileContent(relPath, content)
-      this.entranceFiles[relPath] = true
+      this.vfs.overrideFileContent(fullPath, content)
+      this.entranceFiles[fullPath] = true
     }
   }
 
-  updateFile(relPath: string, content: string) {
-    if (this.entranceFiles[relPath]) {
-      this.vfs.overrideFileContent(relPath, content)
+  updateFile(fullPath: string, content: string) {
+    if (this.entranceFiles[fullPath]) {
+      this.vfs.overrideFileContent(fullPath, content)
     }
   }
 
-  closeFile(relPath: string) {
-    if (this.entranceFiles[relPath]) {
-      delete this.entranceFiles[relPath]
-      this.vfs.cancelOverrideFileContent(relPath)
+  closeFile(fullPath: string) {
+    if (this.entranceFiles[fullPath]) {
+      delete this.entranceFiles[fullPath]
+      this.vfs.cancelOverrideFileContent(fullPath)
     }
   }
 }

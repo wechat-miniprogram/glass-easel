@@ -1,5 +1,4 @@
 import fs from 'node:fs'
-import path from 'node:path'
 import chokidar, { type FSWatcher } from 'chokidar'
 
 type VirtualFile = {
@@ -9,60 +8,45 @@ type VirtualFile = {
   overriddenContent: string | null
 }
 
-type VirtualDirectory = {
-  version: number
-  children: { [name: string]: VirtualFile | VirtualDirectory }
-}
-
 export class VirtualFileSystem {
   private rootPath: string
-  private root: VirtualDirectory
+  private files = Object.create(null) as Record<string, VirtualFile>
   private watcher: FSWatcher
-  onFileFound: (relPath: string) => void = () => {}
-  onFileUpdated: (relPath: string) => void = () => {}
-  onFileRemoved: (relPath: string) => void = () => {}
-  onTrackedFileRemoved: (relPath: string) => void = () => {}
-  onTrackedFileUpdated: (relPath: string) => void = () => {}
+  onFileFound: (fullPath: string) => void = () => {}
+  onFileUpdated: (fullPath: string) => void = () => {}
+  onFileRemoved: (fullPath: string) => void = () => {}
+  onTrackedFileRemoved: (fullPath: string) => void = () => {}
+  onTrackedFileUpdated: (fullPath: string) => void = () => {}
 
   constructor(rootPath: string, firstScanCallback: () => void) {
     this.rootPath = rootPath
-    this.root = {
-      version: 0,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      children: Object.create(null),
-    }
-    const convFullPath = (fullPath: string) =>
-      path.relative(rootPath, fullPath).split(path.sep).join('/')
 
     // file added handling
     const handleFileAdded = (fullPath: string) => {
-      const relPath = convFullPath(fullPath)
-      this.onFileFound(relPath)
+      this.onFileFound(fullPath)
     }
 
     // file removed handling
     const handleFileRemoved = (fullPath: string) => {
-      const relPath = convFullPath(fullPath)
-      this.onFileRemoved(relPath)
-      const entry = this.getFileEntry(relPath)
+      this.onFileRemoved(fullPath)
+      const entry = this.getFileEntry(fullPath)
       if (entry) {
         entry.content = null
         entry.contentOutdated = false
         if (entry.overriddenContent === null) {
-          this.removeEntry(relPath)
+          this.removeEntry(fullPath)
         }
-        this.onTrackedFileRemoved(relPath)
+        this.onTrackedFileRemoved(fullPath)
       }
     }
 
     // file changed handling
     const handleFileChanged = (fullPath: string) => {
-      const relPath = convFullPath(fullPath)
-      this.onFileUpdated(relPath)
-      const entry = this.getFileEntry(relPath)
+      this.onFileUpdated(fullPath)
+      const entry = this.getFileEntry(fullPath)
       if (entry) {
         entry.contentOutdated = true
-        this.onTrackedFileUpdated(relPath)
+        this.onTrackedFileUpdated(fullPath)
       }
     }
 
@@ -87,84 +71,38 @@ export class VirtualFileSystem {
     await this.watcher.close()
   }
 
-  private getFileEntry(relPath: string): VirtualFile | null {
-    const parts = relPath.split('/')
-    let curDir = this.root
-    for (let i = 0; i < parts.length - 2; i += 1) {
-      const part = parts[i]!
-      if (!curDir.children[part] || !('children' in curDir.children[part]!)) {
-        return null
-      }
-      const child = curDir.children[part]!
-      curDir = child as VirtualDirectory
-    }
-    const name = parts[parts.length - 1]!
-    if (curDir.children[name] && 'content' in curDir.children[name]!) {
-      return curDir.children[name] as VirtualFile
-    }
-    return null
+  private getFileEntry(fullPath: string): VirtualFile | null {
+    return this.files[fullPath] ?? null
   }
 
-  private getOrCreateFileEntry(relPath: string): VirtualFile {
-    const parts = relPath.split('/')
-    let curDir = this.root
-    for (let i = 0; i < parts.length - 2; i += 1) {
-      const part = parts[i]!
-      if (!curDir.children[part] || !('children' in curDir.children[part]!)) {
-        curDir.children[part] = {
-          version: 0,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          children: Object.create(null),
-        }
+  private getOrCreateFileEntry(fullPath: string): VirtualFile {
+    const ret = this.files[fullPath]
+    if (!ret) {
+      const ret = {
+        version: 0,
+        content: null,
+        contentOutdated: false,
+        overriddenContent: null,
       }
-      const child = curDir.children[part]!
-      curDir = child as VirtualDirectory
+      this.files[fullPath] = ret
+      return ret
     }
-    const name = parts[parts.length - 1]!
-    if (curDir.children[name] && 'content' in curDir.children[name]!) {
-      return curDir.children[name] as VirtualFile
-    }
-    curDir.children[name] = {
-      version: 0,
-      content: null,
-      contentOutdated: false,
-      overriddenContent: null,
-    }
-    return curDir.children[name] as VirtualFile
+    return ret
   }
 
-  private removeEntry(relPath: string) {
-    const parts = relPath.split('/')
-    let curDir = this.root
-    const mid: [string, VirtualDirectory][] = []
-    for (let i = 0; i < parts.length - 2; i += 1) {
-      const part = parts[i]!
-      if (!curDir.children[part] || !('children' in curDir.children[part]!)) {
-        return
-      }
-      mid.push([part, curDir])
-      const child = curDir.children[part]!
-      curDir = child as VirtualDirectory
-    }
-    const name = parts[parts.length - 1]!
-    delete curDir.children[name]
-    while (mid.length > 0) {
-      const [name, dir] = mid.pop()!
-      if (Object.keys(dir.children).length === 0) {
-        delete dir.children[name]
-      }
-    }
+  private removeEntry(fullPath: string) {
+    delete this.files[fullPath]
   }
 
-  private loadFileContentFromDisk(relPath: string): VirtualFile | null {
+  private loadFileContentFromDisk(fullPath: string): VirtualFile | null {
     let content: string
     try {
-      content = fs.readFileSync(path.join(this.rootPath, relPath), { encoding: 'utf8' })
+      content = fs.readFileSync(fullPath, { encoding: 'utf8' })
     } catch (e) {
       return null
     }
-    if (content === null) return this.getFileEntry(relPath)
-    const entry = this.getOrCreateFileEntry(relPath)
+    if (content === null) return this.getFileEntry(fullPath)
+    const entry = this.getOrCreateFileEntry(fullPath)
     if (entry.overriddenContent === null) {
       entry.version += 1
     }
@@ -173,26 +111,23 @@ export class VirtualFileSystem {
     return entry
   }
 
-  // Read the file content and start tracking
+  // Read the file content and start tracking if the file is inside the project
   //
   // This will try to load file content from disk if not present.
-  // The `relPath` should always be `/` seperated even on Windows.
-  trackFile(relPath: string): VirtualFile | null {
-    let entry = this.getFileEntry(relPath)
+  trackFile(fullPath: string): VirtualFile | null {
+    let entry = this.getFileEntry(fullPath)
     if (!entry || (entry.contentOutdated && entry.overriddenContent === null)) {
-      entry = this.loadFileContentFromDisk(relPath)
+      entry = this.loadFileContentFromDisk(fullPath)
     }
     return entry ?? null
   }
 
   // End the tracking of the file content
-  //
-  // The `relPath` should always be `/` seperated even on Windows.
-  endTrackFile(relPath: string) {
-    const entry = this.getFileEntry(relPath)
+  endTrackFile(fullPath: string) {
+    const entry = this.getFileEntry(fullPath)
     if (!entry) return
     if (entry.overriddenContent === null) {
-      this.removeEntry(relPath)
+      this.removeEntry(fullPath)
       return
     }
     entry.content = null
@@ -202,21 +137,18 @@ export class VirtualFileSystem {
   // Overrides the content of a file (and also mark it as an entrance file)
   //
   // This also keep the file when the file is unlinked on dist.
-  // The `relPath` should always be `/` seperated even on Windows.
-  overrideFileContent(relPath: string, content: string) {
-    const entry = this.getOrCreateFileEntry(relPath)
+  overrideFileContent(fullPath: string, content: string) {
+    const entry = this.getOrCreateFileEntry(fullPath)
     entry.version += 1
     entry.overriddenContent = content
   }
 
   // Cancels the corresponding `overrideFileContent` operation
-  //
-  // The `relPath` should always be `/` seperated even on Windows.
-  cancelOverrideFileContent(relPath: string) {
-    const entry = this.getFileEntry(relPath)
+  cancelOverrideFileContent(fullPath: string) {
+    const entry = this.getFileEntry(fullPath)
     if (!entry) return
     if (entry.content === null) {
-      this.removeEntry(relPath)
+      this.removeEntry(fullPath)
       return
     }
     if (entry.overriddenContent === null) return
