@@ -7,3 +7,4 @@ pub(crate) mod expr;
 pub mod options;
 mod stringifier;
 mod tag;
+pub(crate) mod typescript;

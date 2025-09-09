@@ -634,7 +634,7 @@ mod tests {
     fn case(src: &str) {
         let (template, _) = crate::parse::parse("TEST", src);
         let mut stringifier =
-            crate::stringify::Stringifier::new(String::new(), "test", src, Default::default());
+            crate::stringify::Stringifier::new(String::new(), "test", Some(src), Default::default());
         template.stringify_write(&mut stringifier).unwrap();
         let (stringify_result, _sourcemap) = stringifier.finish();
         assert_eq!(stringify_result.as_str(), &format!("{}\n", src));

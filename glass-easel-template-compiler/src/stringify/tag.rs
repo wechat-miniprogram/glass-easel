@@ -1268,7 +1268,7 @@ mod test {
         let src = r#" text <div> text <span/> </div>"#;
         let (template, _) = crate::parse::parse("TEST", src);
         let mut stringifier =
-            crate::stringify::Stringifier::new(String::new(), "test", src, Default::default());
+            crate::stringify::Stringifier::new(String::new(), "test", Some(src), Default::default());
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(
@@ -1282,7 +1282,7 @@ mod test {
         let src = r#"<!----> text <!---->"#;
         let (template, _) = crate::parse::parse("TEST", src);
         let mut stringifier =
-            crate::stringify::Stringifier::new(String::new(), "test", src, Default::default());
+            crate::stringify::Stringifier::new(String::new(), "test", Some(src), Default::default());
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(output.as_str(), "<!----> text <!---->\n",);
@@ -1297,7 +1297,7 @@ mod test {
             ..Default::default()
         };
         let mut stringifier =
-            crate::stringify::Stringifier::new(String::new(), "test", src, options);
+            crate::stringify::Stringifier::new(String::new(), "test", Some(src), options);
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(
@@ -1315,7 +1315,7 @@ mod test {
             ..Default::default()
         };
         let mut stringifier =
-            crate::stringify::Stringifier::new(String::new(), "test", src, options);
+            crate::stringify::Stringifier::new(String::new(), "test", Some(src), options);
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(
@@ -1329,7 +1329,7 @@ mod test {
         let src = r#"<div> <!--TEST--> abc </div>"#;
         let (template, _) = crate::parse::parse("TEST", src);
         let mut stringifier =
-            crate::stringify::Stringifier::new(String::new(), "test", src, Default::default());
+            crate::stringify::Stringifier::new(String::new(), "test", Some(src), Default::default());
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(
@@ -1347,7 +1347,7 @@ mod test {
             ..Default::default()
         };
         let mut stringifier =
-            crate::stringify::Stringifier::new(String::new(), "test", src, options);
+            crate::stringify::Stringifier::new(String::new(), "test", Some(src), options);
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(output.as_str(), "<div><span/></div>",);
@@ -1358,7 +1358,7 @@ mod test {
         let src = r#"<div> abc <!-- 1 --> <span /> <!-- 2 --> <span> <!-- 3 --> </span> </div>"#;
         let (template, _) = crate::parse::parse("TEST", src);
         let mut stringifier =
-            crate::stringify::Stringifier::new(String::new(), "test", src, Default::default());
+            crate::stringify::Stringifier::new(String::new(), "test", Some(src), Default::default());
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(
@@ -1372,7 +1372,7 @@ mod test {
         let src = "<div> \n\n <span /> \n\n <span /> \n\n </div>";
         let (template, _) = crate::parse::parse("TEST", src);
         let mut stringifier =
-            crate::stringify::Stringifier::new(String::new(), "test", src, Default::default());
+            crate::stringify::Stringifier::new(String::new(), "test", Some(src), Default::default());
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(

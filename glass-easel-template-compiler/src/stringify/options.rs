@@ -50,7 +50,7 @@ mod test {
             ..Default::default()
         };
         let mut stringifier =
-            crate::stringify::Stringifier::new(String::new(), "test", src, options);
+            crate::stringify::Stringifier::new(String::new(), "test", Some(src), options);
         template.stringify_write(&mut stringifier).unwrap();
         let (output, sourcemap) = stringifier.finish();
         assert!(sourcemap.is_none());
@@ -66,7 +66,7 @@ mod test {
             ..Default::default()
         };
         let mut stringifier =
-            crate::stringify::Stringifier::new(String::new(), "test", src, options);
+            crate::stringify::Stringifier::new(String::new(), "test", Some(src), options);
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(
@@ -84,7 +84,7 @@ mod test {
             ..Default::default()
         };
         let mut stringifier =
-            crate::stringify::Stringifier::new(String::new(), "test", src, options);
+            crate::stringify::Stringifier::new(String::new(), "test", Some(src), options);
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(
@@ -102,7 +102,7 @@ mod test {
             ..Default::default()
         };
         let mut stringifier =
-            crate::stringify::Stringifier::new(String::new(), "test", src, options);
+            crate::stringify::Stringifier::new(String::new(), "test", Some(src), options);
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(
@@ -126,7 +126,7 @@ mod test {
             ..Default::default()
         };
         let mut stringifier =
-            crate::stringify::Stringifier::new(String::new(), "test", src, options);
+            crate::stringify::Stringifier::new(String::new(), "test", Some(src), options);
         template.stringify_write(&mut stringifier).unwrap();
         let (output, sourcemap) = stringifier.finish();
         assert_eq!(
@@ -184,7 +184,7 @@ mod test {
             ..Default::default()
         };
         let mut stringifier =
-            crate::stringify::Stringifier::new(String::new(), "test", src, options);
+            crate::stringify::Stringifier::new(String::new(), "test", Some(src), options);
         template.stringify_write(&mut stringifier).unwrap();
         let (output, sourcemap) = stringifier.finish();
         assert_eq!(

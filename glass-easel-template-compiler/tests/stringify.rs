@@ -7,7 +7,7 @@ fn stringifier() {
     group.add_tmpl("a", SRC_A);
     let tmpl = group.get_tree("a").unwrap();
     let mut out = String::new();
-    Stringifier::new(&mut out, "a", SRC_A, Default::default())
+    Stringifier::new(&mut out, "a", Some(SRC_A), Default::default())
         .run(tmpl)
         .unwrap();
     assert_eq!(

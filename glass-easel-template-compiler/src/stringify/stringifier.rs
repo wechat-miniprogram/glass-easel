@@ -26,11 +26,11 @@ pub struct Stringifier<'s, W: FmtWrite> {
 }
 
 impl<'s, W: FmtWrite> Stringifier<'s, W> {
-    pub fn new(w: W, source_path: &'s str, source: &'s str, options: StringifyOptions) -> Self {
+    pub fn new(w: W, source_path: &'s str, source: Option<&'s str>, options: StringifyOptions) -> Self {
         let smb = if options.source_map {
             let mut smb = SourceMapBuilder::new(Some(source_path));
             let source_id = smb.add_source(source_path);
-            smb.set_source_contents(source_id, Some(source));
+            smb.set_source_contents(source_id, source);
             Some(smb)
         } else {
             None

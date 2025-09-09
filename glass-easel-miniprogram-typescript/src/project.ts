@@ -22,10 +22,25 @@ const isCompPath = (fullPath: string): boolean => {
   return false
 }
 
+const isWxmlFile = (fullPath: string): boolean => path.extname(fullPath) === '.wxml'
+
+export const getWxmlConvertedTsPath = (fullPath: string): string | null => {
+  if (!isWxmlFile(fullPath)) return null
+  return `${fullPath}.INLINE.ts`
+}
+
+export const getWxmlTsPathReverted = (fullPath: string): string | null => {
+  if (!fullPath.endsWith('.wxml.INLINE.ts')) return null
+  const p = fullPath.slice(0, -10)
+  return p
+}
+
 export class ProjectDirManager {
   readonly vfs: VirtualFileSystem
   private tmplGroup = new TmplGroup()
-  private entranceFiles = Object.create(null) as Record<string, true>
+  private entranceWxmlFiles = Object.create(null) as Record<string, true>
+  onEntranceFileAdded: (fullPath: string) => void = () => {}
+  onEntranceFileRemoved: (fullPath: string) => void = () => {}
   onTrackedFileRemoved: (fullPath: string) => void = () => {}
   onTrackedFileUpdated: (fullPath: string) => void = () => {}
 
@@ -33,11 +48,11 @@ export class ProjectDirManager {
     this.vfs = new VirtualFileSystem(rootPath, firstScanCallback)
     this.vfs.onFileFound = (fullPath) => {
       if (!autoTrackAllComponents) return
-      const extName = path.extname(fullPath)
-      if (extName === '.wxml') {
-        if (isCompPath(fullPath.slice(0, -extName.length))) {
+      if (isWxmlFile(fullPath)) {
+        if (isCompPath(fullPath.slice(0, -5))) {
           this.vfs.trackFile(fullPath)
-          this.entranceFiles[fullPath] = true
+          this.entranceWxmlFiles[fullPath] = true
+          this.onEntranceFileAdded(fullPath)
         }
       }
     }
@@ -54,20 +69,30 @@ export class ProjectDirManager {
     return this.vfs.stop()
   }
 
-  getEntranceFiles() {
-    return Object.keys(this.entranceFiles)
+  getEntranceWxmlFiles() {
+    return Object.keys(this.entranceWxmlFiles)
   }
 
   getFileContent(fullPath: string): string | null {
     return this.vfs.trackFile(fullPath)?.content ?? null
   }
 
-  getWxmlConvertedExpr(fullPath: string): string | null {
-    const content = this.getFileContent(fullPath)
+  getWxmlConvertedExpr(wxmlFullPath: string): string | null {
+    const content = this.getFileContent(wxmlFullPath)
     if (!content) return null
-    const relPath = path.relative(this.vfs.rootPath, fullPath).split(path.sep).join('/')
+    const relPath = path.relative(this.vfs.rootPath, wxmlFullPath).split(path.sep).join('/')
+    if (relPath.startsWith('../')) return null
     this.tmplGroup.addTmpl(relPath, content)
-    return this.tmplGroup.getTmplConvertedExpr(relPath)
+    const ret = this.tmplGroup.getTmplConvertedExpr(relPath)
+    return ret
+  }
+
+  getFileTsContent(fullPath: string): string | null {
+    const p = getWxmlTsPathReverted(fullPath)
+    if (p !== null) {
+      return this.getWxmlConvertedExpr(p)
+    }
+    return this.getFileContent(fullPath)
   }
 
   getFileVersion(fullPath: string): number | null {
@@ -75,23 +100,24 @@ export class ProjectDirManager {
   }
 
   openFile(fullPath: string, content: string) {
-    const extName = path.extname(fullPath)
-    if (extName === '.wxml') {
+    if (isWxmlFile(fullPath)) {
       this.vfs.overrideFileContent(fullPath, content)
-      this.entranceFiles[fullPath] = true
+      this.entranceWxmlFiles[fullPath] = true
+      this.onEntranceFileAdded(fullPath)
     }
   }
 
   updateFile(fullPath: string, content: string) {
-    if (this.entranceFiles[fullPath]) {
+    if (this.entranceWxmlFiles[fullPath]) {
       this.vfs.overrideFileContent(fullPath, content)
     }
   }
 
   closeFile(fullPath: string) {
-    if (this.entranceFiles[fullPath]) {
-      delete this.entranceFiles[fullPath]
+    if (this.entranceWxmlFiles[fullPath]) {
+      delete this.entranceWxmlFiles[fullPath]
       this.vfs.cancelOverrideFileContent(fullPath)
+      this.onEntranceFileRemoved(fullPath)
     }
   }
 }

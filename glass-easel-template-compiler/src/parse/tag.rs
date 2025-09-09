@@ -4631,7 +4631,7 @@ mod test {
             ..Default::default()
         };
         let mut stringifier =
-            crate::stringify::Stringifier::new(String::new(), "test", src, options);
+            crate::stringify::Stringifier::new(String::new(), "test", Some(src), options);
         template.stringify_write(&mut stringifier).unwrap();
         let (stringify_result, _sourcemap) = stringifier.finish();
         assert_eq!(stringify_result.as_str(), expect);

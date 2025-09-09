@@ -1,7 +1,7 @@
 import path from 'node:path'
 import * as ts from 'typescript'
 import chalk from 'chalk'
-import { ProjectDirManager } from './project'
+import { getWxmlConvertedTsPath, ProjectDirManager } from './project'
 
 export type Position = {
   line: number
@@ -46,35 +46,34 @@ export class Server {
   private projectPath: string
   private tsLangService: ts.LanguageService
   private projectDirManager: ProjectDirManager
+  private rootFilePaths: string[]
+  private rootFilePathsVersion: number
 
   constructor(options: ServerOptions) {
     this.options = options
     this.projectPath = path.join(process.cwd(), options.projectPath)
-    const rootFullPaths: string[] = []
 
     // initialize virtual file system
     this.projectDirManager = new ProjectDirManager(
       this.projectPath,
       options.scanAllComponents || false,
       () => {
-        // collect all entrance files
-        if (options.scanAllComponents) {
-          this.projectDirManager.getEntranceFiles().forEach((fullPath) => {
-            const extname = path.extname(fullPath)
-            if (extname === '.wxml') {
-              this.logVerboseMessage(`Found component WXML: ${fullPath}`)
-              const tsPath = `${fullPath.slice(0, -extname.length)}.ts`
+        if (this.options.reportTypeScriptDiagnostics) {
+          const rootFullPaths: string[] = []
+
+          // collect all entrance files
+          if (options.scanAllComponents) {
+            this.projectDirManager.getEntranceWxmlFiles().forEach((fullPath) => {
+              const tsPath = `${fullPath.slice(0, -5)}.ts`
               const tsContent = this.projectDirManager.getFileContent(tsPath)
               if (tsContent !== null) {
                 rootFullPaths.push(tsPath)
               }
               this.analyzeWxmlFile(fullPath)
-            }
-          })
-        }
+            })
+          }
 
-        // run all ts files
-        if (this.options.reportTypeScriptDiagnostics) {
+          // run all ts files
           rootFullPaths.forEach((fullPath) => {
             this.analyzeTsFile(fullPath)
           })
@@ -84,6 +83,25 @@ export class Server {
         this.options?.onFirstScanDone?.call(this)
       },
     )
+    this.projectDirManager.onEntranceFileAdded = (fullPath) => {
+      this.logVerboseMessage(`Opened component WXML: ${fullPath}`)
+      const p = getWxmlConvertedTsPath(fullPath)
+      if (p) {
+        this.rootFilePaths.push(p)
+        this.rootFilePathsVersion += 1
+      }
+    }
+    this.projectDirManager.onEntranceFileRemoved = (fullPath) => {
+      this.logVerboseMessage(`Closed component WXML: ${fullPath}`)
+      const p = getWxmlConvertedTsPath(fullPath)
+      if (p) {
+        const index = this.rootFilePaths.lastIndexOf(p)
+        if (index >= 0) {
+          this.rootFilePaths[index] = this.rootFilePaths.pop()!
+          this.rootFilePathsVersion += 1
+        }
+      }
+    }
 
     // initialize ts language service
     /* eslint-disable @typescript-eslint/unbound-method, arrow-body-style */
@@ -103,6 +121,9 @@ export class Server {
         },
         path.dirname(configPath),
         { noEmit: true },
+        // undefined,
+        // undefined,
+        // [{ extension: '.wxml', isMixedContent: true, scriptKind: ts.ScriptKind.TS }],
       )
       config.errors.forEach((diag) => {
         diag.file = configFile
@@ -116,19 +137,25 @@ export class Server {
         errors: [],
       }
     }
+    this.rootFilePaths = config.fileNames
+    this.rootFilePathsVersion = 1
     const servicesHost: ts.LanguageServiceHost = {
       getCompilationSettings() {
         return config.options
       },
-      getScriptFileNames() {
-        return config.fileNames
+      getProjectVersion: () => {
+        console.info('!!! 1', this.rootFilePathsVersion)
+        return String(this.rootFilePathsVersion)
+      },
+      getScriptFileNames: () => {
+        console.info('!!! 2', this.rootFilePaths)
+        return this.rootFilePaths
       },
       getScriptVersion: (fullPath) => {
         return this.projectDirManager.getFileVersion(fullPath)?.toString() ?? ''
       },
       getScriptSnapshot: (fullPath) => {
-        // console.info('!!! getSnapshot', fullPath)
-        const content = this.projectDirManager.getFileContent(fullPath)
+        const content = this.projectDirManager.getFileTsContent(fullPath)
         if (content === null) return undefined
         return ts.ScriptSnapshot.fromString(content)
       },
@@ -198,7 +225,9 @@ export class Server {
   }
 
   private analyzeWxmlFile(fullPath: string) {
-    // TODO
+    const tsFullPath = getWxmlConvertedTsPath(fullPath)
+    if (tsFullPath === null) return
+    this.analyzeTsFile(tsFullPath)
   }
 
   private logVerboseMessage(message: string) {
