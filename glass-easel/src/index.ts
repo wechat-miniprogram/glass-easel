@@ -31,7 +31,7 @@ export {
   GeneralComponentDefinition,
 } from './component'
 export * as typeUtils from './component_params'
-export { ComponentSpace, getDefaultComponentSpace } from './component_space'
+export { ComponentSpace, getDefaultComponentSpace, MiddlewareHook } from './component_space'
 export * as dataPath from './data_path'
 export {
   DataChange,
