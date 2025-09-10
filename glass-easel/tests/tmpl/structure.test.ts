@@ -1638,6 +1638,62 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     matchElementWithDom(elem)
   })
 
+  test('setting element dataset', () => {
+    const subComp = glassEasel.registerElement({
+      template: tmpl(`
+        <slot id="a" data:a-b="789" />
+      `),
+    })
+    const def = glassEasel
+      .registerElement({
+        using: {
+          'sub-comp': subComp,
+        },
+        template: tmpl(`
+          <sub-comp id="sub" data:a-b="456">
+            <div id="a" data:a-b="123" />
+          </sub-comp>
+        `),
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe('<sub-comp><div></div></sub-comp>')
+    matchElementWithDom(elem)
+    expect(elem.getShadowRoot()!.getElementById('a')!.dataset['a-b']).toBe('123')
+    const sub = elem.getShadowRoot()!.getElementById('sub')!.asGeneralComponent()!
+    expect(sub.dataset['a-b']).toBe('456')
+    expect(sub.getShadowRoot()!.getElementById('a')!.dataset['a-b']).toBe('789')
+  })
+
+  test('setting element dataset (legacy syntax)', () => {
+    const subComp = glassEasel.registerElement({
+      template: tmpl(`
+        <slot id="a" data-a-b="789" />
+      `),
+    })
+    const def = glassEasel
+      .registerElement({
+        using: {
+          'sub-comp': subComp,
+        },
+        template: tmpl(`
+          <sub-comp id="sub" data-a-b="456">
+            <div id="a" data-a-b="123" />
+          </sub-comp>
+        `),
+      })
+      .general()
+    const elem = glassEasel.Component.createWithContext('root', def, testBackend)
+    glassEasel.Element.pretendAttached(elem)
+    expect(domHtml(elem)).toBe('<sub-comp><div></div></sub-comp>')
+    matchElementWithDom(elem)
+    expect(elem.getShadowRoot()!.getElementById('a')!.dataset.aB).toBe('123')
+    const sub = elem.getShadowRoot()!.getElementById('sub')!.asGeneralComponent()!
+    expect(sub.dataset.aB).toBe('456')
+    expect(sub.getShadowRoot()!.getElementById('a')!.dataset.aB).toBe('789')
+  })
+
   test('setting slot name', () => {
     const subComp = glassEasel.registerElement({
       options: {
@@ -1814,11 +1870,13 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     const cs = new glassEasel.ComponentSpace()
     const subComp = cs.defineComponent({
       template: tmpl(`
-        <div class="{{style}} a-{{propA + 1}}"></div>
+        <div hidden="{{a}} {{style}} a-{{propA + 1}} b-{{dataB + 1}}"></div>
       `),
       properties: {
+        a: Boolean,
         style: String,
         propA: Number,
+        dataB: String,
       },
     })
     const def = cs
@@ -1827,13 +1885,13 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           'sub-comp': subComp.general(),
         },
         template: tmpl(`
-          <sub-comp style="abc" prop-a="3" />
+          <sub-comp a style="abc" prop-a="3" data-b="5" />
         `),
       })
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
-    expect(domHtml(elem)).toBe('<sub-comp><div class="abc a-4"></div></sub-comp>')
+    expect(domHtml(elem)).toBe('<sub-comp><div hidden="true abc a-4 b-51"></div></sub-comp>')
     matchElementWithDom(elem)
   })
 
@@ -1899,9 +1957,9 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     )
     const ssm = cs.styleScopeManager
     const subComp = cs.defineComponent({
-      externalClasses: ['class', 'ext-class'],
+      externalClasses: ['class', 'data-class'],
       template: tmpl(`
-        <div class="class ext-class"></div>
+        <div class="class data-class"></div>
       `),
       data: {
         a: 's',
@@ -1916,7 +1974,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           'sub-comp': subComp.general(),
         },
         template: tmpl(`
-        <sub-comp class="static {{ dynamic || '' }}" ext-class="a-class" />
+        <sub-comp class="static {{ dynamic || '' }}" data-class="a-class" />
       `),
       })
       .general()

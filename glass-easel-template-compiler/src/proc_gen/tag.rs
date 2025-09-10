@@ -5,7 +5,7 @@ use super::{
 };
 use crate::{
     binding_map::BindingMapCollector,
-    escape::gen_lit_str,
+    escape::{camel_to_dash, gen_lit_str},
     parse::{
         tag::{
             Attribute, ClassAttribute, CommonElementAttributes, Element, ElementKind, EventBinding,
@@ -484,7 +484,12 @@ impl Element {
                     f(&gen_lit_str(&attr.name.name))?;
                 }
                 for attr in common.data.iter() {
-                    f(&gen_lit_str(&format!("data:{}", &attr.name.name)))?;
+                    if attr.prefix_location.is_none() {
+                        let dash_name = camel_to_dash(&attr.name.name);
+                        f(&gen_lit_str(&format!("data-{}", dash_name)))?;
+                    } else {
+                        f(&gen_lit_str(&format!("data:{}", &attr.name.name)))?;
+                    }
                 }
                 for attr in common.marks.iter() {
                     f(&gen_lit_str(&format!("mark:{}", &attr.name.name)))?;
@@ -517,7 +522,12 @@ impl Element {
                     f(&gen_lit_str(&attr.name.name))?;
                 }
                 for attr in common.data.iter() {
-                    f(&gen_lit_str(&format!("data:{}", &attr.name.name)))?;
+                    if attr.prefix_location.is_none() {
+                        let dash_name = camel_to_dash(&attr.name.name);
+                        f(&gen_lit_str(&format!("data-{}", dash_name)))?;
+                    } else {
+                        f(&gen_lit_str(&format!("data:{}", &attr.name.name)))?;
+                    }
                 }
                 for attr in common.marks.iter() {
                     f(&gen_lit_str(&format!("mark:{}", &attr.name.name)))?;
@@ -1465,10 +1475,14 @@ impl CommonElementAttributes {
             marks,
         } = self;
         for attr in data.iter() {
-            attr.to_proc_gen_with_method(w, "R.d", scopes, bmc)?;
+            let fallback_data_hyphen = match attr.prefix_location {
+                None => Some("!0"),
+                Some(_) => None,
+            };
+            attr.to_proc_gen_with_method(w, "R.d", fallback_data_hyphen, scopes, bmc)?;
         }
         for mark in marks {
-            mark.to_proc_gen_with_method(w, "M", scopes, bmc)?;
+            mark.to_proc_gen_with_method(w, "M", None, scopes, bmc)?;
         }
         for ev in event_bindings {
             ev.to_proc_gen(w, scopes, bmc)?;
@@ -1573,6 +1587,7 @@ impl Attribute {
         &self,
         w: &mut JsFunctionScopeWriter<W>,
         method_name: &str,
+        extra_arg: Option<&str>,
         scopes: &Vec<ScopeVar>,
         bmc: &BindingMapCollector,
     ) -> Result<(), TmplError> {
@@ -1582,11 +1597,15 @@ impl Attribute {
                 w.expr_stmt(|w| {
                     write!(
                         w,
-                        "if(C){}(N,{},{})",
+                        "if(C){}(N,{},{}",
                         method_name,
                         gen_lit_str(&self.name.name),
                         value
                     )?;
+                    if let Some(extra_arg) = extra_arg {
+                        write!(w, ",{}", extra_arg)?;
+                    }
+                    write!(w, ")")?;
                     Ok(())
                 })?;
             }
@@ -1594,11 +1613,15 @@ impl Attribute {
                 w.expr_stmt(|w| {
                     write!(
                         w,
-                        "if(C){}(N,{},{})",
+                        "if(C){}(N,{},{}",
                         method_name,
                         gen_lit_str(&self.name.name),
                         gen_lit_str(value)
                     )?;
+                    if let Some(extra_arg) = extra_arg {
+                        write!(w, ",{}", extra_arg)?;
+                    }
+                    write!(w, ")")?;
                     Ok(())
                 })?;
             }
@@ -1613,6 +1636,9 @@ impl Attribute {
                     p.lvalue_state_expr(w, scopes, false)?;
                     write!(w, "){}(N,{},", method_name, gen_lit_str(&self.name.name))?;
                     p.value_expr(w)?;
+                    if let Some(extra_arg) = extra_arg {
+                        write!(w, ",{}", extra_arg)?;
+                    }
                     write!(w, ")")?;
                     Ok(())
                 })?;
@@ -1623,6 +1649,9 @@ impl Attribute {
                             w.expr_stmt(|w| {
                                 write!(w, "{}(N,{},", method_name, gen_lit_str(&self.name.name))?;
                                 p.value_expr(w)?;
+                                if let Some(extra_arg) = extra_arg {
+                                    write!(w, ",{}", extra_arg)?;
+                                }
                                 write!(w, ")")?;
                                 Ok(())
                             })?;
