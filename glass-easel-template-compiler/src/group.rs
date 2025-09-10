@@ -4,6 +4,8 @@ use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Write;
 
+use sourcemap::SourceMap;
+
 use crate::escape::gen_lit_str;
 use crate::parse::{ParseError, Template};
 use crate::proc_gen::{JsFunctionScopeWriter, JsTopScopeWriter};
@@ -511,7 +513,7 @@ impl TmplGroup {
     }
 
     /// Get a string that used to check TypeScript problems.
-    pub(crate) fn get_tmpl_converted_expr(&self, path: &str) -> Result<String, TmplError> {
+    pub(crate) fn get_tmpl_converted_expr(&self, path: &str) -> Result<(String, SourceMap), TmplError> {
         let tree = self.get_tree(path)?;
         Ok(crate::stringify::typescript::generate_tmpl_converted_expr(tree))
     }

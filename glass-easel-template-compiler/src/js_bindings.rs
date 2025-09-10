@@ -2,6 +2,8 @@
 
 #![cfg(feature = "js_bindings")]
 
+use std::str::{self, FromStr};
+
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -202,8 +204,42 @@ impl TmplGroup {
 
     #[wasm_bindgen(js_name = "getTmplConvertedExpr")]
     #[doc(hidden)]
-    pub fn get_tmpl_converted_expr(&mut self, path: &str) -> Result<String, JsError> {
-        Ok(self.group.get_tmpl_converted_expr(path)?)
+    pub fn get_tmpl_converted_expr(&mut self, path: &str) -> Result<TmplConvertedExpr, JsError> {
+        let (code, source_map) = self.group.get_tmpl_converted_expr(path)?;
+        Ok(TmplConvertedExpr { code, source_map })
+    }
+}
+
+#[wasm_bindgen]
+pub struct TmplConvertedExpr {
+    code: String,
+    source_map: sourcemap::SourceMap,
+}
+
+#[wasm_bindgen]
+impl TmplConvertedExpr {
+    #[wasm_bindgen(js_name = "code")]
+    pub fn code(&self) -> Option<js_sys::JsString> {
+        js_sys::JsString::from_str(&self.code).ok()
+    }
+
+    #[wasm_bindgen(js_name = "getSourceLocation")]
+    pub fn get_source_location(&self, start_line: u32, start_col: u32, end_line: u32, end_col: u32) -> Option<Vec<u32>> {
+        fn adjust_line_col(token: &sourcemap::Token, req: (u32, u32)) -> (u32, u32) {
+            let dest_line = token.get_dst_line();
+            let dest_col = token.get_dst_col();
+            let src_line = token.get_src_line();
+            let src_col = token.get_src_col();
+            let diff_line = req.0 - dest_line;
+            let diff_col = req.1 - dest_col;
+            (src_line + diff_line, if diff_line == 0 { src_col + diff_col } else { diff_col })
+        }
+        let start = self.source_map.lookup_token(start_line, start_col)?;
+        let (ret0, ret1) = adjust_line_col(&start, (start_line, start_col));
+        let end_diff = if end_col > 0 { 1 } else { 0 };
+        let end = self.source_map.lookup_token(end_line, end_col - end_diff).unwrap_or(start);
+        let (ret2, ret3) = adjust_line_col(&end, (end_line, end_col - end_diff));
+        Some(vec![ret0, ret1, ret2, ret3 + end_diff])
     }
 }
 

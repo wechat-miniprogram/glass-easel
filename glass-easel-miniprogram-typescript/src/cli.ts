@@ -1,6 +1,5 @@
 import { parseArgs } from 'util'
-import chalk from 'chalk'
-import { DiagnosticLevel, Server } from './server'
+import { DiagnosticLevel, formatDiagnostic, Server } from './server'
 
 const { values } = parseArgs({
   args: process.argv.slice(2),
@@ -25,19 +24,18 @@ const server = new Server({
   verboseMessages: values.verbose,
   onNewDiagnostics(diag) {
     // eslint-disable-next-line no-console
-    console.log(chalk.gray(`${diag.file}:${diag.start.line}:${diag.start.character}`))
     if (diag.level === DiagnosticLevel.Error) {
       // eslint-disable-next-line no-console
-      console.error(chalk.red(diag.formattedMessage))
+      console.error(formatDiagnostic(diag))
     } else if (diag.level === DiagnosticLevel.Warning) {
       // eslint-disable-next-line no-console
-      console.warn(chalk.yellow(diag.formattedMessage))
+      console.warn(formatDiagnostic(diag))
     } else if (diag.level === DiagnosticLevel.Info) {
       // eslint-disable-next-line no-console
-      console.info(chalk.blue(diag.formattedMessage))
+      console.info(formatDiagnostic(diag))
     } else {
       // eslint-disable-next-line no-console
-      console.log(chalk.white(diag.formattedMessage))
+      console.log(formatDiagnostic(diag))
     }
   },
   onFirstScanDone() {

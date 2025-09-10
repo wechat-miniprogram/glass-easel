@@ -1,7 +1,7 @@
 import path from 'node:path'
 import * as ts from 'typescript'
 import chalk from 'chalk'
-import { getWxmlConvertedTsPath, ProjectDirManager } from './project'
+import { getWxmlConvertedTsPath, getWxmlTsPathReverted, ProjectDirManager } from './project'
 
 export type Position = {
   line: number
@@ -18,12 +18,72 @@ export const enum DiagnosticLevel {
 
 export type Diagnostic = {
   file: string
+  source: ts.SourceFile | null
   start: Position
   end: Position
   code: number
   level: DiagnosticLevel
   message: string
-  formattedMessage: string
+}
+
+export const formatDiagnostic = (diag: Diagnostic): string => {
+  // draw source lines
+  let sourceLines = ''
+  if (diag.source !== null) {
+    const lineStarts = diag.source.getLineStarts()
+    for (let i = diag.start.line; i <= diag.end.line; i += 1) {
+      const lineStart = lineStarts[i]
+      const lineEnd = lineStarts[i + 1]
+      const lineContent = diag.source.text.slice(lineStart, lineEnd).trimEnd().replace(/\t/g, ' ')
+      const lineNum = i + 1
+      const lineNumStr = lineNum.toString()
+      const emptyLineNumStr = ' '.repeat(lineNumStr.length)
+      const highlightStart = i === diag.start.line ? diag.start.character : 0
+      const highlightEnd = i === diag.end.line ? diag.end.character : lineContent.length
+      const highlightMark = ' '.repeat(highlightStart) + '~'.repeat(highlightEnd - highlightStart)
+      let highlight = chalk.blue(highlightMark)
+      if (diag.level === DiagnosticLevel.Error) {
+        highlight = chalk.red(highlightMark)
+      } else if (diag.level === DiagnosticLevel.Warning) {
+        highlight = chalk.yellow(highlightMark)
+      } else if (diag.level === DiagnosticLevel.Info) {
+        highlight = chalk.blue(highlightMark)
+      }
+      sourceLines += [
+        chalk.bgWhite.black(lineNumStr),
+        ' ',
+        chalk.white(lineContent),
+        '\n',
+        chalk.bgWhite.black(emptyLineNumStr),
+        ' ',
+        highlight,
+        '\n',
+      ].join('')
+    }
+  }
+
+  // draw other parts
+  let levelHint = chalk.blue('note')
+  if (diag.level === DiagnosticLevel.Error) {
+    levelHint = chalk.red('error')
+  } else if (diag.level === DiagnosticLevel.Warning) {
+    levelHint = chalk.yellow('warning')
+  } else if (diag.level === DiagnosticLevel.Info) {
+    levelHint = chalk.blue('info')
+  }
+  return [
+    chalk.cyan(path.relative(process.cwd(), diag.file)),
+    chalk.gray(':'),
+    chalk.white(diag.start.line + 1),
+    chalk.gray(':'),
+    chalk.white(diag.start.character + 1),
+    chalk.gray(' - '),
+    levelHint,
+    chalk.gray(` TS${diag.code}: `),
+    chalk.white(diag.message),
+    '\n\n',
+    sourceLines,
+  ].join('')
 }
 
 export type ServerOptions = {
@@ -144,11 +204,9 @@ export class Server {
         return config.options
       },
       getProjectVersion: () => {
-        console.info('!!! 1', this.rootFilePathsVersion)
         return String(this.rootFilePathsVersion)
       },
       getScriptFileNames: () => {
-        console.info('!!! 2', this.rootFilePaths)
         return this.rootFilePaths
       },
       getScriptVersion: (fullPath) => {
@@ -241,13 +299,28 @@ export class Server {
   private diagnosticReporter(diagnostic: ts.Diagnostic) {
     const file = diagnostic.file
     if (!file) return
-    if (!this.options.reportTypeScriptDiagnostics) {
-      if (path.extname(file.fileName) !== '.wxml') return
+    let start = file.getLineAndCharacterOfPosition(diagnostic.start ?? 0)
+    let end = file.getLineAndCharacterOfPosition((diagnostic.start ?? 0) + (diagnostic.length ?? 0))
+    const wxmlFullPath = getWxmlTsPathReverted(file.fileName)
+    let fileName: string
+    let source: ts.SourceFile | null
+    if (wxmlFullPath) {
+      fileName = wxmlFullPath
+      const loc = this.projectDirManager.getWxmlSource(
+        wxmlFullPath,
+        start.line,
+        start.character,
+        end.line,
+        end.character,
+      )
+      source = loc?.source ?? null
+      start = { line: loc?.startLine ?? 0, character: loc?.startCol ?? 0 }
+      end = { line: loc?.endLine ?? 0, character: loc?.endCol ?? 0 }
+    } else {
+      if (!this.options.reportTypeScriptDiagnostics) return
+      fileName = file.fileName
+      source = file
     }
-    const start = file.getLineAndCharacterOfPosition(diagnostic.start ?? 0)
-    const end = file.getLineAndCharacterOfPosition(
-      (diagnostic.start ?? 0) + (diagnostic.length ?? 0),
-    )
     let level = DiagnosticLevel.Unknown
     if (diagnostic.category === ts.DiagnosticCategory.Error) {
       level = DiagnosticLevel.Error
@@ -259,17 +332,13 @@ export class Server {
       level = DiagnosticLevel.Note
     }
     this.options.onNewDiagnostics?.({
-      file: file.fileName,
+      file: fileName,
+      source,
       start,
       end,
       code: diagnostic.code,
       level,
       message: ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
-      formattedMessage: ts.formatDiagnosticsWithColorAndContext([diagnostic], {
-        getCanonicalFileName: (fileName) => fileName,
-        getCurrentDirectory: () => process.cwd(),
-        getNewLine: () => '\n',
-      }),
     })
   }
 }

@@ -136,7 +136,7 @@ impl<'s, 't, W: FmtWrite> StringifierBlock<'s, 't, W> {
 
     pub(super) fn write_sub_block(
         &mut self,
-        f: impl FnOnce(&mut StringifierBlock<W>) -> FmtResult,
+        f: impl FnOnce(&mut StringifierBlock<'s, '_, W>) -> FmtResult,
     ) -> FmtResult {
         let mut b = StringifierBlock {
             top: self.top,
