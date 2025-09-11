@@ -2,7 +2,7 @@ use std::fmt::{Result as FmtResult, Write as FmtWrite};
 
 use sourcemap::SourceMap;
 
-use crate::{parse::{expr::*, tag::*, Template, TemplateStructure}, stringify::{Stringifier, StringifierBlock, StringifierLine, StringifierLineState, StringifyLine, StringifyOptions}};
+use crate::{escape::dash_to_camel, parse::{expr::*, tag::*, Template, TemplateStructure}, stringify::{Stringifier, StringifierBlock, StringifierLine, StringifierLineState, StringifyLine, StringifyOptions}};
 
 trait ConvertedExprWriteBlock {
     fn converted_expr_write<'s, 't, W: FmtWrite>(&self, w: &mut StringifierBlock<'s, 't, W>) -> FmtResult;
@@ -12,7 +12,7 @@ trait ConvertedExprWriteInline {
     fn converted_expr_write<'s, 't, 'u, W: FmtWrite>(&self, w: &mut StringifierLine<'s, 't, 'u, W>) -> FmtResult;
 }
 
-pub(crate) fn generate_tmpl_converted_expr(tree: &Template) -> (String, SourceMap) {
+pub(crate) fn generate_tmpl_converted_expr(tree: &Template, ts_env: &str) -> (String, SourceMap) {
     let ret = String::new();
     let options = StringifyOptions {
         source_map: true,
@@ -21,6 +21,9 @@ pub(crate) fn generate_tmpl_converted_expr(tree: &Template) -> (String, SourceMa
         ..Default::default()
     };
     let mut w = Stringifier::new(ret, &tree.path, None, options);
+    w.block(|w| {
+        w.write_line(|w| w.write_str(ts_env))
+    }).unwrap();
 
     // TODO tree.globals.imports
     // TODO tree.globals.includes
@@ -49,9 +52,13 @@ impl ConvertedExprWriteBlock for Node {
     fn converted_expr_write<'s, 't, W: FmtWrite>(&self, w: &mut StringifierBlock<'s, 't, W>) -> FmtResult {
         match self {
             Self::Text(x) => {
-                w.write_line(|w| {
-                    x.converted_expr_write(w)
-                })
+                if let Value::Static { .. } = x {
+                    Ok(())
+                } else {
+                    w.write_line(|w| {
+                        x.converted_expr_write(w)
+                    })
+                }
             }
             Self::Element(x) => x.converted_expr_write(w),
             Self::Comment(_) | Self::UnknownMetaTag(_) => Ok(()),
@@ -92,8 +99,58 @@ impl ConvertedExprWriteBlock for Element {
                 let_vars,
                 common,
             } => {
+                w.write_line(|w| {
+                    w.write_token_state("var ", Some(""), &(tag_name.location.start..tag_name.location.start), StringifierLineState::Normal)?;
+                    w.write_token_state("_tag_", Some(&tag_name.name), &tag_name.location, StringifierLineState::Normal)?;
+                    w.write_token_state("=", Some(""), &(tag_name.location.end..tag_name.location.end), StringifierLineState::Normal)?;
+                    w.write_token_state("tags", Some(&tag_name.name), &tag_name.location, StringifierLineState::Normal)?;
+                    w.write_token_state(".", Some(&tag_name.name), &tag_name.location, StringifierLineState::Normal)?;
+                    w.write_token_state(&tag_name.name.replace("-", "_"), Some(&tag_name.name), &tag_name.location, StringifierLineState::Normal)?;
+                    w.write_token(";", None, &(tag_name.location.end..tag_name.location.end))
+                })?;
                 wrap_brace_block(w, &self.tag_location, |w| {
                     // TODO handling attrs
+                    for attr in attributes {
+                        let attr_name = dash_to_camel(&attr.name.name);
+                        w.write_line(|w| {
+                            match &attr.value {
+                                None => {
+                                    w.write_token_state("_tag_", Some(&attr.name.name), &attr.name.location, StringifierLineState::Normal)?;
+                                    w.write_token_state(".", Some(&attr.name.name), &attr.name.location, StringifierLineState::NoSpaceAround)?;
+                                    w.write_token_state(&attr_name, Some(&attr.name.name), &attr.name.location, StringifierLineState::Normal)?;
+                                    let pos = attr.name.location.end;
+                                    w.write_token_state("=", Some(""), &(pos..pos), StringifierLineState::Normal)?;
+                                    w.write_token_state("true", Some(""), &(pos..pos), StringifierLineState::Normal)?;
+                                    w.write_token(";", None, &(pos..pos))
+                                }
+                                Some(Value::Static { .. }) => {
+                                    let pos = attr.name.location.start;
+                                    w.write_token_state("var ", Some(""), &(pos..pos), StringifierLineState::Normal)?;
+                                    w.write_token_state("_string_or_number_", Some(""), &(pos..pos), StringifierLineState::Normal)?;
+                                    w.write_token_state(":", Some(""), &(pos..pos), StringifierLineState::NoSpaceBefore)?;
+                                    w.write_token_state("string", Some(""), &(pos..pos), StringifierLineState::Normal)?;
+                                    w.write_token_state("|", Some(""), &(pos..pos), StringifierLineState::Normal)?;
+                                    w.write_token_state("number", Some(""), &(pos..pos), StringifierLineState::Normal)?;
+                                    w.write_token_state("=", Some(""), &(pos..pos), StringifierLineState::Normal)?;
+                                    w.write_token_state("_tag_", Some(&attr.name.name), &attr.name.location, StringifierLineState::Normal)?;
+                                    w.write_token_state(".", Some(&attr.name.name), &attr.name.location, StringifierLineState::NoSpaceAround)?;
+                                    w.write_token_state(&attr_name, Some(&attr.name.name), &attr.name.location, StringifierLineState::Normal)?;
+                                    let pos = attr.name.location.end;
+                                    w.write_token(";", None, &(pos..pos))
+                                }
+                                Some(value) => {
+                                    w.write_token_state("_tag_", Some(&attr.name.name), &attr.name.location, StringifierLineState::Normal)?;
+                                    w.write_token_state(".", Some(&attr.name.name), &attr.name.location, StringifierLineState::NoSpaceAround)?;
+                                    w.write_token_state(&attr_name, Some(&attr.name.name), &attr.name.location, StringifierLineState::Normal)?;
+                                    let pos = attr.name.location.end;
+                                    w.write_token_state("=", Some(""), &(pos..pos), StringifierLineState::Normal)?;
+                                    value.converted_expr_write(w)?;
+                                    let pos = value.location_end();
+                                    w.write_token(";", None, &(pos..pos))
+                                }
+                            }
+                        })?;
+                    }
                     children.converted_expr_write(w)
                 })?;
             }
@@ -151,7 +208,7 @@ impl ConvertedExprWriteInline for Value {
                 let mut prev_loc = None;
                 expression.for_each_static_or_dynamic_part::<std::fmt::Error>(|part, loc| {
                     if let Some(prev_loc) = prev_loc.take() {
-                        w.write_token_state("+", None, &prev_loc, StringifierLineState::Normal)?;
+                        w.write_token_state("+", Some(""), &prev_loc, StringifierLineState::Normal)?;
                     }
                     if let Expression::ToStringWithoutUndefined { value, location } = part {
                         value.stringify_write(w)?;
@@ -181,7 +238,7 @@ mod test {
     fn convert(src: &str) -> (String, SourceMap) {
         let mut group = crate::TmplGroup::new();
         group.add_tmpl("TEST", src);
-        generate_tmpl_converted_expr(group.get_tree("TEST").unwrap())
+        generate_tmpl_converted_expr(group.get_tree("TEST").unwrap(), "")
     }
 
     fn find_token(sm: &SourceMap, line: u32, col: u32) -> Option<(u32, u32)> {
@@ -192,13 +249,13 @@ mod test {
     #[test]
     fn basic() {
         let src = r#"<view>{{ hello }}</view>"#;
-        let expect = r#"{hello}"#;
+        let expect = r#"var _tag_=tags.view;{hello}"#;
         let (out, sm) = convert(src);
         dbg!(&sm);
         assert_eq!(out, expect);
-        assert_eq!(find_token(&sm, 0, 0), Some((0, 0)));
-        assert_eq!(find_token(&sm, 0, 1), Some((0, 9)));
-        assert_eq!(find_token(&sm, 0, 6), Some((0, 17)));
+        assert_eq!(find_token(&sm, 0, 0), Some((0, 1)));
+        assert_eq!(find_token(&sm, 0, 15), Some((0, 1)));
+        assert_eq!(find_token(&sm, 0, 21), Some((0, 9)));
     }
 
     #[test]
@@ -212,5 +269,40 @@ mod test {
         assert_eq!(find_token(&sm, 0, 9), Some((0, 9)));
         assert_eq!(find_token(&sm, 0, 14), Some((0, 17)));
         assert_eq!(find_token(&sm, 0, 17), Some((0, 17)));
+    }
+
+    #[test]
+    fn normal_attr_no_value() {
+        let src = r#"<custom-comp attr-a />"#;
+        let expect = r#"var _tag_=tags.custom_comp;{_tag_.attrA=true;}"#;
+        let (out, sm) = convert(src);
+        assert_eq!(out, expect);
+        assert_eq!(find_token(&sm, 0, 28), Some((0, 13)));
+        assert_eq!(find_token(&sm, 0, 34), Some((0, 13)));
+        assert_eq!(find_token(&sm, 0, 40), Some((0, 19)));
+    }
+
+    #[test]
+    fn normal_attr_static_value() {
+        let src = r#"<custom-comp attr-a="x" />"#;
+        let expect = r#"var _tag_=tags.custom_comp;{var _string_or_number_:string|number=_tag_.attrA;}"#;
+        let (out, sm) = convert(src);
+        assert_eq!(out, expect);
+        assert_eq!(find_token(&sm, 0, 28), Some((0, 13)));
+        assert_eq!(find_token(&sm, 0, 32), Some((0, 13)));
+        assert_eq!(find_token(&sm, 0, 51), Some((0, 13)));
+        assert_eq!(find_token(&sm, 0, 65), Some((0, 13)));
+        assert_eq!(find_token(&sm, 0, 71), Some((0, 13)));
+    }
+
+    #[test]
+    fn normal_attr_dynamic_value() {
+        let src = r#"<custom-comp attr-a="{{ x }}" />"#;
+        let expect = r#"var _tag_=tags.custom_comp;{_tag_.attrA=x;}"#;
+        let (out, sm) = convert(src);
+        assert_eq!(out, expect);
+        assert_eq!(find_token(&sm, 0, 28), Some((0, 13)));
+        assert_eq!(find_token(&sm, 0, 34), Some((0, 13)));
+        assert_eq!(find_token(&sm, 0, 40), Some((0, 24)));
     }
 }

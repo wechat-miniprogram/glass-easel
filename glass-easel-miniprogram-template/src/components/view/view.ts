@@ -1,6 +1,6 @@
 import { StyleSegmentIndex } from 'glass-easel'
 
-Component({
+export default Component({
   properties: {
     hidden: Boolean,
   },

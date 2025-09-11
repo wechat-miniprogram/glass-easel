@@ -204,8 +204,8 @@ impl TmplGroup {
 
     #[wasm_bindgen(js_name = "getTmplConvertedExpr")]
     #[doc(hidden)]
-    pub fn get_tmpl_converted_expr(&mut self, path: &str) -> Result<TmplConvertedExpr, JsError> {
-        let (code, source_map) = self.group.get_tmpl_converted_expr(path)?;
+    pub fn get_tmpl_converted_expr(&mut self, path: &str, ts_env: &str) -> Result<TmplConvertedExpr, JsError> {
+        let (code, source_map) = self.group.get_tmpl_converted_expr(path, ts_env)?;
         Ok(TmplConvertedExpr { code, source_map })
     }
 }
@@ -231,7 +231,10 @@ impl TmplConvertedExpr {
             let src_line = token.get_src_line();
             let src_col = token.get_src_col();
             let diff_line = req.0 - dest_line;
-            let diff_col = req.1 - dest_col;
+            let mut diff_col = req.1 - dest_col;
+            if let Some(src) = token.get_name() {
+                diff_col = diff_col.min(src.len() as u32);
+            }
             (src_line + diff_line, if diff_line == 0 { src_col + diff_col } else { diff_col })
         }
         let start = self.source_map.lookup_token(start_line, start_col)?;

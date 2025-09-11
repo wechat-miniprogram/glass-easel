@@ -36,7 +36,11 @@ export const getWxmlTsPathReverted = (fullPath: string): string | null => {
   return p
 }
 
-type ConvertedExprCache = { expr: TmplConvertedExpr; source: ts.SourceFile }
+type ConvertedExprCache = {
+  expr: TmplConvertedExpr
+  source: ts.SourceFile
+  tsVersion: number
+}
 
 export class ProjectDirManager {
   readonly vfs: VirtualFileSystem
@@ -94,19 +98,27 @@ export class ProjectDirManager {
     }
   }
 
-  getWxmlConvertedExpr(wxmlFullPath: string): string | null {
-    if (this.convertedExprCache[wxmlFullPath]) {
-      return this.convertedExprCache[wxmlFullPath]!.expr.code() ?? ''
+  getWxmlConvertedExpr(
+    wxmlFullPath: string,
+    tsExportsGetter: (fullPath: string) => string,
+  ): string | null {
+    const tsFullPath = `${wxmlFullPath.slice(0, -5)}.ts`
+    const tsVersion = this.getFileVersion(tsFullPath) ?? -1
+    const cache = this.convertedExprCache[wxmlFullPath]
+    if (cache && cache.tsVersion === tsVersion) {
+      return cache.expr.code() ?? ''
     }
     const content = this.getFileContent(wxmlFullPath)
     if (!content) return null
     const relPath = path.relative(this.vfs.rootPath, wxmlFullPath).split(path.sep).join('/')
     if (relPath.startsWith('../')) return null
     this.tmplGroup.addTmpl(relPath, content)
-    const expr = this.tmplGroup.getTmplConvertedExpr(relPath)
+    const expr = this.tmplGroup.getTmplConvertedExpr(relPath, tsExportsGetter(tsFullPath))
+    console.info('!!! CONV', expr.code())
     this.convertedExprCache[wxmlFullPath] = {
       expr,
       source: ts.createSourceFile(wxmlFullPath, content, ts.ScriptTarget.Latest),
+      tsVersion,
     }
     return expr.code() ?? ''
   }
@@ -140,10 +152,10 @@ export class ProjectDirManager {
     }
   }
 
-  getFileTsContent(fullPath: string): string | null {
+  getFileTsContent(fullPath: string, tsExportsGetter: (fullPath: string) => string): string | null {
     const p = getWxmlTsPathReverted(fullPath)
     if (p !== null) {
-      return this.getWxmlConvertedExpr(p)
+      return this.getWxmlConvertedExpr(p, tsExportsGetter)
     }
     return this.getFileContent(fullPath)
   }

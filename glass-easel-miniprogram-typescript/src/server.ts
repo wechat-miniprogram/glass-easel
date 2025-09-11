@@ -213,7 +213,7 @@ export class Server {
         return this.projectDirManager.getFileVersion(fullPath)?.toString() ?? ''
       },
       getScriptSnapshot: (fullPath) => {
-        const content = this.projectDirManager.getFileTsContent(fullPath)
+        const content = this.projectDirManager.getFileTsContent(fullPath, tsExportsGetter)
         if (content === null) return undefined
         return ts.ScriptSnapshot.fromString(content)
       },
@@ -254,6 +254,20 @@ export class Server {
     /* eslint-enable @typescript-eslint/unbound-method, arrow-body-style */
     const docReg = ts.createDocumentRegistry()
     this.tsLangService = ts.createLanguageService(servicesHost, docReg)
+
+    // get the exports of a file
+    const tsExportsGetter = (fullPath: string) => {
+      const program = this.tsLangService.getProgram()
+      if (!program) return ''
+      const source = program.getSourceFile(fullPath)
+      if (!source) return ''
+      const tc = program.getTypeChecker()
+      const symbol = tc.getSymbolAtLocation(source)!
+      const defaultExport = tc.tryGetMemberInModuleExports('default', symbol)
+      // tc.symbolToString(defaultExport, source)
+      // if (!defaultExport) return ''
+      return ''
+    }
 
     // report diagnostics about compiler options
     const optionsDiag = this.tsLangService.getCompilerOptionsDiagnostics()

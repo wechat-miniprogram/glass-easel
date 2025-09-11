@@ -31,7 +31,13 @@ export interface PageConstructor {
           /* TExtraThisFields */ Empty
         >
       >,
-  ): void
+  ): ComponentType<
+    /* TData */ TData,
+    /* TProperty */ Record<string, never>,
+    /* TMethod */ TNewExtraFields,
+    /* TComponentExport */ never,
+    /* TExtraThisFields */ Empty
+  >
 }
 
 // The component constructor
