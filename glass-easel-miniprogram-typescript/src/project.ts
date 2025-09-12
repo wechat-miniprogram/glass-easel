@@ -100,7 +100,7 @@ export class ProjectDirManager {
 
   getWxmlConvertedExpr(
     wxmlFullPath: string,
-    tsExportsGetter: (fullPath: string) => string,
+    tsExportsGetter: (fullPath: string, importTargetFullPath: string) => string,
   ): string | null {
     const tsFullPath = `${wxmlFullPath.slice(0, -5)}.ts`
     const tsVersion = this.getFileVersion(tsFullPath) ?? -1
@@ -113,8 +113,10 @@ export class ProjectDirManager {
     const relPath = path.relative(this.vfs.rootPath, wxmlFullPath).split(path.sep).join('/')
     if (relPath.startsWith('../')) return null
     this.tmplGroup.addTmpl(relPath, content)
-    const expr = this.tmplGroup.getTmplConvertedExpr(relPath, tsExportsGetter(tsFullPath))
-    console.info('!!! CONV', expr.code())
+    const expr = this.tmplGroup.getTmplConvertedExpr(
+      relPath,
+      tsExportsGetter(tsFullPath, wxmlFullPath),
+    )
     this.convertedExprCache[wxmlFullPath] = {
       expr,
       source: ts.createSourceFile(wxmlFullPath, content, ts.ScriptTarget.Latest),
@@ -152,7 +154,10 @@ export class ProjectDirManager {
     }
   }
 
-  getFileTsContent(fullPath: string, tsExportsGetter: (fullPath: string) => string): string | null {
+  getFileTsContent(
+    fullPath: string,
+    tsExportsGetter: (fullPath: string, importTargetFullPath: string) => string,
+  ): string | null {
     const p = getWxmlTsPathReverted(fullPath)
     if (p !== null) {
       return this.getWxmlConvertedExpr(p, tsExportsGetter)

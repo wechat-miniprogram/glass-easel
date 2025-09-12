@@ -2,7 +2,7 @@ use std::fmt::{Result as FmtResult, Write as FmtWrite};
 
 use sourcemap::SourceMap;
 
-use crate::{escape::dash_to_camel, parse::{expr::*, tag::*, Template, TemplateStructure}, stringify::{Stringifier, StringifierBlock, StringifierLine, StringifierLineState, StringifyLine, StringifyOptions}};
+use crate::{escape::dash_to_camel, parse::{expr::*, tag::*, Template, TemplateStructure}, stringify::{expr::{expression_strigify_write, ExpressionLevel}, Stringifier, StringifierBlock, StringifierLine, StringifierLineState, StringifyLine, StringifyOptions}};
 
 trait ConvertedExprWriteBlock {
     fn converted_expr_write<'s, 't, W: FmtWrite>(&self, w: &mut StringifierBlock<'s, 't, W>) -> FmtResult;
@@ -211,10 +211,10 @@ impl ConvertedExprWriteInline for Value {
                         w.write_token_state("+", Some(""), &prev_loc, StringifierLineState::Normal)?;
                     }
                     if let Expression::ToStringWithoutUndefined { value, location } = part {
-                        value.stringify_write(w)?;
+                        value.converted_expr_write(w)?;
                         prev_loc = Some(location.end..location.end);
                     } else {
-                        part.stringify_write(w)?;
+                        part.converted_expr_write(w)?;
                         let pos = loc.end;
                         prev_loc = Some(pos..pos);
                     }
@@ -227,7 +227,28 @@ impl ConvertedExprWriteInline for Value {
 
 impl ConvertedExprWriteInline for Expression {
     fn converted_expr_write<'s, 't, 'u, W: FmtWrite>(&self, w: &mut StringifierLine<'s, 't, 'u, W>) -> FmtResult {
-        StringifyLine::stringify_write(self, w)
+        expression_strigify_write(self, w, ExpressionLevel::Cond, &|expr, w, accept_level| {
+            match expr {
+                Expression::DataField { name, location } => {
+                    if ExpressionLevel::Member > accept_level {
+                        w.write_token_state("(", Some(""), location, StringifierLineState::ParenStart)?;
+                    }
+                    w.write_token_state("data", Some(""), location, StringifierLineState::Normal)?;
+                    w.write_token_state(".", Some(""), location, StringifierLineState::NoSpaceAround)?;
+                    w.write_token_state(
+                        name,
+                        Some(name),
+                        location,
+                        StringifierLineState::Normal,
+                    )?;
+                    if ExpressionLevel::Member > accept_level {
+                        w.write_token_state(")", Some(""), location, StringifierLineState::ParenEnd)?;
+                    }
+                    Ok(false)
+                }
+                _ => Ok(true),
+            }
+        })
     }
 }
 
@@ -249,26 +270,27 @@ mod test {
     #[test]
     fn basic() {
         let src = r#"<view>{{ hello }}</view>"#;
-        let expect = r#"var _tag_=tags.view;{hello}"#;
+        let expect = r#"var _tag_=tags.view;{data.hello}"#;
         let (out, sm) = convert(src);
-        dbg!(&sm);
         assert_eq!(out, expect);
         assert_eq!(find_token(&sm, 0, 0), Some((0, 1)));
         assert_eq!(find_token(&sm, 0, 15), Some((0, 1)));
         assert_eq!(find_token(&sm, 0, 21), Some((0, 9)));
+        assert_eq!(find_token(&sm, 0, 26), Some((0, 9)));
     }
 
     #[test]
     fn composed_text_node() {
         let src = r#"Hello {{ world }}!"#;
-        let expect = r#""Hello "+world+"!""#;
+        let expect = r#""Hello "+data.world+"!""#;
         let (out, sm) = convert(src);
         assert_eq!(out, expect);
         assert_eq!(find_token(&sm, 0, 0), Some((0, 0)));
         assert_eq!(find_token(&sm, 0, 8), Some((0, 6)));
         assert_eq!(find_token(&sm, 0, 9), Some((0, 9)));
-        assert_eq!(find_token(&sm, 0, 14), Some((0, 17)));
-        assert_eq!(find_token(&sm, 0, 17), Some((0, 17)));
+        assert_eq!(find_token(&sm, 0, 14), Some((0, 9)));
+        assert_eq!(find_token(&sm, 0, 19), Some((0, 17)));
+        assert_eq!(find_token(&sm, 0, 24), Some((0, 17)));
     }
 
     #[test]
@@ -298,7 +320,7 @@ mod test {
     #[test]
     fn normal_attr_dynamic_value() {
         let src = r#"<custom-comp attr-a="{{ x }}" />"#;
-        let expect = r#"var _tag_=tags.custom_comp;{_tag_.attrA=x;}"#;
+        let expect = r#"var _tag_=tags.custom_comp;{_tag_.attrA=data.x;}"#;
         let (out, sm) = convert(src);
         assert_eq!(out, expect);
         assert_eq!(find_token(&sm, 0, 28), Some((0, 13)));

@@ -26,6 +26,7 @@
     "build-and-start": "npm run build && node dist/cli.js"
   },
   "peerDependencies": {
+    "glass-easel-miniprogram-adapter": "workspace:*",
     "typescript": "^5.2.2"
   },
   "dependencies": {

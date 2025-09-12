@@ -256,7 +256,7 @@ export class Server {
     this.tsLangService = ts.createLanguageService(servicesHost, docReg)
 
     // get the exports of a file
-    const tsExportsGetter = (fullPath: string) => {
+    const tsExportsGetter = (fullPath: string, importTargetFullPath: string) => {
       const program = this.tsLangService.getProgram()
       if (!program) return ''
       const source = program.getSourceFile(fullPath)
@@ -264,9 +264,23 @@ export class Server {
       const tc = program.getTypeChecker()
       const symbol = tc.getSymbolAtLocation(source)!
       const defaultExport = tc.tryGetMemberInModuleExports('default', symbol)
-      // tc.symbolToString(defaultExport, source)
-      // if (!defaultExport) return ''
-      return ''
+      const relPath = path.relative(path.dirname(importTargetFullPath), fullPath)
+      const adapterImportLine =
+        "import type * as glassEaselMiniprogramAdapter from 'glass-easel-miniprogram-adapter'"
+      const tsImportLine = defaultExport
+        ? `import type component from './${relPath}'`
+        : 'declare const component: any'
+      const dataLine = `
+declare const data: typeof component extends glassEaselMiniprogramAdapter.behavior.ComponentType<infer TData, infer TProperty, any, any, any>
+  ? glassEaselMiniprogramAdapter.component.AllData<TData, TProperty>
+  : Record<string, never>`
+      const methodsLine = `
+declare const methods: typeof component extends glassEaselMiniprogramAdapter.behavior.ComponentType<any, any, infer TMethod, any, any>
+  ? TMethod
+  : Record<string, never>`
+      // TODO tags types
+      const tagsLine = 'declare const tags: { [other: string]: any }'
+      return [adapterImportLine, tsImportLine, dataLine, methodsLine, tagsLine, ''].join('\n')
     }
 
     // report diagnostics about compiler options

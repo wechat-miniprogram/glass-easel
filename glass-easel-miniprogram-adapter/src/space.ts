@@ -33,7 +33,7 @@ export interface PageConstructor {
       >,
   ): ComponentType<
     /* TData */ TData,
-    /* TProperty */ Record<string, never>,
+    /* TProperty */ Empty,
     /* TMethod */ TNewExtraFields,
     /* TComponentExport */ never,
     /* TExtraThisFields */ Empty

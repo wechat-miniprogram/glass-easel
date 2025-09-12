@@ -76,15 +76,19 @@ impl ExpressionLevel {
     }
 }
 
-fn expression_strigify_write<W: FmtWrite>(
+pub(super) fn expression_strigify_write<W: FmtWrite>(
     expression: &Expression,
     stringifier: &mut StringifierLine<W>,
     accept_level: ExpressionLevel,
+    filter: &impl Fn(&Expression, &mut StringifierLine<W>, ExpressionLevel) -> Result<bool, std::fmt::Error>,
 ) -> FmtResult {
+    if !filter(expression, stringifier, accept_level)? {
+        return Ok(());
+    }
     let cur_level = ExpressionLevel::from_expression(expression);
     if cur_level > accept_level {
         stringifier.write_str_state("(", StringifierLineState::ParenStart)?;
-        expression_strigify_write(expression, stringifier, ExpressionLevel::Cond)?;
+        expression_strigify_write(expression, stringifier, ExpressionLevel::Cond, filter)?;
         stringifier.write_str_state(")", StringifierLineState::ParenEnd)?;
         return Ok(());
     }
@@ -177,7 +181,7 @@ fn expression_strigify_write<W: FmtWrite>(
                                 colon_location.as_ref().unwrap_or(location),
                                 StringifierLineState::NoSpaceBefore,
                             )?;
-                            expression_strigify_write(value, stringifier, ExpressionLevel::Cond)?;
+                            expression_strigify_write(value, stringifier, ExpressionLevel::Cond, filter)?;
                         }
                     }
                     ObjectFieldKind::Spread { location, value } => {
@@ -187,7 +191,7 @@ fn expression_strigify_write<W: FmtWrite>(
                             location,
                             StringifierLineState::NoSpaceAfter,
                         )?;
-                        expression_strigify_write(value, stringifier, ExpressionLevel::Cond)?;
+                        expression_strigify_write(value, stringifier, ExpressionLevel::Cond, filter)?;
                     }
                 }
             }
@@ -214,7 +218,7 @@ fn expression_strigify_write<W: FmtWrite>(
                 }
                 match field {
                     ArrayFieldKind::Normal { value } => {
-                        expression_strigify_write(value, stringifier, ExpressionLevel::Cond)?;
+                        expression_strigify_write(value, stringifier, ExpressionLevel::Cond, filter)?;
                     }
                     ArrayFieldKind::Spread { location, value } => {
                         stringifier.write_token_state(
@@ -223,7 +227,7 @@ fn expression_strigify_write<W: FmtWrite>(
                             location,
                             StringifierLineState::NoSpaceAfter,
                         )?;
-                        expression_strigify_write(value, stringifier, ExpressionLevel::Cond)?;
+                        expression_strigify_write(value, stringifier, ExpressionLevel::Cond, filter)?;
                     }
                     ArrayFieldKind::EmptySlot => {
                         if index == fields.len() - 1 {
@@ -247,7 +251,7 @@ fn expression_strigify_write<W: FmtWrite>(
             dot_location,
             field_location,
         } => {
-            expression_strigify_write(obj, stringifier, ExpressionLevel::Member)?;
+            expression_strigify_write(obj, stringifier, ExpressionLevel::Member, filter)?;
             stringifier.write_token_state(
                 ".",
                 None,
@@ -266,14 +270,14 @@ fn expression_strigify_write<W: FmtWrite>(
             field_name,
             bracket_location,
         } => {
-            expression_strigify_write(obj, stringifier, ExpressionLevel::Member)?;
+            expression_strigify_write(obj, stringifier, ExpressionLevel::Member, filter)?;
             stringifier.write_token_state(
                 "[",
                 None,
                 &bracket_location.0,
                 StringifierLineState::ParenCall,
             )?;
-            expression_strigify_write(&field_name, stringifier, ExpressionLevel::Cond)?;
+            expression_strigify_write(&field_name, stringifier, ExpressionLevel::Cond, filter)?;
             stringifier.write_token_state(
                 "]",
                 None,
@@ -286,7 +290,7 @@ fn expression_strigify_write<W: FmtWrite>(
             args,
             paren_location,
         } => {
-            expression_strigify_write(func, stringifier, ExpressionLevel::Member)?;
+            expression_strigify_write(func, stringifier, ExpressionLevel::Member, filter)?;
             stringifier.write_token_state(
                 "(",
                 None,
@@ -297,7 +301,7 @@ fn expression_strigify_write<W: FmtWrite>(
                 if index > 0 {
                     stringifier.write_str_state(",", StringifierLineState::NoSpaceBefore)?;
                 }
-                expression_strigify_write(&arg, stringifier, ExpressionLevel::Cond)?;
+                expression_strigify_write(&arg, stringifier, ExpressionLevel::Cond, filter)?;
             }
             stringifier.write_token_state(
                 ")",
@@ -314,7 +318,7 @@ fn expression_strigify_write<W: FmtWrite>(
                 location,
                 StringifierLineState::NoSpaceAfter,
             )?;
-            expression_strigify_write(&value, stringifier, ExpressionLevel::Unary)?;
+            expression_strigify_write(&value, stringifier, ExpressionLevel::Unary, filter)?;
         }
         Expression::BitReverse { value, location } => {
             stringifier.write_token_state(
@@ -323,7 +327,7 @@ fn expression_strigify_write<W: FmtWrite>(
                 location,
                 StringifierLineState::NoSpaceAfter,
             )?;
-            expression_strigify_write(&value, stringifier, ExpressionLevel::Unary)?;
+            expression_strigify_write(&value, stringifier, ExpressionLevel::Unary, filter)?;
         }
         Expression::Positive { value, location } => {
             stringifier.write_token_state(
@@ -332,7 +336,7 @@ fn expression_strigify_write<W: FmtWrite>(
                 location,
                 StringifierLineState::NoSpaceAround,
             )?;
-            expression_strigify_write(&value, stringifier, ExpressionLevel::Unary)?;
+            expression_strigify_write(&value, stringifier, ExpressionLevel::Unary, filter)?;
         }
         Expression::Negative { value, location } => {
             stringifier.write_token_state(
@@ -341,7 +345,7 @@ fn expression_strigify_write<W: FmtWrite>(
                 location,
                 StringifierLineState::NoSpaceAround,
             )?;
-            expression_strigify_write(&value, stringifier, ExpressionLevel::Unary)?;
+            expression_strigify_write(&value, stringifier, ExpressionLevel::Unary, filter)?;
         }
         Expression::TypeOf { value, location } => {
             stringifier.write_token_state(
@@ -350,7 +354,7 @@ fn expression_strigify_write<W: FmtWrite>(
                 location,
                 StringifierLineState::NoSpaceAround,
             )?;
-            expression_strigify_write(&value, stringifier, ExpressionLevel::Unary)?;
+            expression_strigify_write(&value, stringifier, ExpressionLevel::Unary, filter)?;
         }
         Expression::Void { value, location } => {
             stringifier.write_token_state(
@@ -359,7 +363,7 @@ fn expression_strigify_write<W: FmtWrite>(
                 location,
                 StringifierLineState::NoSpaceAround,
             )?;
-            expression_strigify_write(&value, stringifier, ExpressionLevel::Unary)?;
+            expression_strigify_write(&value, stringifier, ExpressionLevel::Unary, filter)?;
         }
 
         Expression::Multiply {
@@ -367,27 +371,27 @@ fn expression_strigify_write<W: FmtWrite>(
             right,
             location,
         } => {
-            expression_strigify_write(&left, stringifier, ExpressionLevel::Multiply)?;
+            expression_strigify_write(&left, stringifier, ExpressionLevel::Multiply, filter)?;
             stringifier.write_token_state("*", None, location, StringifierLineState::Normal)?;
-            expression_strigify_write(&right, stringifier, ExpressionLevel::Unary)?;
+            expression_strigify_write(&right, stringifier, ExpressionLevel::Unary, filter)?;
         }
         Expression::Divide {
             left,
             right,
             location,
         } => {
-            expression_strigify_write(&left, stringifier, ExpressionLevel::Multiply)?;
+            expression_strigify_write(&left, stringifier, ExpressionLevel::Multiply, filter)?;
             stringifier.write_token_state("/", None, location, StringifierLineState::Normal)?;
-            expression_strigify_write(&right, stringifier, ExpressionLevel::Unary)?;
+            expression_strigify_write(&right, stringifier, ExpressionLevel::Unary, filter)?;
         }
         Expression::Remainer {
             left,
             right,
             location,
         } => {
-            expression_strigify_write(&left, stringifier, ExpressionLevel::Multiply)?;
+            expression_strigify_write(&left, stringifier, ExpressionLevel::Multiply, filter)?;
             stringifier.write_token_state("%", None, location, StringifierLineState::Normal)?;
-            expression_strigify_write(&right, stringifier, ExpressionLevel::Unary)?;
+            expression_strigify_write(&right, stringifier, ExpressionLevel::Unary, filter)?;
         }
 
         Expression::Plus {
@@ -395,18 +399,18 @@ fn expression_strigify_write<W: FmtWrite>(
             right,
             location,
         } => {
-            expression_strigify_write(&left, stringifier, ExpressionLevel::Plus)?;
+            expression_strigify_write(&left, stringifier, ExpressionLevel::Plus, filter)?;
             stringifier.write_token_state("+", None, location, StringifierLineState::Normal)?;
-            expression_strigify_write(&right, stringifier, ExpressionLevel::Multiply)?;
+            expression_strigify_write(&right, stringifier, ExpressionLevel::Multiply, filter)?;
         }
         Expression::Minus {
             left,
             right,
             location,
         } => {
-            expression_strigify_write(&left, stringifier, ExpressionLevel::Plus)?;
+            expression_strigify_write(&left, stringifier, ExpressionLevel::Plus, filter)?;
             stringifier.write_token_state("-", None, location, StringifierLineState::Normal)?;
-            expression_strigify_write(&right, stringifier, ExpressionLevel::Multiply)?;
+            expression_strigify_write(&right, stringifier, ExpressionLevel::Multiply, filter)?;
         }
 
         Expression::LeftShift {
@@ -414,27 +418,27 @@ fn expression_strigify_write<W: FmtWrite>(
             right,
             location,
         } => {
-            expression_strigify_write(&left, stringifier, ExpressionLevel::Shift)?;
+            expression_strigify_write(&left, stringifier, ExpressionLevel::Shift, filter)?;
             stringifier.write_token_state("<<", None, location, StringifierLineState::Normal)?;
-            expression_strigify_write(&right, stringifier, ExpressionLevel::Plus)?;
+            expression_strigify_write(&right, stringifier, ExpressionLevel::Plus, filter)?;
         }
         Expression::RightShift {
             left,
             right,
             location,
         } => {
-            expression_strigify_write(&left, stringifier, ExpressionLevel::Shift)?;
+            expression_strigify_write(&left, stringifier, ExpressionLevel::Shift, filter)?;
             stringifier.write_token_state(">>", None, location, StringifierLineState::Normal)?;
-            expression_strigify_write(&right, stringifier, ExpressionLevel::Plus)?;
+            expression_strigify_write(&right, stringifier, ExpressionLevel::Plus, filter)?;
         }
         Expression::UnsignedRightShift {
             left,
             right,
             location,
         } => {
-            expression_strigify_write(&left, stringifier, ExpressionLevel::Shift)?;
+            expression_strigify_write(&left, stringifier, ExpressionLevel::Shift, filter)?;
             stringifier.write_token_state(">>>", None, location, StringifierLineState::Normal)?;
-            expression_strigify_write(&right, stringifier, ExpressionLevel::Plus)?;
+            expression_strigify_write(&right, stringifier, ExpressionLevel::Plus, filter)?;
         }
 
         Expression::Lt {
@@ -442,50 +446,50 @@ fn expression_strigify_write<W: FmtWrite>(
             right,
             location,
         } => {
-            expression_strigify_write(&left, stringifier, ExpressionLevel::Comparison)?;
+            expression_strigify_write(&left, stringifier, ExpressionLevel::Comparison, filter)?;
             stringifier.write_token_state("<", None, location, StringifierLineState::Normal)?;
-            expression_strigify_write(&right, stringifier, ExpressionLevel::Shift)?;
+            expression_strigify_write(&right, stringifier, ExpressionLevel::Shift, filter)?;
         }
         Expression::Lte {
             left,
             right,
             location,
         } => {
-            expression_strigify_write(&left, stringifier, ExpressionLevel::Comparison)?;
+            expression_strigify_write(&left, stringifier, ExpressionLevel::Comparison, filter)?;
             stringifier.write_token_state("<=", None, location, StringifierLineState::Normal)?;
-            expression_strigify_write(&right, stringifier, ExpressionLevel::Shift)?;
+            expression_strigify_write(&right, stringifier, ExpressionLevel::Shift, filter)?;
         }
         Expression::Gt {
             left,
             right,
             location,
         } => {
-            expression_strigify_write(&left, stringifier, ExpressionLevel::Comparison)?;
+            expression_strigify_write(&left, stringifier, ExpressionLevel::Comparison, filter)?;
             stringifier.write_token_state(">", None, location, StringifierLineState::Normal)?;
-            expression_strigify_write(&right, stringifier, ExpressionLevel::Shift)?;
+            expression_strigify_write(&right, stringifier, ExpressionLevel::Shift, filter)?;
         }
         Expression::Gte {
             left,
             right,
             location,
         } => {
-            expression_strigify_write(&left, stringifier, ExpressionLevel::Comparison)?;
+            expression_strigify_write(&left, stringifier, ExpressionLevel::Comparison, filter)?;
             stringifier.write_token_state(">=", None, location, StringifierLineState::Normal)?;
-            expression_strigify_write(&right, stringifier, ExpressionLevel::Shift)?;
+            expression_strigify_write(&right, stringifier, ExpressionLevel::Shift, filter)?;
         }
         Expression::InstanceOf {
             left,
             right,
             location,
         } => {
-            expression_strigify_write(&left, stringifier, ExpressionLevel::Comparison)?;
+            expression_strigify_write(&left, stringifier, ExpressionLevel::Comparison, filter)?;
             stringifier.write_token_state(
                 " instanceof ",
                 None,
                 location,
                 StringifierLineState::NoSpaceAround,
             )?;
-            expression_strigify_write(&right, stringifier, ExpressionLevel::Shift)?;
+            expression_strigify_write(&right, stringifier, ExpressionLevel::Shift, filter)?;
         }
 
         Expression::Eq {
@@ -493,36 +497,36 @@ fn expression_strigify_write<W: FmtWrite>(
             right,
             location,
         } => {
-            expression_strigify_write(&left, stringifier, ExpressionLevel::Eq)?;
+            expression_strigify_write(&left, stringifier, ExpressionLevel::Eq, filter)?;
             stringifier.write_token_state("==", None, location, StringifierLineState::Normal)?;
-            expression_strigify_write(&right, stringifier, ExpressionLevel::Comparison)?;
+            expression_strigify_write(&right, stringifier, ExpressionLevel::Comparison, filter)?;
         }
         Expression::Ne {
             left,
             right,
             location,
         } => {
-            expression_strigify_write(&left, stringifier, ExpressionLevel::Eq)?;
+            expression_strigify_write(&left, stringifier, ExpressionLevel::Eq, filter)?;
             stringifier.write_token_state("!=", None, location, StringifierLineState::Normal)?;
-            expression_strigify_write(&right, stringifier, ExpressionLevel::Comparison)?;
+            expression_strigify_write(&right, stringifier, ExpressionLevel::Comparison, filter)?;
         }
         Expression::EqFull {
             left,
             right,
             location,
         } => {
-            expression_strigify_write(&left, stringifier, ExpressionLevel::Eq)?;
+            expression_strigify_write(&left, stringifier, ExpressionLevel::Eq, filter)?;
             stringifier.write_token_state("===", None, location, StringifierLineState::Normal)?;
-            expression_strigify_write(&right, stringifier, ExpressionLevel::Comparison)?;
+            expression_strigify_write(&right, stringifier, ExpressionLevel::Comparison, filter)?;
         }
         Expression::NeFull {
             left,
             right,
             location,
         } => {
-            expression_strigify_write(&left, stringifier, ExpressionLevel::Eq)?;
+            expression_strigify_write(&left, stringifier, ExpressionLevel::Eq, filter)?;
             stringifier.write_token_state("!==", None, location, StringifierLineState::Normal)?;
-            expression_strigify_write(&right, stringifier, ExpressionLevel::Comparison)?;
+            expression_strigify_write(&right, stringifier, ExpressionLevel::Comparison, filter)?;
         }
 
         Expression::BitAnd {
@@ -530,9 +534,9 @@ fn expression_strigify_write<W: FmtWrite>(
             right,
             location,
         } => {
-            expression_strigify_write(&left, stringifier, ExpressionLevel::BitAnd)?;
+            expression_strigify_write(&left, stringifier, ExpressionLevel::BitAnd, filter)?;
             stringifier.write_token_state("&", None, location, StringifierLineState::Normal)?;
-            expression_strigify_write(&right, stringifier, ExpressionLevel::Eq)?;
+            expression_strigify_write(&right, stringifier, ExpressionLevel::Eq, filter)?;
         }
 
         Expression::BitXor {
@@ -540,9 +544,9 @@ fn expression_strigify_write<W: FmtWrite>(
             right,
             location,
         } => {
-            expression_strigify_write(&left, stringifier, ExpressionLevel::BitXor)?;
+            expression_strigify_write(&left, stringifier, ExpressionLevel::BitXor, filter)?;
             stringifier.write_token_state("^", None, location, StringifierLineState::Normal)?;
-            expression_strigify_write(&right, stringifier, ExpressionLevel::BitAnd)?;
+            expression_strigify_write(&right, stringifier, ExpressionLevel::BitAnd, filter)?;
         }
 
         Expression::BitOr {
@@ -550,9 +554,9 @@ fn expression_strigify_write<W: FmtWrite>(
             right,
             location,
         } => {
-            expression_strigify_write(&left, stringifier, ExpressionLevel::BitOr)?;
+            expression_strigify_write(&left, stringifier, ExpressionLevel::BitOr, filter)?;
             stringifier.write_token_state("|", None, location, StringifierLineState::Normal)?;
-            expression_strigify_write(&right, stringifier, ExpressionLevel::BitXor)?;
+            expression_strigify_write(&right, stringifier, ExpressionLevel::BitXor, filter)?;
         }
 
         Expression::LogicAnd {
@@ -560,9 +564,9 @@ fn expression_strigify_write<W: FmtWrite>(
             right,
             location,
         } => {
-            expression_strigify_write(&left, stringifier, ExpressionLevel::LogicAnd)?;
+            expression_strigify_write(&left, stringifier, ExpressionLevel::LogicAnd, filter)?;
             stringifier.write_token_state("&&", None, location, StringifierLineState::Normal)?;
-            expression_strigify_write(&right, stringifier, ExpressionLevel::BitOr)?;
+            expression_strigify_write(&right, stringifier, ExpressionLevel::BitOr, filter)?;
         }
 
         Expression::LogicOr {
@@ -570,18 +574,18 @@ fn expression_strigify_write<W: FmtWrite>(
             right,
             location,
         } => {
-            expression_strigify_write(&left, stringifier, ExpressionLevel::LogicOr)?;
+            expression_strigify_write(&left, stringifier, ExpressionLevel::LogicOr, filter)?;
             stringifier.write_token_state("||", None, location, StringifierLineState::Normal)?;
-            expression_strigify_write(&right, stringifier, ExpressionLevel::LogicAnd)?;
+            expression_strigify_write(&right, stringifier, ExpressionLevel::LogicAnd, filter)?;
         }
         Expression::NullishCoalescing {
             left,
             right,
             location,
         } => {
-            expression_strigify_write(&left, stringifier, ExpressionLevel::LogicOr)?;
+            expression_strigify_write(&left, stringifier, ExpressionLevel::LogicOr, filter)?;
             stringifier.write_token_state("??", None, location, StringifierLineState::Normal)?;
-            expression_strigify_write(&right, stringifier, ExpressionLevel::LogicAnd)?;
+            expression_strigify_write(&right, stringifier, ExpressionLevel::LogicAnd, filter)?;
         }
 
         Expression::Cond {
@@ -591,21 +595,21 @@ fn expression_strigify_write<W: FmtWrite>(
             question_location,
             colon_location,
         } => {
-            expression_strigify_write(&cond, stringifier, ExpressionLevel::LogicOr)?;
+            expression_strigify_write(&cond, stringifier, ExpressionLevel::LogicOr, filter)?;
             stringifier.write_token_state(
                 "?",
                 None,
                 question_location,
                 StringifierLineState::Normal,
             )?;
-            expression_strigify_write(&true_br, stringifier, ExpressionLevel::Cond)?;
+            expression_strigify_write(&true_br, stringifier, ExpressionLevel::Cond, filter)?;
             stringifier.write_token_state(
                 ":",
                 None,
                 colon_location,
                 StringifierLineState::Normal,
             )?;
-            expression_strigify_write(&false_br, stringifier, ExpressionLevel::Cond)?;
+            expression_strigify_write(&false_br, stringifier, ExpressionLevel::Cond, filter)?;
         }
     }
     Ok(())
@@ -616,7 +620,7 @@ impl StringifyLine for Expression {
         &self,
         stringifier: &mut StringifierLine<'s, 't, 'u, W>,
     ) -> FmtResult {
-        expression_strigify_write(self, stringifier, ExpressionLevel::Cond)
+        expression_strigify_write(self, stringifier, ExpressionLevel::Cond, &|_, _, _| Ok(true))
     }
 }
 
