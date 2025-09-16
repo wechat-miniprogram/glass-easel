@@ -295,20 +295,20 @@ export class Server {
         "import type * as glassEaselMiniprogramAdapter from 'glass-easel-miniprogram-adapter'"
       // eslint-disable-next-line no-nested-ternary
       const tsImportLine = defaultExport
-        ? `import type _component_ from './${escapeJsString(relPath)}'`
-        : 'declare const _component_: _UnknownElement_'
+        ? `import type component from './${escapeJsString(relPath)}'`
+        : 'declare const component: UnknownElement'
       const dataLine = `
-declare const data: typeof _component_ extends glassEaselMiniprogramAdapter.behavior.ComponentType<infer TData, infer TProperty, any, any, any>
+declare const data: typeof component extends glassEaselMiniprogramAdapter.behavior.ComponentType<infer TData, infer TProperty, any, any, any>
   ? glassEaselMiniprogramAdapter.component.AllData<TData, TProperty>
   : Record<string, never>`
       const methodsLine = `
-declare const methods: typeof _component_ extends glassEaselMiniprogramAdapter.behavior.ComponentType<any, any, infer TMethod, any, any>
+declare const methods: typeof component extends glassEaselMiniprogramAdapter.behavior.ComponentType<any, any, infer TMethod, any, any>
   ? TMethod
   : Record<string, never>`
 
       // get exports from using components
       const propertiesHelperLine = `
-type _Properties_<T> = T extends glassEaselMiniprogramAdapter.behavior.ComponentType<any, infer TProperty, any, any, any>
+type Properties<T> = T extends glassEaselMiniprogramAdapter.behavior.ComponentType<any, infer TProperty, any, any, any>
   ? glassEaselMiniprogramAdapter.component.PropertyValues<TProperty>
   : Record<never, never>`
       let usingComponentsImports = ''
@@ -320,18 +320,27 @@ type _Properties_<T> = T extends glassEaselMiniprogramAdapter.behavior.Component
         const defaultExport = getDefaultExportOfSourceFile(tc, source)
         if (!defaultExport) return
         const relPath = path.relative(compDir, compPath)
-        const entryName = tagName.replace(/-/g, '_')
+        const entryName = `component_${tagName.replace(/-/g, '_')}`
         usingComponentsImports += `import type ${entryName} from './${escapeJsString(relPath)}'\n`
-        usingComponensItems.push(`'${tagName}': _Properties_<typeof ${entryName}>;\n`)
+        usingComponensItems.push(`'${tagName}': Properties<typeof ${entryName}>;\n`)
       })
 
-      // TODO tags types
+      // treat generics as any type tags
+      const generics = this.projectDirManager.getGenerics(compFullPath)
+      generics.forEach((tagName) => {
+        usingComponensItems.push(`'${tagName}': any;\n`)
+      })
+
+      // TODO handling placeholders
+
+      // compose tags types
       const unknownElementLine = this.options.strictMode
-        ? 'interface _UnknownElement_ {}'
-        : 'type _UnknownElement_ = Record<string, any>'
+        ? 'interface UnknownElement {}'
+        : 'type UnknownElement = Record<string, any>'
       const tagsLine = `
 declare const tags: {
-${usingComponensItems.join('')}[other: string]: _UnknownElement_ }`
+${usingComponensItems.join('')}[other: string]: UnknownElement }`
+
       return [
         adapterImportLine,
         unknownElementLine,

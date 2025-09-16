@@ -7,6 +7,7 @@ type ComponentJsonData = {
   jsonFileVersion: number
   usingComponents: Record<string, string>
   placeholders: Record<string, string>
+  generics: string[]
   // IDEA support generics by special type declaration
 }
 
@@ -31,6 +32,7 @@ const parseCompJson = (
       usingComponents: Object.create(null),
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       placeholders: Object.create(null),
+      generics: [],
     }
     const relPath = path.relative(projectRootPath, fullPath)
     const relPathDir = path.dirname(relPath)
@@ -46,6 +48,12 @@ const parseCompJson = (
       if (!isValidKey(key)) return
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       ret.placeholders[key] = String(parsed.placeholders[key])
+    })
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    Object.keys(parsed.generics ?? 0).forEach((key) => {
+      if (!isValidKey(key)) return
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      ret.generics.push(String(parsed.generics[key]))
     })
     return ret
   }
@@ -286,6 +294,13 @@ export class ProjectDirManager {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     if (!comp) return Object.create(null)
     return comp.usingComponents
+  }
+
+  getGenerics(compPath: string): string[] {
+    const comp = this.trackingComponents[compPath]
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    if (!comp) return Object.create(null)
+    return comp.generics
   }
 
   listTrackingComponents() {
