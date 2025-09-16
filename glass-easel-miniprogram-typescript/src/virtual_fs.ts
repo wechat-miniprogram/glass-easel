@@ -35,8 +35,8 @@ export class VirtualFileSystem {
         entry.contentOutdated = false
         if (entry.overriddenContent === null) {
           this.removeEntry(fullPath)
+          this.onTrackedFileRemoved(fullPath)
         }
-        this.onTrackedFileRemoved(fullPath)
       }
     }
 
@@ -46,7 +46,9 @@ export class VirtualFileSystem {
       const entry = this.getFileEntry(fullPath)
       if (entry) {
         entry.contentOutdated = true
-        this.onTrackedFileUpdated(fullPath)
+        if (entry.overriddenContent === null) {
+          this.onTrackedFileUpdated(fullPath)
+        }
       }
     }
 
@@ -103,23 +105,29 @@ export class VirtualFileSystem {
     }
     if (content === null) return this.getFileEntry(fullPath)
     const entry = this.getOrCreateFileEntry(fullPath)
-    if (entry.overriddenContent === null) {
-      entry.version += 1
-    }
     entry.content = content
     entry.contentOutdated = false
+    if (entry.overriddenContent === null) {
+      entry.version += 1
+      this.onTrackedFileUpdated(fullPath)
+    }
     return entry
+  }
+
+  getTrackedFileVersion(fullPath: string): number | null {
+    const entry = this.getFileEntry(fullPath)
+    return entry?.version ?? null
   }
 
   // Read the file content and start tracking if the file is inside the project
   //
   // This will try to load file content from disk if not present.
-  trackFile(fullPath: string): VirtualFile | null {
+  trackFile(fullPath: string): string | null {
     let entry = this.getFileEntry(fullPath)
     if (!entry || (entry.contentOutdated && entry.overriddenContent === null)) {
       entry = this.loadFileContentFromDisk(fullPath)
     }
-    return entry ?? null
+    return entry?.overriddenContent ?? entry?.content ?? null
   }
 
   // End the tracking of the file content
@@ -139,8 +147,15 @@ export class VirtualFileSystem {
   // This also keep the file when the file is unlinked on dist.
   overrideFileContent(fullPath: string, content: string) {
     const entry = this.getOrCreateFileEntry(fullPath)
-    entry.version += 1
     entry.overriddenContent = content
+    entry.version += 1
+    this.onTrackedFileUpdated(fullPath)
+  }
+
+  // Check if the file content is overridden
+  isFileContentOverridden(fullPath: string) {
+    const entry = this.getFileEntry(fullPath)
+    return entry?.overriddenContent !== null
   }
 
   // Cancels the corresponding `overrideFileContent` operation
@@ -149,10 +164,12 @@ export class VirtualFileSystem {
     if (!entry) return
     if (entry.content === null) {
       this.removeEntry(fullPath)
+      this.onTrackedFileRemoved(fullPath)
       return
     }
     if (entry.overriddenContent === null) return
-    entry.version += 1
     entry.overriddenContent = null
+    entry.version += 1
+    this.onTrackedFileUpdated(fullPath)
   }
 }

@@ -56,7 +56,9 @@ impl ConvertedExprWriteBlock for Node {
                     Ok(())
                 } else {
                     w.write_line(|w| {
-                        x.converted_expr_write(w)
+                        x.converted_expr_write(w)?;
+                        let pos = x.location_end();
+                        w.write_token(";", None, &(pos..pos))
                     })
                 }
             }
@@ -99,16 +101,17 @@ impl ConvertedExprWriteBlock for Element {
                 let_vars,
                 common,
             } => {
-                w.write_line(|w| {
-                    w.write_token_state("var ", Some(""), &(tag_name.location.start..tag_name.location.start), StringifierLineState::Normal)?;
-                    w.write_token_state("_tag_", Some(&tag_name.name), &tag_name.location, StringifierLineState::Normal)?;
-                    w.write_token_state("=", Some(""), &(tag_name.location.end..tag_name.location.end), StringifierLineState::Normal)?;
-                    w.write_token_state("tags", Some(&tag_name.name), &tag_name.location, StringifierLineState::Normal)?;
-                    w.write_token_state(".", Some(&tag_name.name), &tag_name.location, StringifierLineState::Normal)?;
-                    w.write_token_state(&tag_name.name.replace("-", "_"), Some(&tag_name.name), &tag_name.location, StringifierLineState::Normal)?;
-                    w.write_token(";", None, &(tag_name.location.end..tag_name.location.end))
-                })?;
                 wrap_brace_block(w, &self.tag_location, |w| {
+                    w.write_line(|w| {
+                        w.write_token_state("const ", Some(""), &(tag_name.location.start..tag_name.location.start), StringifierLineState::Normal)?;
+                        w.write_token_state("_tag_", Some(""), &tag_name.location, StringifierLineState::Normal)?;
+                        w.write_token_state("=", Some(""), &(tag_name.location.end..tag_name.location.end), StringifierLineState::Normal)?;
+                        w.write_token_state("tags", Some(""), &tag_name.location, StringifierLineState::Normal)?;
+                        w.write_token_state("['", Some(""), &tag_name.location, StringifierLineState::Normal)?;
+                        w.write_token_state(&tag_name.name, Some(&tag_name.name), &tag_name.location, StringifierLineState::Normal)?;
+                        w.write_token_state("']", Some(""), &tag_name.location, StringifierLineState::Normal)?;
+                        w.write_token(";", None, &(tag_name.location.end..tag_name.location.end))
+                    })?;
                     // TODO handling attrs
                     for attr in attributes {
                         let attr_name = dash_to_camel(&attr.name.name);
@@ -270,19 +273,25 @@ mod test {
     #[test]
     fn basic() {
         let src = r#"<view>{{ hello }}</view>"#;
-        let expect = r#"var _tag_=tags.view;{data.hello}"#;
+        let expect = r#"{const _tag_=tags['view'];data.hello;}"#;
         let (out, sm) = convert(src);
         assert_eq!(out, expect);
-        assert_eq!(find_token(&sm, 0, 0), Some((0, 1)));
-        assert_eq!(find_token(&sm, 0, 15), Some((0, 1)));
-        assert_eq!(find_token(&sm, 0, 21), Some((0, 9)));
+        assert_eq!(find_token(&sm, 0, 0), Some((0, 0)));
+        assert_eq!(find_token(&sm, 0, 1), Some((0, 1)));
+        assert_eq!(find_token(&sm, 0, 7), Some((0, 1)));
+        assert_eq!(find_token(&sm, 0, 13), Some((0, 1)));
+        assert_eq!(find_token(&sm, 0, 19), Some((0, 1)));
+        assert_eq!(find_token(&sm, 0, 25), Some((0, 5)));
         assert_eq!(find_token(&sm, 0, 26), Some((0, 9)));
+        assert_eq!(find_token(&sm, 0, 31), Some((0, 9)));
+        assert_eq!(find_token(&sm, 0, 36), Some((0, 17)));
+        assert_eq!(find_token(&sm, 0, 37), Some((0, 17)));
     }
 
     #[test]
     fn composed_text_node() {
         let src = r#"Hello {{ world }}!"#;
-        let expect = r#""Hello "+data.world+"!""#;
+        let expect = r#""Hello "+data.world+"!";"#;
         let (out, sm) = convert(src);
         assert_eq!(out, expect);
         assert_eq!(find_token(&sm, 0, 0), Some((0, 0)));
@@ -290,41 +299,45 @@ mod test {
         assert_eq!(find_token(&sm, 0, 9), Some((0, 9)));
         assert_eq!(find_token(&sm, 0, 14), Some((0, 9)));
         assert_eq!(find_token(&sm, 0, 19), Some((0, 17)));
-        assert_eq!(find_token(&sm, 0, 24), Some((0, 17)));
+        assert_eq!(find_token(&sm, 0, 23), Some((0, 18)));
     }
 
     #[test]
     fn normal_attr_no_value() {
         let src = r#"<custom-comp attr-a />"#;
-        let expect = r#"var _tag_=tags.custom_comp;{_tag_.attrA=true;}"#;
+        let expect = r#"{const _tag_=tags['custom-comp'];_tag_.attrA=true;}"#;
         let (out, sm) = convert(src);
         assert_eq!(out, expect);
-        assert_eq!(find_token(&sm, 0, 28), Some((0, 13)));
-        assert_eq!(find_token(&sm, 0, 34), Some((0, 13)));
-        assert_eq!(find_token(&sm, 0, 40), Some((0, 19)));
+        assert_eq!(find_token(&sm, 0, 33), Some((0, 13)));
+        assert_eq!(find_token(&sm, 0, 39), Some((0, 13)));
+        assert_eq!(find_token(&sm, 0, 45), Some((0, 19)));
+        assert_eq!(find_token(&sm, 0, 49), Some((0, 19)));
     }
 
     #[test]
     fn normal_attr_static_value() {
         let src = r#"<custom-comp attr-a="x" />"#;
-        let expect = r#"var _tag_=tags.custom_comp;{var _string_or_number_:string|number=_tag_.attrA;}"#;
+        let expect = r#"{const _tag_=tags['custom-comp'];var _string_or_number_:string|number=_tag_.attrA;}"#;
         let (out, sm) = convert(src);
         assert_eq!(out, expect);
-        assert_eq!(find_token(&sm, 0, 28), Some((0, 13)));
-        assert_eq!(find_token(&sm, 0, 32), Some((0, 13)));
-        assert_eq!(find_token(&sm, 0, 51), Some((0, 13)));
-        assert_eq!(find_token(&sm, 0, 65), Some((0, 13)));
-        assert_eq!(find_token(&sm, 0, 71), Some((0, 13)));
+        assert_eq!(find_token(&sm, 0, 34), Some((0, 13)));
+        assert_eq!(find_token(&sm, 0, 37), Some((0, 13)));
+        assert_eq!(find_token(&sm, 0, 56), Some((0, 13)));
+        assert_eq!(find_token(&sm, 0, 70), Some((0, 13)));
+        assert_eq!(find_token(&sm, 0, 76), Some((0, 13)));
+        assert_eq!(find_token(&sm, 0, 81), Some((0, 19)));
     }
 
     #[test]
     fn normal_attr_dynamic_value() {
         let src = r#"<custom-comp attr-a="{{ x }}" />"#;
-        let expect = r#"var _tag_=tags.custom_comp;{_tag_.attrA=data.x;}"#;
+        let expect = r#"{const _tag_=tags['custom-comp'];_tag_.attrA=data.x;}"#;
         let (out, sm) = convert(src);
         assert_eq!(out, expect);
-        assert_eq!(find_token(&sm, 0, 28), Some((0, 13)));
-        assert_eq!(find_token(&sm, 0, 34), Some((0, 13)));
-        assert_eq!(find_token(&sm, 0, 40), Some((0, 24)));
+        assert_eq!(find_token(&sm, 0, 33), Some((0, 13)));
+        assert_eq!(find_token(&sm, 0, 39), Some((0, 13)));
+        assert_eq!(find_token(&sm, 0, 45), Some((0, 24)));
+        assert_eq!(find_token(&sm, 0, 50), Some((0, 24)));
+        assert_eq!(find_token(&sm, 0, 51), Some((0, 28)));
     }
 }

@@ -13,6 +13,10 @@ const { values } = parseArgs({
       type: 'boolean',
       short: 'v',
     },
+    strict: {
+      type: 'boolean',
+      short: 's',
+    },
   },
   strict: true,
 })
@@ -22,6 +26,7 @@ const server = new Server({
   reportTypeScriptDiagnostics: true,
   scanAllComponents: true,
   verboseMessages: values.verbose,
+  strictMode: true,
   onNewDiagnostics(diag) {
     // eslint-disable-next-line no-console
     if (diag.level === DiagnosticLevel.Error) {

@@ -86,6 +86,20 @@ export const formatDiagnostic = (diag: Diagnostic): string => {
   ].join('')
 }
 
+const getDefaultExportOfSourceFile = (
+  tc: ts.TypeChecker,
+  source: ts.SourceFile,
+): ts.Symbol | undefined => {
+  const symbol = tc.getSymbolAtLocation(source)!
+  let defaultExport: ts.Symbol | undefined
+  try {
+    defaultExport = tc.tryGetMemberInModuleExports('default', symbol)
+  } catch {
+    defaultExport = undefined
+  }
+  return defaultExport
+}
+
 export type ServerOptions = {
   /** the path of the project root */
   projectPath: string
@@ -95,6 +109,8 @@ export type ServerOptions = {
   verboseMessages?: boolean
   /** whether to find diagnostics in all components on startup */
   scanAllComponents?: boolean
+  /** Whether to enable strict checks (avoid `any` type fallbacks) */
+  strictMode?: boolean
   /** the callback when the first scan is done */
   onFirstScanDone?: (this: Server) => void
   /** the callback when new diagnostics are found */
@@ -118,22 +134,22 @@ export class Server {
       this.projectPath,
       options.scanAllComponents || false,
       () => {
+        const rootFullPaths: string[] = []
+
+        // collect all entrance files
+        if (options.scanAllComponents) {
+          this.projectDirManager.listTrackingComponents().forEach((compPath) => {
+            const tsPath = `${compPath}.ts`
+            const tsContent = this.projectDirManager.getFileContent(tsPath)
+            if (tsContent !== null) {
+              rootFullPaths.push(tsPath)
+            }
+            this.analyzeWxmlFile(`${compPath}.wxml`)
+          })
+        }
+
+        // run all ts files
         if (this.options.reportTypeScriptDiagnostics) {
-          const rootFullPaths: string[] = []
-
-          // collect all entrance files
-          if (options.scanAllComponents) {
-            this.projectDirManager.getEntranceWxmlFiles().forEach((fullPath) => {
-              const tsPath = `${fullPath.slice(0, -5)}.ts`
-              const tsContent = this.projectDirManager.getFileContent(tsPath)
-              if (tsContent !== null) {
-                rootFullPaths.push(tsPath)
-              }
-              this.analyzeWxmlFile(fullPath)
-            })
-          }
-
-          // run all ts files
           rootFullPaths.forEach((fullPath) => {
             this.analyzeTsFile(fullPath)
           })
@@ -161,6 +177,10 @@ export class Server {
           this.rootFilePathsVersion += 1
         }
       }
+    }
+    this.projectDirManager.onConvertedExprCacheInvalidated = (wxmlFullPath) => {
+      // TODO clear prev errors
+      this.analyzeWxmlFile(wxmlFullPath)
     }
 
     // initialize ts language service
@@ -213,7 +233,7 @@ export class Server {
         return this.projectDirManager.getFileVersion(fullPath)?.toString() ?? ''
       },
       getScriptSnapshot: (fullPath) => {
-        const content = this.projectDirManager.getFileTsContent(fullPath, tsExportsGetter)
+        const content = this.projectDirManager.getFileTsContent(fullPath, wxmlEnvGetter)
         if (content === null) return undefined
         return ts.ScriptSnapshot.fromString(content)
       },
@@ -256,31 +276,73 @@ export class Server {
     this.tsLangService = ts.createLanguageService(servicesHost, docReg)
 
     // get the exports of a file
-    const tsExportsGetter = (fullPath: string, importTargetFullPath: string) => {
+    const wxmlEnvGetter = (tsFullPath: string, wxmlFullPath: string) => {
       const program = this.tsLangService.getProgram()
       if (!program) return ''
-      const source = program.getSourceFile(fullPath)
+      const source = program.getSourceFile(tsFullPath)
       if (!source) return ''
+      const compFullPath = tsFullPath.slice(0, -3)
+      const compDir = path.dirname(wxmlFullPath)
       const tc = program.getTypeChecker()
-      const symbol = tc.getSymbolAtLocation(source)!
-      const defaultExport = tc.tryGetMemberInModuleExports('default', symbol)
-      const relPath = path.relative(path.dirname(importTargetFullPath), fullPath)
+
+      // escape helper
+      const escapeJsString = (str: string) => str.replace(/['\\]/g, (a) => `\\${a}`)
+
+      // get exports from corresponding ts file
+      const defaultExport = getDefaultExportOfSourceFile(tc, source)
+      const relPath = path.relative(compDir, tsFullPath)
       const adapterImportLine =
         "import type * as glassEaselMiniprogramAdapter from 'glass-easel-miniprogram-adapter'"
+      // eslint-disable-next-line no-nested-ternary
       const tsImportLine = defaultExport
-        ? `import type component from './${relPath}'`
-        : 'declare const component: any'
+        ? `import type _component_ from './${escapeJsString(relPath)}'`
+        : 'declare const _component_: _UnknownElement_'
       const dataLine = `
-declare const data: typeof component extends glassEaselMiniprogramAdapter.behavior.ComponentType<infer TData, infer TProperty, any, any, any>
+declare const data: typeof _component_ extends glassEaselMiniprogramAdapter.behavior.ComponentType<infer TData, infer TProperty, any, any, any>
   ? glassEaselMiniprogramAdapter.component.AllData<TData, TProperty>
   : Record<string, never>`
       const methodsLine = `
-declare const methods: typeof component extends glassEaselMiniprogramAdapter.behavior.ComponentType<any, any, infer TMethod, any, any>
+declare const methods: typeof _component_ extends glassEaselMiniprogramAdapter.behavior.ComponentType<any, any, infer TMethod, any, any>
   ? TMethod
   : Record<string, never>`
+
+      // get exports from using components
+      const propertiesHelperLine = `
+type _Properties_<T> = T extends glassEaselMiniprogramAdapter.behavior.ComponentType<any, infer TProperty, any, any, any>
+  ? glassEaselMiniprogramAdapter.component.PropertyValues<TProperty>
+  : Record<never, never>`
+      let usingComponentsImports = ''
+      const usingComponensItems = [] as string[]
+      const usingComponents = this.projectDirManager.getUsingComponents(compFullPath)
+      Object.entries(usingComponents).forEach(([tagName, compPath]) => {
+        const source = program.getSourceFile(`${compPath}.ts`)
+        if (!source) return
+        const defaultExport = getDefaultExportOfSourceFile(tc, source)
+        if (!defaultExport) return
+        const relPath = path.relative(compDir, compPath)
+        const entryName = tagName.replace(/-/g, '_')
+        usingComponentsImports += `import type ${entryName} from './${escapeJsString(relPath)}'\n`
+        usingComponensItems.push(`'${tagName}': _Properties_<typeof ${entryName}>;\n`)
+      })
+
       // TODO tags types
-      const tagsLine = 'declare const tags: { [other: string]: any }'
-      return [adapterImportLine, tsImportLine, dataLine, methodsLine, tagsLine, ''].join('\n')
+      const unknownElementLine = this.options.strictMode
+        ? 'interface _UnknownElement_ {}'
+        : 'type _UnknownElement_ = Record<string, any>'
+      const tagsLine = `
+declare const tags: {
+${usingComponensItems.join('')}[other: string]: _UnknownElement_ }`
+      return [
+        adapterImportLine,
+        unknownElementLine,
+        tsImportLine,
+        usingComponentsImports,
+        propertiesHelperLine,
+        dataLine,
+        methodsLine,
+        tagsLine,
+        '',
+      ].join('\n')
     }
 
     // report diagnostics about compiler options

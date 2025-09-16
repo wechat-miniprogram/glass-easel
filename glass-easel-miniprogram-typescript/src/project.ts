@@ -1,29 +1,68 @@
-import fs from 'node:fs'
 import path from 'node:path'
 import * as ts from 'typescript'
 import { type TmplConvertedExpr, TmplGroup } from 'glass-easel-template-compiler'
 import { VirtualFileSystem } from './virtual_fs'
 
-// determine if a path (relative to the code root) is a component
-const isCompPath = (fullPath: string): boolean => {
-  try {
-    const json = fs.readFileSync(`${fullPath}.json`, { encoding: 'utf8' })
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const parsed = JSON.parse(json)
-    if (
-      typeof parsed === 'object' &&
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      (parsed.component === true || typeof parsed.usingComponents === 'object')
-    ) {
-      return true
-    }
-  } catch (e) {
-    /* empty */
-  }
-  return false
+type ComponentJsonData = {
+  jsonFileVersion: number
+  usingComponents: Record<string, string>
+  placeholders: Record<string, string>
+  // IDEA support generics by special type declaration
 }
 
-export const isWxmlFile = (fullPath: string): boolean => path.extname(fullPath) === '.wxml'
+const parseCompJson = (
+  projectRootPath: string,
+  fullPath: string,
+  json: string,
+  jsonFileVersion: number,
+): ComponentJsonData | null => {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  const parsed = JSON.parse(json)
+  if (
+    typeof parsed === 'object' &&
+    parsed !== null &&
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    (parsed.component === true || typeof parsed.usingComponents === 'object')
+  ) {
+    const isValidKey = (key: string): boolean => /^[a-zA-Z][a-zA-Z0-9-_]*$/.test(key)
+    const ret: ComponentJsonData = {
+      jsonFileVersion,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      usingComponents: Object.create(null),
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      placeholders: Object.create(null),
+    }
+    const relPath = path.relative(projectRootPath, fullPath)
+    const relPathDir = path.dirname(relPath)
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    Object.keys(parsed.usingComponents ?? 0).forEach((key) => {
+      if (!isValidKey(key)) return
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const p = String(parsed.usingComponents[key])
+      ret.usingComponents[key] = path.join(projectRootPath, path.resolve(relPathDir, p))
+    })
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    Object.keys(parsed.placeholders ?? 0).forEach((key) => {
+      if (!isValidKey(key)) return
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      ret.placeholders[key] = String(parsed.placeholders[key])
+    })
+    return ret
+  }
+  return null
+}
+
+const isWxmlFile = (fullPath: string): boolean => path.extname(fullPath) === '.wxml'
+
+const isJsonFile = (fullPath: string): boolean => path.extname(fullPath) === '.json'
+
+const isTsFile = (fullPath: string): boolean => path.extname(fullPath) === '.ts'
+
+const possibleComponentPath = (fullPath: string): string | null => {
+  const ext = path.extname(fullPath)
+  const isComp = ext === '.wxml' || ext === '.json' || ext === '.ts'
+  return isComp ? fullPath.slice(0, -ext.length) : null
+}
 
 export const getWxmlConvertedTsPath = (fullPath: string): string | null => {
   if (!isWxmlFile(fullPath)) return null
@@ -44,33 +83,67 @@ type ConvertedExprCache = {
 
 export class ProjectDirManager {
   readonly vfs: VirtualFileSystem
+  private readonly rootPath: string
   private tmplGroup = new TmplGroup()
-  private entranceWxmlFiles = Object.create(null) as Record<string, true>
+  private trackingComponents = Object.create(null) as Record<string, ComponentJsonData>
   private convertedExprCache = Object.create(null) as Record<string, ConvertedExprCache>
   onEntranceFileAdded: (fullPath: string) => void = () => {}
   onEntranceFileRemoved: (fullPath: string) => void = () => {}
-  onTrackedFileRemoved: (fullPath: string) => void = () => {}
-  onTrackedFileUpdated: (fullPath: string) => void = () => {}
+  onConvertedExprCacheInvalidated: (wxmlFullPath: string) => void = () => {}
+  // onTrackedFileRemoved: (fullPath: string) => void = () => {}
+  // onTrackedFileUpdated: (fullPath: string) => void = () => {}
 
   constructor(rootPath: string, autoTrackAllComponents: boolean, firstScanCallback: () => void) {
+    this.rootPath = rootPath
     this.vfs = new VirtualFileSystem(rootPath, firstScanCallback)
     this.vfs.onFileFound = (fullPath) => {
       if (!autoTrackAllComponents) return
       if (isWxmlFile(fullPath)) {
-        if (isCompPath(fullPath.slice(0, -5))) {
-          this.vfs.trackFile(fullPath)
-          this.entranceWxmlFiles[fullPath] = true
-          this.onEntranceFileAdded(fullPath)
-        }
+        this.updateComponentJsonData(fullPath)
       }
     }
     this.vfs.onTrackedFileUpdated = (fullPath) => {
-      this.removeConvertedExprCache(fullPath)
-      this.onTrackedFileUpdated(fullPath)
+      const compPath = possibleComponentPath(fullPath)
+      if (compPath !== null) {
+        if (isJsonFile(fullPath)) {
+          this.removeConvertedExprCache(`${compPath}.wxml`)
+          const isComp = !!this.trackingComponents[compPath]
+          const newIsComp = this.updateComponentJsonData(fullPath) !== null
+          if (!isComp && newIsComp) {
+            this.onEntranceFileAdded(`${compPath}.wxml`)
+          } else if (isComp && !newIsComp) {
+            this.onEntranceFileRemoved(`${compPath}.wxml`)
+          }
+        } else if (isTsFile(fullPath)) {
+          this.removeConvertedExprCache(`${compPath}.wxml`)
+          this.forEachDirectDependantComponents(compPath, (compPath) => {
+            this.removeConvertedExprCache(`${compPath}.wxml`)
+          })
+        } else {
+          this.removeConvertedExprCache(fullPath)
+        }
+      }
+      // this.onTrackedFileUpdated(fullPath)
     }
     this.vfs.onTrackedFileRemoved = (fullPath) => {
-      this.removeConvertedExprCache(fullPath)
-      this.onTrackedFileRemoved(fullPath)
+      const compPath = possibleComponentPath(fullPath)
+      if (compPath !== null) {
+        if (isJsonFile(fullPath)) {
+          this.removeConvertedExprCache(`${compPath}.wxml`)
+          const isComp = !!this.trackingComponents[compPath]
+          if (isComp) {
+            this.onEntranceFileRemoved(`${compPath}.wxml`)
+          }
+        } else if (isTsFile(fullPath)) {
+          this.removeConvertedExprCache(`${compPath}.wxml`)
+          this.forEachDirectDependantComponents(compPath, (compPath) => {
+            this.removeConvertedExprCache(`${compPath}.wxml`)
+          })
+        } else {
+          this.removeConvertedExprCache(fullPath)
+        }
+      }
+      // this.onTrackedFileRemoved(fullPath)
     }
   }
 
@@ -80,12 +153,8 @@ export class ProjectDirManager {
     return this.vfs.stop()
   }
 
-  getEntranceWxmlFiles() {
-    return Object.keys(this.entranceWxmlFiles)
-  }
-
   getFileContent(fullPath: string): string | null {
-    return this.vfs.trackFile(fullPath)?.content ?? null
+    return this.vfs.trackFile(fullPath)
   }
 
   removeConvertedExprCache(fullPath: string) {
@@ -94,13 +163,14 @@ export class ProjectDirManager {
       if (ce) {
         delete this.convertedExprCache[fullPath]
         ce.expr.free()
+        this.onConvertedExprCacheInvalidated(fullPath)
       }
     }
   }
 
   getWxmlConvertedExpr(
     wxmlFullPath: string,
-    tsExportsGetter: (fullPath: string, importTargetFullPath: string) => string,
+    wxmlEnvGetter: (fullPath: string, importTargetFullPath: string) => string,
   ): string | null {
     const tsFullPath = `${wxmlFullPath.slice(0, -5)}.ts`
     const tsVersion = this.getFileVersion(tsFullPath) ?? -1
@@ -115,8 +185,9 @@ export class ProjectDirManager {
     this.tmplGroup.addTmpl(relPath, content)
     const expr = this.tmplGroup.getTmplConvertedExpr(
       relPath,
-      tsExportsGetter(tsFullPath, wxmlFullPath),
+      wxmlEnvGetter(tsFullPath, wxmlFullPath),
     )
+    console.info(`!!! CONV ${wxmlFullPath}\n${expr.code()}\n`)
     this.convertedExprCache[wxmlFullPath] = {
       expr,
       source: ts.createSourceFile(wxmlFullPath, content, ts.ScriptTarget.Latest),
@@ -156,38 +227,86 @@ export class ProjectDirManager {
 
   getFileTsContent(
     fullPath: string,
-    tsExportsGetter: (fullPath: string, importTargetFullPath: string) => string,
+    wxmlEnvGetter: (tsFullPath: string, wxmlFullPath: string) => string,
   ): string | null {
     const p = getWxmlTsPathReverted(fullPath)
     if (p !== null) {
-      return this.getWxmlConvertedExpr(p, tsExportsGetter)
+      return this.getWxmlConvertedExpr(p, wxmlEnvGetter)
     }
     return this.getFileContent(fullPath)
   }
 
   getFileVersion(fullPath: string): number | null {
-    return this.vfs.trackFile(fullPath)?.version ?? null
+    return this.vfs.getTrackedFileVersion(fullPath)
+  }
+
+  private readComponentJsonData(compPath: string): ComponentJsonData | null {
+    if (compPath === null) return null
+    const json = this.vfs.trackFile(`${compPath}.json`)
+    const version = this.getFileVersion(`${compPath}.json`)!
+    if (json === null) return null
+    let compConfig: ComponentJsonData | null
+    try {
+      compConfig = parseCompJson(this.rootPath, `${compPath}.json`, json, version)
+    } catch {
+      return null
+    }
+    if (compConfig === null) return null
+    return compConfig
+  }
+
+  private updateComponentJsonData(fullPath: string): string | null {
+    const compPath = possibleComponentPath(fullPath)
+    if (compPath === null) return null
+    const version = this.getFileVersion(`${compPath}.json`)
+    if (version !== null && version === this.trackingComponents[compPath]?.jsonFileVersion) {
+      return compPath
+    }
+    const compJson = this.readComponentJsonData(compPath)
+    if (compJson !== null) {
+      this.trackingComponents[compPath] = compJson
+    } else {
+      delete this.trackingComponents[compPath]
+      return null
+    }
+    return compPath
+  }
+
+  private forEachDirectDependantComponents(compPath: string, f: (dep: string) => void) {
+    Object.keys(this.trackingComponents).forEach((p) => {
+      const comp = this.trackingComponents[p]!
+      if (Object.values(comp.usingComponents).includes(compPath)) {
+        f(p)
+      }
+    })
+  }
+
+  getUsingComponents(compPath: string): Record<string, string> {
+    const comp = this.trackingComponents[compPath]
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    if (!comp) return Object.create(null)
+    return comp.usingComponents
+  }
+
+  listTrackingComponents() {
+    return Object.keys(this.trackingComponents)
   }
 
   openFile(fullPath: string, content: string) {
-    if (isWxmlFile(fullPath)) {
+    if (possibleComponentPath(fullPath) !== null) {
       this.vfs.overrideFileContent(fullPath, content)
-      this.entranceWxmlFiles[fullPath] = true
-      this.onEntranceFileAdded(fullPath)
     }
   }
 
   updateFile(fullPath: string, content: string) {
-    if (this.entranceWxmlFiles[fullPath]) {
+    if (this.vfs.isFileContentOverridden(fullPath)) {
       this.vfs.overrideFileContent(fullPath, content)
     }
   }
 
   closeFile(fullPath: string) {
-    if (this.entranceWxmlFiles[fullPath]) {
-      delete this.entranceWxmlFiles[fullPath]
+    if (this.vfs.isFileContentOverridden(fullPath)) {
       this.vfs.cancelOverrideFileContent(fullPath)
-      this.onEntranceFileRemoved(fullPath)
     }
   }
 }
