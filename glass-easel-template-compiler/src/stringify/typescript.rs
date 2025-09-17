@@ -40,7 +40,13 @@ pub(crate) fn generate_tmpl_converted_expr(tree: &Template, ts_env: &str, runtim
         // TODO tree.globals.includes
 
         for tmpl in tree.globals.sub_templates.iter() {
-            tmpl.content.converted_expr_write(w)?;
+            wrap_brace_block(w, &tmpl.tag_location, |w| {
+                let pos = tmpl.tag_location.start.0.start;
+                w.write_line(|w| {
+                    write_token_series(["const ", "data", ":", "any", "=", "0", ";"], &(pos..pos), w)
+                })?;
+                tmpl.content.converted_expr_write(w)
+            })?;
         }
         tree.content.converted_expr_write(w)
     }).unwrap();
@@ -130,7 +136,7 @@ fn write_dynamic_value<'s, 't, W: FmtWrite>(x: &Value, w: &mut StringifierBlock<
 fn write_slot_value_refs<'s, 't, W: FmtWrite>(slot_value_refs: &[StaticAttribute], w: &mut StringifierBlock<'s, 't, W>) -> FmtResult {
     // IDEA impl slot value typing
     for attr in slot_value_refs {
-        let scope_name = w.add_scope(&attr.name.name);
+        let scope_name = w.add_scope(&attr.value.name);
         let var_name = format!("_scope_{}", scope_name);
         w.write_line(|w| {
             write_token_series(["const "], &(attr.name.location.start..attr.name.location.start), w)?;
@@ -155,7 +161,7 @@ fn write_event_method<'s, 't, W: FmtWrite>(name: &Ident, value: &Option<Value>, 
             } else {
                 value.converted_expr_write(w)?;
             }
-            w.write_token(";", None, &(pos..pos))
+            write_token_series([";"], &(pos..pos), w)
         })?;
     }
     Ok(())
@@ -333,7 +339,7 @@ impl ConvertedExprWriteBlock for Element {
                         write_token_series(["const "], &item_name.0, w)?;
                         w.write_token_state(&item_scope_name, Some(&item_name.1.name), &item_name.1.location, StringifierLineState::Normal)?;
                         write_token_series(
-                            ["=", "0", " as ", "unknown", " as ", "_ForItem", "<", "typeof ", "_for_", ">", ";"],
+                            ["=", "0", " as ", "unknown", " as ", "_ForItem_", "<", "typeof ", "_for_", ">", ";"],
                             &(item_name.0.end..item_name.0.end),
                             w,
                         )
@@ -342,21 +348,23 @@ impl ConvertedExprWriteBlock for Element {
                         write_token_series(["const "], &index_name.0, w)?;
                         w.write_token_state(&index_scope_name, Some(&index_name.1.name), &index_name.1.location, StringifierLineState::Normal)?;
                         write_token_series(
-                            ["=", "0", " as ", "unknown", " as ", "_ForIndex", "<", "typeof ", "_for_", ">", ";"],
+                            ["=", "0", " as ", "unknown", " as ", "_ForIndex_", "<", "typeof ", "_for_", ">", ";"],
                             &(item_name.0.end..item_name.0.end),
                             w,
                         )
                     })?;
-                    w.write_line(|w| {
-                        write_token_series(
-                            ["var ", "_string_or_number_", ":", "string", "|", "number", "=", "0", " as ", "unknown", " as ", "_ForKey_", "<", "typeof ", "_for_", ","],
-                            &(key.0.start..key.0.start),
-                            w,
-                        )?;
-                        let name_str = crate::escape::gen_lit_str(&key.1.name);
-                        w.write_token_state(&name_str, Some(&key.1.name), &key.1.location, StringifierLineState::Normal)?;
-                        write_token_series([">", ";"], &(key.0.end..key.0.end), w)
-                    })?;
+                    if !key.1.name.is_empty() {
+                        w.write_line(|w| {
+                            write_token_series(
+                                ["var ", "_string_or_number_", ":", "string", "|", "number", "=", "0", " as ", "unknown", " as ", "_ForKey_", "<", "typeof ", "_for_", ","],
+                                &(key.0.start..key.0.start),
+                                w,
+                            )?;
+                            let name_str = crate::escape::gen_lit_str(&key.1.name);
+                            w.write_token_state(&name_str, Some(&key.1.name), &key.1.location, StringifierLineState::Normal)?;
+                            write_token_series([">", ";"], &(key.0.end..key.0.end), w)
+                        })?;
+                    }
                     children.converted_expr_write(w)
                 })?;
             }
@@ -424,6 +432,10 @@ impl ConvertedExprWriteInline for Expression {
     fn converted_expr_write<'s, 't, 'u, W: FmtWrite>(&self, w: &mut StringifierLine<'s, 't, 'u, W>) -> FmtResult {
         fn filter<'s, 't, 'u, W: FmtWrite>(expr: &Expression, w: &mut StringifierLine<'s, 't, 'u, W>, accept_level: ExpressionLevel) -> Result<bool, std::fmt::Error> {
             match expr {
+                Expression::ScopeRef { location, index } => {
+                    w.write_scope_name("_scope_", *index, location)?;
+                    Ok(false)
+                }
                 Expression::DataField { name, location } => {
                     if ExpressionLevel::Member > accept_level {
                         w.write_token_state("(", Some(""), location, StringifierLineState::ParenStart)?;
@@ -707,5 +719,230 @@ mod test {
         assert_eq!(find_token(&sm, 0, 47), Some((0, 6)));
     }
 
-    // TODO more tests
+    #[test]
+    fn element_id() {
+        let src = r#"<view id="{{ a }}" />"#;
+        let expect = r#"{const _tag_=tags['view'];data.a;}"#;
+        let (out, sm) = convert(src);
+        assert_eq!(out, expect);
+        assert_eq!(find_token(&sm, 0, 26), Some((0, 13)));
+        assert_eq!(find_token(&sm, 0, 31), Some((0, 13)));
+    }
+
+    #[test]
+    fn element_slot() {
+        let src = r#"<view slot="{{ a }}" />"#;
+        let expect = r#"{const _tag_=tags['view'];data.a;}"#;
+        let (out, sm) = convert(src);
+        assert_eq!(out, expect);
+        assert_eq!(find_token(&sm, 0, 26), Some((0, 15)));
+        assert_eq!(find_token(&sm, 0, 31), Some((0, 15)));
+    }
+
+    #[test]
+    fn element_data() {
+        let src = r#"<view data:a="{{ a }}" />"#;
+        let expect = r#"{const _tag_=tags['view'];data.a;}"#;
+        let (out, sm) = convert(src);
+        assert_eq!(out, expect);
+        assert_eq!(find_token(&sm, 0, 26), Some((0, 17)));
+        assert_eq!(find_token(&sm, 0, 31), Some((0, 17)));
+    }
+
+    #[test]
+    fn element_mark() {
+        let src = r#"<view mark:a="{{ a }}" />"#;
+        let expect = r#"{const _tag_=tags['view'];data.a;}"#;
+        let (out, sm) = convert(src);
+        assert_eq!(out, expect);
+        assert_eq!(find_token(&sm, 0, 26), Some((0, 17)));
+        assert_eq!(find_token(&sm, 0, 31), Some((0, 17)));
+    }
+
+    #[test]
+    fn element_event() {
+        let src = r#"<view bind:a="b" />"#;
+        let expect = r#"{const _tag_=tags['view'];var _event_:Function=methods.b;}"#;
+        let (out, sm) = convert(src);
+        assert_eq!(out, expect);
+        assert_eq!(find_token(&sm, 0, 26), Some((0, 11)));
+        assert_eq!(find_token(&sm, 0, 30), Some((0, 11)));
+        assert_eq!(find_token(&sm, 0, 38), Some((0, 11)));
+        assert_eq!(find_token(&sm, 0, 47), Some((0, 11)));
+        assert_eq!(find_token(&sm, 0, 55), Some((0, 14)));
+    }
+
+    #[test]
+    fn element_worklet() {
+        let src = r#"<view worklet:a="b" />"#;
+        let expect = r#"{const _tag_=tags['view'];var _event_:Function=methods.b;}"#;
+        let (out, sm) = convert(src);
+        assert_eq!(out, expect);
+        assert_eq!(find_token(&sm, 0, 26), Some((0, 14)));
+        assert_eq!(find_token(&sm, 0, 30), Some((0, 14)));
+        assert_eq!(find_token(&sm, 0, 38), Some((0, 14)));
+        assert_eq!(find_token(&sm, 0, 47), Some((0, 14)));
+        assert_eq!(find_token(&sm, 0, 55), Some((0, 17)));
+    }
+
+    #[test]
+    fn element_slot_values() {
+        let src = r#"<view slot:a="b" slot:c hidden="{{ b + c }}" />"#;
+        let expect = r#"{const _tag_=tags['view'];const _scope_b:any=0;const _scope_c:any=0;_tag_.hidden=_scope_b+_scope_c;}"#;
+        let (out, sm) = convert(src);
+        assert_eq!(out, expect);
+        assert_eq!(find_token(&sm, 0, 26), Some((0, 11)));
+        assert_eq!(find_token(&sm, 0, 32), Some((0, 11)));
+        assert_eq!(find_token(&sm, 0, 41), Some((0, 12)));
+        assert_eq!(find_token(&sm, 0, 45), Some((0, 12)));
+        assert_eq!(find_token(&sm, 0, 53), Some((0, 22)));
+    }
+
+    #[test]
+    fn element_let_vars() {
+        let src = r#"<view let:a="{{ x }}" />"#;
+        let expect = r#"{const _tag_=tags['view'];const _scope_a=data.x;}"#;
+        let (out, sm) = convert(src);
+        assert_eq!(out, expect);
+        assert_eq!(find_token(&sm, 0, 32), Some((0, 10)));
+        assert_eq!(find_token(&sm, 0, 38), Some((0, 10)));
+        assert_eq!(find_token(&sm, 0, 41), Some((0, 16)));
+        assert_eq!(find_token(&sm, 0, 46), Some((0, 16)));
+    }
+
+    #[test]
+    fn element_scope_with_scripts() {
+        let src = r#"<view let:a="{{ b.c() }}" /><wxs module="b">;</wxs>"#;
+        let expect = r#"{const _tag_=tags['view'];const _scope_a=_scope_b?.c?.();}"#;
+        let (out, sm) = convert(src);
+        assert_eq!(out, expect);
+        assert_eq!(find_token(&sm, 0, 32), Some((0, 10)));
+        assert_eq!(find_token(&sm, 0, 41), Some((0, 16)));
+    }
+
+    #[test]
+    fn pure_element_scopes() {
+        let src = r#"<block let:a="{{ b }}" slot:b>{{ a }}</block>"#;
+        let expect = r#"{const _scope_b:any=0;const _scope_a=_scope_b;_scope_a;}"#;
+        let (out, sm) = convert(src);
+        assert_eq!(out, expect);
+        assert_eq!(find_token(&sm, 0, 7), Some((0, 28)));
+        assert_eq!(find_token(&sm, 0, 28), Some((0, 11)));
+        assert_eq!(find_token(&sm, 0, 37), Some((0, 17)));
+        assert_eq!(find_token(&sm, 0, 46), Some((0, 33)));
+    }
+
+    #[test]
+    fn pure_element_slot() {
+        let src = r#"<block slot="{{ a }}" />"#;
+        let expect = r#"{data.a;}"#;
+        let (out, sm) = convert(src);
+        assert_eq!(out, expect);
+        assert_eq!(find_token(&sm, 0, 1), Some((0, 16)));
+        assert_eq!(find_token(&sm, 0, 6), Some((0, 16)));
+    }
+
+    #[test]
+    fn slot_tag_id() {
+        let src = r#"<slot id="{{ a }}" />"#;
+        let expect = r#"{data.a;}"#;
+        let (out, sm) = convert(src);
+        assert_eq!(out, expect);
+        assert_eq!(find_token(&sm, 0, 1), Some((0, 13)));
+        assert_eq!(find_token(&sm, 0, 6), Some((0, 13)));
+    }
+
+    #[test]
+    fn slot_tag_slot() {
+        let src = r#"<slot slot="{{ a }}" />"#;
+        let expect = r#"{data.a;}"#;
+        let (out, sm) = convert(src);
+        assert_eq!(out, expect);
+        assert_eq!(find_token(&sm, 0, 1), Some((0, 15)));
+        assert_eq!(find_token(&sm, 0, 6), Some((0, 15)));
+    }
+
+    #[test]
+    fn slot_tag_data() {
+        let src = r#"<slot data:a="{{ a }}" />"#;
+        let expect = r#"{data.a;}"#;
+        let (out, sm) = convert(src);
+        assert_eq!(out, expect);
+        assert_eq!(find_token(&sm, 0, 1), Some((0, 17)));
+        assert_eq!(find_token(&sm, 0, 6), Some((0, 17)));
+    }
+
+    #[test]
+    fn slot_tag_mark() {
+        let src = r#"<slot mark:a="{{ a }}" />"#;
+        let expect = r#"{data.a;}"#;
+        let (out, sm) = convert(src);
+        assert_eq!(out, expect);
+        assert_eq!(find_token(&sm, 0, 1), Some((0, 17)));
+        assert_eq!(find_token(&sm, 0, 6), Some((0, 17)));
+    }
+
+    #[test]
+    fn slot_tag_event() {
+        let src = r#"<slot bind:a="b" />"#;
+        let expect = r#"{var _event_:Function=methods.b;}"#;
+        let (out, sm) = convert(src);
+        assert_eq!(out, expect);
+        assert_eq!(find_token(&sm, 0, 1), Some((0, 11)));
+        assert_eq!(find_token(&sm, 0, 5), Some((0, 11)));
+        assert_eq!(find_token(&sm, 0, 13), Some((0, 11)));
+        assert_eq!(find_token(&sm, 0, 22), Some((0, 11)));
+        assert_eq!(find_token(&sm, 0, 30), Some((0, 14)));
+    }
+
+    #[test]
+    fn slot_value_definition() {
+        let src = r#"<slot a="{{ b }}" />"#;
+        let expect = r#"{data.b;}"#;
+        let (out, sm) = convert(src);
+        assert_eq!(out, expect);
+        assert_eq!(find_token(&sm, 0, 1), Some((0, 12)));
+        assert_eq!(find_token(&sm, 0, 6), Some((0, 12)));
+    }
+
+    #[test]
+    fn for_element_scopes() {
+        let src = r#"<view wx:for="{{ list }}" wx:for-item="v" wx:for-index="k" wx:key="id" hidden="{{ k && v }}" />"#;
+        let expect = r#"{const _for_=data.list;const v=0 as unknown as _ForItem_<typeof _for_>;const k=0 as unknown as _ForIndex_<typeof _for_>;var _string_or_number_:string|number=0 as unknown as _ForKey_<typeof _for_,"id">;{const _tag_=tags['view'];_tag_.hidden=_scope_k&&_scope_v;}}"#;
+        let (out, sm) = convert(src);
+        assert_eq!(out, expect);
+        assert_eq!(find_token(&sm, 0, 1), Some((0, 6)));
+        assert_eq!(find_token(&sm, 0, 7), Some((0, 6)));
+        assert_eq!(find_token(&sm, 0, 13), Some((0, 17)));
+        assert_eq!(find_token(&sm, 0, 18), Some((0, 17)));
+        assert_eq!(find_token(&sm, 0, 23), Some((0, 26)));
+        assert_eq!(find_token(&sm, 0, 29), Some((0, 39)));
+        assert_eq!(find_token(&sm, 0, 71), Some((0, 42)));
+        assert_eq!(find_token(&sm, 0, 77), Some((0, 56)));
+        assert_eq!(find_token(&sm, 0, 120), Some((0, 59)));
+        assert_eq!(find_token(&sm, 0, 196), Some((0, 67)));
+        assert_eq!(find_token(&sm, 0, 202), Some((0, 1)));
+    }
+
+    #[test]
+    fn if_branches() {
+        let src = r#"<block wx:if="{{ a }}" /><block wx:elif="{{ b }}" /><block wx:else />"#;
+        let expect = r#"data.a;data.b;"#;
+        let (out, sm) = convert(src);
+        assert_eq!(out, expect);
+        assert_eq!(find_token(&sm, 0, 0), Some((0, 17)));
+        assert_eq!(find_token(&sm, 0, 5), Some((0, 17)));
+        assert_eq!(find_token(&sm, 0, 7), Some((0, 44)));
+        assert_eq!(find_token(&sm, 0, 12), Some((0, 44)));
+    }
+
+    #[test]
+    fn sub_template_definition() {
+        let src = r#"<template name="a">{{ b }}</template>"#;
+        let expect = r#"{const data:any=0;data.b;}"#;
+        let (out, sm) = convert(src);
+        assert_eq!(out, expect);
+        assert_eq!(find_token(&sm, 0, 18), Some((0, 22)));
+        assert_eq!(find_token(&sm, 0, 23), Some((0, 22)));
+    }
 }

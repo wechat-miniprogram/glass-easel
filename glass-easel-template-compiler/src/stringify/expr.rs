@@ -94,7 +94,7 @@ pub(super) fn expression_strigify_write<W: FmtWrite>(
     }
     match expression {
         Expression::ScopeRef { location, index } => {
-            stringifier.write_scope_name(*index, location)?;
+            stringifier.write_scope_name("", *index, location)?;
         }
         Expression::DataField { name, location } => {
             stringifier.write_token_state(

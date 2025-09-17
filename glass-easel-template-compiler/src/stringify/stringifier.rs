@@ -237,11 +237,13 @@ impl<'s, 't, 'u, W: FmtWrite> StringifierLine<'s, 't, 'u, W> {
 
     pub(super) fn write_scope_name(
         &mut self,
+        prefix: &str,
         index: usize,
         location: &Range<Position>,
     ) -> FmtResult {
-        let name = self.block.get_scope_name(index).to_string();
-        self.write_token_state(&name, Some(&name), location, StringifierLineState::Normal)
+        let name = format!("{}{}", prefix, self.block.get_scope_name(index));
+        let src_name = self.block.get_scope_name(index).to_string();
+        self.write_token_state(&name, Some(&src_name), location, StringifierLineState::Normal)
     }
 
     pub(super) fn write_token(
