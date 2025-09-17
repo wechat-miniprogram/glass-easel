@@ -1,5 +1,5 @@
 import { parseArgs } from 'util'
-import { DiagnosticLevel, formatDiagnostic, Server } from './server'
+import { type Diagnostic, DiagnosticLevel, formatDiagnostic, Server } from './server'
 
 const { values } = parseArgs({
   args: process.argv.slice(2),
@@ -17,33 +17,57 @@ const { values } = parseArgs({
       type: 'boolean',
       short: 's',
     },
+    watch: {
+      type: 'boolean',
+      short: 'w',
+    },
   },
   strict: true,
 })
 
+const logDiagnostic = (diag: Diagnostic) => {
+  // eslint-disable-next-line no-console
+  if (diag.level === DiagnosticLevel.Error) {
+    // eslint-disable-next-line no-console
+    console.error(formatDiagnostic(diag))
+  } else if (diag.level === DiagnosticLevel.Warning) {
+    // eslint-disable-next-line no-console
+    console.warn(formatDiagnostic(diag))
+  } else if (diag.level === DiagnosticLevel.Info) {
+    // eslint-disable-next-line no-console
+    console.info(formatDiagnostic(diag))
+  } else {
+    // eslint-disable-next-line no-console
+    console.log(formatDiagnostic(diag))
+  }
+}
+
 const server = new Server({
   projectPath: values.path,
-  reportTypeScriptDiagnostics: true,
   scanAllComponents: true,
   verboseMessages: values.verbose,
   strictMode: true,
-  onNewDiagnostics(diag) {
-    // eslint-disable-next-line no-console
-    if (diag.level === DiagnosticLevel.Error) {
-      // eslint-disable-next-line no-console
-      console.error(formatDiagnostic(diag))
-    } else if (diag.level === DiagnosticLevel.Warning) {
-      // eslint-disable-next-line no-console
-      console.warn(formatDiagnostic(diag))
-    } else if (diag.level === DiagnosticLevel.Info) {
-      // eslint-disable-next-line no-console
-      console.info(formatDiagnostic(diag))
-    } else {
-      // eslint-disable-next-line no-console
-      console.log(formatDiagnostic(diag))
+  onFirstScanDone() {
+    let success = true
+    this.getConfigErrors().forEach((diag) => {
+      success = false
+      logDiagnostic(diag)
+    })
+    if (success) {
+      this.listTrackingComponents().forEach((compPath) => {
+        const diags = this.analyzeWxmlFile(`${compPath}.wxml`)
+        if (diags.length) success = false
+        diags.forEach(logDiagnostic)
+      })
+    }
+    if (!values.watch) {
+      server.end()
+      if (!success) process.exit(1)
     }
   },
-  onFirstScanDone() {
-    server.end()
+  onDiagnosticsNeedUpdate(fullPath: string) {
+    if (!values.watch) return
+    const diags = this.analyzeWxmlFile(fullPath)
+    diags.forEach(logDiagnostic)
   },
 })

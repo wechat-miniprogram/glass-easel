@@ -84,9 +84,9 @@ export const getWxmlTsPathReverted = (fullPath: string): string | null => {
 }
 
 type ConvertedExprCache = {
-  expr: TmplConvertedExpr
-  source: ts.SourceFile
-  tsVersion: number
+  expr?: TmplConvertedExpr
+  source?: ts.SourceFile
+  version: number
 }
 
 export class ProjectDirManager {
@@ -94,7 +94,7 @@ export class ProjectDirManager {
   private readonly rootPath: string
   private tmplGroup = new TmplGroup()
   private trackingComponents = Object.create(null) as Record<string, ComponentJsonData>
-  private convertedExprCache = Object.create(null) as Record<string, ConvertedExprCache>
+  private convertedExpr = Object.create(null) as Record<string, ConvertedExprCache>
   onEntranceFileAdded: (fullPath: string) => void = () => {}
   onEntranceFileRemoved: (fullPath: string) => void = () => {}
   onConvertedExprCacheInvalidated: (wxmlFullPath: string) => void = () => {}
@@ -106,8 +106,15 @@ export class ProjectDirManager {
     this.vfs = new VirtualFileSystem(rootPath, firstScanCallback)
     this.vfs.onFileFound = (fullPath) => {
       if (!autoTrackAllComponents) return
-      if (isWxmlFile(fullPath)) {
-        this.updateComponentJsonData(fullPath)
+      const compPath = possibleComponentPath(fullPath)
+      if (compPath !== null) {
+        if (isJsonFile(fullPath)) {
+          const isComp = !!this.trackingComponents[compPath]
+          const newIsComp = this.updateComponentJsonData(fullPath) !== null
+          if (!isComp && newIsComp) {
+            this.onEntranceFileAdded(`${compPath}.wxml`)
+          }
+        }
       }
     }
     this.vfs.onTrackedFileUpdated = (fullPath) => {
@@ -156,7 +163,7 @@ export class ProjectDirManager {
   }
 
   stop() {
-    Object.values(this.convertedExprCache).forEach((ce) => ce.expr.free())
+    Object.values(this.convertedExpr).forEach((ce) => ce.expr?.free())
     this.tmplGroup.free()
     return this.vfs.stop()
   }
@@ -167,10 +174,12 @@ export class ProjectDirManager {
 
   removeConvertedExprCache(fullPath: string) {
     if (isWxmlFile(fullPath)) {
-      const ce = this.convertedExprCache[fullPath]
+      const ce = this.convertedExpr[fullPath]
       if (ce) {
-        delete this.convertedExprCache[fullPath]
-        ce.expr.free()
+        ce.expr?.free()
+        ce.expr = undefined
+        ce.source = undefined
+        ce.version += 1
         this.onConvertedExprCacheInvalidated(fullPath)
       }
     }
@@ -181,10 +190,17 @@ export class ProjectDirManager {
     wxmlEnvGetter: (fullPath: string, importTargetFullPath: string) => string,
   ): string | null {
     const tsFullPath = `${wxmlFullPath.slice(0, -5)}.ts`
-    const tsVersion = this.getFileVersion(tsFullPath) ?? -1
-    const cache = this.convertedExprCache[wxmlFullPath]
-    if (cache && cache.tsVersion === tsVersion) {
+    let cache = this.convertedExpr[wxmlFullPath]
+    if (cache?.expr) {
       return cache.expr.code() ?? ''
+    }
+    if (!cache) {
+      cache = {
+        expr: undefined,
+        source: undefined,
+        version: 1,
+      }
+      this.convertedExpr[wxmlFullPath] = cache
     }
     const content = this.getFileContent(wxmlFullPath)
     if (!content) return null
@@ -195,12 +211,9 @@ export class ProjectDirManager {
       relPath,
       wxmlEnvGetter(tsFullPath, wxmlFullPath),
     )
-    console.info(`!!! CONV ${wxmlFullPath}\n${expr.code()}\n`)
-    this.convertedExprCache[wxmlFullPath] = {
-      expr,
-      source: ts.createSourceFile(wxmlFullPath, content, ts.ScriptTarget.Latest),
-      tsVersion,
-    }
+    cache.expr = expr
+    cache.source = ts.createSourceFile(wxmlFullPath, content, ts.ScriptTarget.Latest)
+    cache.version += 1
     return expr.code() ?? ''
   }
 
@@ -217,7 +230,7 @@ export class ProjectDirManager {
     endLine: number
     endCol: number
   } | null {
-    const arr = this.convertedExprCache[wxmlFullPath]?.expr.getSourceLocation(
+    const arr = this.convertedExpr[wxmlFullPath]?.expr?.getSourceLocation(
       startLine,
       startCol,
       endLine,
@@ -225,7 +238,7 @@ export class ProjectDirManager {
     )
     if (!arr) return null
     return {
-      source: this.convertedExprCache[wxmlFullPath]!.source,
+      source: this.convertedExpr[wxmlFullPath]!.source!,
       startLine: arr[0]!,
       startCol: arr[1]!,
       endLine: arr[2]!,
@@ -245,6 +258,10 @@ export class ProjectDirManager {
   }
 
   getFileVersion(fullPath: string): number | null {
+    const p = getWxmlTsPathReverted(fullPath)
+    if (p !== null) {
+      return this.convertedExpr[p]?.version ?? 0
+    }
     return this.vfs.getTrackedFileVersion(fullPath)
   }
 

@@ -109,7 +109,6 @@ export class VirtualFileSystem {
     entry.contentOutdated = false
     if (entry.overriddenContent === null) {
       entry.version += 1
-      this.onTrackedFileUpdated(fullPath)
     }
     return entry
   }

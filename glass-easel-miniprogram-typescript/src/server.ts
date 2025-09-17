@@ -1,7 +1,7 @@
 import path from 'node:path'
 import * as ts from 'typescript'
 import chalk from 'chalk'
-import { getWxmlConvertedTsPath, getWxmlTsPathReverted, ProjectDirManager } from './project'
+import { getWxmlConvertedTsPath, ProjectDirManager } from './project'
 
 export type Position = {
   line: number
@@ -103,8 +103,6 @@ const getDefaultExportOfSourceFile = (
 export type ServerOptions = {
   /** the path of the project root */
   projectPath: string
-  /** whether to report diagnostics in TypeScript files */
-  reportTypeScriptDiagnostics?: boolean
   /** whether to print verbose messages */
   verboseMessages?: boolean
   /** whether to find diagnostics in all components on startup */
@@ -113,8 +111,8 @@ export type ServerOptions = {
   strictMode?: boolean
   /** the callback when the first scan is done */
   onFirstScanDone?: (this: Server) => void
-  /** the callback when new diagnostics are found */
-  onNewDiagnostics?: (diag: Diagnostic) => void
+  /** the callback when diagnostics need update */
+  onDiagnosticsNeedUpdate?: (this: Server, fullPath: string) => void
 }
 
 export class Server {
@@ -124,6 +122,7 @@ export class Server {
   private projectDirManager: ProjectDirManager
   private rootFilePaths: string[]
   private rootFilePathsVersion: number
+  private configErrors: ts.Diagnostic[]
 
   constructor(options: ServerOptions) {
     this.options = options
@@ -134,29 +133,7 @@ export class Server {
       this.projectPath,
       options.scanAllComponents || false,
       () => {
-        const rootFullPaths: string[] = []
-
-        // collect all entrance files
-        if (options.scanAllComponents) {
-          this.projectDirManager.listTrackingComponents().forEach((compPath) => {
-            const tsPath = `${compPath}.ts`
-            const tsContent = this.projectDirManager.getFileContent(tsPath)
-            if (tsContent !== null) {
-              rootFullPaths.push(tsPath)
-            }
-            this.analyzeWxmlFile(`${compPath}.wxml`)
-          })
-        }
-
-        // run all ts files
-        if (this.options.reportTypeScriptDiagnostics) {
-          rootFullPaths.forEach((fullPath) => {
-            this.analyzeTsFile(fullPath)
-          })
-        }
-
-        // callback
-        this.options?.onFirstScanDone?.call(this)
+        this.options.onFirstScanDone?.call(this)
       },
     )
     this.projectDirManager.onEntranceFileAdded = (fullPath) => {
@@ -179,8 +156,9 @@ export class Server {
       }
     }
     this.projectDirManager.onConvertedExprCacheInvalidated = (wxmlFullPath) => {
-      // TODO clear prev errors
-      this.analyzeWxmlFile(wxmlFullPath)
+      this.logVerboseMessage(`Component WXML needs update: ${wxmlFullPath}`)
+      this.rootFilePathsVersion += 1
+      this.options.onDiagnosticsNeedUpdate?.call(this, wxmlFullPath)
     }
 
     // initialize ts language service
@@ -205,10 +183,6 @@ export class Server {
         // undefined,
         // [{ extension: '.wxml', isMixedContent: true, scriptKind: ts.ScriptKind.TS }],
       )
-      config.errors.forEach((diag) => {
-        diag.file = configFile
-        this.diagnosticReporter(diag)
-      })
     } else {
       const compilerOptions = ts.getDefaultCompilerOptions()
       config = {
@@ -217,6 +191,7 @@ export class Server {
         errors: [],
       }
     }
+    this.configErrors = config.errors
     this.rootFilePaths = config.fileNames
     this.rootFilePathsVersion = 1
     const servicesHost: ts.LanguageServiceHost = {
@@ -354,11 +329,9 @@ ${usingComponensItems.join('')}[other: string]: UnknownElement }`
       ].join('\n')
     }
 
-    // report diagnostics about compiler options
+    // collect config errors
     const optionsDiag = this.tsLangService.getCompilerOptionsDiagnostics()
-    optionsDiag.forEach((diag) => {
-      this.diagnosticReporter(diag)
-    })
+    this.configErrors.push(...optionsDiag)
   }
 
   end() {
@@ -366,25 +339,54 @@ ${usingComponensItems.join('')}[other: string]: UnknownElement }`
     this.projectDirManager.stop()
   }
 
-  private analyzeTsFile(fullPath: string) {
-    const services = this.tsLangService
-    const diags = services.getSyntacticDiagnostics(fullPath)
-    if (!diags?.length) {
-      const diags = services.getSemanticDiagnostics(fullPath)
-      diags.forEach((diag) => {
-        this.diagnosticReporter(diag)
-      })
-      return
-    }
-    diags.forEach((diag) => {
-      this.diagnosticReporter(diag)
+  getConfigErrors(): Diagnostic[] {
+    const ret: Diagnostic[] = []
+    this.configErrors.forEach((diag) => {
+      const item = this.convDiagnostic(diag)
+      if (item) ret.push(item)
     })
+    return ret
   }
 
-  private analyzeWxmlFile(fullPath: string) {
+  analyzeTsFile(fullPath: string): Diagnostic[] {
+    const ret: Diagnostic[] = []
+    const services = this.tsLangService
+    const diags = services.getSyntacticDiagnostics(fullPath)
+    diags.forEach((diag) => {
+      const item = this.convDiagnostic(diag)
+      if (item) ret.push(item)
+    })
+    if (!diags.length) {
+      const diags = services.getSemanticDiagnostics(fullPath)
+      diags.forEach((diag) => {
+        const item = this.convDiagnostic(diag)
+        if (item) ret.push(item)
+      })
+    }
+    return ret
+  }
+
+  analyzeWxmlFile(fullPath: string): Diagnostic[] {
     const tsFullPath = getWxmlConvertedTsPath(fullPath)
-    if (tsFullPath === null) return
-    this.analyzeTsFile(tsFullPath)
+    if (tsFullPath === null) return []
+    const ret = this.analyzeTsFile(tsFullPath)
+    ret.forEach((diag) => {
+      const loc = this.projectDirManager.getWxmlSource(
+        fullPath,
+        diag.start.line,
+        diag.start.character,
+        diag.end.line,
+        diag.end.character,
+      )
+      diag.source = loc?.source ?? null
+      diag.start = { line: loc?.startLine ?? 0, character: loc?.startCol ?? 0 }
+      diag.end = { line: loc?.endLine ?? 0, character: loc?.endCol ?? 0 }
+    })
+    return ret
+  }
+
+  listTrackingComponents(): string[] {
+    return this.projectDirManager.listTrackingComponents()
   }
 
   private logVerboseMessage(message: string) {
@@ -395,30 +397,17 @@ ${usingComponensItems.join('')}[other: string]: UnknownElement }`
   }
 
   // eslint-disable-next-line class-methods-use-this
-  private diagnosticReporter(diagnostic: ts.Diagnostic) {
+  private convDiagnostic(diagnostic: ts.Diagnostic): Diagnostic | null {
     const file = diagnostic.file
-    if (!file) return
-    let start = file.getLineAndCharacterOfPosition(diagnostic.start ?? 0)
-    let end = file.getLineAndCharacterOfPosition((diagnostic.start ?? 0) + (diagnostic.length ?? 0))
-    const wxmlFullPath = getWxmlTsPathReverted(file.fileName)
-    let fileName: string
-    let source: ts.SourceFile | null
-    if (wxmlFullPath) {
-      fileName = wxmlFullPath
-      const loc = this.projectDirManager.getWxmlSource(
-        wxmlFullPath,
-        start.line,
-        start.character,
-        end.line,
-        end.character,
-      )
-      source = loc?.source ?? null
-      start = { line: loc?.startLine ?? 0, character: loc?.startCol ?? 0 }
-      end = { line: loc?.endLine ?? 0, character: loc?.endCol ?? 0 }
-    } else {
-      if (!this.options.reportTypeScriptDiagnostics) return
-      fileName = file.fileName
-      source = file
+    const start = file?.getLineAndCharacterOfPosition(diagnostic.start ?? 0) ?? {
+      line: 0,
+      character: 0,
+    }
+    const end = file?.getLineAndCharacterOfPosition(
+      (diagnostic.start ?? 0) + (diagnostic.length ?? 0),
+    ) ?? {
+      line: 0,
+      character: 0,
     }
     let level = DiagnosticLevel.Unknown
     if (diagnostic.category === ts.DiagnosticCategory.Error) {
@@ -430,7 +419,9 @@ ${usingComponensItems.join('')}[other: string]: UnknownElement }`
     } else if (diagnostic.category === ts.DiagnosticCategory.Message) {
       level = DiagnosticLevel.Note
     }
-    this.options.onNewDiagnostics?.({
+    const fileName = file?.fileName ?? ''
+    const source = file ?? null
+    return {
       file: fileName,
       source,
       start,
@@ -438,6 +429,18 @@ ${usingComponensItems.join('')}[other: string]: UnknownElement }`
       code: diagnostic.code,
       level,
       message: ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
-    })
+    }
+  }
+
+  openFile(fullPath: string, content: string) {
+    this.projectDirManager.openFile(fullPath, content)
+  }
+
+  updateFile(fullPath: string, content: string) {
+    this.projectDirManager.updateFile(fullPath, content)
+  }
+
+  closeFile(fullPath: string) {
+    this.projectDirManager.closeFile(fullPath)
   }
 }
