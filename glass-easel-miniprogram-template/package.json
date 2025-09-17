@@ -8,7 +8,8 @@
   },
   "dependencies": {
     "glass-easel": "workspace:*",
-    "glass-easel-miniprogram-adapter": "workspace:*"
+    "glass-easel-miniprogram-adapter": "workspace:*",
+    "glass-easel-miniprogram-typescript": "workspace:*"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^6.21.0",

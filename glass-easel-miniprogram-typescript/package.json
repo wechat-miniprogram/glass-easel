@@ -5,6 +5,9 @@
   "engines": {
     "node": ">=20.0.0"
   },
+  "bin": {
+    "miniprogram-typescript-check": "dist/cli.js"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/wechat-miniprogram/glass-easel.git"

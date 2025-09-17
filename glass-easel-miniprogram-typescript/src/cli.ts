@@ -4,6 +4,9 @@ import { type Diagnostic, DiagnosticLevel, formatDiagnostic, Server } from './se
 const { values } = parseArgs({
   args: process.argv.slice(2),
   options: {
+    help: {
+      type: 'boolean',
+    },
     path: {
       type: 'string',
       short: 'p',
@@ -24,6 +27,20 @@ const { values } = parseArgs({
   },
   strict: true,
 })
+
+if (values.help) {
+  // eslint-disable-next-line no-console
+  console.log(`Usage: miniprogram-typescript-check [options]
+
+Options:
+  -h, --help            Show this help message and exit
+  -p, --path <path>     The path of the mini-program project (default: .)
+  -w, --watch           Watch the project and analyze on change
+  -s, --strict          Enable strict mode (avoid using \`any\` types when possible)
+  -v, --verbose         Print verbose messages
+`)
+  process.exit(0)
+}
 
 const logDiagnostic = (diag: Diagnostic) => {
   // eslint-disable-next-line no-console
@@ -46,7 +63,7 @@ const server = new Server({
   projectPath: values.path,
   scanAllComponents: true,
   verboseMessages: values.verbose,
-  strictMode: true,
+  strictMode: values.strict,
   onFirstScanDone() {
     let success = true
     this.getConfigErrors().forEach((diag) => {

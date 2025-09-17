@@ -122,6 +122,9 @@ importers:
       glass-easel-miniprogram-adapter:
         specifier: workspace:*
         version: link:../glass-easel-miniprogram-adapter
+      glass-easel-miniprogram-typescript:
+        specifier: workspace:*
+        version: link:../glass-easel-miniprogram-typescript
     devDependencies:
       '@typescript-eslint/eslint-plugin':
         specifier: ^6.21.0
@@ -174,6 +177,9 @@ importers:
       chokidar:
         specifier: ^4.0.3
         version: 4.0.3
+      glass-easel-miniprogram-adapter:
+        specifier: workspace:*
+        version: link:../glass-easel-miniprogram-adapter
       glass-easel-stylesheet-compiler:
         specifier: workspace:*
         version: link:../glass-easel-stylesheet-compiler
