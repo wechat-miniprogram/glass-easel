@@ -2,16 +2,22 @@
 import nodeResolve from '@rollup/plugin-node-resolve'
 import typescript from '@rollup/plugin-typescript'
 import dts from 'rollup-plugin-dts'
+import terser from '@rollup/plugin-terser'
 
 const config = [
   {
     input: './src/view_controller',
-    output: [{ file: 'dist/view_controller.js', format: 'es' }],
+    output: [{ file: 'dist/view_controller.js', sourcemap: true, format: 'es' }],
     plugins: [
       nodeResolve({
         extensions: ['.ts', 'js'],
       }),
-      typescript(),
+      typescript({
+        sourceMap: true,
+      }),
+      terser({
+        sourceMap: true,
+      }),
     ],
   },
   {
@@ -26,12 +32,17 @@ const config = [
   },
   {
     input: './src/backend',
-    output: [{ file: 'dist/backend.js', format: 'es' }],
+    output: [{ file: 'dist/backend.js', sourcemap: true, format: 'es' }],
     plugins: [
       nodeResolve({
         extensions: ['.ts', 'js'],
       }),
-      typescript(),
+      typescript({
+        sourceMap: true,
+      }),
+      terser({
+        sourceMap: true,
+      }),
     ],
   },
   {

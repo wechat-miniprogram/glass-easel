@@ -103,6 +103,8 @@ if (jobs.length) {
     genConfig('dynamic', 'all', 'cjs', false),
     genConfig('dynamic', 'all.es', 'es', false),
     genConfig('dynamic', 'all.es', 'es', true),
+    genConfig('dynamic', 'all.global', 'iife', false),
+    genConfig('dynamic', 'all.global', 'iife', true),
   )
 }
 
