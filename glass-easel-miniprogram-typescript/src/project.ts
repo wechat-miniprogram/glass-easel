@@ -3,6 +3,11 @@ import * as ts from 'typescript'
 import { type TmplConvertedExpr, TmplGroup } from 'glass-easel-template-compiler'
 import { VirtualFileSystem } from './virtual_fs'
 
+export type Position = {
+  line: number
+  character: number
+}
+
 type ComponentJsonData = {
   jsonFileVersion: number
   usingComponents: Record<string, string>
@@ -98,67 +103,18 @@ export class ProjectDirManager {
   onEntranceFileAdded: (fullPath: string) => void = () => {}
   onEntranceFileRemoved: (fullPath: string) => void = () => {}
   onConvertedExprCacheInvalidated: (wxmlFullPath: string) => void = () => {}
-  // onTrackedFileRemoved: (fullPath: string) => void = () => {}
-  // onTrackedFileUpdated: (fullPath: string) => void = () => {}
 
-  constructor(rootPath: string, autoTrackAllComponents: boolean, firstScanCallback: () => void) {
+  constructor(rootPath: string, firstScanCallback: () => void) {
     this.rootPath = rootPath
     this.vfs = new VirtualFileSystem(rootPath, firstScanCallback)
     this.vfs.onFileFound = (fullPath) => {
-      if (!autoTrackAllComponents) return
-      const compPath = possibleComponentPath(fullPath)
-      if (compPath !== null) {
-        if (isJsonFile(fullPath)) {
-          const isComp = !!this.trackingComponents[compPath]
-          const newIsComp = this.updateComponentJsonData(fullPath) !== null
-          if (!isComp && newIsComp) {
-            this.onEntranceFileAdded(`${compPath}.wxml`)
-          }
-        }
-      }
+      this.handleFileOpened(fullPath)
     }
     this.vfs.onTrackedFileUpdated = (fullPath) => {
-      const compPath = possibleComponentPath(fullPath)
-      if (compPath !== null) {
-        if (isJsonFile(fullPath)) {
-          this.removeConvertedExprCache(`${compPath}.wxml`)
-          const isComp = !!this.trackingComponents[compPath]
-          const newIsComp = this.updateComponentJsonData(fullPath) !== null
-          if (!isComp && newIsComp) {
-            this.onEntranceFileAdded(`${compPath}.wxml`)
-          } else if (isComp && !newIsComp) {
-            this.onEntranceFileRemoved(`${compPath}.wxml`)
-          }
-        } else if (isTsFile(fullPath)) {
-          this.removeConvertedExprCache(`${compPath}.wxml`)
-          this.forEachDirectDependantComponents(compPath, (compPath) => {
-            this.removeConvertedExprCache(`${compPath}.wxml`)
-          })
-        } else {
-          this.removeConvertedExprCache(fullPath)
-        }
-      }
-      // this.onTrackedFileUpdated(fullPath)
+      this.handleFileUpdated(fullPath)
     }
     this.vfs.onTrackedFileRemoved = (fullPath) => {
-      const compPath = possibleComponentPath(fullPath)
-      if (compPath !== null) {
-        if (isJsonFile(fullPath)) {
-          this.removeConvertedExprCache(`${compPath}.wxml`)
-          const isComp = !!this.trackingComponents[compPath]
-          if (isComp) {
-            this.onEntranceFileRemoved(`${compPath}.wxml`)
-          }
-        } else if (isTsFile(fullPath)) {
-          this.removeConvertedExprCache(`${compPath}.wxml`)
-          this.forEachDirectDependantComponents(compPath, (compPath) => {
-            this.removeConvertedExprCache(`${compPath}.wxml`)
-          })
-        } else {
-          this.removeConvertedExprCache(fullPath)
-        }
-      }
-      // this.onTrackedFileRemoved(fullPath)
+      this.handleFileRemoved(fullPath)
     }
   }
 
@@ -166,6 +122,62 @@ export class ProjectDirManager {
     Object.values(this.convertedExpr).forEach((ce) => ce.expr?.free())
     this.tmplGroup.free()
     return this.vfs.stop()
+  }
+
+  private handleFileOpened(fullPath: string) {
+    const compPath = possibleComponentPath(fullPath)
+    if (compPath !== null) {
+      if (isJsonFile(fullPath)) {
+        const isComp = !!this.trackingComponents[compPath]
+        const newIsComp = this.updateComponentJsonData(fullPath) !== null
+        if (!isComp && newIsComp) {
+          this.onEntranceFileAdded(`${compPath}.wxml`)
+        }
+      }
+    }
+  }
+
+  private handleFileUpdated(fullPath: string) {
+    const compPath = possibleComponentPath(fullPath)
+    if (compPath !== null) {
+      if (isJsonFile(fullPath)) {
+        this.removeConvertedExprCache(`${compPath}.wxml`)
+        const isComp = !!this.trackingComponents[compPath]
+        const newIsComp = this.updateComponentJsonData(fullPath) !== null
+        if (!isComp && newIsComp) {
+          this.onEntranceFileAdded(`${compPath}.wxml`)
+        } else if (isComp && !newIsComp) {
+          this.onEntranceFileRemoved(`${compPath}.wxml`)
+        }
+      } else if (isTsFile(fullPath)) {
+        this.removeConvertedExprCache(`${compPath}.wxml`)
+        this.forEachDirectDependantComponents(compPath, (compPath) => {
+          this.removeConvertedExprCache(`${compPath}.wxml`)
+        })
+      } else {
+        this.removeConvertedExprCache(fullPath)
+      }
+    }
+  }
+
+  private handleFileRemoved(fullPath: string) {
+    const compPath = possibleComponentPath(fullPath)
+    if (compPath !== null) {
+      if (isJsonFile(fullPath)) {
+        this.removeConvertedExprCache(`${compPath}.wxml`)
+        const isComp = !!this.trackingComponents[compPath]
+        if (isComp) {
+          this.onEntranceFileRemoved(`${compPath}.wxml`)
+        }
+      } else if (isTsFile(fullPath)) {
+        this.removeConvertedExprCache(`${compPath}.wxml`)
+        this.forEachDirectDependantComponents(compPath, (compPath) => {
+          this.removeConvertedExprCache(`${compPath}.wxml`)
+        })
+      } else {
+        this.removeConvertedExprCache(fullPath)
+      }
+    }
   }
 
   getFileContent(fullPath: string): string | null {
@@ -215,6 +227,22 @@ export class ProjectDirManager {
     cache.source = ts.createSourceFile(wxmlFullPath, content, ts.ScriptTarget.Latest)
     cache.version += 1
     return expr.code() ?? ''
+  }
+
+  getTokenInfoAtPosition(
+    wxmlFullPath: string,
+    pos: Position,
+  ): { sourceStart: Position; sourceEnd: Position; dest: Position } | null {
+    const arr = this.convertedExpr[wxmlFullPath]?.expr?.getTokenAtSourcePosition(
+      pos.line,
+      pos.character,
+    )
+    if (!arr) return null
+    return {
+      sourceStart: { line: arr[0]!, character: arr[1]! },
+      sourceEnd: { line: arr[2]!, character: arr[3]! },
+      dest: { line: arr[4]!, character: arr[5]! },
+    }
   }
 
   getWxmlSource(
@@ -315,13 +343,16 @@ export class ProjectDirManager {
 
   getGenerics(compPath: string): string[] {
     const comp = this.trackingComponents[compPath]
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    if (!comp) return Object.create(null)
+    if (!comp) return []
     return comp.generics
   }
 
   listTrackingComponents() {
     return Object.keys(this.trackingComponents)
+  }
+
+  isComponentTracking(fullPath: string) {
+    return !!this.trackingComponents[possibleComponentPath(fullPath) ?? '']
   }
 
   openFile(fullPath: string, content: string) {
@@ -340,5 +371,9 @@ export class ProjectDirManager {
     if (this.vfs.isFileContentOverridden(fullPath)) {
       this.vfs.cancelOverrideFileContent(fullPath)
     }
+  }
+
+  isFileOpened(fullPath: string) {
+    return this.vfs.isFileContentOverridden(fullPath)
   }
 }

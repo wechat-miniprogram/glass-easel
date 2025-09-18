@@ -154,7 +154,8 @@ export class VirtualFileSystem {
   // Check if the file content is overridden
   isFileContentOverridden(fullPath: string) {
     const entry = this.getFileEntry(fullPath)
-    return entry?.overriddenContent !== null
+    if (!entry) return false
+    return entry.overriddenContent !== null
   }
 
   // Cancels the corresponding `overrideFileContent` operation

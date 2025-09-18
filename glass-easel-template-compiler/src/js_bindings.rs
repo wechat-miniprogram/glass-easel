@@ -225,24 +225,39 @@ impl TmplConvertedExpr {
 
     #[wasm_bindgen(js_name = "getSourceLocation")]
     pub fn get_source_location(&self, start_line: u32, start_col: u32, end_line: u32, end_col: u32) -> Option<Vec<u32>> {
-        fn adjust_line_col(token: &sourcemap::Token, req: (u32, u32)) -> (u32, u32) {
-            let dest_line = token.get_dst_line();
-            let dest_col = token.get_dst_col();
-            let src_line = token.get_src_line();
-            let src_col = token.get_src_col();
-            let diff_line = req.0 - dest_line;
-            let mut diff_col = req.1 - dest_col;
-            if let Some(src) = token.get_name() {
-                diff_col = diff_col.min(src.len() as u32);
-            }
-            (src_line + diff_line, if diff_line == 0 { src_col + diff_col } else { diff_col })
-        }
         let start = self.source_map.lookup_token(start_line, start_col)?;
-        let (ret0, ret1) = adjust_line_col(&start, (start_line, start_col));
+        let (ret0, ret1) = start.get_src();
+        if (start_line, start_col) == (end_line, end_col) {
+            return Some(vec![ret0, ret1, ret0, ret1]);
+        }
         let end_diff = if end_col > 0 { 1 } else { 0 };
-        let end = self.source_map.lookup_token(end_line, end_col - end_diff).unwrap_or(start);
-        let (ret2, ret3) = adjust_line_col(&end, (end_line, end_col - end_diff));
-        Some(vec![ret0, ret1, ret2, ret3 + end_diff])
+        let (ret2, ret3) = match self.source_map.lookup_token(end_line, end_col - end_diff) {
+            None => (ret0, ret1),
+            Some(token) => {
+                let line = token.get_src_line();
+                let col = token.get_src_col();
+                let len = token.get_name().map(|s| s.len() as u32).unwrap_or(0);
+                (line, col + len)
+            }
+        };
+        Some(vec![ret0, ret1, ret2, ret3])
+    }
+
+    #[wasm_bindgen(js_name = "getTokenAtSourcePosition")]
+    pub fn get_token_at_source_position(&self, line: u32, col: u32) -> Option<Vec<u32>> {
+        for token in self.source_map.tokens() {
+            let Some(name) = token.get_name() else { continue };
+            let (src_start_line, src_start_col) = token.get_src();
+            if src_start_line != line { continue };
+            let src_end_line = src_start_line;
+            let src_end_col = src_start_col + name.len() as u32;
+            if !(src_start_col..=src_end_col).contains(&col) {
+                continue;
+            }
+            let (dst_start_line, dst_start_col) = token.get_dst();
+            return Some(vec![src_start_line, src_start_col, src_end_line, src_end_col, dst_start_line, dst_start_col]);
+        }
+        None
     }
 }
 

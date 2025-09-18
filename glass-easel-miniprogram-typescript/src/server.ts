@@ -1,12 +1,7 @@
 import path from 'node:path'
 import * as ts from 'typescript'
 import chalk from 'chalk'
-import { getWxmlConvertedTsPath, ProjectDirManager } from './project'
-
-export type Position = {
-  line: number
-  character: number
-}
+import { getWxmlConvertedTsPath, type Position, ProjectDirManager } from './project'
 
 export const enum DiagnosticLevel {
   Unknown = 0,
@@ -105,8 +100,6 @@ export type ServerOptions = {
   projectPath: string
   /** whether to print verbose messages */
   verboseMessages?: boolean
-  /** whether to find diagnostics in all components on startup */
-  scanAllComponents?: boolean
   /** Whether to enable strict checks (avoid `any` type fallbacks) */
   strictMode?: boolean
   /** the callback when the first scan is done */
@@ -131,7 +124,6 @@ export class Server {
     // initialize virtual file system
     this.projectDirManager = new ProjectDirManager(
       this.projectPath,
-      options.scanAllComponents || false,
       () => {
         this.options.onFirstScanDone?.call(this)
       },
@@ -367,6 +359,7 @@ ${usingComponensItems.join('')}[other: string]: UnknownElement }`
   }
 
   analyzeWxmlFile(fullPath: string): Diagnostic[] {
+    if (!this.projectDirManager.isComponentTracking(fullPath)) return []
     const tsFullPath = getWxmlConvertedTsPath(fullPath)
     if (tsFullPath === null) return []
     const ret = this.analyzeTsFile(tsFullPath)
@@ -385,8 +378,33 @@ ${usingComponensItems.join('')}[other: string]: UnknownElement }`
     return ret
   }
 
+  // getWxmlSimpleCompletions(fullPath: string, position: Position): string[] {
+  //   const tsFullPath = getWxmlConvertedTsPath(fullPath)
+  //   if (tsFullPath === null) return []
+  //   const program = this.tsLangService.getProgram()
+  //   if (!program) return []
+  //   const source = program.getSourceFile(tsFullPath)
+  //   if (!source) return []
+  //   const tokenInfo = this.projectDirManager.getTokenInfoAtPosition(fullPath, position)
+  //   if (!tokenInfo) return []
+  //   if (
+  //     tokenInfo.sourceStart.line === tokenInfo.sourceEnd.line &&
+  //     tokenInfo.sourceStart.character === tokenInfo.sourceEnd.character
+  //   ) {
+  //     return []
+  //   }
+  //   const pos = source.getPositionOfLineAndCharacter(tokenInfo.dest.line, tokenInfo.dest.character)
+  //   const sourceText = source.getFullText(source)
+  //   console.info('!!! source', pos, sourceText)
+  //   sourceText.slice(pos - )
+  // }
+
   listTrackingComponents(): string[] {
     return this.projectDirManager.listTrackingComponents()
+  }
+
+  getTypeScriptServer(): ts.LanguageService {
+    return this.tsLangService
   }
 
   private logVerboseMessage(message: string) {
@@ -442,5 +460,9 @@ ${usingComponensItems.join('')}[other: string]: UnknownElement }`
 
   closeFile(fullPath: string) {
     this.projectDirManager.closeFile(fullPath)
+  }
+
+  isFileOpened(fullPath: string) {
+    return this.projectDirManager.isFileOpened(fullPath)
   }
 }

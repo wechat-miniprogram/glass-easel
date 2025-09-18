@@ -22,8 +22,10 @@
   },
   "homepage": "https://github.com/wechat-miniprogram/glass-easel",
   "main": "dist/index.js",
+  "types": "src/index.ts",
   "scripts": {
     "build": "tsc -p .",
+    "dev": "tsc -w -p .",
     "lint": "eslint src/**/*.ts",
     "start": "node dist/cli.js",
     "build-and-start": "npm run build && node dist/cli.js"

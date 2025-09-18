@@ -96,7 +96,7 @@ fn write_token_series<'s, 't, 'u, W: FmtWrite, const N: usize>(
     w: &mut StringifierLine<'s, 't, 'u, W>,
 ) -> FmtResult {
     for token in tokens {
-        w.write_token_state(token, Some(""), location, StringifierLineState::Normal)?;
+        w.write_token_state(token, None, location, StringifierLineState::Normal)?;
     }
     Ok(())
 }
@@ -109,13 +109,13 @@ fn write_let_vars<'s, 't, W: FmtWrite>(let_vars: &[Attribute], w: &mut Stringifi
             write_token_series(["const "], &(attr.name.location.start..attr.name.location.start), w)?;
             w.write_token_state(&var_name, Some(&attr.name.name), &attr.name.location, StringifierLineState::Normal)?;
             let pos = attr.name.location.end;
-            w.write_token_state("=", Some(""), &(pos..pos), StringifierLineState::Normal)?;
+            w.write_token_state("=", None, &(pos..pos), StringifierLineState::Normal)?;
             if let Some(value) = &attr.value {
                 value.converted_expr_write(w)?;
             } else {
                 w.write_token_state("undefined", None, &(pos..pos), StringifierLineState::Normal)?;
             }
-            w.write_token(";", None, &(pos..pos))
+            write_token_series([";"], &(pos..pos), w)
         })?;
     }
     Ok(())
@@ -128,7 +128,7 @@ fn write_dynamic_value<'s, 't, W: FmtWrite>(x: &Value, w: &mut StringifierBlock<
         w.write_line(|w| {
             x.converted_expr_write(w)?;
             let pos = x.location_end();
-            w.write_token(";", None, &(pos..pos))
+            write_token_series([";"], &(pos..pos), w)
         })
     }
 }
@@ -155,8 +155,8 @@ fn write_event_method<'s, 't, W: FmtWrite>(name: &Ident, value: &Option<Value>, 
             let pos = name.location.start;
             write_token_series(["var ", "_event_", ":", "Function", "="], &(pos..pos), w)?;
             if let Value::Static { value, location } = value {
-                w.write_token_state("methods", Some(""), &(pos..pos), StringifierLineState::Normal)?;
-                w.write_token_state(".", Some(""), &(pos..pos), StringifierLineState::Normal)?;
+                w.write_token_state("methods", None, &(pos..pos), StringifierLineState::Normal)?;
+                w.write_token_state(".", None, &(pos..pos), StringifierLineState::Normal)?;
                 w.write_token_state(&value, Some(&value), &location, StringifierLineState::Normal)?;
             } else {
                 value.converted_expr_write(w)?;
@@ -236,7 +236,7 @@ impl ConvertedExprWriteBlock for Element {
                                     write_token_series(["_tag_", "."], &(name.location.start..name.location.start), w)?;
                                     w.write_token_state(&attr_name, Some(&name.name), &name.location, StringifierLineState::Normal)?;
                                     let pos = name.location.end;
-                                    w.write_token_state("=", Some(""), &(pos..pos), StringifierLineState::Normal)?;
+                                    w.write_token_state("=", None, &(pos..pos), StringifierLineState::Normal)?;
                                     value.converted_expr_write(w)?;
                                     write_token_series([";"], &(pos..pos), w)
                                 }
@@ -411,7 +411,7 @@ impl ConvertedExprWriteInline for Value {
                 let mut prev_loc = None;
                 expression.for_each_static_or_dynamic_part::<std::fmt::Error>(|part, loc| {
                     if let Some(prev_loc) = prev_loc.take() {
-                        w.write_token_state("+", Some(""), &prev_loc, StringifierLineState::Normal)?;
+                        w.write_token_state("+", None, &prev_loc, StringifierLineState::Normal)?;
                     }
                     if let Expression::ToStringWithoutUndefined { value, location } = part {
                         value.converted_expr_write(w)?;
@@ -438,10 +438,10 @@ impl ConvertedExprWriteInline for Expression {
                 }
                 Expression::DataField { name, location } => {
                     if ExpressionLevel::Member > accept_level {
-                        w.write_token_state("(", Some(""), location, StringifierLineState::ParenStart)?;
+                        w.write_token_state("(", None, location, StringifierLineState::ParenStart)?;
                     }
-                    w.write_token_state("data", Some(""), location, StringifierLineState::Normal)?;
-                    w.write_token_state(".", Some(""), location, StringifierLineState::NoSpaceAround)?;
+                    w.write_token_state("data", None, location, StringifierLineState::Normal)?;
+                    w.write_token_state(".", None, location, StringifierLineState::NoSpaceAround)?;
                     w.write_token_state(
                         name,
                         Some(name),
@@ -449,14 +449,14 @@ impl ConvertedExprWriteInline for Expression {
                         StringifierLineState::Normal,
                     )?;
                     if ExpressionLevel::Member > accept_level {
-                        w.write_token_state(")", Some(""), location, StringifierLineState::ParenEnd)?;
+                        w.write_token_state(")", None, location, StringifierLineState::ParenEnd)?;
                     }
                     Ok(false)
                 }
                 Expression::StaticMember { obj, field_name, dot_location, field_location } => {
                     if ExpressionLevel::Member > accept_level {
                         let pos = obj.location_start();
-                        w.write_token_state("(", Some(""), &(pos..pos), StringifierLineState::ParenStart)?;
+                        w.write_token_state("(", None, &(pos..pos), StringifierLineState::ParenStart)?;
                     }
                     expression_strigify_write(obj, w, ExpressionLevel::Member, &filter)?;
                     w.write_token_state(
@@ -473,14 +473,14 @@ impl ConvertedExprWriteInline for Expression {
                     )?;
                     if ExpressionLevel::Member > accept_level {
                         let pos = field_location.end;
-                        w.write_token_state(")", Some(""), &(pos..pos), StringifierLineState::ParenEnd)?;
+                        w.write_token_state(")", None, &(pos..pos), StringifierLineState::ParenEnd)?;
                     }
                     Ok(false)
                 }
                 Expression::DynamicMember { obj, field_name, bracket_location } => {
                     if ExpressionLevel::Member > accept_level {
                         let pos = obj.location_start();
-                        w.write_token_state("(", Some(""), &(pos..pos), StringifierLineState::ParenStart)?;
+                        w.write_token_state("(", None, &(pos..pos), StringifierLineState::ParenStart)?;
                     }
                     expression_strigify_write(obj, w, ExpressionLevel::Member, &filter)?;
                     w.write_token_state(
@@ -498,14 +498,14 @@ impl ConvertedExprWriteInline for Expression {
                     )?;
                     if ExpressionLevel::Member > accept_level {
                         let pos = bracket_location.1.end;
-                        w.write_token_state(")", Some(""), &(pos..pos), StringifierLineState::ParenEnd)?;
+                        w.write_token_state(")", None, &(pos..pos), StringifierLineState::ParenEnd)?;
                     }
                     Ok(false)
                 }
                 Expression::FuncCall { func, args, paren_location } => {
                     if ExpressionLevel::Member > accept_level {
                         let pos = func.location_start();
-                        w.write_token_state("(", Some(""), &(pos..pos), StringifierLineState::ParenStart)?;
+                        w.write_token_state("(", None, &(pos..pos), StringifierLineState::ParenStart)?;
                     }
                     expression_strigify_write(func, w, ExpressionLevel::Member, &filter)?;
                     w.write_token_state(
@@ -528,7 +528,7 @@ impl ConvertedExprWriteInline for Expression {
                     )?;
                     if ExpressionLevel::Member > accept_level {
                         let pos = paren_location.1.end;
-                        w.write_token_state(")", Some(""), &(pos..pos), StringifierLineState::ParenEnd)?;
+                        w.write_token_state(")", None, &(pos..pos), StringifierLineState::ParenEnd)?;
                     }
                     Ok(false)
                 }
