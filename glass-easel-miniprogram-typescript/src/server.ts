@@ -21,66 +21,6 @@ export type Diagnostic = {
   message: string
 }
 
-export const formatDiagnostic = (diag: Diagnostic): string => {
-  // draw source lines
-  let sourceLines = ''
-  if (diag.source !== null) {
-    const lineStarts = diag.source.getLineStarts()
-    for (let i = diag.start.line; i <= diag.end.line; i += 1) {
-      const lineStart = lineStarts[i]
-      const lineEnd = lineStarts[i + 1]
-      const lineContent = diag.source.text.slice(lineStart, lineEnd).trimEnd().replace(/\t/g, ' ')
-      const lineNum = i + 1
-      const lineNumStr = lineNum.toString()
-      const emptyLineNumStr = ' '.repeat(lineNumStr.length)
-      const highlightStart = i === diag.start.line ? diag.start.character : 0
-      const highlightEnd = i === diag.end.line ? diag.end.character : lineContent.length
-      const highlightMark = ' '.repeat(highlightStart) + '~'.repeat(highlightEnd - highlightStart)
-      let highlight = chalk.blue(highlightMark)
-      if (diag.level === DiagnosticLevel.Error) {
-        highlight = chalk.red(highlightMark)
-      } else if (diag.level === DiagnosticLevel.Warning) {
-        highlight = chalk.yellow(highlightMark)
-      } else if (diag.level === DiagnosticLevel.Info) {
-        highlight = chalk.blue(highlightMark)
-      }
-      sourceLines += [
-        chalk.bgWhite.black(lineNumStr),
-        ' ',
-        chalk.white(lineContent),
-        '\n',
-        chalk.bgWhite.black(emptyLineNumStr),
-        ' ',
-        highlight,
-        '\n',
-      ].join('')
-    }
-  }
-
-  // draw other parts
-  let levelHint = chalk.blue('note')
-  if (diag.level === DiagnosticLevel.Error) {
-    levelHint = chalk.red('error')
-  } else if (diag.level === DiagnosticLevel.Warning) {
-    levelHint = chalk.yellow('warning')
-  } else if (diag.level === DiagnosticLevel.Info) {
-    levelHint = chalk.blue('info')
-  }
-  return [
-    chalk.cyan(path.relative(process.cwd(), diag.file)),
-    chalk.gray(':'),
-    chalk.white(diag.start.line + 1),
-    chalk.gray(':'),
-    chalk.white(diag.start.character + 1),
-    chalk.gray(' - '),
-    levelHint,
-    chalk.gray(` TS${diag.code}: `),
-    chalk.white(diag.message),
-    '\n\n',
-    sourceLines,
-  ].join('')
-}
-
 const getDefaultExportOfSourceFile = (
   tc: ts.TypeChecker,
   source: ts.SourceFile,
@@ -98,6 +38,8 @@ const getDefaultExportOfSourceFile = (
 export type ServerOptions = {
   /** the path of the project root */
   projectPath: string
+  /** the working directory */
+  workingDirectory?: string
   /** whether to print verbose messages */
   verboseMessages?: boolean
   /** Whether to enable strict checks (avoid `any` type fallbacks) */
@@ -111,6 +53,7 @@ export type ServerOptions = {
 export class Server {
   private options: ServerOptions
   private projectPath: string
+  private workingDirectory: string
   private tsLangService: ts.LanguageService
   private projectDirManager: ProjectDirManager
   private rootFilePaths: string[]
@@ -119,15 +62,13 @@ export class Server {
 
   constructor(options: ServerOptions) {
     this.options = options
-    this.projectPath = path.resolve(process.cwd(), options.projectPath)
+    this.workingDirectory = options.workingDirectory ?? process.cwd()
+    this.projectPath = path.resolve(this.workingDirectory, options.projectPath)
 
     // initialize virtual file system
-    this.projectDirManager = new ProjectDirManager(
-      this.projectPath,
-      () => {
-        this.options.onFirstScanDone?.call(this)
-      },
-    )
+    this.projectDirManager = new ProjectDirManager(this.projectPath, () => {
+      this.options.onFirstScanDone?.call(this)
+    })
     this.projectDirManager.onEntranceFileAdded = (fullPath) => {
       this.logVerboseMessage(`Opened component WXML: ${fullPath}`)
       const p = getWxmlConvertedTsPath(fullPath)
@@ -204,8 +145,8 @@ export class Server {
         if (content === null) return undefined
         return ts.ScriptSnapshot.fromString(content)
       },
-      getCurrentDirectory() {
-        return process.cwd()
+      getCurrentDirectory: () => {
+        return this.workingDirectory
       },
       getDefaultLibFileName(options) {
         return ts.getDefaultLibFilePath(options)
@@ -413,6 +354,66 @@ ${usingComponensItems.join('')}[other: string]: UnknownElement }`
       // eslint-disable-next-line no-console
       console.log(chalk.gray(message))
     }
+  }
+
+  formatDiagnostic(diag: Diagnostic): string {
+    // draw source lines
+    let sourceLines = ''
+    if (diag.source !== null) {
+      const lineStarts = diag.source.getLineStarts()
+      for (let i = diag.start.line; i <= diag.end.line; i += 1) {
+        const lineStart = lineStarts[i]
+        const lineEnd = lineStarts[i + 1]
+        const lineContent = diag.source.text.slice(lineStart, lineEnd).trimEnd().replace(/\t/g, ' ')
+        const lineNum = i + 1
+        const lineNumStr = lineNum.toString()
+        const emptyLineNumStr = ' '.repeat(lineNumStr.length)
+        const highlightStart = i === diag.start.line ? diag.start.character : 0
+        const highlightEnd = i === diag.end.line ? diag.end.character : lineContent.length
+        const highlightMark = ' '.repeat(highlightStart) + '~'.repeat(highlightEnd - highlightStart)
+        let highlight = chalk.blue(highlightMark)
+        if (diag.level === DiagnosticLevel.Error) {
+          highlight = chalk.red(highlightMark)
+        } else if (diag.level === DiagnosticLevel.Warning) {
+          highlight = chalk.yellow(highlightMark)
+        } else if (diag.level === DiagnosticLevel.Info) {
+          highlight = chalk.blue(highlightMark)
+        }
+        sourceLines += [
+          chalk.bgWhite.black(lineNumStr),
+          ' ',
+          chalk.white(lineContent),
+          '\n',
+          chalk.bgWhite.black(emptyLineNumStr),
+          ' ',
+          highlight,
+          '\n',
+        ].join('')
+      }
+    }
+
+    // draw other parts
+    let levelHint = chalk.blue('note')
+    if (diag.level === DiagnosticLevel.Error) {
+      levelHint = chalk.red('error')
+    } else if (diag.level === DiagnosticLevel.Warning) {
+      levelHint = chalk.yellow('warning')
+    } else if (diag.level === DiagnosticLevel.Info) {
+      levelHint = chalk.blue('info')
+    }
+    return [
+      chalk.cyan(path.relative(this.workingDirectory, diag.file)),
+      chalk.gray(':'),
+      chalk.white(diag.start.line + 1),
+      chalk.gray(':'),
+      chalk.white(diag.start.character + 1),
+      chalk.gray(' - '),
+      levelHint,
+      chalk.gray(` TS${diag.code}: `),
+      chalk.white(diag.message),
+      '\n\n',
+      sourceLines,
+    ].join('')
   }
 
   // eslint-disable-next-line class-methods-use-this
