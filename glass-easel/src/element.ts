@@ -2467,6 +2467,10 @@ export class Element implements NodeCast {
     }
   }
 
+  getListeners(): Record<string, (EventListenerOptions & { listener: EventListener<unknown> })[]> {
+    return this._$eventTarget.getListeners()
+  }
+
   /** Get an attribute value ( `null` if not set or removed) */
   getAttribute(name: string): unknown {
     if (!this._$nodeAttributes) return null

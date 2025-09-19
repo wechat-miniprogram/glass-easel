@@ -54,6 +54,7 @@ export {
   MutLevel as EventMutLevel,
   EventOptions,
   ShadowedEvent,
+  EventPhase,
 } from './event'
 export { ExternalShadowRoot } from './external_shadow_tree'
 export { FuncArr, GeneralFuncType, safeCallback } from './func_arr'
