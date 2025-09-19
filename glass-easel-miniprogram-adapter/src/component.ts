@@ -8,6 +8,7 @@ import { MediaQueryObserver } from './media_query'
 type DataList = typeUtils.DataList
 type PropertyList = typeUtils.PropertyList
 type MethodList = typeUtils.MethodList
+export type Empty = typeUtils.Empty
 export type PropertyValues<TProperty extends PropertyList> = typeUtils.PropertyValues<TProperty>
 export type AllData<
   TData extends DataList,

@@ -39,14 +39,14 @@ const parseCompJson = (
       placeholders: Object.create(null),
       generics: [],
     }
-    const relPath = path.relative(projectRootPath, fullPath)
-    const relPathDir = path.dirname(relPath)
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     Object.keys(parsed.usingComponents ?? 0).forEach((key) => {
       if (!isValidKey(key)) return
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       const p = String(parsed.usingComponents[key])
-      ret.usingComponents[key] = path.join(projectRootPath, path.resolve(relPathDir, p))
+      const basePath = p.startsWith('/') ? projectRootPath : path.dirname(fullPath)
+      const resolvedPath = path.join(basePath, ...p.split('/'))
+      ret.usingComponents[key] = resolvedPath
     })
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     Object.keys(parsed.placeholders ?? 0).forEach((key) => {
@@ -199,7 +199,7 @@ export class ProjectDirManager {
 
   getWxmlConvertedExpr(
     wxmlFullPath: string,
-    wxmlEnvGetter: (fullPath: string, importTargetFullPath: string) => string,
+    wxmlEnvGetter: (fullPath: string, importTargetFullPath: string) => string | null,
   ): string | null {
     const tsFullPath = `${wxmlFullPath.slice(0, -5)}.ts`
     let cache = this.convertedExpr[wxmlFullPath]
@@ -219,10 +219,9 @@ export class ProjectDirManager {
     const relPath = path.relative(this.vfs.rootPath, wxmlFullPath).split(path.sep).join('/')
     if (relPath.startsWith('../')) return null
     this.tmplGroup.addTmpl(relPath, content)
-    const expr = this.tmplGroup.getTmplConvertedExpr(
-      relPath,
-      wxmlEnvGetter(tsFullPath, wxmlFullPath),
-    )
+    const env = wxmlEnvGetter(tsFullPath, wxmlFullPath)
+    if (!env) return null
+    const expr = this.tmplGroup.getTmplConvertedExpr(relPath, env)
     cache.expr = expr
     cache.source = ts.createSourceFile(wxmlFullPath, content, ts.ScriptTarget.Latest)
     cache.version += 1
@@ -276,11 +275,11 @@ export class ProjectDirManager {
 
   getFileTsContent(
     fullPath: string,
-    wxmlEnvGetter: (tsFullPath: string, wxmlFullPath: string) => string,
+    wxmlEnvGetter: (tsFullPath: string, wxmlFullPath: string) => string | null,
   ): string | null {
     const p = getWxmlTsPathReverted(fullPath)
     if (p !== null) {
-      return this.getWxmlConvertedExpr(p, wxmlEnvGetter)
+      return this.getWxmlConvertedExpr(p, wxmlEnvGetter) ?? ''
     }
     return this.getFileContent(fullPath)
   }

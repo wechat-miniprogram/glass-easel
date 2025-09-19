@@ -119,7 +119,7 @@ export class Server {
 
   constructor(options: ServerOptions) {
     this.options = options
-    this.projectPath = path.join(process.cwd(), options.projectPath)
+    this.projectPath = path.resolve(process.cwd(), options.projectPath)
 
     // initialize virtual file system
     this.projectDirManager = new ProjectDirManager(
@@ -243,11 +243,11 @@ export class Server {
     this.tsLangService = ts.createLanguageService(servicesHost, docReg)
 
     // get the exports of a file
-    const wxmlEnvGetter = (tsFullPath: string, wxmlFullPath: string) => {
+    const wxmlEnvGetter = (tsFullPath: string, wxmlFullPath: string): string | null => {
       const program = this.tsLangService.getProgram()
-      if (!program) return ''
+      if (!program) return null
       const source = program.getSourceFile(tsFullPath)
-      if (!source) return ''
+      if (!source) return null
       const compFullPath = tsFullPath.slice(0, -3)
       const compDir = path.dirname(wxmlFullPath)
       const tc = program.getTypeChecker()
@@ -267,17 +267,17 @@ export class Server {
       const dataLine = `
 declare const data: typeof component extends glassEaselMiniprogramAdapter.behavior.ComponentType<infer TData, infer TProperty, any, any, any>
   ? glassEaselMiniprogramAdapter.component.AllData<TData, TProperty>
-  : Record<string, never>`
+  : { [k: string]: any }`
       const methodsLine = `
 declare const methods: typeof component extends glassEaselMiniprogramAdapter.behavior.ComponentType<any, any, infer TMethod, any, any>
   ? TMethod
-  : Record<string, never>`
+  : { [k: string]: any }`
 
       // get exports from using components
       const propertiesHelperLine = `
 type Properties<T> = T extends glassEaselMiniprogramAdapter.behavior.ComponentType<any, infer TProperty, any, any, any>
   ? glassEaselMiniprogramAdapter.component.PropertyValues<TProperty>
-  : Record<never, never>`
+  : glassEaselMiniprogramAdapter.component.Empty`
       let usingComponentsImports = ''
       const usingComponensItems = [] as string[]
       const usingComponents = this.projectDirManager.getUsingComponents(compFullPath)
@@ -303,7 +303,7 @@ type Properties<T> = T extends glassEaselMiniprogramAdapter.behavior.ComponentTy
       // compose tags types
       const unknownElementLine = this.options.strictMode
         ? 'interface UnknownElement {}'
-        : 'type UnknownElement = Record<string, any>'
+        : 'type UnknownElement = { [k: string]: any }'
       const tagsLine = `
 declare const tags: {
 ${usingComponensItems.join('')}[other: string]: UnknownElement }`
@@ -371,6 +371,7 @@ ${usingComponensItems.join('')}[other: string]: UnknownElement }`
         diag.end.line,
         diag.end.character,
       )
+      diag.file = diag.file === tsFullPath ? fullPath : diag.file
       diag.source = loc?.source ?? null
       diag.start = { line: loc?.startLine ?? 0, character: loc?.startCol ?? 0 }
       diag.end = { line: loc?.endLine ?? 0, character: loc?.endCol ?? 0 }
