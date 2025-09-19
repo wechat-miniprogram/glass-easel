@@ -23,7 +23,7 @@
   "peerDependencies": {
     "glass-easel": "workspace:*",
     "glass-easel-miniprogram-adapter": "workspace:*",
-    "webpack": "^5.85.0"
+    "webpack": "^5.101.3"
   },
   "dependencies": {
     "chalk": "4",
