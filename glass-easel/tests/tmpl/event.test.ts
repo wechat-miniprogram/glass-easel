@@ -17,22 +17,42 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       `,
       {},
       {
-        C: (elem, event, listener) => {
-          switch (event.getEventName()) {
-            case 'customEv': {
-              event.target = Object.assign(event.target, { id: 'b' })
-              return listener.apply(elem, [event])
-            }
-            case 'dropEvent': {
-              return undefined
-            }
+        C: (elem, evName, listener, final, mutated, capture, generalLvaluePath) => {
+          const hostMethodCaller = elem.ownerShadowRoot?.getHostNode().getMethodCaller()
+          expect(final).toBe(false)
+          expect(mutated).toBe(false)
+          expect(capture).toBe(false)
+          switch (evName) {
             case 'customHandler': {
-              const ret = (listener as any as typeof customHandler)(event.detail as number, 2)
-              expect(ret).toBe(3)
-              return undefined
+              expect(generalLvaluePath).toStrictEqual([
+                glassEasel.template.GeneralLvaluePathPrefix.InlineScript,
+                '',
+                'w',
+                'customHandler',
+              ])
+              break
             }
-            default: {
-              return listener.apply(elem, [event])
+            default:
+              expect(generalLvaluePath).toBe(undefined)
+          }
+          return (event) => {
+            expect(event.getEventName()).toBe(evName)
+            switch (evName) {
+              case 'customEv': {
+                event.target = Object.assign(event.target, { id: 'b' })
+                return listener.apply(hostMethodCaller, [event])
+              }
+              case 'dropEvent': {
+                return undefined
+              }
+              case 'customHandler': {
+                const ret = (listener as any as typeof customHandler)(event.detail as number, 2)
+                expect(ret).toBe(3)
+                return undefined
+              }
+              default: {
+                return listener.apply(hostMethodCaller, [event])
+              }
             }
           }
         },

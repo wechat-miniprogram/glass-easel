@@ -31,28 +31,42 @@ export type ChangePropListener<T> = (
 
 export type ChangePropFilter = <T>(
   listener: ChangePropListener<T>,
-  generalLvaluePath?: DataPath | null,
+  generalLvaluePath: DataPath | null | undefined,
+  elem: Element,
+  propName: string,
 ) => ChangePropListener<T>
 
 export interface EventListenerWrapper {
   <T>(
-    elem: GeneralComponent,
-    event: ShadowedEvent<T>,
+    elem: Element,
+    evName: string,
     listener: EventListener<T>,
+    final: boolean,
+    mutated: boolean,
+    capture: boolean,
     generalLvaluePath?: DataPath | null,
-  ): boolean | void
+  ): EventListener<T> | null
+  isEventListenerWrapper?: true
 }
 
 const emptyFilter = <T>(x: T) => x
 
-const defaultEventListenerWrapper: EventListenerWrapper = (elem, event, listener) =>
-  listener.apply(elem, [event])
+let defaultChangePropFilter: ChangePropFilter = <T>(x: T) => x
+export const setDefaultChangePropFilter = (fn: ChangePropFilter) => {
+  defaultChangePropFilter = fn
+}
+
+let defaultEventListenerWrapper: EventListenerWrapper = (elem, evName, listener) => (e) =>
+  listener.call(elem.ownerShadowRoot?.getHostNode().getMethodCaller(), e)
+export const setDefaultEventListenerWrapper = (fn: EventListenerWrapper) => {
+  defaultEventListenerWrapper = fn
+}
 
 type TmplArgs = {
   key?: number | string
   keyList?: RangeListManager
   dynEvListeners?: {
-    [name: string]: EventListener<unknown>
+    [name: string]: EventListener<unknown> | null
   }
   dynamicSlotNameMatched?: boolean
   changeProp?: {
@@ -183,7 +197,7 @@ export class ProcGenWrapper {
   procGen: ProcGen
   fallbackListenerOnNativeNode: boolean
   bindingMapDisabled = false
-  changePropFilter: ChangePropFilter = emptyFilter
+  changePropFilter: ChangePropFilter = defaultChangePropFilter
   eventListenerWrapper: EventListenerWrapper = defaultEventListenerWrapper
 
   constructor(shadowRoot: ShadowRoot, procGen: ProcGen, fallbackListenerOnNativeNode: boolean) {
@@ -1146,21 +1160,23 @@ export class ProcGenWrapper {
     generalLvaluePath?: DataPath | null,
   ) => {
     const handler = typeof v === 'function' ? v : dataValueToString(v)
-    const listener: EventListener<unknown> = (ev) => {
-      const host = elem.ownerShadowRoot!.getHostNode()
-      const methodCaller = host.getMethodCaller()
-      const f = typeof handler === 'function' ? handler : Component.getMethod(host, handler)
-      if (typeof f === 'function') {
-        return this.eventListenerWrapper(
-          methodCaller,
-          ev,
-          f as EventListener<unknown>,
-          generalLvaluePath,
-        )
-      }
-      return undefined
-    }
-    if (ENV.DEV) {
+    const listener = this.eventListenerWrapper(
+      elem,
+      evName,
+      function (this: any, ...args: any[]) {
+        const host = elem.ownerShadowRoot!.getHostNode()
+        const f = typeof handler === 'function' ? handler : Component.getMethod(host, handler)
+        if (typeof f === 'function') {
+          return f.call(this, ...args) as boolean | void
+        }
+        return undefined
+      },
+      final,
+      mutated,
+      capture,
+      generalLvaluePath,
+    )
+    if (listener) {
       Object.defineProperty(listener, 'name', {
         value: typeof handler === 'string' ? handler : handler.name,
       })
@@ -1179,7 +1195,7 @@ export class ProcGenWrapper {
       }
       dynEvListeners[evName] = listener
     }
-    if (handler) elem.addListener(evName, listener, evOptions)
+    if (handler && listener) elem.addListener(evName, listener, evOptions)
   }
 
   // update a property or external class of a component, or an attribute of a native node
@@ -1267,7 +1283,7 @@ export class ProcGenWrapper {
       tmplArgs.changeProp = Object.create(null) as typeof tmplArgs.changeProp
     }
     tmplArgs.changeProp![name] = {
-      listener: this.changePropFilter(v, generalLvaluePath),
+      listener: this.changePropFilter(v, generalLvaluePath, elem, name),
       oldValue: undefined,
     }
   }
