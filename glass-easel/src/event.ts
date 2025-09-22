@@ -75,6 +75,13 @@ export const enum FinalChanged {
   Mut,
 }
 
+export const enum EventPhase {
+  None,
+  CapturingPhase,
+  AtTarget,
+  BubblingPhase,
+}
+
 /** The target of an event */
 export class EventTarget<TEvents extends { [type: string]: unknown }> {
   listeners = Object.create(null) as {
@@ -162,6 +169,42 @@ export class EventTarget<TEvents extends { [type: string]: unknown }> {
     }
     return FinalChanged.NotChanged
   }
+
+  getListeners() {
+    const finalListeners = Object.create(null) as Record<
+      string,
+      (EventListenerOptions & { listener: EventListener<unknown> })[]
+    >
+    const resolveListeners = (
+      listeners: { [T in keyof TEvents]: EventFuncArr<TEvents[T]> },
+      capture: boolean,
+    ) => {
+      const names = Object.keys(listeners)
+      for (let i = 0; i < names.length; i += 1) {
+        const name = names[i]!
+        const efa = listeners[name] as EventFuncArr<unknown>
+        if (!finalListeners[name]) finalListeners[name] = []
+        const funcArr = efa.funcArr.getArr()
+        if (funcArr) {
+          for (let j = 0; j < funcArr.length; j += 1) {
+            const funcInfo = funcArr[j]!
+            finalListeners[name]!.push({
+              listener: funcInfo.f,
+              mutated: funcInfo.data === MutLevel.Mut,
+              final: funcInfo.data === MutLevel.Final,
+              capture,
+              useCapture: capture,
+            })
+          }
+        }
+      }
+    }
+    resolveListeners(this.listeners, false)
+    if (this.captureListeners) {
+      resolveListeners(this.captureListeners, false)
+    }
+    return finalListeners
+  }
 }
 
 export type ShadowedEvent<TDetail> = Required<Event<TDetail>> & {
@@ -177,6 +220,7 @@ export class Event<TDetail> {
   bubbles: boolean
   composed: boolean
   extraFields: Record<string, unknown> | undefined
+  eventPhase: EventPhase = EventPhase.None
   /** @internal */
   private _$eventName: string
   /** @internal */
@@ -193,6 +237,8 @@ export class Event<TDetail> {
   }
   /** @internal */
   private _$handleListenerReturn: ((ret: unknown) => boolean | void) | undefined
+  /** @internal */
+  private _$hasListener: boolean
 
   constructor(name: string, detail: TDetail, options: EventOptions = {}) {
     const ts = getCurrentTimeStamp()
@@ -209,6 +255,7 @@ export class Event<TDetail> {
     }
     this._$originalEvent = options.originalEvent
     this._$dispatched = false
+    this._$hasListener = false
     this._$handleListenerReturn = options.handleListenerReturn
     if (options.extraFields) {
       Object.assign(this, options.extraFields)
@@ -257,6 +304,10 @@ export class Event<TDetail> {
     return this._$eventBubblingControl.stopped
   }
 
+  hasListener() {
+    return this._$hasListener
+  }
+
   markMutated() {
     this._$eventBubblingControl.mutated = true
   }
@@ -267,6 +318,10 @@ export class Event<TDetail> {
 
   listenerReturnHandler() {
     return this._$handleListenerReturn
+  }
+
+  isCapturePhase() {
+    return this.eventPhase === EventPhase.CapturingPhase
   }
 
   callListener(
@@ -290,6 +345,7 @@ export class Event<TDetail> {
     const currentTargetCaller = isComponent(currentTarget)
       ? currentTarget.getMethodCaller() || currentTarget
       : currentTarget
+    this._$hasListener ||= efa.funcArr.hasFunc()
     const ev = this.wrapShadowedEvent(targetCaller, mark, currentTargetCaller)
     const ret = efa.funcArr.call(
       currentTargetCaller,
@@ -358,6 +414,7 @@ export class Event<TDetail> {
 
     // capture phase
     if (this._$capturePhase && !eventBubblingControl.stopped && !inExternalOnly) {
+      this.eventPhase = EventPhase.CapturingPhase
       const bubblingPath: [Element, Element, Record<string, unknown>][] = []
       forEachBubblePath(target, (currentTarget, target, mark) => {
         bubblingPath.push([currentTarget, target, mark])
@@ -370,6 +427,8 @@ export class Event<TDetail> {
         }
       }
     }
+
+    this.eventPhase = EventPhase.AtTarget
 
     // bubble phase in external component
     if (!eventBubblingControl.stopped && externalTarget) {
@@ -387,14 +446,19 @@ export class Event<TDetail> {
           sr.handleEvent(sr.slot, this)
         }
         atTarget = false
-        if (currentTarget._$eventTarget) {
+
+        this.eventPhase = EventPhase.BubblingPhase
+        if (currentTarget._$eventTarget && !eventBubblingControl.stopped) {
           this.callListener(currentTarget, mark, target, false)
         }
         return bubbles && !eventBubblingControl.stopped
       })
     }
 
+    this.eventPhase = EventPhase.None
+
     if (ENV.DEV) performanceMeasureEnd()
+    return this.getEventBubbleStatus()
   }
 
   static dispatchEvent<TDetail>(target: Element, event: Event<TDetail>) {
@@ -417,7 +481,7 @@ export class Event<TDetail> {
     options?: EventOptions,
   ) {
     const ev = new Event(name, detail, options)
-    Event.dispatchEvent(target, ev)
+    return Event.dispatchEvent(target, ev)
   }
 
   static triggerExternalEvent<TDetail>(
@@ -429,6 +493,6 @@ export class Event<TDetail> {
     options?: EventOptions,
   ) {
     const ev = new Event(name, detail, options)
-    Event.dispatchExternalEvent(component, target, ev)
+    return Event.dispatchExternalEvent(component, target, ev)
   }
 }

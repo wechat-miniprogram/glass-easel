@@ -7,7 +7,9 @@ export type GeneralFuncType = (this: any, ...args: any[]) => any
 
 export class FuncArr<F extends GeneralFuncType> {
   empty = true
+  /* @internal */
   private _$type: string
+  /* @internal */
   private _$arr: F[] | null = null
 
   constructor(type: string) {
@@ -42,7 +44,7 @@ export class FuncArr<F extends GeneralFuncType> {
   call(
     caller: ThisParameterType<F>,
     args: Parameters<F>,
-    relatedComponent?: AnyComponent,
+    relatedComponent?: AnyComponent | string,
   ): boolean {
     const arr = this._$arr
     let ret = true
@@ -63,6 +65,14 @@ export class FuncArrWithMeta<F extends GeneralFuncType, T> {
 
   constructor(type: string) {
     this._$type = type
+  }
+
+  getArr() {
+    return this._$arr
+  }
+
+  hasFunc() {
+    return this._$arr !== null && this._$arr.length > 0
   }
 
   add(func: F, data: T) {
