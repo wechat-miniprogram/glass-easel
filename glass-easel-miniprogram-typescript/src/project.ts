@@ -8,6 +8,11 @@ export type Position = {
   character: number
 }
 
+export type PositionRange = {
+  start: Position
+  end: Position
+}
+
 type ComponentJsonData = {
   jsonFileVersion: number
   usingComponents: Record<string, string>

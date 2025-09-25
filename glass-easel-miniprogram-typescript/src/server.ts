@@ -1,7 +1,13 @@
 import path from 'node:path'
 import * as ts from 'typescript'
 import chalk from 'chalk'
-import { getWxmlConvertedTsPath, type Position, ProjectDirManager } from './project'
+import {
+  getWxmlConvertedTsPath,
+  getWxmlTsPathReverted,
+  type Position,
+  type PositionRange,
+  ProjectDirManager,
+} from './project'
 
 export const enum DiagnosticLevel {
   Unknown = 0,
@@ -19,6 +25,12 @@ export type Diagnostic = {
   code: number
   level: DiagnosticLevel
   message: string
+}
+
+type LocationLink = {
+  originSelectionRange: PositionRange
+  targetUri: string
+  targetRange: PositionRange
 }
 
 const getDefaultExportOfSourceFile = (
@@ -198,7 +210,7 @@ export class Server {
 
       // get exports from corresponding ts file
       const defaultExport = getDefaultExportOfSourceFile(tc, source)
-      const relPath = path.relative(compDir, tsFullPath)
+      const relPath = path.relative(compDir, tsFullPath.slice(0, -3))
       const adapterImportLine =
         "import type * as glassEaselMiniprogramAdapter from 'glass-easel-miniprogram-adapter'"
       // eslint-disable-next-line no-nested-ternary
@@ -320,26 +332,148 @@ ${usingComponensItems.join('')}[other: string]: UnknownElement }`
     return ret
   }
 
-  // getWxmlSimpleCompletions(fullPath: string, position: Position): string[] {
-  //   const tsFullPath = getWxmlConvertedTsPath(fullPath)
-  //   if (tsFullPath === null) return []
-  //   const program = this.tsLangService.getProgram()
-  //   if (!program) return []
-  //   const source = program.getSourceFile(tsFullPath)
-  //   if (!source) return []
-  //   const tokenInfo = this.projectDirManager.getTokenInfoAtPosition(fullPath, position)
-  //   if (!tokenInfo) return []
-  //   if (
-  //     tokenInfo.sourceStart.line === tokenInfo.sourceEnd.line &&
-  //     tokenInfo.sourceStart.character === tokenInfo.sourceEnd.character
-  //   ) {
-  //     return []
-  //   }
-  //   const pos = source.getPositionOfLineAndCharacter(tokenInfo.dest.line, tokenInfo.dest.character)
-  //   const sourceText = source.getFullText(source)
-  //   console.info('!!! source', pos, sourceText)
-  //   sourceText.slice(pos - )
-  // }
+  private getWxmlSourcePos(
+    fullPath: string,
+    position: Position,
+  ): {
+    tsFullPath: string
+    sourceStart: Position
+    sourceEnd: Position
+    destStart: Position
+    dest: number
+  } | null {
+    const tsFullPath = getWxmlConvertedTsPath(fullPath)
+    if (tsFullPath === null) return null
+    const program = this.tsLangService.getProgram()
+    if (!program) return null
+    const source = program.getSourceFile(tsFullPath)
+    if (!source) return null
+    const tokenInfo = this.projectDirManager.getTokenInfoAtPosition(fullPath, position)
+    if (!tokenInfo) return null
+    if (
+      tokenInfo.sourceStart.line === tokenInfo.sourceEnd.line &&
+      tokenInfo.sourceStart.character === tokenInfo.sourceEnd.character
+    ) {
+      return null // ignore if the source range is empty (it is unimportant identifier in this case)
+    }
+    const dest = source.getPositionOfLineAndCharacter(tokenInfo.dest.line, tokenInfo.dest.character)
+    return {
+      tsFullPath,
+      sourceStart: tokenInfo.sourceStart,
+      sourceEnd: tokenInfo.sourceEnd,
+      destStart: tokenInfo.dest,
+      dest,
+    }
+  }
+
+  getWxmlHoverContent(fullPath: string, position: Position): string | null {
+    const tsFullPath = getWxmlConvertedTsPath(fullPath)
+    if (tsFullPath === null) return null
+    const pos = this.getWxmlSourcePos(fullPath, position)
+    if (pos === null) return null
+    const quickInfo = this.tsLangService.getQuickInfoAtPosition(tsFullPath, pos.dest)
+    return ts.displayPartsToString(quickInfo?.displayParts ?? [])
+  }
+
+  private toLocationLink(
+    originSelectionRange: PositionRange,
+    refInfo: ts.DocumentSpan,
+  ): LocationLink | null {
+    const program = this.tsLangService.getProgram()
+    if (!program) return null
+    const targetOrigUri = refInfo.fileName
+    const source = program.getSourceFile(targetOrigUri)
+    if (!source) return null
+    const targetRange = {
+      start: source.getLineAndCharacterOfPosition(refInfo.textSpan.start),
+      end: source.getLineAndCharacterOfPosition(refInfo.textSpan.start + refInfo.textSpan.length),
+    }
+    const targetWxmlUri = getWxmlTsPathReverted(targetOrigUri)
+    if (targetWxmlUri) {
+      const wxmlPosInfo = this.projectDirManager.getWxmlSource(
+        targetWxmlUri,
+        targetRange.start.line,
+        targetRange.start.character,
+        targetRange.end.line,
+        targetRange.end.character,
+      )
+      if (!wxmlPosInfo) return null
+      return {
+        originSelectionRange,
+        targetUri: targetWxmlUri,
+        targetRange: {
+          start: { line: wxmlPosInfo?.startLine ?? 0, character: wxmlPosInfo?.startCol ?? 0 },
+          end: { line: wxmlPosInfo?.endLine ?? 0, character: wxmlPosInfo?.endCol ?? 0 },
+        },
+      }
+    }
+    return {
+      originSelectionRange,
+      targetUri: targetOrigUri,
+      targetRange,
+    }
+  }
+
+  getWxmlDefinition(fullPath: string, position: Position): LocationLink[] | null {
+    const tsFullPath = getWxmlConvertedTsPath(fullPath)
+    if (tsFullPath === null) return null
+    const pos = this.getWxmlSourcePos(fullPath, position)
+    if (pos === null) return null
+    const list = this.tsLangService.getDefinitionAtPosition(tsFullPath, pos.dest)
+    if (!list) return null
+    const originSelectionRange = {
+      start: pos.sourceStart,
+      end: pos.sourceEnd,
+    }
+    const ret = list
+      .map((item) => this.toLocationLink(originSelectionRange, item))
+      .filter((x) => x !== null)
+    return ret as LocationLink[]
+  }
+
+  getWxmlReferences(fullPath: string, position: Position): LocationLink[] | null {
+    const tsFullPath = getWxmlConvertedTsPath(fullPath)
+    if (tsFullPath === null) return null
+    const pos = this.getWxmlSourcePos(fullPath, position)
+    if (pos === null) return null
+    const list = this.tsLangService.getReferencesAtPosition(tsFullPath, pos.dest)
+    if (!list) return null
+    const originSelectionRange = {
+      start: pos.sourceStart,
+      end: pos.sourceEnd,
+    }
+    const ret = list
+      .map((item) => this.toLocationLink(originSelectionRange, item))
+      .filter((x) => x !== null)
+    return ret as LocationLink[]
+  }
+
+  getWxmlCompletion(
+    fullPath: string,
+    position: Position,
+  ): { items: { label: string; kind: string; sortText: string }[]; isIncomplete: boolean } | null {
+    const tsFullPath = getWxmlConvertedTsPath(fullPath)
+    if (tsFullPath === null) return null
+    const pos = this.getWxmlSourcePos(fullPath, position)
+    if (pos === null) return null
+    const ret = this.tsLangService.getCompletionsAtPosition(tsFullPath, pos.dest, undefined)
+    if (!ret || ret.isGlobalCompletion || !ret.isMemberCompletion) return null
+    const items = ret.entries
+      .map((item) => {
+        if (item.hasAction) return null
+        if (item.isSnippet) return null
+        return {
+          label: item.name,
+          kind: item.kind,
+          sortText: item.sortText,
+        }
+      })
+      .filter((item) => item !== null) as { label: string; kind: string; sortText: string }[]
+    return {
+      items,
+      isIncomplete: ret.isIncomplete ?? false,
+    }
+  }
 
   listTrackingComponents(): string[] {
     return this.projectDirManager.listTrackingComponents()
