@@ -946,6 +946,7 @@ impl<'a> StringifyLine for ElementWithWx<'a> {
                 stringifier.write_str("block")?;
                 write_slot_and_slot_values(stringifier, &mut attr_list, slot, slot_value_refs);
                 for attr in let_vars.iter() {
+                    let scope_name = stringifier.add_scope(&attr.name.name);
                     let prefix = (
                         "let",
                         attr.prefix_location
@@ -955,7 +956,14 @@ impl<'a> StringifyLine for ElementWithWx<'a> {
                     );
                     attr_list.push(WriteAttrItem::Attr {
                         prefix: Some(prefix),
-                        name: Cow::Borrowed(&attr.name),
+                        name: if scope_name != &attr.name.name {
+                            Cow::Owned(Ident {
+                                name: scope_name.clone(),
+                                location: attr.name.location(),
+                            })
+                        } else {
+                            Cow::Borrowed(&attr.name)
+                        },
                         value: attr.value.as_ref(),
                         respect_none_value: false,
                     });

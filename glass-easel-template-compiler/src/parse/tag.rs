@@ -4101,7 +4101,7 @@ mod test {
             ParseErrorKind::InvalidScopeName,
             13..15
         );
-        case!("<div let:a-b='{{a}}'></div>", r#"<div let:aB="{{a}}"/>"#);
+        case!("<div let:a-b='{{a}}'>{{ aB }}</div>", r#"<div let:aB="{{a}}">{{aB}}</div>"#);
         case!(
             "<div let:a></div>",
             r#"<div let:a/>"#,
@@ -4251,8 +4251,8 @@ mod test {
         case!("<block slot='a'></block>", r#"<block slot="a"/>"#);
         case!("<block slot:a-b></block>", r#"<block slot:aB/>"#);
         case!(
-            "<block let:a-b='{{a}}'></block>",
-            r#"<block let:aB="{{a}}"/>"#
+            "<block let:a-b='{{a}}'>{{ aB }}</block>",
+            r#"<block let:aB="{{a}}">{{aB}}</block>"#
         );
     }
 
