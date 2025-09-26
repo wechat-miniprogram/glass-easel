@@ -110,6 +110,16 @@ impl<'s, 't, W: FmtWrite> StringifierBlock<'s, 't, W> {
         &self.scope_names[i]
     }
 
+    pub(super) fn add_scope_with_ts_keyword_escape(&mut self, name: &CompactString, extra_preserved: &[&'static str]) -> CompactString {
+        let name = if super::is_typescript_keyword(name) || extra_preserved.contains(&name.as_str()) || name.starts_with("_") {
+            compact_str::format_compact!("${}", name)
+        } else {
+            name.clone()
+        };
+        self.scope_names.push(name.clone());
+        name
+    }
+
     pub(super) fn get_scope_name(&mut self, index: usize) -> &str {
         self.scope_names
             .get(index)

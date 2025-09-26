@@ -240,7 +240,7 @@ type Properties<T> = T extends glassEaselMiniprogramAdapter.behavior.ComponentTy
         const defaultExport = getDefaultExportOfSourceFile(tc, source)
         if (!defaultExport) return
         const relPath = path.relative(compDir, compPath)
-        const entryName = `component_${tagName.replace(/-/g, '_')}`
+        const entryName = `_component_${tagName.replace(/-/g, '_')}`
         usingComponentsImports += `import type ${entryName} from './${escapeJsString(relPath)}'\n`
         usingComponensItems.push(`'${tagName}': Properties<typeof ${entryName}>;\n`)
       })
