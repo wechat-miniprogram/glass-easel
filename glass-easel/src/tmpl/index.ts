@@ -17,6 +17,8 @@ import {
 } from './proc_gen_wrapper'
 
 export {
+  setDefaultChangePropFilter,
+  setDefaultEventListenerWrapper,
   type TmplDevArgs,
   type EventListenerWrapper,
   type ChangePropListener,

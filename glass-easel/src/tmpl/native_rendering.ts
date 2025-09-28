@@ -30,7 +30,6 @@ export class GlassEaselTemplateDOM implements Template {
   innerData: DataValue
   genObjectGroupEnv: ProcGenEnv
   updateMode: string
-  methods: { [name: string]: GeneralFuncType }
 
   constructor(behavior: GeneralBehavior) {
     if (typeof behavior._$template !== 'object' && behavior._$template !== undefined) {
@@ -47,7 +46,6 @@ export class GlassEaselTemplateDOM implements Template {
       }
     }
     this.updateMode = ''
-    this.methods = behavior._$methodMap
   }
 
   createInstance(comp: GeneralComponent): TemplateInstance {
