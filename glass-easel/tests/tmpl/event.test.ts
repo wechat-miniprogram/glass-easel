@@ -3,6 +3,10 @@ import { tmpl, domBackend, composedBackend, shadowBackend } from '../base/env'
 import * as glassEasel from '../../src'
 
 const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
+  beforeAll(() => {
+    domBackend.onEvent(glassEasel.Event.triggerEvent)
+  })
+
   test('event listener filter', () => {
     const customHandler = (a: number, b: number) => a + b
     const template = tmpl(
@@ -485,32 +489,38 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
   })
 
   test('event phrase', () => {
+    let eventPhase: [string, glassEasel.EventPhase][] = []
     const def = glassEasel.registerElement({
       template: tmpl(`
         <div id="a" bind:customEv="evA">
-          <div id="b" catch:customEv="evB">
+          <div id="b" capture-bind:customEv="evB">
             <div id="c" bind:customEv="evC" />
           </div>
         </div>
       `),
       methods: {
         evA(e: glassEasel.ShadowedEvent<unknown>) {
-          expect(e.eventPhase).toBe(glassEasel.EventPhase.BubblingPhase)
+          eventPhase.push(['a', e.eventPhase])
         },
         evB(e: glassEasel.ShadowedEvent<unknown>) {
-          expect(e.eventPhase).toBe(glassEasel.EventPhase.CapturingPhase)
+          eventPhase.push(['b', e.eventPhase])
         },
         evC(e: glassEasel.ShadowedEvent<unknown>) {
-          expect(e.eventPhase).toBe(glassEasel.EventPhase.BubblingPhase)
+          eventPhase.push(['c', e.eventPhase])
         },
       },
     })
     const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
     const c = elem.getShadowRoot()!.getElementById('c')!
-    const event = new glassEasel.Event('customEv', {}, { composed: true, capturePhase: true })
+    const event = new glassEasel.Event('customEv', {}, { composed: true, capturePhase: true, bubbles: true })
     expect(event.eventPhase).toBe(glassEasel.EventPhase.None)
     c.dispatchEvent(event)
     expect(event.eventPhase).toBe(glassEasel.EventPhase.None)
+    expect(eventPhase).toStrictEqual([
+      ['b', glassEasel.EventPhase.CapturingPhase],
+      ['c', glassEasel.EventPhase.BubblingPhase],
+      ['a', glassEasel.EventPhase.BubblingPhase],
+    ])
   })
 
   test('has listeners', () => {

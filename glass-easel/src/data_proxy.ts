@@ -523,6 +523,7 @@ export class DataGroup<
     combined: DataChange[]
     count: number
   } | null = null
+  /* @internal */
   private _$recUpdateLevel = 0
 
   /* @internal */

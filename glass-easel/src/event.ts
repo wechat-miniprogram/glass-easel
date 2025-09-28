@@ -345,8 +345,8 @@ export class Event<TDetail> {
     const currentTargetCaller = isComponent(currentTarget)
       ? currentTarget.getMethodCaller() || currentTarget
       : currentTarget
-    const ev = this.wrapShadowedEvent(targetCaller, mark, currentTargetCaller)
     this._$hasListener ||= efa.funcArr.hasFunc()
+    const ev = this.wrapShadowedEvent(targetCaller, mark, currentTargetCaller)
     const ret = efa.funcArr.call(
       currentTargetCaller,
       [ev],
@@ -446,6 +446,7 @@ export class Event<TDetail> {
           sr.handleEvent(sr.slot, this)
         }
         atTarget = false
+
         this.eventPhase = EventPhase.BubblingPhase
         if (currentTarget._$eventTarget && !eventBubblingControl.stopped) {
           this.callListener(currentTarget, mark, target, false)

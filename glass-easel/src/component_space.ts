@@ -419,6 +419,7 @@ export class ComponentSpace {
     return new BehaviorBuilder(is, this)
   }
 
+  /** Register a component in this space using an existing definition */
   registerComponent(is: string, comp: GeneralComponentDefinition) {
     this._$list[is] = comp
     this._$behaviorList[is] = comp.behavior as unknown as GeneralBehavior

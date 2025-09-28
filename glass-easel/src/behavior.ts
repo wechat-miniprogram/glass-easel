@@ -556,7 +556,7 @@ export class BehaviorBuilder<
         ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>
       >,
     ) => TExport,
-    once = true,
+    once = false,
     // eslint-disable-next-line function-paren-newline
   ): ResolveBehaviorBuilder<
     BehaviorBuilder<
