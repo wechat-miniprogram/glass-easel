@@ -532,11 +532,10 @@ describe('chaining-form interface', () => {
     const compDef = componentSpace
       .define()
       .behavior(beh)
-      .listenerWrapper((event, listener, options) => {
-        return (e) => {
-          e.detail = { eventOrder: eventOrder++ }
-          listener(e)
-        }
+      .listenerWrapper((event, listener, options) => (e) => {
+        eventOrder += 1
+        e.detail = { eventOrder }
+        listener(e)
       })
       .init(({ self, lifetime }) => {
         lifetime('created', () => {
@@ -551,7 +550,10 @@ describe('chaining-form interface', () => {
       .registerComponent()
     const root = glassEasel.Component.createWithContext('root', compDef, domBackend)
     root.triggerEvent('customEv', {})
-    expect(callOrder).toStrictEqual([[1, 0], [2, 1]])
+    expect(callOrder).toStrictEqual([
+      [1, 1],
+      [2, 2],
+    ])
   })
 
   test('chaining relations', () => {

@@ -1208,29 +1208,31 @@ export class Component<
   }
 
   override addListener(name: string, func: EventListener<unknown>, options?: EventListenerOptions | undefined): void {
+    let listener = func
     if (this._$behavior._$listenerWrapper) {
       const wrappedFunc = this._$behavior._$listenerWrapper(name, func, options)
       if (this._$wrappedListeners === undefined) {
         this._$wrappedListeners = new WeakMap()
       }
       this._$wrappedListeners.set(wrappedFunc, func)
-      func = wrappedFunc
+      listener = wrappedFunc
     }
-    super.addListener(name, func, options)
+    super.addListener(name, listener, options)
     if (this._$definition._$options.listenerChangeLifetimes) {
-      this.triggerLifetime('listenerChange', [true, name, func, options])
+      this.triggerLifetime('listenerChange', [true, name, listener, options])
     }
   }
 
   override removeListener(name: string, func: EventListener<unknown>, options?: EventListenerOptions | undefined): boolean {
+    let listener = func
     if (this._$behavior._$listenerWrapper) {
       const originFunc = this._$wrappedListeners?.get(func)
       if (!originFunc) return false
-      func = originFunc
+      listener = originFunc
     }
-    const changed = super.removeListener(name, func, options)
+    const changed = super.removeListener(name, listener, options)
     if (changed && this._$definition._$options.listenerChangeLifetimes) {
-      this.triggerLifetime('listenerChange', [false, name, func, options])
+      this.triggerLifetime('listenerChange', [false, name, listener, options])
     }
     return changed
   }
