@@ -49,18 +49,10 @@ export interface EventListenerWrapper {
   isEventListenerWrapper?: true
 }
 
-const emptyFilter = <T>(x: T) => x
+const defaultChangePropFilter: ChangePropFilter = <T>(x: T) => x
 
-let defaultChangePropFilter: ChangePropFilter = <T>(x: T) => x
-export const setDefaultChangePropFilter = (fn: ChangePropFilter) => {
-  defaultChangePropFilter = fn
-}
-
-let defaultEventListenerWrapper: EventListenerWrapper = (elem, evName, listener) => (e) =>
+const defaultEventListenerWrapper: EventListenerWrapper = (elem, evName, listener) => (e) =>
   listener.call(elem.ownerShadowRoot?.getHostNode().getMethodCaller(), e)
-export const setDefaultEventListenerWrapper = (fn: EventListenerWrapper) => {
-  defaultEventListenerWrapper = fn
-}
 
 type TmplArgs = {
   key?: number | string

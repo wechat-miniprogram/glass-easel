@@ -512,6 +512,48 @@ describe('chaining-form interface', () => {
     expect(callOrder).toStrictEqual([3, 1, 2])
   })
 
+  test('chaining listener wrapper', () => {
+    const callOrder: [number, number][] = []
+    const beh = componentSpace
+      .define()
+      .init(({ self, lifetime }) => {
+        lifetime('created', () => {
+          self.addListener('customEv', (e) => {
+            callOrder.push([
+              1,
+              (e as glassEasel.ShadowedEvent<{ eventOrder: number }>).detail.eventOrder,
+            ])
+          })
+        })
+      })
+      .registerBehavior()
+
+    let eventOrder = 0
+    const compDef = componentSpace
+      .define()
+      .behavior(beh)
+      .listenerWrapper((event, listener, options) => {
+        return (e) => {
+          e.detail = { eventOrder: eventOrder++ }
+          listener(e)
+        }
+      })
+      .init(({ self, lifetime }) => {
+        lifetime('created', () => {
+          self.addListener('customEv', (e) => {
+            callOrder.push([
+              2,
+              (e as glassEasel.ShadowedEvent<{ eventOrder: number }>).detail.eventOrder,
+            ])
+          })
+        })
+      })
+      .registerComponent()
+    const root = glassEasel.Component.createWithContext('root', compDef, domBackend)
+    root.triggerEvent('customEv', {})
+    expect(callOrder).toStrictEqual([[1, 0], [2, 1]])
+  })
+
   test('chaining relations', () => {
     const eventArr: number[] = []
     const parentDef = componentSpace

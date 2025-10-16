@@ -50,7 +50,7 @@ import {
   type PropertyDefinition,
 } from './data_proxy'
 import { simpleDeepCopy } from './data_utils'
-import { type EventListener } from './event'
+import { type EventOptions, type EventListener, type EventListenerOptions } from './event'
 import { FuncArr, safeCallback } from './func_arr'
 import { type ComponentOptions } from './global_options'
 import { normalizeRelation, type RelationDefinition, type RelationHandler } from './relation'
@@ -190,6 +190,13 @@ export class BehaviorBuilder<
   _$init: ((this: any, ctx: any) => any)[] = []
   /** @internal */
   _$methodCallerInit?: (this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>) => any
+  /** @internal */
+  _$listenerWrapper?: (
+    this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>,
+    event: string,
+    listener: EventListener<unknown>,
+    options: EventListenerOptions | undefined,
+  ) => EventListener<unknown>
 
   /** @internal */
   constructor(is: string | undefined, ownerSpace: ComponentSpace) {
@@ -207,6 +214,23 @@ export class BehaviorBuilder<
     func: (this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>) => any,
   ): ResolveBehaviorBuilder<this, TChainingFilter> {
     this._$methodCallerInit = func
+    return this as any
+  }
+
+  /**
+   * Set a listener wrapper function
+   *
+   * It should return the wrapped listener.
+   */
+  listenerWrapper(
+    func: (
+      this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>,
+      event: string,
+      listener: EventListener<unknown>,
+      options: EventListenerOptions | undefined,
+    ) => EventListener<unknown>,
+  ): ResolveBehaviorBuilder<this, TChainingFilter> {
+    this._$listenerWrapper = func
     return this as any
   }
 
@@ -841,6 +865,13 @@ export class Behavior<
   _$methodCallerInit?: (
     this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>,
   ) => ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>
+  /** @internal */
+  _$listenerWrapper?: (
+    this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>,
+    event: string,
+    listener: EventListener<unknown>,
+    options: EventListenerOptions | undefined,
+  ) => EventListener<unknown>
 
   /**
    * Create a behavior with classic-style definition
@@ -891,6 +922,7 @@ export class Behavior<
     this._$relationMap = undefined
     this._$init = []
     this._$methodCallerInit = builder._$methodCallerInit
+    this._$listenerWrapper = builder._$listenerWrapper
   }
 
   general(): GeneralBehavior {

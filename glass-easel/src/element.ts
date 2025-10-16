@@ -2452,19 +2452,14 @@ export class Element implements NodeCast {
   addListener(name: string, func: EventListener<unknown>, options?: EventListenerOptions) {
     const finalChanged = this._$eventTarget.addListener(name, func, options)
     this._$setListenerStats(name, finalChanged, options)
-    if (isComponent(this) && this._$definition._$options.listenerChangeLifetimes) {
-      this.triggerLifetime('listenerChange', [true, name, func, options])
-    }
   }
 
   /** Remove an event listener on the element */
-  removeListener(name: string, func: EventListener<unknown>, options?: EventListenerOptions) {
+  removeListener(name: string, func: EventListener<unknown>, options?: EventListenerOptions): boolean {
     const finalChanged = this._$eventTarget.removeListener(name, func, options)
-    if (finalChanged === FinalChanged.Failed) return
+    if (finalChanged === FinalChanged.Failed) return false
     this._$setListenerStats(name, finalChanged, options)
-    if (isComponent(this) && this._$definition._$options.listenerChangeLifetimes) {
-      this.triggerLifetime('listenerChange', [false, name, func, options])
-    }
+    return true
   }
 
   /** Get an attribute value ( `null` if not set or removed) */

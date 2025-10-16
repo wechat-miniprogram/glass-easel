@@ -452,6 +452,8 @@ export class Component<
   private _$traitGroup: TraitGroup
   /** @internal */
   private _$methodCaller: ComponentInstance<TData, TProperty, TMethod>
+  /** @internal */
+  private _$wrappedListeners: WeakMap<EventListener<unknown>, EventListener<unknown>> | undefined
 
   /* istanbul ignore next */
   constructor() {
@@ -1203,6 +1205,34 @@ export class Component<
    */
   getMethodCaller(): ComponentInstance<TData, TProperty, TMethod> {
     return this._$methodCaller
+  }
+
+  override addListener(name: string, func: EventListener<unknown>, options?: EventListenerOptions | undefined): void {
+    if (this._$behavior._$listenerWrapper) {
+      const wrappedFunc = this._$behavior._$listenerWrapper(name, func, options)
+      if (this._$wrappedListeners === undefined) {
+        this._$wrappedListeners = new WeakMap()
+      }
+      this._$wrappedListeners.set(wrappedFunc, func)
+      func = wrappedFunc
+    }
+    super.addListener(name, func, options)
+    if (this._$definition._$options.listenerChangeLifetimes) {
+      this.triggerLifetime('listenerChange', [true, name, func, options])
+    }
+  }
+
+  override removeListener(name: string, func: EventListener<unknown>, options?: EventListenerOptions | undefined): boolean {
+    if (this._$behavior._$listenerWrapper) {
+      const originFunc = this._$wrappedListeners?.get(func)
+      if (!originFunc) return false
+      func = originFunc
+    }
+    const changed = super.removeListener(name, func, options)
+    if (changed && this._$definition._$options.listenerChangeLifetimes) {
+      this.triggerLifetime('listenerChange', [false, name, func, options])
+    }
+    return changed
   }
 
   /**
