@@ -50,7 +50,7 @@ import {
   type PropertyDefinition,
 } from './data_proxy'
 import { simpleDeepCopy } from './data_utils'
-import { type EventListener } from './event'
+import { type EventListener, type ShadowedEvent } from './event'
 import { FuncArr, safeCallback } from './func_arr'
 import { type ComponentOptions } from './global_options'
 import { normalizeRelation, type RelationDefinition, type RelationHandler } from './relation'
@@ -189,6 +189,11 @@ export class BehaviorBuilder<
   _$init: { func: (this: any, ctx: any) => any; once: boolean }[] = []
   /** @internal */
   _$methodCallerInit?: (this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>) => any
+  /** @internal */
+  _$listenerEventReplacer?: (
+    this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>,
+    event: ShadowedEvent<unknown>,
+  ) => ShadowedEvent<unknown>
 
   /** @internal */
   constructor(is: string | undefined, ownerSpace: ComponentSpace) {
@@ -206,6 +211,21 @@ export class BehaviorBuilder<
     func: (this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>) => any,
   ): ResolveBehaviorBuilder<this, TChainingFilter> {
     this._$methodCallerInit = func
+    return this as any
+  }
+
+  /**
+   * Set a listener wrapper function
+   *
+   * It should return the wrapped listener.
+   */
+  listenerEventReplacer(
+    func: (
+      this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>,
+      event: ShadowedEvent<unknown>,
+    ) => ShadowedEvent<unknown>,
+  ): ResolveBehaviorBuilder<this, TChainingFilter> {
+    this._$listenerEventReplacer = func
     return this as any
   }
 
@@ -850,6 +870,11 @@ export class Behavior<
   _$methodCallerInit?: (
     this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>,
   ) => ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>
+  /** @internal */
+  _$listenerEventReplacer?: (
+    this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>,
+    event: ShadowedEvent<unknown>,
+  ) => ShadowedEvent<unknown>
 
   /**
    * Create a behavior with classic-style definition
@@ -900,6 +925,7 @@ export class Behavior<
     this._$relationMap = undefined
     this._$init = []
     this._$methodCallerInit = builder._$methodCallerInit
+    this._$listenerEventReplacer = builder._$listenerEventReplacer
   }
 
   general(): GeneralBehavior {

@@ -11,7 +11,6 @@ export class FuncArr<F extends GeneralFuncType> {
   private _$type: string
   /* @internal */
   private _$arr: F[] | null = null
-  /* @internal */
 
   constructor(type: string) {
     this._$type = type

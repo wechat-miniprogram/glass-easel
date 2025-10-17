@@ -4,9 +4,8 @@ import { Component, type GeneralComponent } from '../component'
 import { type DataPath } from '../data_path'
 import { type DataValue } from '../data_proxy'
 import { Element, StyleSegmentIndex } from '../element'
-import { type ShadowedEvent, type EventListener } from '../event'
+import { type EventListener } from '../event'
 import { safeCallback } from '../func_arr'
-import { ENV } from '../global_options'
 import { type NativeNode } from '../native_node'
 import { type Node } from '../node'
 import { SlotMode, type ShadowRoot } from '../shadow_root'
@@ -49,16 +48,10 @@ export interface EventListenerWrapper {
   isEventListenerWrapper?: true
 }
 
-let defaultChangePropFilter: ChangePropFilter = <T>(x: T) => x
-export const setDefaultChangePropFilter = (fn: ChangePropFilter) => {
-  defaultChangePropFilter = fn
-}
+const defaultChangePropFilter: ChangePropFilter = <T>(x: T) => x
 
-let defaultEventListenerWrapper: EventListenerWrapper = (elem, evName, listener) => (e) =>
+const defaultEventListenerWrapper: EventListenerWrapper = (elem, evName, listener) => (e) =>
   listener.call(elem.ownerShadowRoot?.getHostNode().getMethodCaller(), e)
-export const setDefaultEventListenerWrapper = (fn: EventListenerWrapper) => {
-  defaultEventListenerWrapper = fn
-}
 
 type TmplArgs = {
   key?: number | string

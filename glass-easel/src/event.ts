@@ -272,12 +272,13 @@ export class Event<TDetail> {
     targetCaller: Element,
     mark: { [name: string]: unknown } | null,
     currentTargetCaller: Element,
+    ownerHost: GeneralComponent | undefined,
   ): ShadowedEvent<TDetail> {
     const ret = Object.create(this) as ShadowedEvent<TDetail>
     ret.target = targetCaller
     ret.mark = mark
     ret.currentTarget = currentTargetCaller
-    return ret
+    return ownerHost?.getEventObject(ret) || ret
   }
 
   getEventName(): string {
@@ -346,7 +347,7 @@ export class Event<TDetail> {
       ? currentTarget.getMethodCaller() || currentTarget
       : currentTarget
     this._$hasListener ||= efa.funcArr.hasFunc()
-    const ev = this.wrapShadowedEvent(targetCaller, mark, currentTargetCaller)
+    const ev = this.wrapShadowedEvent(targetCaller, mark, currentTargetCaller, target.ownerShadowRoot?.getHostNode())
     const ret = efa.funcArr.call(
       currentTargetCaller,
       [ev],
