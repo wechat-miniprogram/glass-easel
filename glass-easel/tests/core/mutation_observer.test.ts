@@ -409,4 +409,26 @@ describe('MutationObserver', () => {
     textNode.textContent = 'def'
     expect(callEv.pop()).toBeUndefined()
   })
+
+  it('observer native node attach status', () => {
+    const elem = glassEasel.Component.createWithContext('root', parentDef, domBackend)
+    const shadowRoot = elem.getShadowRoot()!
+    const child1 = shadowRoot.childNodes[0]!.asInstanceOf(childDef)!
+    const div = child1.childNodes[1]!.asNativeNode()!
+    const callEv = [] as glassEasel.mutationObserver.MutationObserverEvent[]
+    const observer = glassEasel.MutationObserver.create((ev) => {
+      callEv.push(ev)
+    })
+    observer.observe(div, { attachStatus: true })
+    glassEasel.Element.pretendAttached(elem)
+    expect(callEv.pop()).toMatchObject({
+      type: 'attachStatus',
+      status: 'attached'
+    })
+    glassEasel.Element.pretendDetached(elem)
+    expect(callEv.pop()).toMatchObject({
+      type: 'attachStatus',
+      status: 'detached'
+    })
+  })
 })
