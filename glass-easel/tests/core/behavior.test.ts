@@ -513,7 +513,7 @@ describe('chaining-form interface', () => {
   })
 
   test('chaining listener wrapper', () => {
-    const callOrder: [number, number][] = []
+    const callOrder: [number, number | undefined][] = []
     const beh = componentSpace
       .define()
       .init(({ self, lifetime }) => {
@@ -521,7 +521,7 @@ describe('chaining-form interface', () => {
           self.addListener('customEv', (e) => {
             callOrder.push([
               1,
-              (e as glassEasel.ShadowedEvent<{ eventOrder: number }>).detail.eventOrder,
+              (e as glassEasel.ShadowedEvent<{ eventOrder?: number }>).detail.eventOrder,
             ])
           })
         })
@@ -532,27 +532,41 @@ describe('chaining-form interface', () => {
     const compDef = componentSpace
       .define()
       .behavior(beh)
+      .template(tmpl(`<div id="wrapper" bind:customEv="onCustomEv"></div>`))
       .listenerWrapper((event, listener, options) => (e) => {
         eventOrder += 1
         e.detail = { eventOrder }
         listener(e)
       })
-      .init(({ self, lifetime }) => {
+      .init(({ self, lifetime, listener }) => {
         lifetime('created', () => {
-          self.addListener('customEv', (e) => {
+          ;(self.shadowRoot as glassEasel.ShadowRoot).addListener('customEv', (e) => {
             callOrder.push([
-              2,
+              3,
               (e as glassEasel.ShadowedEvent<{ eventOrder: number }>).detail.eventOrder,
             ])
           })
         })
+        return {
+          onCustomEv: listener((e) => {
+            callOrder.push([
+              2,
+              (e as glassEasel.ShadowedEvent<{ eventOrder: number }>).detail.eventOrder,
+            ])
+          }),
+        }
       })
       .registerComponent()
     const root = glassEasel.Component.createWithContext('root', compDef, domBackend)
-    root.triggerEvent('customEv', {})
+    ;(root.$.wrapper as glassEasel.Element).triggerEvent(
+      'customEv',
+      {},
+      { bubbles: true, composed: true },
+    )
     expect(callOrder).toStrictEqual([
-      [1, 1],
-      [2, 2],
+      [2, 1],
+      [3, 2],
+      [1, undefined],
     ])
   })
 
