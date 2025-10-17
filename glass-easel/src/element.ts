@@ -149,8 +149,6 @@ export class Element implements NodeCast {
   _$mutationObserverTarget: MutationObserverTarget | null
   /** @internal */
   _$eventTarget: EventTarget<{ [name: string]: unknown }>
-  /** @internal */
-  private _$wrappedListeners: WeakMap<EventListener<unknown>, EventListener<unknown>> | undefined
 
   /* istanbul ignore next */
   constructor() {
@@ -190,7 +188,6 @@ export class Element implements NodeCast {
     this.ownerShadowRoot = owner
     this._$mutationObserverTarget = null
     this._$eventTarget = new EventTarget()
-    this._$wrappedListeners = undefined
   }
 
   get $$(): GeneralBackendElement | null {
@@ -2453,28 +2450,20 @@ export class Element implements NodeCast {
 
   /** Add an event listener on the element */
   addListener(name: string, func: EventListener<unknown>, options?: EventListenerOptions) {
-    let listener = func
-    const wrappedFunc = this.ownerShadowRoot?.getHostNode()?._$behavior._$listenerWrapper?.(name, func, options)
-    if (wrappedFunc) {
-      if (this._$wrappedListeners === undefined) this._$wrappedListeners = new WeakMap()
-      this._$wrappedListeners.set(wrappedFunc, func)
-      listener = wrappedFunc
-    }
-    const finalChanged = this._$eventTarget.addListener(name, listener, options)
+    const finalChanged = this._$eventTarget.addListener(name, func, options)
     this._$setListenerStats(name, finalChanged, options)
     if (isComponent(this) && this._$definition._$options.listenerChangeLifetimes) {
-      this.triggerLifetime('listenerChange', [true, name, listener, options])
+      this.triggerLifetime('listenerChange', [true, name, func, options])
     }
   }
 
   /** Remove an event listener on the element */
   removeListener(name: string, func: EventListener<unknown>, options?: EventListenerOptions) {
-    const listener = this._$wrappedListeners?.get(func) || func
-    const finalChanged = this._$eventTarget.removeListener(name, listener, options)
+    const finalChanged = this._$eventTarget.removeListener(name, func, options)
     if (finalChanged === FinalChanged.Failed) return
     this._$setListenerStats(name, finalChanged, options)
     if (isComponent(this) && this._$definition._$options.listenerChangeLifetimes) {
-      this.triggerLifetime('listenerChange', [false, name, listener, options])
+      this.triggerLifetime('listenerChange', [false, name, func, options])
     }
   }
 

@@ -50,7 +50,7 @@ import {
   type PropertyDefinition,
 } from './data_proxy'
 import { simpleDeepCopy } from './data_utils'
-import { type EventOptions, type EventListener, type EventListenerOptions } from './event'
+import { type EventListener, type ShadowedEvent } from './event'
 import { FuncArr, safeCallback } from './func_arr'
 import { type ComponentOptions } from './global_options'
 import { normalizeRelation, type RelationDefinition, type RelationHandler } from './relation'
@@ -191,12 +191,10 @@ export class BehaviorBuilder<
   /** @internal */
   _$methodCallerInit?: (this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>) => any
   /** @internal */
-  _$listenerWrapper?: (
+  _$listenerEventReplacer?: (
     this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>,
-    event: string,
-    listener: EventListener<unknown>,
-    options: EventListenerOptions | undefined,
-  ) => EventListener<unknown>
+    event: ShadowedEvent<unknown>,
+  ) => ShadowedEvent<unknown>
 
   /** @internal */
   constructor(is: string | undefined, ownerSpace: ComponentSpace) {
@@ -222,15 +220,13 @@ export class BehaviorBuilder<
    *
    * It should return the wrapped listener.
    */
-  listenerWrapper(
+  listenerEventReplacer(
     func: (
       this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>,
-      event: string,
-      listener: EventListener<unknown>,
-      options: EventListenerOptions | undefined,
-    ) => EventListener<unknown>,
+      event: ShadowedEvent<unknown>,
+    ) => ShadowedEvent<unknown>,
   ): ResolveBehaviorBuilder<this, TChainingFilter> {
-    this._$listenerWrapper = func
+    this._$listenerEventReplacer = func
     return this as any
   }
 
@@ -866,12 +862,10 @@ export class Behavior<
     this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>,
   ) => ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>
   /** @internal */
-  _$listenerWrapper?: (
+  _$listenerEventReplacer?: (
     this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>,
-    event: string,
-    listener: EventListener<unknown>,
-    options: EventListenerOptions | undefined,
-  ) => EventListener<unknown>
+    event: ShadowedEvent<unknown>,
+  ) => ShadowedEvent<unknown>
 
   /**
    * Create a behavior with classic-style definition
@@ -922,7 +916,7 @@ export class Behavior<
     this._$relationMap = undefined
     this._$init = []
     this._$methodCallerInit = builder._$methodCallerInit
-    this._$listenerWrapper = builder._$listenerWrapper
+    this._$listenerEventReplacer = builder._$listenerEventReplacer
   }
 
   general(): GeneralBehavior {

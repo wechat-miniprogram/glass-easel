@@ -512,7 +512,7 @@ describe('chaining-form interface', () => {
     expect(callOrder).toStrictEqual([3, 1, 2])
   })
 
-  test('chaining listener wrapper', () => {
+  test('chaining listener event replacer', () => {
     const callOrder: [number, number | undefined][] = []
     const beh = componentSpace
       .define()
@@ -533,10 +533,10 @@ describe('chaining-form interface', () => {
       .define()
       .behavior(beh)
       .template(tmpl(`<div id="wrapper" bind:customEv="onCustomEv"></div>`))
-      .listenerWrapper((event, listener, options) => (e) => {
+      .listenerEventReplacer((e) => {
         eventOrder += 1
         e.detail = { eventOrder }
-        listener(e)
+        return e
       })
       .init(({ self, lifetime, listener }) => {
         lifetime('created', () => {
@@ -566,6 +566,58 @@ describe('chaining-form interface', () => {
     expect(callOrder).toStrictEqual([
       [2, 1],
       [3, 2],
+      [1, undefined],
+    ])
+  })
+
+  test('chaining listener event replacer on native rendering', () => {
+    const callOrder: [number, number | undefined][] = []
+    const beh = componentSpace
+      .define()
+      .init(({ self, lifetime }) => {
+        lifetime('created', () => {
+          self.addListener('customEv', (e) => {
+            callOrder.push([
+              1,
+              (e as glassEasel.ShadowedEvent<{ eventOrder?: number }>).detail.eventOrder,
+            ])
+          })
+        })
+      })
+      .registerBehavior()
+
+    let eventOrder = 0
+    const compDef = componentSpace
+      .define()
+      .behavior(beh)
+      .options({ externalComponent: true })
+      .template(tmpl(`<div id="wrapper" bind:customEv="onCustomEv"></div>`))
+      .listenerEventReplacer((e) => {
+        eventOrder += 1
+        e.detail = { eventOrder }
+        return e
+      })
+      .init(({ listener }) => {
+        return {
+          onCustomEv: listener((e) => {
+            callOrder.push([
+              2,
+              (e as glassEasel.ShadowedEvent<{ eventOrder: number }>).detail.eventOrder,
+            ])
+          }),
+        }
+      })
+      .registerComponent()
+    const root = glassEasel.Component.createWithContext('root', compDef, domBackend)
+    glassEasel.triggerExternalEvent(
+      root,
+      root.$.wrapper as glassEasel.GeneralBackendElement,
+      'customEv',
+      {},
+      { bubbles: true, composed: true },
+    )
+    expect(callOrder).toStrictEqual([
+      [2, 1],
       [1, undefined],
     ])
   })

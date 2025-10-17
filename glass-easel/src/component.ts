@@ -53,7 +53,7 @@ import {
   performanceMeasureStart,
 } from './dev_tools'
 import { Element } from './element'
-import { type EventListener, type EventListenerOptions } from './event'
+import { type ShadowedEvent, type EventListener, type EventListenerOptions } from './event'
 import { type ExternalShadowRoot } from './external_shadow_tree'
 import { FuncArr, safeCallback, type GeneralFuncType } from './func_arr'
 import {
@@ -1203,6 +1203,13 @@ export class Component<
    */
   getMethodCaller(): ComponentInstance<TData, TProperty, TMethod> {
     return this._$methodCaller
+  }
+
+  /**
+   * Get the final event object
+   */
+  getEventObject(e: ShadowedEvent<unknown>): ShadowedEvent<any> {
+    return this._$behavior._$listenerEventReplacer?.(e) || e
   }
 
   /**
