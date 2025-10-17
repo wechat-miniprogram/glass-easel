@@ -28,7 +28,7 @@ macro_rules! case {
             let options = StringifyOptions { minimize: true, ..Default::default() };
 
             // check stringify result
-            let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, options);
+            let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", Some(src), options);
             template.stringify_write(&mut stringifier).unwrap();
             let (stringify_result, _sourcemap) = stringifier.finish();
             assert_eq!(stringify_result.as_str(), expect);
@@ -36,7 +36,7 @@ macro_rules! case {
             // re-parse and then stringify
             let (template, ps) = $crate::parse::parse("TEST", expect);
             assert_eq!(ps.warnings().filter(|x| x.kind.level() > crate::parse::ParseErrorLevel::Note).next(), None);
-            let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", src, options);
+            let mut stringifier = crate::stringify::Stringifier::new(String::new(), "test", Some(src), options);
             template.stringify_write(&mut stringifier).unwrap();
             assert_eq!(stringifier.finish().0.as_str(), expect);
         }

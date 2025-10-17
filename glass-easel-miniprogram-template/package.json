@@ -17,13 +17,14 @@
     "eslint": "^7.32.0",
     "eslint-plugin-import": "^2.22.1",
     "eslint-plugin-promise": "^4.2.1",
+    "glass-easel-miniprogram-typescript": "workspace:*",
     "glass-easel-miniprogram-webpack-plugin": "workspace:*",
     "less": "^4.1.3",
     "less-loader": "^11.0.0",
     "mini-css-extract-plugin": "^2.6.1",
     "ts-loader": "^9.4.2",
     "typescript": "~5.2.2",
-    "webpack": "^5.85.0",
-    "webpack-cli": "^5.0.1"
+    "webpack": "^5.101.3",
+    "webpack-cli": "^6.0.1"
   }
 }

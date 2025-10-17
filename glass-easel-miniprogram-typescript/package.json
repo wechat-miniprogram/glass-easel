@@ -1,7 +1,13 @@
 {
-  "name": "glass-easel-miniprogram-webpack-plugin",
-  "description": "The webpack plugin of the glass-easel project for MiniProgram file structure",
-  "version": "0.14.1",
+  "name": "glass-easel-miniprogram-typescript",
+  "description": "A checker for the glass-easel project in MiniProgram file structure",
+  "version": "0.13.0",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "bin": {
+    "miniprogram-typescript-check": "dist/cli.js"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/wechat-miniprogram/glass-easel.git"
@@ -15,23 +21,23 @@
     "url": "https://github.com/wechat-miniprogram/glass-easel/issues"
   },
   "homepage": "https://github.com/wechat-miniprogram/glass-easel",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "types": "src/index.ts",
   "scripts": {
     "build": "tsc -p .",
-    "lint": "eslint src/**/*.ts"
+    "dev": "tsc -w -p .",
+    "lint": "eslint src/**/*.ts",
+    "start": "node dist/cli.js",
+    "build-and-start": "npm run build && node dist/cli.js"
   },
   "peerDependencies": {
-    "glass-easel": "workspace:*",
     "glass-easel-miniprogram-adapter": "workspace:*",
-    "webpack": "^5.101.3"
+    "typescript": "^5.2.2"
   },
   "dependencies": {
     "chalk": "4",
     "chokidar": "^4.0.3",
     "glass-easel-stylesheet-compiler": "workspace:*",
-    "glass-easel-template-compiler": "workspace:*",
-    "source-map": "^0.7.4",
-    "webpack-sources": "^3.2.1",
-    "webpack-virtual-modules": "^0.5.0"
+    "glass-easel-template-compiler": "workspace:*"
   }
 }
