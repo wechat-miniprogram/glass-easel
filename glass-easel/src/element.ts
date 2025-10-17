@@ -597,20 +597,23 @@ export class Element implements NodeCast {
     const callFunc = function callFunc(node: Node) {
       if (isElement(node) && !node._$attached) {
         node._$attached = true
-        if (isComponent(node)) {
+        const nodeIsComponent = isComponent(node)
+        if (nodeIsComponent) {
           node.triggerLifetime('attached', [])
           if (node._$relation) {
             node._$relation.triggerLinkEvent(RelationType.ParentNonVirtualNode, false)
             node._$relation.triggerLinkEvent(RelationType.ParentComponent, false)
             node._$relation.triggerLinkEvent(RelationType.Ancestor, false)
           }
-          if (node._$mutationObserverTarget) {
-            MutationObserverTarget.callAttachObservers(node, {
-              type: 'attachStatus',
-              target: node,
-              status: 'attached',
-            })
-          }
+        }
+        if (node._$mutationObserverTarget) {
+          MutationObserverTarget.callAttachObservers(node, {
+            type: 'attachStatus',
+            target: node,
+            status: 'attached',
+          })
+        }
+        if (nodeIsComponent) {
           const shadowRoot = node.getShadowRoot()
           if (shadowRoot) callFunc(shadowRoot)
         }
@@ -641,15 +644,15 @@ export class Element implements NodeCast {
             node._$relation.triggerLinkEvent(RelationType.ParentComponent, true)
             node._$relation.triggerLinkEvent(RelationType.Ancestor, true)
           }
-          if (node._$mutationObserverTarget) {
-            MutationObserverTarget.callAttachObservers(node, {
-              type: 'attachStatus',
-              target: node,
-              status: 'detached',
-            })
-          }
         } else {
           node._$attached = false
+        }
+        if (node._$mutationObserverTarget) {
+          MutationObserverTarget.callAttachObservers(node, {
+            type: 'attachStatus',
+            target: node,
+            status: 'detached',
+          })
         }
       }
     }
