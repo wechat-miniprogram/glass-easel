@@ -46,6 +46,8 @@ export type ElementForDomLike = {
 }
 
 export interface Context<Ctx, Elem> {
+  dropBackendAfterRelease?: boolean
+
   createContext(
     options: unknown,
     cb: (ContextWrapper: GetWrapper<Partial<Context<Ctx, Elem> & Ctx>>) => void,

@@ -87,7 +87,9 @@ export type MutationObserverEvent =
 export type MutationObserverListener<T> = (this: Node, ev: T) => void
 
 export class MutationObserverTarget {
+  /* @internal */
   private _$bound: Node
+  /* @internal */
   private _$subtreeObserversCount = 0
   attrObservers: FuncArr<MutationObserverListener<MutationObserverAttrEvent>> | null = null
   allAttrObservers: FuncArr<MutationObserverListener<MutationObserverAttrEvent>> | null = null
@@ -190,10 +192,15 @@ export class MutationObserverTarget {
  * Further more, it can listen attached/detached events on an element.
  */
 export class MutationObserver {
+  /* @internal */
   private _$listener: MutationObserverListener<MutationObserverEvent> | null
+  /* @internal */
   private _$normalizedListener: MutationObserverListener<MutationObserverEvent> | null
+  /* @internal */
   private _$subtreeListenersCount = 0
+  /* @internal */
   private _$boundFuncArrs: FuncArr<MutationObserverListener<MutationObserverEvent>>[] = []
+  /* @internal */
   private _$boundTarget: MutationObserverTarget | null = null
 
   constructor(listener: (ev: MutationObserverEvent) => void) {

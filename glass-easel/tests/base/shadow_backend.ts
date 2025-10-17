@@ -18,6 +18,8 @@ export class Context implements glassEasel.backend.Context {
   private _$destroyed = false
   public _$currentMethod: string | null = null
 
+  public dropBackendAfterRelease = true
+
   private _$createEvent:
     | null
     | ((

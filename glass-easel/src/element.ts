@@ -76,10 +76,22 @@ export const enum StyleSegmentIndex {
 type composedContext = composedBackend.Context | domlikeBackend.Context
 type composedElement = composedBackend.Element | domlikeBackend.Element
 
-type DestroyedBackendContext = { mode: BackendMode; destroyed: true }
-const DESTROYED_SHADOW_BACKEND_CONTEXT = { mode: BackendMode.Shadow, destroyed: true } as const
-const DESTROYED_COMPOSED_BACKEND_CONTEXT = { mode: BackendMode.Composed, destroyed: true } as const
-const DESTROYED_DOMLIKE_BACKEND_CONTEXT = { mode: BackendMode.Domlike, destroyed: true } as const
+type DestroyedBackendContext = { mode: BackendMode; destroyed: true; dropBackendAfterRelease: true }
+const DESTROYED_SHADOW_BACKEND_CONTEXT = {
+  mode: BackendMode.Shadow,
+  destroyed: true,
+  dropBackendAfterRelease: true,
+} as const
+const DESTROYED_COMPOSED_BACKEND_CONTEXT = {
+  mode: BackendMode.Composed,
+  destroyed: true,
+  dropBackendAfterRelease: true,
+} as const
+const DESTROYED_DOMLIKE_BACKEND_CONTEXT = {
+  mode: BackendMode.Domlike,
+  destroyed: true,
+  dropBackendAfterRelease: true,
+} as const
 
 export type DoubleLinkedList<T> = {
   value: T
@@ -410,14 +422,16 @@ export class Element implements NodeCast {
         ;(this._$backendElement as backend.Element | composedBackend.Element).release()
         if (ENV.DEV) performanceMeasureEnd()
       }
-      this._$backendElement = null
     }
-    if (BM.COMPOSED || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Composed)) {
-      this._$nodeTreeContext = DESTROYED_COMPOSED_BACKEND_CONTEXT
-    } else if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
-      this._$nodeTreeContext = DESTROYED_DOMLIKE_BACKEND_CONTEXT
-    } else {
-      this._$nodeTreeContext = DESTROYED_SHADOW_BACKEND_CONTEXT
+    if (this._$nodeTreeContext.dropBackendAfterRelease) {
+      this._$backendElement = null
+      if (BM.COMPOSED || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Composed)) {
+        this._$nodeTreeContext = DESTROYED_COMPOSED_BACKEND_CONTEXT
+      } else if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
+        this._$nodeTreeContext = DESTROYED_DOMLIKE_BACKEND_CONTEXT
+      } else {
+        this._$nodeTreeContext = DESTROYED_SHADOW_BACKEND_CONTEXT
+      }
     }
   }
 
@@ -2465,6 +2479,10 @@ export class Element implements NodeCast {
     if (isComponent(this) && this._$definition._$options.listenerChangeLifetimes) {
       this.triggerLifetime('listenerChange', [false, name, func, options])
     }
+  }
+
+  getListeners(): Record<string, (EventListenerOptions & { listener: EventListener<unknown> })[]> {
+    return this._$eventTarget.getListeners()
   }
 
   /** Get an attribute value ( `null` if not set or removed) */
