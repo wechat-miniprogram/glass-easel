@@ -30,7 +30,6 @@ export class GlassEaselTemplateDOM implements Template {
   innerData: DataValue
   genObjectGroupEnv: ProcGenEnv
   updateMode: string
-  methods: { [name: string]: GeneralFuncType }
 
   constructor(behavior: GeneralBehavior) {
     if (typeof behavior._$template !== 'object' && behavior._$template !== undefined) {
@@ -47,7 +46,6 @@ export class GlassEaselTemplateDOM implements Template {
       }
     }
     this.updateMode = ''
-    this.methods = behavior._$methodMap
   }
 
   createInstance(comp: GeneralComponent): TemplateInstance {
@@ -140,7 +138,7 @@ export class GlassEaselTemplateDOMInstance implements TemplateInstance, External
     const evName = event.getEventName()
     const bubbles = event.bubbles
     for (;;) {
-      const shadowedEvent = event.wrapShadowedEvent(target as any, null, cur as any)
+      const shadowedEvent = event.wrapShadowedEvent(target as any, null, cur as any, this.comp)
       const f = (cur as unknown as ElementWithEvent)._$wxTmplEv?.[evName]
       if (f) {
         const r = f.call(cur, shadowedEvent)
