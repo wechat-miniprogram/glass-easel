@@ -999,4 +999,57 @@ describe('partial update', () => {
       comp.setData({ cond: true })
     })
   })
+
+  test('should preserve item when keys are invalid', () => {
+    let execArr: string[] = []
+    const childCompDef = componentSpace
+      .define()
+      .property('a', String)
+      .observer('a', function () {
+        execArr.push(`update:${this.data.a}`)
+      })
+      .lifetime('attached', function () {
+        execArr.push(`create:${this.data.a}`)
+      })
+      .template(
+        tmpl(`
+          <block>{{a}}</block>
+        `),
+      )
+      .registerComponent()
+    const compDef = componentSpace
+      .define()
+      .usingComponents({
+        child: childCompDef,
+      })
+      .data(() => ({
+        list: [1],
+      }))
+      .template(
+        tmpl(`
+          <child wx:for="{{ list }}" wx:key="invalid" a="{{item}}-{{index}}"/>
+        `),
+      )
+      .registerComponent()
+    const comp = glassEasel.Component.createWithContext('root', compDef, domBackend)
+    glassEasel.Element.pretendAttached(comp)
+
+    expect(domHtml(comp)).toBe('<child>1-0</child>')
+    expect(execArr).toEqual(['update:1-0', 'create:1-0'])
+
+    execArr = []
+    execWithWarn(1, () => {
+      comp.setData({
+        list: [2, 1],
+      })
+    })
+    expect(domHtml(comp)).toBe('<child>2-0</child><child>1-1</child>')
+    expect(execArr).toEqual(['update:1-1', 'update:2-0', 'create:1-1'])
+
+    execArr = []
+    comp.spliceArrayDataOnPath(['list'], 0, 1, [])
+    comp.applyDataUpdates()
+    expect(domHtml(comp)).toBe('<child>1-0</child>')
+    expect(execArr).toEqual(['update:1-0'])
+  })
 })

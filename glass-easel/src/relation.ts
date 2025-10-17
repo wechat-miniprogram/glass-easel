@@ -66,9 +66,9 @@ export const normalizeRelation = <TOut extends { [key: string]: any }>(
     target = relation.target
   } else {
     const path = String(relation.target || key)
-    const usingTarget = ownerSpace.getComponentByUrlWithoutDefault(path, is)
+    const usingTarget = ownerSpace.getBehaviorByUrl(path, is)
     if (usingTarget) {
-      target = usingTarget.behavior
+      target = usingTarget
     } else {
       const globalTarget = ownerSpace.getGlobalUsingComponent(path)
       if (typeof globalTarget === 'object' && globalTarget !== null) {

@@ -65,7 +65,7 @@ const testBackend = (elem: GeneralComponent): void => {
       }
     }
   }
-  if (elem.getBackendMode() === BackendMode.Shadow) {
+  if (elem.getBackendMode() === BackendMode.Shadow && !elem.isExternal()) {
     testDom(
       (
         elem.getBackendElement() as backend.Element

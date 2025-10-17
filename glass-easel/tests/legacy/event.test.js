@@ -46,7 +46,6 @@ describe('Events', function () {
 
   beforeAll(function () {
     root = createElem('root')
-    root.$$.id = 'root'
     var backendRoot = domBackend.getRootNode()
     var placeholder = domBackend.document.createElement('div')
     backendRoot.appendChild(placeholder)

@@ -39,7 +39,6 @@ const testCases = function (testBackend) {
       is: 'virtual-a',
     })
     root = createElem('virtual-a')
-    root.$$.id = 'root'
     var backendRoot = testBackend.getRootNode()
     if (testBackend === shadowBackend) {
       backendRoot.appendChild(root.getBackendElement())

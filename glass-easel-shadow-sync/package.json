@@ -1,0 +1,15 @@
+{
+  "name": "glass-easel-shadow-sync",
+  "version": "0.1.0",
+  "main": "dist/glass-easel-shadow-sync.js",
+  "scripts": {
+    "build": "rollup -c rollup.config.mjs",
+    "test": "jest -c jest.config.js"
+  },
+  "dependencies": {
+    "glass-easel": "workspace:*"
+  },
+  "devDependencies": {
+    "glass-easel-template-compiler": "workspace:*"
+  }
+}

@@ -52,7 +52,7 @@ class MyTemplateInstance {
 
 export const myComponent = componentSpace.defineComponent({
   options: {
-    templateEngine: MyTemplateEngine,
+    templateEngine: new MyTemplateEngine(),
   },
   template: {
     // 这部分内容由 MyTemplateEngine 来处理
