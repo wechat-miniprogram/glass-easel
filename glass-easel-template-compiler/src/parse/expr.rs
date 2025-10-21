@@ -1190,14 +1190,14 @@ fn is_ident_start_char(ch: char) -> bool {
 }
 
 impl Expression {
-    pub fn sub_expressions(&self) -> SubExpression {
+    pub fn sub_expressions<'a>(&'a self) -> SubExpression<'a> {
         SubExpression {
             inner: self,
             index: 0,
         }
     }
 
-    pub fn sub_expressions_mut(&mut self) -> SubExpressionMut {
+    pub fn sub_expressions_mut<'a>(&'a mut self) -> SubExpressionMut<'a> {
         SubExpressionMut {
             inner: self,
             index: 0,

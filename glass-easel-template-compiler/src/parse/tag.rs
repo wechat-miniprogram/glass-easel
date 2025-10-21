@@ -503,11 +503,11 @@ impl Element {
         }
     }
 
-    pub fn iter_children(&self) -> super::iter::ChildrenIter {
+    pub fn iter_children<'a>(&'a self) -> super::iter::ChildrenIter<'a> {
         super::iter::ChildrenIter::new(self)
     }
 
-    pub fn iter_children_mut(&mut self) -> super::iter::ChildrenIterMut {
+    pub fn iter_children_mut<'a>(&'a mut self) -> super::iter::ChildrenIterMut<'a> {
         super::iter::ChildrenIterMut::new(self)
     }
 
