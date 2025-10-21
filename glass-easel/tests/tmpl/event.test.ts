@@ -489,7 +489,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
   })
 
   test('event phrase', () => {
-    let eventPhase: [string, glassEasel.EventPhase][] = []
+    const eventPhase: [string, glassEasel.EventPhase][] = []
     const def = glassEasel.registerElement({
       template: tmpl(`
         <div id="a" bind:customEv="evA">
@@ -512,7 +512,11 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     })
     const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
     const c = elem.getShadowRoot()!.getElementById('c')!
-    const event = new glassEasel.Event('customEv', {}, { composed: true, capturePhase: true, bubbles: true })
+    const event = new glassEasel.Event(
+      'customEv',
+      {},
+      { composed: true, capturePhase: true, bubbles: true },
+    )
     expect(event.eventPhase).toBe(glassEasel.EventPhase.None)
     c.dispatchEvent(event)
     expect(event.eventPhase).toBe(glassEasel.EventPhase.None)

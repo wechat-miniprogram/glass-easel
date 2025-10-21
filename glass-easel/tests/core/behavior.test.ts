@@ -597,6 +597,7 @@ describe('chaining-form interface', () => {
         e.detail = { eventOrder }
         return e
       })
+      // eslint-disable-next-line arrow-body-style
       .init(({ listener }) => {
         return {
           onCustomEv: listener((e) => {

@@ -423,12 +423,12 @@ describe('MutationObserver', () => {
     glassEasel.Element.pretendAttached(elem)
     expect(callEv.pop()).toMatchObject({
       type: 'attachStatus',
-      status: 'attached'
+      status: 'attached',
     })
     glassEasel.Element.pretendDetached(elem)
     expect(callEv.pop()).toMatchObject({
       type: 'attachStatus',
-      status: 'detached'
+      status: 'detached',
     })
   })
 })
