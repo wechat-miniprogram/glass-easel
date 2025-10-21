@@ -200,7 +200,8 @@ export class ComponentSpace {
     allowUnusedNativeNode = true,
   ) {
     if (baseSpace) {
-      this.updateBaseSpace(baseSpace)
+      Object.assign(this._$list, baseSpace._$pubList)
+      Object.assign(this._$behaviorList, baseSpace._$pubBehaviorList)
     }
     this._$defaultComponent = defaultComponent ?? ''
     this._$componentOptions = normalizeComponentOptions({}, baseSpace?._$componentOptions)
@@ -219,11 +220,6 @@ export class ComponentSpace {
 
   getComponentOptions(): NormalizedComponentOptions {
     return this._$componentOptions
-  }
-
-  updateBaseSpace(baseSpace: ComponentSpace) {
-    Object.assign(this._$list, baseSpace._$pubList)
-    Object.assign(this._$behaviorList, baseSpace._$pubBehaviorList)
   }
 
   /**

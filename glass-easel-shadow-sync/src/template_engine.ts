@@ -34,10 +34,10 @@ export class EmptyTemplateEngine implements templateEngine.Template {
             },
           }
         : createShadowRoot(comp),
-      initValues: (data) => {
+      initValues: (_data) => {
         // empty
       },
-      updateValues: (data, changes) => {
+      updateValues: (_data, _changes) => {
         // empty
       },
     }

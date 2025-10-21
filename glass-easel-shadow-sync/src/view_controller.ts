@@ -1,4 +1,4 @@
-/* eslint-disable consistent-return, class-methods-use-this, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable consistent-return, class-methods-use-this, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/consistent-type-imports */
 import type {
   BehaviorBuilder,
   ComponentSpace,
@@ -22,10 +22,13 @@ import type {
 import { EmptyTemplateEngine } from './template_engine'
 import { dashToCamelCase, initValues, updateValues } from './utils'
 
+// eslint-disable-next-line @typescript-eslint/ban-types
 type OptionalKeys<T> = { [P in keyof T]-?: {} extends Pick<T, P> ? P : never }[keyof T]
 
 type CallbackFunction<Args extends any[], Ret> = (...args: [...Args, (ret: Ret) => void]) => void
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 type ParametersOrNever<T> = T extends CallbackFunction<infer Arg, infer Ret> ? Arg : never
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 type DefaultReturn<T> = T extends CallbackFunction<infer Arg, infer Ret> ? Ret : never
 
 export class Fragment {
@@ -92,7 +95,7 @@ export class ViewController {
     //
   }
 
-  initData(initData: Record<string, unknown>): void {
+  initData(_initData: Record<string, unknown>): void {
     //
   }
 
@@ -331,7 +334,7 @@ export class ViewController {
     _glassEasel.Element.setSlotElement(node, slot)
   }
 
-  setExternalSlot(component: GeneralComponent, slot: Element): void {
+  setExternalSlot(_component: GeneralComponent, _slot: Element): void {
     // TODO
   }
 
@@ -684,7 +687,12 @@ export class ViewController {
     )
   }
 
-  callWXSPropChangeListener(element: Element, newValue: any, oldValue: any, lvaluePath: (string | number)[]): void {
+  callWXSPropChangeListener(
+    _element: Element,
+    _newValue: any,
+    _oldValue: any,
+    _lvaluePath: (string | number)[],
+  ): void {
     // To be override
   }
 

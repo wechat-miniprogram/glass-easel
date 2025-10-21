@@ -23,6 +23,7 @@ if (!message) {
   'glass-easel-miniprogram-adapter',
   'glass-easel-miniprogram-webpack-plugin',
   'glass-easel-miniprogram-template',
+  'glass-easel-shadow-sync',
 ].forEach((p) => {
   console.info(`Deprecate ${p}@${version} on npmjs`)
   if (

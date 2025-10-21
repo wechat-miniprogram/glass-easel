@@ -269,7 +269,7 @@ export type ChannelArgs = ExhaustiveChannelEvent<{
     boolean,
     (string | number)[],
   ]
-  [ChannelEventType.CALL_WXS_PROP_CHANGE_LISTENER]: [number, any, any, (string | number)[]]
+  [ChannelEventType.CALL_WXS_PROP_CHANGE_LISTENER]: [number, unknown, unknown, (string | number)[]]
   [ChannelEventType.ON_WXS_CALL_METHOD]: [number, string, string]
 }>
 

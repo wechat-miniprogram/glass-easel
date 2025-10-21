@@ -1,3 +1,4 @@
+/* eslint-disable */
 import * as coreEnv from 'glass-easel/tests/base/env'
 import { shadowSyncBackend } from '../base/env'
 

@@ -1,7 +1,6 @@
-/* eslint-disable class-methods-use-this */
+/* eslint-disable class-methods-use-this, @typescript-eslint/consistent-type-imports */
 import type {
   BackendMode,
-  DataChange,
   Element,
   Event,
   EventBubbleStatus,
@@ -21,7 +20,7 @@ import type {
 import { type Channel } from './message_channel'
 import { replayShadowBackend } from './replay'
 import { EmptyTemplateEngine } from './template_engine'
-import { initValues, updateValues, type IDGenerator } from './utils'
+import { type IDGenerator } from './utils'
 
 export const enum ShadowSyncElementType {
   Fragment,

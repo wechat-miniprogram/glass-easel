@@ -437,9 +437,10 @@ describe('backend', () => {
       expect(isWXS).toBe(true)
 
       if (lvaluePath[0] === glassEasel.template.GeneralLvaluePathPrefix.Script) {
-        const path = lvaluePath[1] as string
-        const key = lvaluePath[2] as string
-        return
+        // const path = lvaluePath[1] as string
+        // const key = lvaluePath[2] as string
+        // return
+        throw new Error('not implemented')
       } else if (lvaluePath[0] === glassEasel.template.GeneralLvaluePathPrefix.InlineScript) {
         const wxmlFile = lvaluePath[1] as string
         const module = lvaluePath[2] as string
@@ -451,12 +452,13 @@ describe('backend', () => {
           element,
           eventName,
           capture,
+          // eslint-disable-next-line no-nested-ternary
           final
             ? glassEasel.EventMutLevel.Final
             : mutated
             ? glassEasel.EventMutLevel.Mut
             : glassEasel.EventMutLevel.None,
-          function (this: glassEasel.GeneralComponent, ev: glassEasel.ShadowedEvent<unknown>) {
+          function (this: glassEasel.GeneralComponent, _ev: glassEasel.ShadowedEvent<unknown>) {
             syncController.onWXSCallMethod(this.ownerShadowRoot!.getHostNode(), 'customHandler', [
               true,
             ])

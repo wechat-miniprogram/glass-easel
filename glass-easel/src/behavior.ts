@@ -865,7 +865,7 @@ export class Behavior<
   /** @internal */
   _$relationMap?: { [name: string]: RelationDefinition }
   /** @internal */
-  _$init: { func: ((this: any, ctx: any) => any), once: boolean }[]
+  _$init: { func: (this: any, ctx: any) => any; once: boolean }[]
   /** @internal */
   _$methodCallerInit?: (
     this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>,

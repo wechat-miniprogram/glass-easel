@@ -147,7 +147,7 @@ export const convertGenerics = (
             )
           } else {
             triggerWarning(
-              `Cannot find impl for generic "${key}", using default component (on component "${compDef.is}")`,
+              `No component specified for generic "${key}", using default component (on component "${compDef.is}")`,
             )
           }
         }
