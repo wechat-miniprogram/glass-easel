@@ -4,6 +4,7 @@ import { promises as fs } from 'node:fs'
 import * as path from 'node:path'
 import { NormalModule, type Compiler, type WebpackPluginInstance } from 'webpack'
 import chalk from 'chalk'
+import chokidar from 'chokidar'
 import { TmplGroup } from 'glass-easel-template-compiler'
 import { escapeJsString } from './helpers'
 
@@ -24,8 +25,6 @@ type Warning = {
   endColumn: number
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-const chokidar = require('chokidar')
 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 const { RawSource } = require('webpack-sources')
 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -356,7 +355,6 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
       // await readdirp(codeRoot, handleFile)
       await new Promise((resolve, reject) => {
         const promises: Promise<void>[] = []
-        /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
         const watcher = chokidar.watch(codeRoot, { ignoreInitial: false })
         watcher
           .on('add', (p: string) => {
@@ -372,14 +370,12 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
           .on('ready', () => {
             Promise.all(promises)
               .then(() => {
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-return
                 if (!enableWatch) return watcher.close()
                 return null
               })
               .then(resolve)
               .catch(reject)
           })
-        /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
       })
     }
 

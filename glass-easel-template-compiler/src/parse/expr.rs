@@ -2191,7 +2191,7 @@ mod test {
                         ..Default::default()
                     };
                     let mut stringifier =
-                        crate::stringify::Stringifier::new(String::new(), "test", src, options);
+                        crate::stringify::Stringifier::new(String::new(), "test", Some(src), options);
                     x.stringify_write(&mut stringifier).unwrap();
                     let (s, _) = stringifier.finish();
                     s

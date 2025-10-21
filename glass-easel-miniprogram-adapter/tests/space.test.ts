@@ -1194,4 +1194,26 @@ describe('define', () => {
     root.getComponent().triggerPageLifetime('show', [])
     expect(domHtml(root.getComponent())).toBe('<comp1>2</comp1>')
   })
+
+  test('overall behavior', () => {
+    const env = new MiniProgramEnv()
+    const codeSpace = env.createCodeSpace('', true)
+
+    const componentSpace = codeSpace.getComponentSpace()
+    const overall = componentSpace.defineBehavior({
+      is: 'overall',
+      data: {
+        num: 1,
+      },
+    })
+    codeSpace.setOverallBehavior(overall)
+
+    codeSpace.addCompiledTemplate('comp', tmpl(`<div>{{ num }}</div>`))
+
+    codeSpace.component('comp').register()
+
+    const ab = env.associateBackend()
+    const root = ab.createRoot('body', codeSpace, 'comp')
+    expect(domHtml(root.getComponent())).toBe('<div>1</div>')
+  })
 })

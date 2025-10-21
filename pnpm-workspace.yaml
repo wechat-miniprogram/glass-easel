@@ -4,5 +4,6 @@ packages:
   - "glass-easel-miniprogram-webpack-plugin"
   - "glass-easel-shadow-sync"
   - "glass-easel-miniprogram-template"
+  - "glass-easel-miniprogram-typescript"
   - "glass-easel-template-compiler"
   - "glass-easel-stylesheet-compiler"

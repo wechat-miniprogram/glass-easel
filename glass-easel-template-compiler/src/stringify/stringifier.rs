@@ -26,11 +26,11 @@ pub struct Stringifier<'s, W: FmtWrite> {
 }
 
 impl<'s, W: FmtWrite> Stringifier<'s, W> {
-    pub fn new(w: W, source_path: &'s str, source: &'s str, options: StringifyOptions) -> Self {
+    pub fn new(w: W, source_path: &'s str, source: Option<&'s str>, options: StringifyOptions) -> Self {
         let smb = if options.source_map {
             let mut smb = SourceMapBuilder::new(Some(source_path));
             let source_id = smb.add_source(source_path);
-            smb.set_source_contents(source_id, Some(source));
+            smb.set_source_contents(source_id, source);
             Some(smb)
         } else {
             None
@@ -110,6 +110,16 @@ impl<'s, 't, W: FmtWrite> StringifierBlock<'s, 't, W> {
         &self.scope_names[i]
     }
 
+    pub(super) fn add_scope_with_ts_keyword_escape(&mut self, name: &CompactString, extra_preserved: &[&'static str]) -> CompactString {
+        let name = if super::is_typescript_keyword(name) || extra_preserved.contains(&name.as_str()) || name.starts_with("_") {
+            compact_str::format_compact!("${}", name)
+        } else {
+            name.clone()
+        };
+        self.scope_names.push(name.clone());
+        name
+    }
+
     pub(super) fn get_scope_name(&mut self, index: usize) -> &str {
         self.scope_names
             .get(index)
@@ -136,7 +146,7 @@ impl<'s, 't, W: FmtWrite> StringifierBlock<'s, 't, W> {
 
     pub(super) fn write_sub_block(
         &mut self,
-        f: impl FnOnce(&mut StringifierBlock<W>) -> FmtResult,
+        f: impl FnOnce(&mut StringifierBlock<'s, '_, W>) -> FmtResult,
     ) -> FmtResult {
         let mut b = StringifierBlock {
             top: self.top,
@@ -237,11 +247,13 @@ impl<'s, 't, 'u, W: FmtWrite> StringifierLine<'s, 't, 'u, W> {
 
     pub(super) fn write_scope_name(
         &mut self,
+        prefix: &str,
         index: usize,
         location: &Range<Position>,
     ) -> FmtResult {
-        let name = self.block.get_scope_name(index).to_string();
-        self.write_token_state(&name, Some(&name), location, StringifierLineState::Normal)
+        let name = format!("{}{}", prefix, self.block.get_scope_name(index));
+        let src_name = self.block.get_scope_name(index).to_string();
+        self.write_token_state(&name, Some(&src_name), location, StringifierLineState::Normal)
     }
 
     pub(super) fn write_token(

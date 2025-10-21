@@ -1,4 +1,4 @@
-Page({
+export default Page({
   data: {
     showAgain: false,
   },
