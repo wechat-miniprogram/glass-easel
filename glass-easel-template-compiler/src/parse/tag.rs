@@ -846,9 +846,10 @@ impl Element {
                             (ElementKind::Normal { .. }, "class") => AttrPrefixKind::ClassString,
                             (ElementKind::Normal { .. }, "style") => AttrPrefixKind::StyleString,
                             (ElementKind::Normal { .. }, x) | (ElementKind::Slot { .. }, x)
-                                if x.starts_with("data-") && x != "data-" => {
-                                    AttrPrefixKind::DataHyphen
-                                }
+                                if x.starts_with("data-") && x != "data-" =>
+                            {
+                                AttrPrefixKind::DataHyphen
+                            }
                             _ => AttrPrefixKind::Normal,
                         },
                         Some(x) => match x.name.as_str() {
@@ -4101,7 +4102,10 @@ mod test {
             ParseErrorKind::InvalidScopeName,
             13..15
         );
-        case!("<div let:a-b='{{a}}'>{{ aB }}</div>", r#"<div let:aB="{{a}}">{{aB}}</div>"#);
+        case!(
+            "<div let:a-b='{{a}}'>{{ aB }}</div>",
+            r#"<div let:aB="{{a}}">{{aB}}</div>"#
+        );
         case!(
             "<div let:a></div>",
             r#"<div let:a/>"#,

@@ -2,14 +2,27 @@ use std::fmt::{Result as FmtResult, Write as FmtWrite};
 
 use sourcemap::SourceMap;
 
-use crate::{escape::dash_to_camel, parse::{expr::*, tag::*, Position, Template, TemplateStructure}, stringify::{expr::{expression_strigify_write, ExpressionLevel}, Stringifier, StringifierBlock, StringifierLine, StringifierLineState, StringifyOptions}};
+use crate::{
+    escape::dash_to_camel,
+    parse::{expr::*, tag::*, Position, Template, TemplateStructure},
+    stringify::{
+        expr::{expression_strigify_write, ExpressionLevel},
+        Stringifier, StringifierBlock, StringifierLine, StringifierLineState, StringifyOptions,
+    },
+};
 
 trait ConvertedExprWriteBlock {
-    fn converted_expr_write<'s, 't, W: FmtWrite>(&self, w: &mut StringifierBlock<'s, 't, W>) -> FmtResult;
+    fn converted_expr_write<'s, 't, W: FmtWrite>(
+        &self,
+        w: &mut StringifierBlock<'s, 't, W>,
+    ) -> FmtResult;
 }
 
 trait ConvertedExprWriteInline {
-    fn converted_expr_write<'s, 't, 'u, W: FmtWrite>(&self, w: &mut StringifierLine<'s, 't, 'u, W>) -> FmtResult;
+    fn converted_expr_write<'s, 't, 'u, W: FmtWrite>(
+        &self,
+        w: &mut StringifierLine<'s, 't, 'u, W>,
+    ) -> FmtResult;
 }
 
 const PRESERVED_VAR_NAMES: [&'static str; 3] = ["component", "data", "methods"];
@@ -22,7 +35,11 @@ type _ForKey_<T, N extends string> = N extends "*this" ? _ForItem_<T> : _ForItem
 "#
 }
 
-pub(crate) fn generate_tmpl_converted_expr(tree: &Template, ts_env: &str, runtime: &str) -> (String, SourceMap) {
+pub(crate) fn generate_tmpl_converted_expr(
+    tree: &Template,
+    ts_env: &str,
+    runtime: &str,
+) -> (String, SourceMap) {
     let ret = String::new();
     let options = StringifyOptions {
         source_map: true,
@@ -45,20 +62,28 @@ pub(crate) fn generate_tmpl_converted_expr(tree: &Template, ts_env: &str, runtim
             wrap_brace_block(w, &tmpl.tag_location, |w| {
                 let pos = tmpl.tag_location.start.0.start;
                 w.write_line(|w| {
-                    write_token_series(["const ", "data", ":", "any", "=", "0", ";"], &(pos..pos), w)
+                    write_token_series(
+                        ["const ", "data", ":", "any", "=", "0", ";"],
+                        &(pos..pos),
+                        w,
+                    )
                 })?;
                 tmpl.content.converted_expr_write(w)
             })?;
         }
         tree.content.converted_expr_write(w)
-    }).unwrap();
+    })
+    .unwrap();
 
     let (s, sm) = w.finish();
     (s, sm.unwrap())
 }
 
 impl ConvertedExprWriteBlock for Vec<Node> {
-    fn converted_expr_write<'s, 't, W: FmtWrite>(&self, w: &mut StringifierBlock<'s, 't, W>) -> FmtResult {
+    fn converted_expr_write<'s, 't, W: FmtWrite>(
+        &self,
+        w: &mut StringifierBlock<'s, 't, W>,
+    ) -> FmtResult {
         for node in self {
             node.converted_expr_write(w)?;
         }
@@ -67,7 +92,10 @@ impl ConvertedExprWriteBlock for Vec<Node> {
 }
 
 impl ConvertedExprWriteBlock for Node {
-    fn converted_expr_write<'s, 't, W: FmtWrite>(&self, w: &mut StringifierBlock<'s, 't, W>) -> FmtResult {
+    fn converted_expr_write<'s, 't, W: FmtWrite>(
+        &self,
+        w: &mut StringifierBlock<'s, 't, W>,
+    ) -> FmtResult {
         match self {
             Self::Text(x) => write_dynamic_value(x, w),
             Self::Element(x) => x.converted_expr_write(w),
@@ -81,14 +109,18 @@ fn wrap_brace_block<'s, 't, W: FmtWrite>(
     tag_location: &TagLocation,
     f: impl FnOnce(&mut StringifierBlock<'s, '_, W>) -> FmtResult,
 ) -> FmtResult {
+    w.write_line(|w| w.write_token("{", None, &tag_location.start.0))?;
+    w.write_sub_block(|w| f(w))?;
     w.write_line(|w| {
-        w.write_token("{", None, &tag_location.start.0)
-    })?;
-    w.write_sub_block(|w| {
-        f(w)
-    })?;
-    w.write_line(|w| {
-        w.write_token("}", None, tag_location.end.as_ref().map(|x| &x.0).unwrap_or(&tag_location.start.1))
+        w.write_token(
+            "}",
+            None,
+            tag_location
+                .end
+                .as_ref()
+                .map(|x| &x.0)
+                .unwrap_or(&tag_location.start.1),
+        )
     })
 }
 
@@ -103,12 +135,26 @@ fn write_token_series<'s, 't, 'u, W: FmtWrite, const N: usize>(
     Ok(())
 }
 
-fn write_let_vars<'s, 't, W: FmtWrite>(let_vars: &[Attribute], w: &mut StringifierBlock<'s, 't, W>) -> FmtResult {
+fn write_let_vars<'s, 't, W: FmtWrite>(
+    let_vars: &[Attribute],
+    w: &mut StringifierBlock<'s, 't, W>,
+) -> FmtResult {
     for attr in let_vars {
-        let var_name = w.add_scope_with_ts_keyword_escape(&attr.name.name, &PRESERVED_VAR_NAMES).clone();
+        let var_name = w
+            .add_scope_with_ts_keyword_escape(&attr.name.name, &PRESERVED_VAR_NAMES)
+            .clone();
         w.write_line(|w| {
-            write_token_series(["const "], &(attr.name.location.start..attr.name.location.start), w)?;
-            w.write_token_state(&var_name, Some(&attr.name.name), &attr.name.location, StringifierLineState::Normal)?;
+            write_token_series(
+                ["const "],
+                &(attr.name.location.start..attr.name.location.start),
+                w,
+            )?;
+            w.write_token_state(
+                &var_name,
+                Some(&attr.name.name),
+                &attr.name.location,
+                StringifierLineState::Normal,
+            )?;
             let pos = attr.name.location.end;
             w.write_token_state("=", None, &(pos..pos), StringifierLineState::Normal)?;
             if let Some(value) = &attr.value {
@@ -122,7 +168,10 @@ fn write_let_vars<'s, 't, W: FmtWrite>(let_vars: &[Attribute], w: &mut Stringifi
     Ok(())
 }
 
-fn write_dynamic_value<'s, 't, W: FmtWrite>(x: &Value, w: &mut StringifierBlock<'s, 't, W>) -> FmtResult {
+fn write_dynamic_value<'s, 't, W: FmtWrite>(
+    x: &Value,
+    w: &mut StringifierBlock<'s, 't, W>,
+) -> FmtResult {
     if let Value::Static { .. } = x {
         Ok(())
     } else {
@@ -134,13 +183,27 @@ fn write_dynamic_value<'s, 't, W: FmtWrite>(x: &Value, w: &mut StringifierBlock<
     }
 }
 
-fn write_slot_value_refs<'s, 't, W: FmtWrite>(slot_value_refs: &[StaticAttribute], w: &mut StringifierBlock<'s, 't, W>) -> FmtResult {
+fn write_slot_value_refs<'s, 't, W: FmtWrite>(
+    slot_value_refs: &[StaticAttribute],
+    w: &mut StringifierBlock<'s, 't, W>,
+) -> FmtResult {
     // IDEA impl slot value typing
     for attr in slot_value_refs {
-        let var_name = w.add_scope_with_ts_keyword_escape(&attr.value.name, &PRESERVED_VAR_NAMES).clone();
+        let var_name = w
+            .add_scope_with_ts_keyword_escape(&attr.value.name, &PRESERVED_VAR_NAMES)
+            .clone();
         w.write_line(|w| {
-            write_token_series(["const "], &(attr.name.location.start..attr.name.location.start), w)?;
-            w.write_token_state(&var_name, Some(&attr.name.name), &attr.name.location, StringifierLineState::Normal)?;
+            write_token_series(
+                ["const "],
+                &(attr.name.location.start..attr.name.location.start),
+                w,
+            )?;
+            w.write_token_state(
+                &var_name,
+                Some(&attr.name.name),
+                &attr.name.location,
+                StringifierLineState::Normal,
+            )?;
             let pos = attr.name.location.end;
             write_token_series([":", "any", "=", "0", ";"], &(pos..pos), w)
         })?;
@@ -148,7 +211,11 @@ fn write_slot_value_refs<'s, 't, W: FmtWrite>(slot_value_refs: &[StaticAttribute
     Ok(())
 }
 
-fn write_event_method<'s, 't, W: FmtWrite>(name: &Ident, value: &Option<Value>, w: &mut StringifierBlock<'s, 't, W>) -> FmtResult {
+fn write_event_method<'s, 't, W: FmtWrite>(
+    name: &Ident,
+    value: &Option<Value>,
+    w: &mut StringifierBlock<'s, 't, W>,
+) -> FmtResult {
     // IDEA impl event typing
     if let Some(value) = value.as_ref() {
         w.write_line(|w| {
@@ -157,7 +224,12 @@ fn write_event_method<'s, 't, W: FmtWrite>(name: &Ident, value: &Option<Value>, 
             if let Value::Static { value, location } = value {
                 w.write_token_state("methods", None, &(pos..pos), StringifierLineState::Normal)?;
                 w.write_token_state(".", None, &(pos..pos), StringifierLineState::Normal)?;
-                w.write_token_state(&value, Some(&value), &location, StringifierLineState::Normal)?;
+                w.write_token_state(
+                    &value,
+                    Some(&value),
+                    &location,
+                    StringifierLineState::Normal,
+                )?;
             } else {
                 value.converted_expr_write(w)?;
             }
@@ -167,8 +239,18 @@ fn write_event_method<'s, 't, W: FmtWrite>(name: &Ident, value: &Option<Value>, 
     Ok(())
 }
 
-fn write_common<'s, 't, W: FmtWrite>(common: &CommonElementAttributes, w: &mut StringifierBlock<'s, 't, W>) -> FmtResult {
-    let CommonElementAttributes { id, slot, slot_value_refs: _, event_bindings, data, marks } = common;
+fn write_common<'s, 't, W: FmtWrite>(
+    common: &CommonElementAttributes,
+    w: &mut StringifierBlock<'s, 't, W>,
+) -> FmtResult {
+    let CommonElementAttributes {
+        id,
+        slot,
+        slot_value_refs: _,
+        event_bindings,
+        data,
+        marks,
+    } = common;
     if let Some(x) = id {
         write_dynamic_value(&x.1, w)?;
     }
@@ -187,7 +269,10 @@ fn write_common<'s, 't, W: FmtWrite>(common: &CommonElementAttributes, w: &mut S
 }
 
 impl ConvertedExprWriteBlock for Element {
-    fn converted_expr_write<'s, 't, W: FmtWrite>(&self, w: &mut StringifierBlock<'s, 't, W>) -> FmtResult {
+    fn converted_expr_write<'s, 't, W: FmtWrite>(
+        &self,
+        w: &mut StringifierBlock<'s, 't, W>,
+    ) -> FmtResult {
         match &self.kind {
             ElementKind::Normal {
                 tag_name,
@@ -204,9 +289,22 @@ impl ConvertedExprWriteBlock for Element {
             } => {
                 wrap_brace_block(w, &self.tag_location, |w| {
                     w.write_line(|w| {
-                        write_token_series(["const ", "_tag_", "=", "tags", "['"], &(tag_name.location.start..tag_name.location.start), w)?;
-                        w.write_token_state(&tag_name.name, Some(&tag_name.name), &tag_name.location, StringifierLineState::Normal)?;
-                        write_token_series(["']", ";"], &(tag_name.location.end..tag_name.location.end), w)
+                        write_token_series(
+                            ["const ", "_tag_", "=", "tags", "['"],
+                            &(tag_name.location.start..tag_name.location.start),
+                            w,
+                        )?;
+                        w.write_token_state(
+                            &tag_name.name,
+                            Some(&tag_name.name),
+                            &tag_name.location,
+                            StringifierLineState::Normal,
+                        )?;
+                        write_token_series(
+                            ["']", ";"],
+                            &(tag_name.location.end..tag_name.location.end),
+                            w,
+                        )
                     })?;
                     write_slot_value_refs(&common.slot_value_refs, w)?;
                     write_let_vars(let_vars, w)?;
@@ -216,30 +314,74 @@ impl ConvertedExprWriteBlock for Element {
                     let nv_change_attr = change_attributes.iter().map(|x| (&x.name, &x.value));
                     for (name, value) in nv_attr.chain(nv_change_attr) {
                         let attr_name = dash_to_camel(&name.name);
-                        w.write_line(|w| {
-                            match value {
-                                None => {
-                                    write_token_series(["_tag_", "."], &(name.location.start..name.location.start), w)?;
-                                    w.write_token_state(&attr_name, Some(&name.name), &name.location, StringifierLineState::Normal)?;
-                                    write_token_series(["=", "true", ";"], &(name.location.end..name.location.end), w)
-                                }
-                                Some(Value::Static { .. }) => {
-                                    write_token_series(
-                                        ["var ", "_string_or_number_", ":", "string", "|", "number", "=", "_tag_", "."],
-                                        &(name.location.start..name.location.start),
-                                        w,
-                                    )?;
-                                    w.write_token_state(&attr_name, Some(&name.name), &name.location, StringifierLineState::Normal)?;
-                                    write_token_series([";"], &(name.location.end..name.location.end), w)
-                                }
-                                Some(value) => {
-                                    write_token_series(["_tag_", "."], &(name.location.start..name.location.start), w)?;
-                                    w.write_token_state(&attr_name, Some(&name.name), &name.location, StringifierLineState::Normal)?;
-                                    let pos = name.location.end;
-                                    w.write_token_state("=", None, &(pos..pos), StringifierLineState::Normal)?;
-                                    value.converted_expr_write(w)?;
-                                    write_token_series([";"], &(pos..pos), w)
-                                }
+                        w.write_line(|w| match value {
+                            None => {
+                                write_token_series(
+                                    ["_tag_", "."],
+                                    &(name.location.start..name.location.start),
+                                    w,
+                                )?;
+                                w.write_token_state(
+                                    &attr_name,
+                                    Some(&name.name),
+                                    &name.location,
+                                    StringifierLineState::Normal,
+                                )?;
+                                write_token_series(
+                                    ["=", "true", ";"],
+                                    &(name.location.end..name.location.end),
+                                    w,
+                                )
+                            }
+                            Some(Value::Static { .. }) => {
+                                write_token_series(
+                                    [
+                                        "var ",
+                                        "_string_or_number_",
+                                        ":",
+                                        "string",
+                                        "|",
+                                        "number",
+                                        "=",
+                                        "_tag_",
+                                        ".",
+                                    ],
+                                    &(name.location.start..name.location.start),
+                                    w,
+                                )?;
+                                w.write_token_state(
+                                    &attr_name,
+                                    Some(&name.name),
+                                    &name.location,
+                                    StringifierLineState::Normal,
+                                )?;
+                                write_token_series(
+                                    [";"],
+                                    &(name.location.end..name.location.end),
+                                    w,
+                                )
+                            }
+                            Some(value) => {
+                                write_token_series(
+                                    ["_tag_", "."],
+                                    &(name.location.start..name.location.start),
+                                    w,
+                                )?;
+                                w.write_token_state(
+                                    &attr_name,
+                                    Some(&name.name),
+                                    &name.location,
+                                    StringifierLineState::Normal,
+                                )?;
+                                let pos = name.location.end;
+                                w.write_token_state(
+                                    "=",
+                                    None,
+                                    &(pos..pos),
+                                    StringifierLineState::Normal,
+                                )?;
+                                value.converted_expr_write(w)?;
+                                write_token_series([";"], &(pos..pos), w)
                             }
                         })?;
                     }
@@ -249,7 +391,11 @@ impl ConvertedExprWriteBlock for Element {
                         ClassAttribute::None => {}
                         ClassAttribute::String(loc, value) => {
                             w.write_line(|w| {
-                                write_token_series(["var ", "_class_", ":", "string", "="], loc, w)?;
+                                write_token_series(
+                                    ["var ", "_class_", ":", "string", "="],
+                                    loc,
+                                    w,
+                                )?;
                                 value.converted_expr_write(w)?;
                                 let pos = loc.end;
                                 write_token_series([";"], &(pos..pos), w)
@@ -259,7 +405,11 @@ impl ConvertedExprWriteBlock for Element {
                             for (loc, _name, value) in arr {
                                 if let Some(value) = value {
                                     w.write_line(|w| {
-                                        write_token_series(["var ", "_class_enabled_", ":", "boolean", "="], loc, w)?;
+                                        write_token_series(
+                                            ["var ", "_class_enabled_", ":", "boolean", "="],
+                                            loc,
+                                            w,
+                                        )?;
                                         value.converted_expr_write(w)?;
                                         let pos = loc.end;
                                         write_token_series([";"], &(pos..pos), w)
@@ -274,7 +424,11 @@ impl ConvertedExprWriteBlock for Element {
                         StyleAttribute::None => {}
                         StyleAttribute::String(loc, value) => {
                             w.write_line(|w| {
-                                write_token_series(["var ", "_style_", ":", "string", "="], loc, w)?;
+                                write_token_series(
+                                    ["var ", "_style_", ":", "string", "="],
+                                    loc,
+                                    w,
+                                )?;
                                 value.converted_expr_write(w)?;
                                 let pos = loc.end;
                                 write_token_series([";"], &(pos..pos), w)
@@ -284,7 +438,11 @@ impl ConvertedExprWriteBlock for Element {
                             for (loc, _name, value) in arr {
                                 if let Value::Dynamic { .. } = value {
                                     w.write_line(|w| {
-                                        write_token_series(["var ", "_style_property_", ":", "string", "="], loc, w)?;
+                                        write_token_series(
+                                            ["var ", "_style_property_", ":", "string", "="],
+                                            loc,
+                                            w,
+                                        )?;
                                         value.converted_expr_write(w)?;
                                         let pos = loc.end;
                                         write_token_series([";"], &(pos..pos), w)
@@ -296,7 +454,10 @@ impl ConvertedExprWriteBlock for Element {
 
                     // worklet
                     for attr in worklet_attributes {
-                        let v = Value::Static { value: attr.value.name.clone(), location: attr.value.location() };
+                        let v = Value::Static {
+                            value: attr.value.name.clone(),
+                            location: attr.value.location(),
+                        };
                         write_event_method(&attr.name, &Some(v), w)?;
                     }
 
@@ -328,8 +489,12 @@ impl ConvertedExprWriteBlock for Element {
                 children,
             } => {
                 wrap_brace_block(w, &self.tag_location, |w| {
-                    let item_scope_name = w.add_scope_with_ts_keyword_escape(&item_name.1.name, &PRESERVED_VAR_NAMES).clone();
-                    let index_scope_name = w.add_scope_with_ts_keyword_escape(&index_name.1.name, &PRESERVED_VAR_NAMES).clone();
+                    let item_scope_name = w
+                        .add_scope_with_ts_keyword_escape(&item_name.1.name, &PRESERVED_VAR_NAMES)
+                        .clone();
+                    let index_scope_name = w
+                        .add_scope_with_ts_keyword_escape(&index_name.1.name, &PRESERVED_VAR_NAMES)
+                        .clone();
                     w.write_line(|w| {
                         write_token_series(["const ", "_for_", "="], &list.0, w)?;
                         list.1.converted_expr_write(w)?;
@@ -337,18 +502,52 @@ impl ConvertedExprWriteBlock for Element {
                     })?;
                     w.write_line(|w| {
                         write_token_series(["const "], &item_name.0, w)?;
-                        w.write_token_state(&item_scope_name, Some(&item_name.1.name), &item_name.1.location, StringifierLineState::Normal)?;
+                        w.write_token_state(
+                            &item_scope_name,
+                            Some(&item_name.1.name),
+                            &item_name.1.location,
+                            StringifierLineState::Normal,
+                        )?;
                         write_token_series(
-                            ["=", "0", " as ", "unknown", " as ", "_ForItem_", "<", "typeof ", "_for_", ">", ";"],
+                            [
+                                "=",
+                                "0",
+                                " as ",
+                                "unknown",
+                                " as ",
+                                "_ForItem_",
+                                "<",
+                                "typeof ",
+                                "_for_",
+                                ">",
+                                ";",
+                            ],
                             &(item_name.0.end..item_name.0.end),
                             w,
                         )
                     })?;
                     w.write_line(|w| {
                         write_token_series(["const "], &index_name.0, w)?;
-                        w.write_token_state(&index_scope_name, Some(&index_name.1.name), &index_name.1.location, StringifierLineState::Normal)?;
+                        w.write_token_state(
+                            &index_scope_name,
+                            Some(&index_name.1.name),
+                            &index_name.1.location,
+                            StringifierLineState::Normal,
+                        )?;
                         write_token_series(
-                            ["=", "0", " as ", "unknown", " as ", "_ForIndex_", "<", "typeof ", "_for_", ">", ";"],
+                            [
+                                "=",
+                                "0",
+                                " as ",
+                                "unknown",
+                                " as ",
+                                "_ForIndex_",
+                                "<",
+                                "typeof ",
+                                "_for_",
+                                ">",
+                                ";",
+                            ],
                             &(item_name.0.end..item_name.0.end),
                             w,
                         )
@@ -356,19 +555,44 @@ impl ConvertedExprWriteBlock for Element {
                     if !key.1.name.is_empty() {
                         w.write_line(|w| {
                             write_token_series(
-                                ["var ", "_string_or_number_", ":", "string", "|", "number", "=", "0", " as ", "unknown", " as ", "_ForKey_", "<", "typeof ", "_for_", ","],
+                                [
+                                    "var ",
+                                    "_string_or_number_",
+                                    ":",
+                                    "string",
+                                    "|",
+                                    "number",
+                                    "=",
+                                    "0",
+                                    " as ",
+                                    "unknown",
+                                    " as ",
+                                    "_ForKey_",
+                                    "<",
+                                    "typeof ",
+                                    "_for_",
+                                    ",",
+                                ],
                                 &(key.0.start..key.0.start),
                                 w,
                             )?;
                             let name_str = crate::escape::gen_lit_str(&key.1.name);
-                            w.write_token_state(&name_str, Some(&key.1.name), &key.1.location, StringifierLineState::Normal)?;
+                            w.write_token_state(
+                                &name_str,
+                                Some(&key.1.name),
+                                &key.1.location,
+                                StringifierLineState::Normal,
+                            )?;
                             write_token_series([">", ";"], &(key.0.end..key.0.end), w)
                         })?;
                     }
                     children.converted_expr_write(w)
                 })?;
             }
-            ElementKind::If { branches, else_branch } => {
+            ElementKind::If {
+                branches,
+                else_branch,
+            } => {
                 for (_loc, cond, children) in branches {
                     write_dynamic_value(cond, w)?;
                     children.converted_expr_write(w)?;
@@ -384,7 +608,11 @@ impl ConvertedExprWriteBlock for Element {
             ElementKind::Include { path: _ } => {
                 // IDEA impl include typing
             }
-            ElementKind::Slot { name: _, values, common } => {
+            ElementKind::Slot {
+                name: _,
+                values,
+                common,
+            } => {
                 wrap_brace_block(w, &self.tag_location, |w| {
                     write_slot_value_refs(&common.slot_value_refs, w)?;
                     for attr in values {
@@ -402,12 +630,22 @@ impl ConvertedExprWriteBlock for Element {
 }
 
 impl ConvertedExprWriteInline for Value {
-    fn converted_expr_write<'s, 't, 'u, W: FmtWrite>(&self, w: &mut StringifierLine<'s, 't, 'u, W>) -> FmtResult {
+    fn converted_expr_write<'s, 't, 'u, W: FmtWrite>(
+        &self,
+        w: &mut StringifierLine<'s, 't, 'u, W>,
+    ) -> FmtResult {
         match self {
-            Self::Static { value, location } => {
-                w.write_token_state(&format!("{:?}", value), Some(value), location, StringifierLineState::Normal)
-            }
-            Self::Dynamic { expression, double_brace_location: _, binding_map_keys: _ } => {
+            Self::Static { value, location } => w.write_token_state(
+                &format!("{:?}", value),
+                Some(value),
+                location,
+                StringifierLineState::Normal,
+            ),
+            Self::Dynamic {
+                expression,
+                double_brace_location: _,
+                binding_map_keys: _,
+            } => {
                 let mut prev_loc = None;
                 expression.for_each_static_or_dynamic_part::<std::fmt::Error>(|part, loc| {
                     if let Some(prev_loc) = prev_loc.take() {
@@ -429,8 +667,15 @@ impl ConvertedExprWriteInline for Value {
 }
 
 impl ConvertedExprWriteInline for Expression {
-    fn converted_expr_write<'s, 't, 'u, W: FmtWrite>(&self, w: &mut StringifierLine<'s, 't, 'u, W>) -> FmtResult {
-        fn filter<'s, 't, 'u, W: FmtWrite>(expr: &Expression, w: &mut StringifierLine<'s, 't, 'u, W>, accept_level: ExpressionLevel) -> Result<bool, std::fmt::Error> {
+    fn converted_expr_write<'s, 't, 'u, W: FmtWrite>(
+        &self,
+        w: &mut StringifierLine<'s, 't, 'u, W>,
+    ) -> FmtResult {
+        fn filter<'s, 't, 'u, W: FmtWrite>(
+            expr: &Expression,
+            w: &mut StringifierLine<'s, 't, 'u, W>,
+            accept_level: ExpressionLevel,
+        ) -> Result<bool, std::fmt::Error> {
             match expr {
                 Expression::ScopeRef { location, index } => {
                     w.write_scope_name("", *index, location)?;
@@ -442,21 +687,26 @@ impl ConvertedExprWriteInline for Expression {
                     }
                     w.write_token_state("data", None, location, StringifierLineState::Normal)?;
                     w.write_token_state(".", None, location, StringifierLineState::NoSpaceAround)?;
-                    w.write_token_state(
-                        name,
-                        Some(name),
-                        location,
-                        StringifierLineState::Normal,
-                    )?;
+                    w.write_token_state(name, Some(name), location, StringifierLineState::Normal)?;
                     if ExpressionLevel::Member > accept_level {
                         w.write_token_state(")", None, location, StringifierLineState::ParenEnd)?;
                     }
                     Ok(false)
                 }
-                Expression::StaticMember { obj, field_name, dot_location, field_location } => {
+                Expression::StaticMember {
+                    obj,
+                    field_name,
+                    dot_location,
+                    field_location,
+                } => {
                     if ExpressionLevel::Member > accept_level {
                         let pos = obj.location_start();
-                        w.write_token_state("(", None, &(pos..pos), StringifierLineState::ParenStart)?;
+                        w.write_token_state(
+                            "(",
+                            None,
+                            &(pos..pos),
+                            StringifierLineState::ParenStart,
+                        )?;
                     }
                     expression_strigify_write(obj, w, ExpressionLevel::Member, &filter)?;
                     w.write_token_state(
@@ -473,14 +723,28 @@ impl ConvertedExprWriteInline for Expression {
                     )?;
                     if ExpressionLevel::Member > accept_level {
                         let pos = field_location.end;
-                        w.write_token_state(")", None, &(pos..pos), StringifierLineState::ParenEnd)?;
+                        w.write_token_state(
+                            ")",
+                            None,
+                            &(pos..pos),
+                            StringifierLineState::ParenEnd,
+                        )?;
                     }
                     Ok(false)
                 }
-                Expression::DynamicMember { obj, field_name, bracket_location } => {
+                Expression::DynamicMember {
+                    obj,
+                    field_name,
+                    bracket_location,
+                } => {
                     if ExpressionLevel::Member > accept_level {
                         let pos = obj.location_start();
-                        w.write_token_state("(", None, &(pos..pos), StringifierLineState::ParenStart)?;
+                        w.write_token_state(
+                            "(",
+                            None,
+                            &(pos..pos),
+                            StringifierLineState::ParenStart,
+                        )?;
                     }
                     expression_strigify_write(obj, w, ExpressionLevel::Member, &filter)?;
                     w.write_token_state(
@@ -498,14 +762,28 @@ impl ConvertedExprWriteInline for Expression {
                     )?;
                     if ExpressionLevel::Member > accept_level {
                         let pos = bracket_location.1.end;
-                        w.write_token_state(")", None, &(pos..pos), StringifierLineState::ParenEnd)?;
+                        w.write_token_state(
+                            ")",
+                            None,
+                            &(pos..pos),
+                            StringifierLineState::ParenEnd,
+                        )?;
                     }
                     Ok(false)
                 }
-                Expression::FuncCall { func, args, paren_location } => {
+                Expression::FuncCall {
+                    func,
+                    args,
+                    paren_location,
+                } => {
                     if ExpressionLevel::Member > accept_level {
                         let pos = func.location_start();
-                        w.write_token_state("(", None, &(pos..pos), StringifierLineState::ParenStart)?;
+                        w.write_token_state(
+                            "(",
+                            None,
+                            &(pos..pos),
+                            StringifierLineState::ParenStart,
+                        )?;
                     }
                     expression_strigify_write(func, w, ExpressionLevel::Member, &filter)?;
                     w.write_token_state(
@@ -528,7 +806,12 @@ impl ConvertedExprWriteInline for Expression {
                     )?;
                     if ExpressionLevel::Member > accept_level {
                         let pos = paren_location.1.end;
-                        w.write_token_state(")", None, &(pos..pos), StringifierLineState::ParenEnd)?;
+                        w.write_token_state(
+                            ")",
+                            None,
+                            &(pos..pos),
+                            StringifierLineState::ParenEnd,
+                        )?;
                     }
                     Ok(false)
                 }

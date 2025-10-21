@@ -421,10 +421,7 @@ fn write_common_attributes_without_slot<'a>(
     }
     for attr in data.iter() {
         if let Some(prefix_location) = attr.prefix_location.clone() {
-            let prefix = (
-                "data",
-                prefix_location,
-            );
+            let prefix = ("data", prefix_location);
             let item = WriteAttrItem::Attr {
                 prefix: Some(prefix),
                 name: Cow::Borrowed(&attr.name),
@@ -1275,8 +1272,12 @@ mod test {
     fn text_node() {
         let src = r#" text <div> text <span/> </div>"#;
         let (template, _) = crate::parse::parse("TEST", src);
-        let mut stringifier =
-            crate::stringify::Stringifier::new(String::new(), "test", Some(src), Default::default());
+        let mut stringifier = crate::stringify::Stringifier::new(
+            String::new(),
+            "test",
+            Some(src),
+            Default::default(),
+        );
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(
@@ -1289,8 +1290,12 @@ mod test {
     fn comment_around_text_node() {
         let src = r#"<!----> text <!---->"#;
         let (template, _) = crate::parse::parse("TEST", src);
-        let mut stringifier =
-            crate::stringify::Stringifier::new(String::new(), "test", Some(src), Default::default());
+        let mut stringifier = crate::stringify::Stringifier::new(
+            String::new(),
+            "test",
+            Some(src),
+            Default::default(),
+        );
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(output.as_str(), "<!----> text <!---->\n",);
@@ -1336,8 +1341,12 @@ mod test {
     fn comment() {
         let src = r#"<div> <!--TEST--> abc </div>"#;
         let (template, _) = crate::parse::parse("TEST", src);
-        let mut stringifier =
-            crate::stringify::Stringifier::new(String::new(), "test", Some(src), Default::default());
+        let mut stringifier = crate::stringify::Stringifier::new(
+            String::new(),
+            "test",
+            Some(src),
+            Default::default(),
+        );
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(
@@ -1365,8 +1374,12 @@ mod test {
     fn line_end_comments() {
         let src = r#"<div> abc <!-- 1 --> <span /> <!-- 2 --> <span> <!-- 3 --> </span> </div>"#;
         let (template, _) = crate::parse::parse("TEST", src);
-        let mut stringifier =
-            crate::stringify::Stringifier::new(String::new(), "test", Some(src), Default::default());
+        let mut stringifier = crate::stringify::Stringifier::new(
+            String::new(),
+            "test",
+            Some(src),
+            Default::default(),
+        );
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(
@@ -1379,8 +1392,12 @@ mod test {
     fn preserve_empty_lines_between_tags() {
         let src = "<div> \n\n <span /> \n\n <span /> \n\n </div>";
         let (template, _) = crate::parse::parse("TEST", src);
-        let mut stringifier =
-            crate::stringify::Stringifier::new(String::new(), "test", Some(src), Default::default());
+        let mut stringifier = crate::stringify::Stringifier::new(
+            String::new(),
+            "test",
+            Some(src),
+            Default::default(),
+        );
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
         assert_eq!(

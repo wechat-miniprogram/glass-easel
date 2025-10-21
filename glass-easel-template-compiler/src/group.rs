@@ -266,7 +266,8 @@ impl TmplGroup {
             minimize: true,
             ..Default::default()
         };
-        let mut stringifier = crate::stringify::Stringifier::new(String::new(), path, None, options);
+        let mut stringifier =
+            crate::stringify::Stringifier::new(String::new(), path, None, options);
         template.stringify_write(&mut stringifier).unwrap();
         let (stringify_result, _sourcemap) = stringifier.finish();
         Some(stringify_result)
@@ -513,10 +514,16 @@ impl TmplGroup {
     }
 
     /// Get a string that used to check TypeScript problems.
-    pub(crate) fn get_tmpl_converted_expr(&self, path: &str, ts_env: &str) -> Result<(String, SourceMap), TmplError> {
+    pub(crate) fn get_tmpl_converted_expr(
+        &self,
+        path: &str,
+        ts_env: &str,
+    ) -> Result<(String, SourceMap), TmplError> {
         let tree = self.get_tree(path)?;
         let env = crate::stringify::typescript::tmpl_converted_expr_runtime_string();
-        Ok(crate::stringify::typescript::generate_tmpl_converted_expr(tree, ts_env, env))
+        Ok(crate::stringify::typescript::generate_tmpl_converted_expr(
+            tree, ts_env, env,
+        ))
     }
 
     /// Returns the number of templates in the group.

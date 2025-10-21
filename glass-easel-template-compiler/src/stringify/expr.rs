@@ -80,7 +80,11 @@ pub(super) fn expression_strigify_write<W: FmtWrite>(
     expression: &Expression,
     stringifier: &mut StringifierLine<W>,
     accept_level: ExpressionLevel,
-    filter: &impl Fn(&Expression, &mut StringifierLine<W>, ExpressionLevel) -> Result<bool, std::fmt::Error>,
+    filter: &impl Fn(
+        &Expression,
+        &mut StringifierLine<W>,
+        ExpressionLevel,
+    ) -> Result<bool, std::fmt::Error>,
 ) -> FmtResult {
     if !filter(expression, stringifier, accept_level)? {
         return Ok(());
@@ -181,7 +185,12 @@ pub(super) fn expression_strigify_write<W: FmtWrite>(
                                 colon_location.as_ref().unwrap_or(location),
                                 StringifierLineState::NoSpaceBefore,
                             )?;
-                            expression_strigify_write(value, stringifier, ExpressionLevel::Cond, filter)?;
+                            expression_strigify_write(
+                                value,
+                                stringifier,
+                                ExpressionLevel::Cond,
+                                filter,
+                            )?;
                         }
                     }
                     ObjectFieldKind::Spread { location, value } => {
@@ -191,7 +200,12 @@ pub(super) fn expression_strigify_write<W: FmtWrite>(
                             location,
                             StringifierLineState::NoSpaceAfter,
                         )?;
-                        expression_strigify_write(value, stringifier, ExpressionLevel::Cond, filter)?;
+                        expression_strigify_write(
+                            value,
+                            stringifier,
+                            ExpressionLevel::Cond,
+                            filter,
+                        )?;
                     }
                 }
             }
@@ -218,7 +232,12 @@ pub(super) fn expression_strigify_write<W: FmtWrite>(
                 }
                 match field {
                     ArrayFieldKind::Normal { value } => {
-                        expression_strigify_write(value, stringifier, ExpressionLevel::Cond, filter)?;
+                        expression_strigify_write(
+                            value,
+                            stringifier,
+                            ExpressionLevel::Cond,
+                            filter,
+                        )?;
                     }
                     ArrayFieldKind::Spread { location, value } => {
                         stringifier.write_token_state(
@@ -227,7 +246,12 @@ pub(super) fn expression_strigify_write<W: FmtWrite>(
                             location,
                             StringifierLineState::NoSpaceAfter,
                         )?;
-                        expression_strigify_write(value, stringifier, ExpressionLevel::Cond, filter)?;
+                        expression_strigify_write(
+                            value,
+                            stringifier,
+                            ExpressionLevel::Cond,
+                            filter,
+                        )?;
                     }
                     ArrayFieldKind::EmptySlot => {
                         if index == fields.len() - 1 {
@@ -620,7 +644,9 @@ impl StringifyLine for Expression {
         &self,
         stringifier: &mut StringifierLine<'s, 't, 'u, W>,
     ) -> FmtResult {
-        expression_strigify_write(self, stringifier, ExpressionLevel::Cond, &|_, _, _| Ok(true))
+        expression_strigify_write(self, stringifier, ExpressionLevel::Cond, &|_, _, _| {
+            Ok(true)
+        })
     }
 }
 
@@ -637,8 +663,12 @@ mod tests {
 
     fn case(src: &str) {
         let (template, _) = crate::parse::parse("TEST", src);
-        let mut stringifier =
-            crate::stringify::Stringifier::new(String::new(), "test", Some(src), Default::default());
+        let mut stringifier = crate::stringify::Stringifier::new(
+            String::new(),
+            "test",
+            Some(src),
+            Default::default(),
+        );
         template.stringify_write(&mut stringifier).unwrap();
         let (stringify_result, _sourcemap) = stringifier.finish();
         assert_eq!(stringify_result.as_str(), &format!("{}\n", src));

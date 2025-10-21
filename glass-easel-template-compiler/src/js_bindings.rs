@@ -204,7 +204,11 @@ impl TmplGroup {
 
     #[wasm_bindgen(js_name = "getTmplConvertedExpr")]
     #[doc(hidden)]
-    pub fn get_tmpl_converted_expr(&mut self, path: &str, ts_env: &str) -> Result<TmplConvertedExpr, JsError> {
+    pub fn get_tmpl_converted_expr(
+        &mut self,
+        path: &str,
+        ts_env: &str,
+    ) -> Result<TmplConvertedExpr, JsError> {
         let (code, source_map) = self.group.get_tmpl_converted_expr(path, ts_env)?;
         Ok(TmplConvertedExpr { code, source_map })
     }
@@ -224,7 +228,13 @@ impl TmplConvertedExpr {
     }
 
     #[wasm_bindgen(js_name = "getSourceLocation")]
-    pub fn get_source_location(&self, start_line: u32, start_col: u32, end_line: u32, end_col: u32) -> Option<Vec<u32>> {
+    pub fn get_source_location(
+        &self,
+        start_line: u32,
+        start_col: u32,
+        end_line: u32,
+        end_col: u32,
+    ) -> Option<Vec<u32>> {
         let start = self.source_map.lookup_token(start_line, start_col)?;
         let (ret0, ret1) = start.get_src();
         if (start_line, start_col) == (end_line, end_col) {
@@ -246,16 +256,27 @@ impl TmplConvertedExpr {
     #[wasm_bindgen(js_name = "getTokenAtSourcePosition")]
     pub fn get_token_at_source_position(&self, line: u32, col: u32) -> Option<Vec<u32>> {
         for token in self.source_map.tokens() {
-            let Some(name) = token.get_name() else { continue };
+            let Some(name) = token.get_name() else {
+                continue;
+            };
             let (src_start_line, src_start_col) = token.get_src();
-            if src_start_line != line { continue };
+            if src_start_line != line {
+                continue;
+            };
             let src_end_line = src_start_line;
             let src_end_col = src_start_col + name.len() as u32;
             if !(src_start_col..=src_end_col).contains(&col) {
                 continue;
             }
             let (dst_start_line, dst_start_col) = token.get_dst();
-            return Some(vec![src_start_line, src_start_col, src_end_line, src_end_col, dst_start_line, dst_start_col]);
+            return Some(vec![
+                src_start_line,
+                src_start_col,
+                src_end_line,
+                src_end_col,
+                dst_start_line,
+                dst_start_col,
+            ]);
         }
         None
     }
