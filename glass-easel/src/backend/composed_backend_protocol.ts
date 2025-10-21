@@ -1,5 +1,5 @@
 import { type Element as GlassEaselElement } from '../element'
-import { type EventBubbleStatus, type EventOptions, type MutLevel } from '../event'
+import { type MutLevel, type EventBubbleStatus, type EventOptions } from '../event'
 import { type BackendMode } from './shared'
 import type * as suggestedBackend from './suggested_backend_protocol'
 

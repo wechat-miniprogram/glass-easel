@@ -71,7 +71,7 @@ import {
   type RelationDefinitionGroup,
   type RelationHandler,
 } from './relation'
-import { ShadowRoot } from './shadow_root'
+import { ShadowRoot, SlotMode } from './shadow_root'
 import { type Template, type TemplateEngine, type TemplateInstance } from './template_engine'
 import { getDefaultTemplateEngine } from './tmpl'
 import { TraitBehavior, TraitGroup } from './trait_behaviors'
@@ -136,13 +136,20 @@ export const convertGenerics = (
           genericImpls[key] = target
         }
       } else {
-        const defaultComp = genericDefaults[key] || space.getDefaultComponent()
+        let defaultComp = genericDefaults[key]
         if (!defaultComp) {
-          throw new ThirdError(
-            `Cannot find default component for generic "${key}"`,
-            '[prepare]',
-            compDef.is,
-          )
+          defaultComp = space.getDefaultComponent()
+          if (!defaultComp) {
+            throw new ThirdError(
+              `Cannot find default component for generic "${key}"`,
+              '[prepare]',
+              compDef.is,
+            )
+          } else {
+            triggerWarning(
+              `No component specified for generic "${key}", using default component (on component "${compDef.is}")`,
+            )
+          }
         }
         genericImpls[key] =
           typeof defaultComp === 'string'
@@ -207,6 +214,7 @@ export type Lifetimes = {
   moved: () => void
   detached: () => void
   ready: () => void
+  error: (err: unknown) => void
   listenerChange: (
     isAdd: boolean,
     name: string,
@@ -507,7 +515,6 @@ export class Component<
     return typeof func === 'function' && !!(func as unknown as { [tag: symbol]: true })[METHOD_TAG]
   }
 
-  /** @internal */
   static _$advancedCreate<
     TData extends DataList,
     TProperty extends PropertyList,
@@ -530,7 +537,7 @@ export class Component<
       def._$detail!
     const options = def._$options
     const behavior = def.behavior
-    const nodeTreeContext: GeneralBackendContext | null = owner
+    const nodeTreeContext = owner
       ? owner.getBackendContext()
       : backendContext || globalOptions.backendContext || getDefaultBackendContext()
     const external = options.externalComponent
@@ -561,10 +568,10 @@ export class Component<
             tagName,
           )
           if (isDedicatedStyleScope) {
-            backendElement.setAttribute(
-              'wx-host',
-              ownerSpace.styleScopeManager.queryName(options.styleScope!),
-            )
+            const styleScopePrefix = ownerSpace.styleScopeManager.queryName(options.styleScope!)
+            if (styleScopePrefix) {
+              backendElement.setAttribute('wx-host', styleScopePrefix)
+            }
           }
           if (ENV.DEV) performanceMeasureEnd()
         }
@@ -579,25 +586,36 @@ export class Component<
         }
       } else if (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Shadow)) {
         if (ENV.DEV) performanceMeasureStart('component.createComponent')
-        const be = (
-          owner ? owner._$backendShadowRoot! : (nodeTreeContext as backend.Context).getRootNode()
-        ).createComponent(
+        const sr = owner
+          ? owner._$backendShadowRoot!
+          : (nodeTreeContext as backend.Context).getRootNode()
+        const be = sr.createComponent(
           tagName,
           external,
           virtualHost,
           options.styleScope ?? StyleScopeManager.globalScope(),
           options.extraStyleScope,
           behavior._$externalClasses,
+          // eslint-disable-next-line no-nested-ternary
+          external
+            ? null
+            : // eslint-disable-next-line no-nested-ternary
+            options.dynamicSlots
+            ? SlotMode.Dynamic
+            : options.multipleSlots
+            ? SlotMode.Multiple
+            : SlotMode.Single,
+          options.writeIdToDOM,
         )
-        if (ENV.DEV) performanceMeasureEnd()
         backendElement = be
+        if (ENV.DEV) performanceMeasureEnd()
       }
     }
     comp._$initialize(
       virtualHost,
       backendElement,
       owner,
-      owner ? owner._$nodeTreeContext : nodeTreeContext!,
+      owner?._$nodeTreeContext ?? nodeTreeContext!,
     )
     comp._$placeholderHandlerRemover = placeholderHandlerRemover
 
@@ -618,27 +636,19 @@ export class Component<
       styleScopeManager,
     )
     if (backendElement) {
-      if (BM.COMPOSED || (BM.DYNAMIC && nodeTreeContext!.mode === BackendMode.Composed)) {
-        ;(backendElement as composedBackend.Element).setStyleScope(
-          styleScope,
-          extraStyleScope,
-          isDedicatedStyleScope ? options.styleScope ?? StyleScopeManager.globalScope() : undefined,
-        )
-      }
-      if (styleScopeManager && writeExtraInfoToAttr) {
-        const prefix = styleScopeManager.queryName(styleScope)
-        if (prefix) {
-          backendElement.setAttribute('exparser:info-class-prefix', `${prefix}--`)
+      const ownerStyleScope = ownerComponentOptions?.styleScope ?? options.styleScope
+      if (ownerStyleScope) {
+        if (BM.COMPOSED || (BM.DYNAMIC && nodeTreeContext!.mode === BackendMode.Composed)) {
+          ;(backendElement as composedBackend.Element).setStyleScope(
+            ownerStyleScope,
+            extraStyleScope,
+            isDedicatedStyleScope
+              ? options.styleScope ?? StyleScopeManager.globalScope()
+              : undefined,
+          )
         }
       }
     }
-
-    // create template engine
-    const tmplInst = template.createInstance(
-      comp as GeneralComponent,
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      ShadowRoot.createShadowRoot,
-    )
 
     // associate in backend
     if (backendElement) {
@@ -653,7 +663,20 @@ export class Component<
         )
       }
       if (ENV.DEV) performanceMeasureEnd()
+      if (styleScopeManager && writeExtraInfoToAttr) {
+        const prefix = styleScopeManager.queryName(styleScope)
+        if (prefix) {
+          backendElement.setAttribute('exparser:info-class-prefix', `${prefix}--`)
+        }
+      }
     }
+
+    // create template engine
+    const tmplInst = template.createInstance(
+      comp as GeneralComponent,
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      ShadowRoot.createShadowRoot,
+    )
 
     // write attr
     if (writeExtraInfoToAttr && backendElement) {
@@ -843,6 +866,10 @@ export class Component<
     // init data
     const shadowRoot = tmplInst.shadowRoot
     comp.shadowRoot = shadowRoot
+    if (external && (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext!.mode === BackendMode.Shadow))) {
+      const slot = (shadowRoot as ExternalShadowRoot).slot as backend.Element
+      ;(backendElement as backend.Element).setExternalSlot(slot)
+    }
     const dataGroup = new DataGroup(
       comp,
       data as DataWithPropertyValues<TData, TProperty>,

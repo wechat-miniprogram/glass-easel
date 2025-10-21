@@ -347,7 +347,12 @@ export class Event<TDetail> {
       ? currentTarget.getMethodCaller() || currentTarget
       : currentTarget
     this._$hasListener ||= efa.funcArr.hasFunc()
-    const ev = this.wrapShadowedEvent(targetCaller, mark, currentTargetCaller, target.ownerShadowRoot?.getHostNode())
+    const ev = this.wrapShadowedEvent(
+      targetCaller,
+      mark,
+      currentTargetCaller,
+      target.ownerShadowRoot?.getHostNode(),
+    )
     const ret = efa.funcArr.call(
       currentTargetCaller,
       [ev],
