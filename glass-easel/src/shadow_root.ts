@@ -20,8 +20,7 @@ import { VirtualNode } from './virtual_node'
 import { ThirdError, triggerWarning } from './warning'
 
 export const enum SlotMode {
-  Direct = 0,
-  Single,
+  Single = 1,
   Multiple,
   Dynamic,
 }
@@ -97,7 +96,6 @@ export class ShadowRoot extends VirtualNode {
     const hostComponentOptions = host.getComponentOptions()
     if (hostComponentOptions.multipleSlots) slotMode = SlotMode.Multiple
     else if (hostComponentOptions.dynamicSlots) slotMode = SlotMode.Dynamic
-    else if (hostComponentOptions.directSlots) slotMode = SlotMode.Direct
     node._$slotMode = slotMode
     if (slotMode === SlotMode.Single) {
       node._$singleSlot = null
@@ -376,7 +374,6 @@ export class ShadowRoot extends VirtualNode {
   getSlotElementFromName(name: string): Element | Element[] | null {
     const slotMode = this._$slotMode
     /* istanbul ignore if */
-    if (slotMode === SlotMode.Direct) throw new Error('cannot get slot element in directSlots')
     if (slotMode === SlotMode.Single) return this._$singleSlot!
     if (slotMode === SlotMode.Multiple) {
       return this._$slots![name] || null
@@ -401,7 +398,6 @@ export class ShadowRoot extends VirtualNode {
    */
   getContainingSlot(elem: Node | null): Element | null {
     const slotMode = this._$slotMode
-    if (slotMode === SlotMode.Direct) return elem?.containingSlot || null
     if (slotMode === SlotMode.Single) return this._$singleSlot as Element | null
     if (slotMode === SlotMode.Dynamic) {
       if (!elem) return null
@@ -448,10 +444,6 @@ export class ShadowRoot extends VirtualNode {
    */
   forEachSlot(f: (slot: Element) => boolean | void) {
     const slotMode = this._$slotMode
-    /* istanbul ignore if */
-    if (slotMode === SlotMode.Direct) {
-      throw new Error('Cannot iterate slots in directSlots')
-    }
     if (slotMode === SlotMode.Single) {
       if (this._$singleSlot) f(this._$singleSlot)
     } else if (slotMode === SlotMode.Multiple) {
@@ -621,7 +613,7 @@ export class ShadowRoot extends VirtualNode {
     const slotMode = this._$slotMode
 
     // single slot does not care slot name
-    if (slotMode === SlotMode.Single || slotMode === SlotMode.Direct) return
+    if (slotMode === SlotMode.Single) return
 
     // for multiple slots, reassign slot contents
     if (slotMode === SlotMode.Multiple) {
@@ -649,9 +641,6 @@ export class ShadowRoot extends VirtualNode {
     move: boolean,
   ): void {
     const slotMode = this._$slotMode
-
-    // for direct slotting, do nothing
-    if (slotMode === SlotMode.Direct) return
 
     if (slotMode === SlotMode.Single) {
       const oldSlot = this._$singleSlot as Element | null
@@ -704,9 +693,6 @@ export class ShadowRoot extends VirtualNode {
     move: boolean,
   ): void {
     const slotMode = this._$slotMode
-
-    // for direct slotting, do nothing
-    if (slotMode === SlotMode.Direct) return
 
     if (slotMode === SlotMode.Single) {
       // will call applySLotsInsertion after if slots were moved

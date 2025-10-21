@@ -282,11 +282,6 @@ export class Element implements NodeCast {
         )
       }
 
-      /* istanbul ignore if  */
-      if (slotMode === SlotMode.Direct) {
-        throw new Error('nodes inside direct slots should not change slot name.')
-      }
-
       const slotUpdater = Element._$updateSubtreeSlotNodes(
         this.parentNode!,
         [this],
