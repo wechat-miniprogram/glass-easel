@@ -1,13 +1,15 @@
 import { type Element as GlassEaselElement } from '../element'
 import { type EventBubbleStatus, type EventOptions } from '../event'
+import { type Node as GlassEaselNode } from '../node'
 import {
   type BoundingClientRect,
   type GetAllComputedStylesResponses,
+  type GetInheritedRulesResponses,
   type GetMatchedRulesResponses,
-  type ScrollOffset,
   type IntersectionStatus,
   type MediaQueryStatus,
   type Observer,
+  type ScrollOffset,
 } from './shared'
 
 interface GetWrapper<T> {
@@ -16,6 +18,10 @@ interface GetWrapper<T> {
 
 export type Element<E> = {
   getAllComputedStyles(cb: (res: GetAllComputedStylesResponses) => void): void
+  getPseudoComputedStyles(
+    pseudoType: string,
+    cb: (res: GetAllComputedStylesResponses) => void,
+  ): void
   getBoundingClientRect(cb: (res: BoundingClientRect) => void): void
   getBoxModel(
     cb: (res: {
@@ -32,9 +38,12 @@ export type Element<E> = {
     listener: (res: IntersectionStatus) => void,
   ): Observer
   getMatchedRules(cb: (res: GetMatchedRulesResponses) => void): void
+  getPseudoMatchedRules(pseudoType: string, cb: (res: GetMatchedRulesResponses) => void): void
+  getInheritedRules(cb: (res: GetInheritedRulesResponses) => void): void
   getScrollOffset(cb: (res: ScrollOffset) => void): void
   setScrollPosition(scrollLeft: number, scrollTop: number, duration: number): void
   getContext(cb: (res: unknown) => void): void
+  getPseudoTypes(cb: (res: string[]) => void): void
 }
 
 export type ElementForDomLike = {
@@ -46,6 +55,8 @@ export type ElementForDomLike = {
 }
 
 export interface Context<Ctx, Elem> {
+  dropBackendAfterRelease?: boolean
+
   createContext(
     options: unknown,
     cb: (ContextWrapper: GetWrapper<Partial<Context<Ctx, Elem> & Ctx>>) => void,
@@ -69,7 +80,7 @@ export interface Context<Ctx, Elem> {
   ): void
 
   setFocusedNode(target: Elem): void
-  getFocusedNode(cb: (node: Elem | null) => void): void
+  getFocusedNode(cb: (node: GlassEaselNode | null) => void): void
 
   onWindowResize(
     cb: (res: { width: number; height: number; devicePixelRatio: number }) => void,
@@ -138,6 +149,8 @@ export interface Context<Ctx, Elem> {
     id: number,
     cb: (stats: { startTimestamp: number; endTimestamp: number }) => void,
   ): void
+  startOverlayInspect(cb: (event: string, node: GlassEaselElement | null) => void): void
+  stopOverlayInspect(): void
 }
 
 type UnshiftTarget<Fn, T> = Fn extends (...args: infer Args) => infer Ret
@@ -147,15 +160,4 @@ type UnshiftTarget<Fn, T> = Fn extends (...args: infer Args) => infer Ret
 type UnshiftTargets<T, E> = { [K in keyof T]: UnshiftTarget<T[K], E> }
 
 export type ContextForDomLike<Ctx, Elem> = Context<Ctx, Elem> &
-  UnshiftTargets<
-    Pick<
-      Element<Elem>,
-      | 'getAllComputedStyles'
-      | 'createIntersectionObserver'
-      | 'getMatchedRules'
-      | 'getScrollOffset'
-      | 'setScrollPosition'
-      | 'getContext'
-    >,
-    Elem
-  >
+  UnshiftTargets<Omit<Element<Elem>, 'getBoundingClientRect' | 'getScrollOffset'>, Elem>

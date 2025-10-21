@@ -46,6 +46,7 @@ if (
   'glass-easel-miniprogram-adapter',
   'glass-easel-miniprogram-typescript',
   'glass-easel-miniprogram-webpack-plugin',
+  'glass-easel-miniprogram-shadow-sync',
 ].forEach((p) => {
   console.info(`Run eslint on ${p}`)
   if (
@@ -80,6 +81,7 @@ if (gitStatusRes.status !== 0 || gitStatusRes.stdout.length > 0) {
   'glass-easel-miniprogram-typescript/package.json',
   'glass-easel-miniprogram-webpack-plugin/package.json',
   'glass-easel-miniprogram-template/package.json',
+  'glass-easel-shadow-sync/package.json',
   'glass-easel-template-compiler/package.json',
   'glass-easel-stylesheet-compiler/package.json',
 ].forEach((p) => {
@@ -219,6 +221,17 @@ if (
   throw new Error('failed to compile glass-easel-miniprogram-template')
 }
 
+// compile glass-easel-shadow-sync
+console.info('Compile glass-easel-shadow-sync')
+if (
+  childProcess.spawnSync('npm', ['run', 'build'], {
+    cwd: 'glass-easel-shadow-sync',
+    stdio: 'inherit',
+  }).status !== 0
+) {
+  throw new Error('failed to compile glass-easel-shadow-sync')
+}
+
 // cargo test
 console.info('Run cargo test')
 if (childProcess.spawnSync('cargo', ['test'], { stdio: 'inherit' }).status !== 0) {
@@ -275,6 +288,7 @@ if (
   'glass-easel-miniprogram-typescript',
   'glass-easel-miniprogram-webpack-plugin',
   'glass-easel-miniprogram-template',
+  'glass-easel-shadow-sync',
 ].forEach((p) => {
   console.info(`Publish ${p} to npmjs`)
   if (

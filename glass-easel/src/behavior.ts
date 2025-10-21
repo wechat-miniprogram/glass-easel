@@ -50,7 +50,7 @@ import {
   type PropertyDefinition,
 } from './data_proxy'
 import { simpleDeepCopy } from './data_utils'
-import { type EventListener } from './event'
+import { type EventListener, type ShadowedEvent } from './event'
 import { FuncArr, safeCallback } from './func_arr'
 import { type ComponentOptions } from './global_options'
 import { normalizeRelation, type RelationDefinition, type RelationHandler } from './relation'
@@ -140,10 +140,9 @@ export class BehaviorBuilder<
   TPendingChainingFilter extends ChainingFilterType = never,
   TExtraThisFields extends DataList = Empty,
 > {
+  public is: string | undefined
   /** @internal */
   _$ownerSpace: ComponentSpace
-  /** @internal */
-  _$is: string | undefined
   /** @internal */
   _$behaviors: (string | GeneralBehavior)[] = []
   /** @internal */
@@ -182,18 +181,23 @@ export class BehaviorBuilder<
   _$pageLifetimes?: { name: string; func: ComponentMethod; once: boolean }[] = []
   /** @internal */
   _$listeners?: {
-    [name: string]: ComponentMethod | string
+    [name: string]: { func: ComponentMethod | string; once: boolean }
   }
   /** @internal */
   _$relations?: { name: string; rel: RelationParams }[]
   /** @internal */
-  _$init: ((this: any, ctx: any) => any)[] = []
+  _$init: { func: (this: any, ctx: any) => any; once: boolean }[] = []
   /** @internal */
   _$methodCallerInit?: (this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>) => any
+  /** @internal */
+  _$listenerEventReplacer?: (
+    this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>,
+    event: ShadowedEvent<unknown>,
+  ) => ShadowedEvent<unknown>
 
   /** @internal */
   constructor(is: string | undefined, ownerSpace: ComponentSpace) {
-    this._$is = is
+    this.is = is
     this._$ownerSpace = ownerSpace
   }
 
@@ -207,6 +211,21 @@ export class BehaviorBuilder<
     func: (this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>) => any,
   ): ResolveBehaviorBuilder<this, TChainingFilter> {
     this._$methodCallerInit = func
+    return this as any
+  }
+
+  /**
+   * Set a listener wrapper function
+   *
+   * It should return the wrapped listener.
+   */
+  listenerEventReplacer(
+    func: (
+      this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>,
+      event: ShadowedEvent<unknown>,
+    ) => ShadowedEvent<unknown>,
+  ): ResolveBehaviorBuilder<this, TChainingFilter> {
+    this._$listenerEventReplacer = func
     return this as any
   }
 
@@ -370,7 +389,7 @@ export class BehaviorBuilder<
     >,
     TChainingFilter
   > {
-    this._$data.push(() => safeCallback('Data Generator', gen, null, [], this._$is) ?? {})
+    this._$data.push(() => safeCallback('Data Generator', gen, null, [], this.is) ?? {})
     return this as any
   }
 
@@ -494,7 +513,7 @@ export class BehaviorBuilder<
       this._$observers.push({ dataPaths: parseMultiPaths(paths as string | string[]), func, once })
     } catch (e) {
       // parse multi paths my throw errors
-      dispatchError(e, `observer`, this._$is)
+      dispatchError(e, `observer`, this.is)
     }
     return this as any
   }
@@ -557,6 +576,7 @@ export class BehaviorBuilder<
         ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>
       >,
     ) => TExport,
+    once = false,
     // eslint-disable-next-line function-paren-newline
   ): ResolveBehaviorBuilder<
     BehaviorBuilder<
@@ -575,7 +595,7 @@ export class BehaviorBuilder<
     >,
     TChainingFilter
   > {
-    this._$init.push(func)
+    this._$init.push({ func, once })
     return this as any
   }
 
@@ -618,7 +638,7 @@ export class BehaviorBuilder<
     const rawData = def.data
     if (rawData !== undefined) {
       if (typeof rawData === 'function') {
-        this._$data.push(() => safeCallback('Data Generator', rawData, null, [], this._$is) ?? {})
+        this._$data.push(() => safeCallback('Data Generator', rawData, null, [], this.is) ?? {})
       } else {
         this._$staticData = rawData
       }
@@ -656,7 +676,7 @@ export class BehaviorBuilder<
             })
           } catch (e) {
             // parse multi paths may throw errors
-            dispatchError(e, `definition`, this._$is)
+            dispatchError(e, `definition`, this.is)
           }
         }
       } else {
@@ -672,7 +692,7 @@ export class BehaviorBuilder<
             })
           } catch (e) {
             // parse multi paths may throw errors
-            dispatchError(e, `definition`, this._$is)
+            dispatchError(e, `definition`, this.is)
           }
         }
       }
@@ -711,7 +731,16 @@ export class BehaviorBuilder<
         this._$pageLifetimes.push({ name, func, once: true })
       }
     }
-    this._$listeners = def.listeners
+    const rawListeners = def.listeners
+    if (rawListeners) {
+      if (!this._$listeners) this._$listeners = {}
+      const keys = Object.keys(rawListeners)
+      for (let i = 0; i < keys.length; i += 1) {
+        const name = keys[i]!
+        const func = rawListeners[name]!
+        this._$listeners[name] = { func, once: true }
+      }
+    }
     const rawRelations = def.relations
     if (rawRelations) {
       if (!this._$relations) this._$relations = []
@@ -735,7 +764,7 @@ export class BehaviorBuilder<
     TPendingChainingFilter,
     TExtraThisFields
   > {
-    const is = this._$is
+    const is = this.is
     const behavior = new Behavior(this)
     if (is !== undefined) {
       this._$ownerSpace._$registerBehavior(is, behavior as unknown as GeneralBehavior)
@@ -762,11 +791,11 @@ export class BehaviorBuilder<
    * Finish build, generate a component definition, and register it in the component space
    */
   registerComponent(): ComponentDefinition<TData, TProperty, TMethod> {
-    const is = this._$is
+    const is = this.is
     const behavior = new Behavior(this)
     const compDef = new ComponentDefinition(behavior)
     if (is !== undefined) {
-      this._$ownerSpace._$registerComponent(is, compDef as unknown as GeneralComponentDefinition)
+      this._$ownerSpace.registerComponent(is, compDef as unknown as GeneralComponentDefinition)
     }
     return compDef
   }
@@ -832,15 +861,20 @@ export class Behavior<
   /** @internal */
   _$pageLifetimes?: { name: string; func: ComponentMethod; once: boolean }[]
   /** @internal */
-  _$listeners?: { id: string; ev: string; listener: ComponentMethod }[]
+  _$listeners?: { id: string; ev: string; listener: ComponentMethod; once: boolean }[]
   /** @internal */
   _$relationMap?: { [name: string]: RelationDefinition }
   /** @internal */
-  _$init: ((this: any, ctx: any) => any)[]
+  _$init: { func: (this: any, ctx: any) => any; once: boolean }[]
   /** @internal */
   _$methodCallerInit?: (
     this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>,
   ) => ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>
+  /** @internal */
+  _$listenerEventReplacer?: (
+    this: ComponentInstance<TData, TProperty, TMethod, TExtraThisFields>,
+    event: ShadowedEvent<unknown>,
+  ) => ShadowedEvent<unknown>
 
   /**
    * Create a behavior with classic-style definition
@@ -868,7 +902,7 @@ export class Behavior<
     >,
   ) {
     this._$unprepared = true
-    this.is = builder._$is || ''
+    this.is = builder.is || ''
     this.ownerSpace = builder._$ownerSpace
     this._$builder = builder
     this._$flatAncestors = new Set()
@@ -891,6 +925,7 @@ export class Behavior<
     this._$relationMap = undefined
     this._$init = []
     this._$methodCallerInit = builder._$methodCallerInit
+    this._$listenerEventReplacer = builder._$listenerEventReplacer
   }
 
   general(): GeneralBehavior {
@@ -1040,10 +1075,19 @@ export class Behavior<
         }
 
         // merge legacy listeners
-        const listeners = parent._$listeners as any[] | undefined
+        const listeners = parent._$listeners
         if (listeners !== undefined) {
-          if (!this._$listeners) this._$listeners = []
-          this._$listeners.push(...listeners)
+          if (this._$listeners) {
+            for (let i = 0; i < listeners.length; i += 1) {
+              const item = listeners[i]!
+              if (item.once) {
+                if (this._$listeners.indexOf(item) >= 0) continue
+              }
+              this._$listeners.push(item)
+            }
+          } else {
+            this._$listeners = listeners.slice().slice()
+          }
         }
 
         // merge relations
@@ -1056,7 +1100,13 @@ export class Behavior<
         }
 
         // merge init
-        this._$init.push(...parent._$init)
+        for (let i = 0; i < parent._$init.length; i += 1) {
+          const item = parent._$init[i]!
+          if (item.once) {
+            if (this._$init.indexOf(item) >= 0) continue
+          }
+          this._$init.push(item)
+        }
 
         // construct flat ancestors
         parent._$flatAncestors.forEach((p) => {
@@ -1344,11 +1394,11 @@ export class Behavior<
     if (listeners !== undefined) {
       const keys = Object.keys(listeners)
       if (keys.length > 0) {
-        this._$listeners = []
+        if (!this._$listeners) this._$listeners = []
         for (let i = 0; i < keys.length; i += 1) {
           const k = keys[i]!
-          const v = listeners[k]!
-          const listener = typeof v === 'function' ? v : this._$methodMap[v]
+          const { func, once } = listeners[k]!
+          const listener = typeof func === 'function' ? func : this._$methodMap[func]
           if (listener) {
             const dot = k.indexOf('.')
             let id: string
@@ -1360,7 +1410,7 @@ export class Behavior<
               id = ''
               ev = k
             }
-            this._$listeners.push({ id, ev, listener })
+            this._$listeners.push({ id, ev, listener, once })
           } else {
             dispatchError(
               new Error(`the "${k}" listener is not a function or a method name`),

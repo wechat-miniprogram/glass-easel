@@ -31,7 +31,7 @@ export {
   GeneralComponentDefinition,
 } from './component'
 export * as typeUtils from './component_params'
-export { ComponentSpace, getDefaultComponentSpace } from './component_space'
+export { ComponentSpace, getDefaultComponentSpace, MiddlewareHook } from './component_space'
 export * as dataPath from './data_path'
 export {
   DataChange,
@@ -54,6 +54,7 @@ export {
   MutLevel as EventMutLevel,
   EventOptions,
   ShadowedEvent,
+  EventPhase,
 } from './event'
 export { ExternalShadowRoot } from './external_shadow_tree'
 export { FuncArr, GeneralFuncType, safeCallback } from './func_arr'
@@ -71,13 +72,14 @@ export { Node, NodeCast, dumpElement, dumpElementToString, dumpSingleElementToSt
 export { RelationFailedListener, RelationListener, RelationType } from './relation'
 export { triggerRender } from './render'
 export { ParsedSelector } from './selector'
-export { ShadowRoot } from './shadow_root'
+export { ShadowRoot, SlotMode } from './shadow_root'
 export * as templateEngine from './template_engine'
 export { TextNode } from './text_node'
 export * as template from './tmpl'
 export { TraitBehavior } from './trait_behaviors'
 export { VirtualNode } from './virtual_node'
 export {
+  triggerWarning,
   dispatchError,
   addGlobalErrorListener,
   addGlobalWarningListener,

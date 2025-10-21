@@ -55,6 +55,10 @@ jobs:
         run: |
           pnpm run lint
           pnpm run test
+      - name: Test glass-easel-shadow-sync
+        working-directory: glass-easel-shadow-sync
+        run: |
+          pnpm run test
       - name: Test glass-easel-stylesheet-compiler
         working-directory: glass-easel-stylesheet-compiler
         run: |

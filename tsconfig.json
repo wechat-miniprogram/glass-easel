@@ -16,6 +16,7 @@
         "moduleResolution": "node",
         "lib": ["ES6", "ES7", "DOM", "ESNext"],
         "types": ["jest", "node"],
+        "declaration": false,
         "preserveConstEnums": true,
         "stripInternal": true
     },

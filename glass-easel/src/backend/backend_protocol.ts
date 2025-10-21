@@ -2,6 +2,7 @@
 
 import { type Element as GlassEaselElement } from '../element'
 import { type Event, type EventBubbleStatus, type EventOptions, type MutLevel } from '../event'
+import { type SlotMode } from '../shadow_root'
 import { type BackendMode } from './shared'
 import type * as suggestedBackend from './suggested_backend_protocol'
 
@@ -45,14 +46,12 @@ export interface Element extends Partial<suggestedBackend.Element<Element>> {
   spliceAppend(list: Element): void
   spliceRemove(before: Element, deleteCount: number): void
   setId(id: string): void
+  setSlot(name: string): void
   setSlotName(slot: string): void
-  setContainingSlot(slot: Element | undefined | null): void
-  reassignContainingSlot(oldSlot: Element | null, newSlot: Element | null): void
-  spliceBeforeSlotNodes(before: number, deleteCount: number, list: Element): void
-  spliceAppendSlotNodes(list: Element): void
-  spliceRemoveSlotNodes(before: number, deleteCount: number): void
+  setSlotElement(slot: Element | null): void
+  setExternalSlot(slot: Element): void
   setInheritSlots(): void
-  setStyle(styleText: string): void
+  setStyle(styleText: string, styleSegmentIndex: number): void
   addClass(className: string): void
   removeClass(className: string): void
   clearClasses(): void
@@ -75,6 +74,8 @@ export interface ShadowRootContext extends Element {
     styleScope: number,
     extraStyleScope: number | null,
     externalClasses: string[] | undefined,
+    slotMode: SlotMode | null,
+    writeIdToDOM: boolean,
   ): Element
   createVirtualNode(virtualName: string): Element
 }

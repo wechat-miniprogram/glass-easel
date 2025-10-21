@@ -799,7 +799,6 @@ const testCases = function (testBackend) {
       var root = createElem('root')
       root.appendChild(elem)
       expect(callOrder).toStrictEqual(['c'])
-      root.$$.id = 'root'
       glassEasel.Element.pretendAttached(root)
       expect(callOrder).toStrictEqual(['c', 'a'])
       root.removeChild(elem)
@@ -1355,15 +1354,7 @@ const testCases = function (testBackend) {
               ? undefined
               : getCustomExternalTemplateEngine((comp) => {
                   var root = comp.getBackendElement()
-                  var slot
-                  if (testBackend === shadowBackend) {
-                    var shadowRoot = root.getShadowRoot()
-                    slot = shadowRoot.createElement('div', 'div')
-                    slot.setSlotName('')
-                    shadowRoot.appendChild(slot)
-                  } else {
-                    slot = root
-                  }
+                  var slot = root
                   return {
                     root,
                     slot,
