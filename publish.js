@@ -46,7 +46,7 @@ if (
   'glass-easel-miniprogram-adapter',
   'glass-easel-miniprogram-typescript',
   'glass-easel-miniprogram-webpack-plugin',
-  'glass-easel-miniprogram-shadow-sync',
+  'glass-easel-shadow-sync',
 ].forEach((p) => {
   console.info(`Run eslint on ${p}`)
   if (
