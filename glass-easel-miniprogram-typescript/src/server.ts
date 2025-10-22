@@ -211,26 +211,26 @@ export class Server {
       // get exports from corresponding ts file
       const defaultExport = getDefaultExportOfSourceFile(tc, source)
       const relPath = path.relative(compDir, tsFullPath.slice(0, -3))
-      const adapterImportLine =
-        "import type * as glassEaselMiniprogramAdapter from 'glass-easel-miniprogram-adapter'"
+      const adapterTypesLine =
+        'type _Component_<P, W, M> = { propertyValues: P, dataWithProperties: W, methods: M }'
       // eslint-disable-next-line no-nested-ternary
       const tsImportLine = defaultExport
         ? `import type component from './${escapeJsString(relPath)}'`
         : 'declare const component: UnknownElement'
       const dataLine = `
-declare const data: typeof component extends glassEaselMiniprogramAdapter.behavior.ComponentType<infer TData, infer TProperty, any, any, any>
-  ? glassEaselMiniprogramAdapter.component.AllData<TData, TProperty>
+declare const data: typeof component['_$fieldTypes'] extends _Component_<any, infer W, any>
+  ? W
   : { [k: string]: any }`
       const methodsLine = `
-declare const methods: typeof component extends glassEaselMiniprogramAdapter.behavior.ComponentType<any, any, infer TMethod, any, any>
-  ? TMethod
+declare const methods: typeof component['_$fieldTypes'] extends _Component_<any, any, infer M>
+  ? M
   : { [k: string]: any }`
 
       // get exports from using components
       const propertiesHelperLine = `
-type Properties<T> = T extends glassEaselMiniprogramAdapter.behavior.ComponentType<any, infer TProperty, any, any, any>
-  ? glassEaselMiniprogramAdapter.component.PropertyValues<TProperty>
-  : glassEaselMiniprogramAdapter.component.Empty`
+type Properties<T> = T extends _Component_<infer P, any, any>
+  ? P
+  : { [k: string]: any }`
       let usingComponentsImports = ''
       const usingComponensItems = [] as string[]
       const usingComponents = this.projectDirManager.getUsingComponents(compFullPath)
@@ -242,7 +242,7 @@ type Properties<T> = T extends glassEaselMiniprogramAdapter.behavior.ComponentTy
         const relPath = path.relative(compDir, compPath)
         const entryName = `_component_${tagName.replace(/-/g, '_')}`
         usingComponentsImports += `import type ${entryName} from './${escapeJsString(relPath)}'\n`
-        usingComponensItems.push(`'${tagName}': Properties<typeof ${entryName}>;\n`)
+        usingComponensItems.push(`'${tagName}': Properties<typeof ${entryName}['_$fieldTypes']>;\n`)
       })
 
       // treat generics as any type tags
@@ -262,7 +262,7 @@ declare const tags: {
 ${usingComponensItems.join('')}[other: string]: UnknownElement }`
 
       return [
-        adapterImportLine,
+        adapterTypesLine,
         unknownElementLine,
         tsImportLine,
         usingComponentsImports,

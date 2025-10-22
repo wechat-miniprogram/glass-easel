@@ -1,6 +1,11 @@
 import type * as glassEasel from 'glass-easel'
 import { type GeneralComponentDefinition, type utils as typeUtils } from './types'
-import { determineComponentExports, type GeneralComponent } from './component'
+import {
+  type AllData,
+  determineComponentExports,
+  type GeneralComponent,
+  type PropertyValues,
+} from './component'
 
 type DataList = typeUtils.DataList
 type PropertyList = typeUtils.PropertyList
@@ -60,6 +65,16 @@ export class Behavior<
   }
 }
 
+export type ComponentFieldTypes<
+  TData extends DataList,
+  TProperty extends PropertyList,
+  TMethod extends MethodList,
+> = {
+  propertyValues: PropertyValues<TProperty>
+  dataWithProperties: AllData<TData, TProperty>
+  methods: TMethod
+}
+
 export class ComponentType<
   TData extends DataList,
   TProperty extends PropertyList,
@@ -71,6 +86,10 @@ export class ComponentType<
 > {
   /** @internal */
   _$: glassEasel.ComponentDefinition<TData, TProperty, TMethod>
+
+  // this field is designed for type identification in some external modules, such as glass-easel-analyzer
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  protected readonly _$fieldTypes: ComponentFieldTypes<TData, TProperty, TMethod> = undefined as any
 
   /** @internal */
   constructor(inner: glassEasel.ComponentDefinition<TData, TProperty, TMethod>) {

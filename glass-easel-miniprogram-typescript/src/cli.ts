@@ -61,7 +61,6 @@ const logDiagnostic = (diag: Diagnostic) => {
 
 const server = new Server({
   projectPath: values.path,
-  workingDirectory: values.path,
   verboseMessages: values.verbose,
   strictMode: values.strict,
   onFirstScanDone() {
