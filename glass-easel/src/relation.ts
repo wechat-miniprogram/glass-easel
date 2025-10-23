@@ -59,6 +59,7 @@ export const normalizeRelation = <TOut extends { [key: string]: any }>(
   let target:
     | GeneralBehavior
     | TraitBehavior<{ [key: string]: unknown }, { [key: string]: unknown }>
+    | string
     | null = null
   if (relation.target instanceof ComponentDefinition) {
     target = relation.target.behavior as GeneralBehavior
@@ -73,6 +74,8 @@ export const normalizeRelation = <TOut extends { [key: string]: any }>(
       const globalTarget = ownerSpace.getGlobalUsingComponent(path)
       if (typeof globalTarget === 'object' && globalTarget !== null) {
         target = globalTarget.behavior
+      } else {
+        target = path
       }
     }
   }
@@ -110,7 +113,10 @@ export type RelationListener = (target: unknown) => void
 export type RelationFailedListener = () => void
 
 export type RelationDefinition = {
-  target: GeneralBehavior | TraitBehavior<{ [x: string]: unknown }, { [x: string]: unknown }>
+  target:
+    | GeneralBehavior
+    | TraitBehavior<{ [x: string]: unknown }, { [x: string]: unknown }>
+    | string
   type: RelationType
   linked: RelationListener | null
   linkChanged: RelationListener | null
