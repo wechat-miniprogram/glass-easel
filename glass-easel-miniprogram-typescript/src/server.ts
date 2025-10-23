@@ -211,24 +211,24 @@ export class Server {
       // get exports from corresponding ts file
       const defaultExport = getDefaultExportOfSourceFile(tc, source)
       const relPath = path.relative(compDir, tsFullPath.slice(0, -3))
-      const adapterTypesLine =
-        'type _Component_<P, W, M> = { propertyValues: P, dataWithProperties: W, methods: M }'
+      const adapterTypesLine = `type _Component_<P, W, M> = { propertyValues: P, dataWithProperties: W, methods: M }
+type _ComponentFieldTypes_<T> = (T & Record<string, never>)['_$fieldTypes']`
       // eslint-disable-next-line no-nested-ternary
       const tsImportLine = defaultExport
         ? `import type component from './${escapeJsString(relPath)}'`
         : 'declare const component: UnknownElement'
       const dataLine = `
-declare const data: typeof component['_$fieldTypes'] extends _Component_<any, infer W, any>
+declare const data: _ComponentFieldTypes_<typeof component> extends _Component_<any, infer W, any>
   ? W
   : { [k: string]: any }`
       const methodsLine = `
-declare const methods: typeof component['_$fieldTypes'] extends _Component_<any, any, infer M>
+declare const methods: _ComponentFieldTypes_<typeof component> extends _Component_<any, any, infer M>
   ? M
   : { [k: string]: any }`
 
       // get exports from using components
       const propertiesHelperLine = `
-type Properties<T> = T extends _Component_<infer P, any, any>
+type Properties<T> = _ComponentFieldTypes_<T> extends _Component_<infer P, any, any>
   ? P
   : { [k: string]: any }`
       let usingComponentsImports = ''
@@ -242,7 +242,7 @@ type Properties<T> = T extends _Component_<infer P, any, any>
         const relPath = path.relative(compDir, compPath)
         const entryName = `_component_${tagName.replace(/-/g, '_')}`
         usingComponentsImports += `import type ${entryName} from './${escapeJsString(relPath)}'\n`
-        usingComponensItems.push(`'${tagName}': Properties<typeof ${entryName}['_$fieldTypes']>;\n`)
+        usingComponensItems.push(`'${tagName}': Properties<typeof ${entryName}>;\n`)
       })
 
       // treat generics as any type tags
@@ -262,10 +262,10 @@ declare const tags: {
 ${usingComponensItems.join('')}[other: string]: UnknownElement }`
 
       return [
-        adapterTypesLine,
-        unknownElementLine,
         tsImportLine,
         usingComponentsImports,
+        adapterTypesLine,
+        unknownElementLine,
         propertiesHelperLine,
         dataLine,
         methodsLine,

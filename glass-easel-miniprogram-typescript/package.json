@@ -31,13 +31,11 @@
     "build-and-start": "npm run build && node dist/cli.js"
   },
   "peerDependencies": {
-    "glass-easel-miniprogram-adapter": "workspace:*",
     "typescript": "^5.2.2"
   },
   "dependencies": {
     "chalk": "4",
     "chokidar": "^4.0.3",
-    "glass-easel-stylesheet-compiler": "workspace:*",
     "glass-easel-template-compiler": "workspace:*"
   }
 }
