@@ -177,9 +177,6 @@ importers:
       chokidar:
         specifier: ^4.0.3
         version: 4.0.3
-      glass-easel-stylesheet-compiler:
-        specifier: workspace:*
-        version: link:../glass-easel-stylesheet-compiler
       glass-easel-template-compiler:
         specifier: workspace:*
         version: link:../glass-easel-template-compiler
