@@ -1,4 +1,5 @@
 import { parseArgs } from 'util'
+import * as ts from 'typescript'
 import { type Diagnostic, DiagnosticLevel, Server } from './server'
 
 const { values } = parseArgs({
@@ -60,6 +61,7 @@ const logDiagnostic = (diag: Diagnostic) => {
 }
 
 const server = new Server({
+  typescriptNodeModule: ts,
   projectPath: values.path,
   verboseMessages: values.verbose,
   strictMode: values.strict,

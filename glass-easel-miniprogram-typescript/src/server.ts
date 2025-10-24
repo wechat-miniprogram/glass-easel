@@ -1,5 +1,5 @@
 import path from 'node:path'
-import * as ts from 'typescript'
+import type * as ts from 'typescript'
 import chalk from 'chalk'
 import {
   getWxmlConvertedTsPath,
@@ -48,6 +48,8 @@ const getDefaultExportOfSourceFile = (
 }
 
 export type ServerOptions = {
+  /** the typescript node module */
+  typescriptNodeModule: typeof ts
   /** the path of the project root */
   projectPath: string
   /** the working directory */
@@ -64,6 +66,7 @@ export type ServerOptions = {
 
 export class Server {
   private options: ServerOptions
+  private tsc: typeof ts
   private projectPath: string
   private workingDirectory: string
   private tsLangService: ts.LanguageService
@@ -73,12 +76,14 @@ export class Server {
   private configErrors: ts.Diagnostic[]
 
   constructor(options: ServerOptions) {
+    this.tsc = options.typescriptNodeModule
+    const tsc = this.tsc
     this.options = options
     this.workingDirectory = options.workingDirectory ?? process.cwd()
     this.projectPath = path.resolve(this.workingDirectory, options.projectPath)
 
     // initialize virtual file system
-    this.projectDirManager = new ProjectDirManager(this.projectPath, () => {
+    this.projectDirManager = new ProjectDirManager(tsc, this.projectPath, () => {
       this.options.onFirstScanDone?.call(this)
     })
     this.projectDirManager.onEntranceFileAdded = (fullPath) => {
@@ -108,19 +113,19 @@ export class Server {
 
     // initialize ts language service
     /* eslint-disable @typescript-eslint/unbound-method, arrow-body-style */
-    const configPath = ts.findConfigFile(this.projectPath, ts.sys.fileExists, 'tsconfig.json')
+    const configPath = tsc.findConfigFile(this.projectPath, tsc.sys.fileExists, 'tsconfig.json')
     this.logVerboseMessage(`Using TypeScript config file: ${configPath ?? '(none)'}`)
     let config: ts.ParsedCommandLine
     if (configPath !== undefined) {
       // eslint-disable-next-line @typescript-eslint/unbound-method
-      const configFile = ts.readJsonConfigFile(configPath, ts.sys.readFile)
-      config = ts.parseJsonSourceFileConfigFileContent(
+      const configFile = tsc.readJsonConfigFile(configPath, tsc.sys.readFile)
+      config = tsc.parseJsonSourceFileConfigFileContent(
         configFile,
         {
           useCaseSensitiveFileNames: false,
-          readDirectory: ts.sys.readDirectory,
-          fileExists: ts.sys.fileExists,
-          readFile: ts.sys.readFile,
+          readDirectory: tsc.sys.readDirectory,
+          fileExists: tsc.sys.fileExists,
+          readFile: tsc.sys.readFile,
         },
         path.dirname(configPath),
         { noEmit: true },
@@ -129,7 +134,7 @@ export class Server {
         // [{ extension: '.wxml', isMixedContent: true, scriptKind: ts.ScriptKind.TS }],
       )
     } else {
-      const compilerOptions = ts.getDefaultCompilerOptions()
+      const compilerOptions = tsc.getDefaultCompilerOptions()
       config = {
         options: compilerOptions,
         fileNames: [],
@@ -155,13 +160,13 @@ export class Server {
       getScriptSnapshot: (fullPath) => {
         const content = this.projectDirManager.getFileTsContent(fullPath, wxmlEnvGetter)
         if (content === null) return undefined
-        return ts.ScriptSnapshot.fromString(content)
+        return tsc.ScriptSnapshot.fromString(content)
       },
       getCurrentDirectory: () => {
         return this.workingDirectory
       },
       getDefaultLibFileName(options) {
-        return ts.getDefaultLibFilePath(options)
+        return tsc.getDefaultLibFilePath(options)
       },
       log(message) {
         // eslint-disable-next-line no-console
@@ -176,24 +181,24 @@ export class Server {
         console.error(message)
       },
       readDirectory: (fullPath, extensions, exclude, include, depth) => {
-        return ts.sys.readDirectory(fullPath, extensions, exclude, include, depth)
+        return tsc.sys.readDirectory(fullPath, extensions, exclude, include, depth)
       },
       readFile: (fullPath, encoding) => {
-        return ts.sys.readFile(fullPath, encoding)
+        return tsc.sys.readFile(fullPath, encoding)
       },
       fileExists: (fullPath) => {
-        return ts.sys.fileExists(fullPath)
+        return tsc.sys.fileExists(fullPath)
       },
       getDirectories: (directoryName) => {
-        return ts.sys.getDirectories(directoryName)
+        return tsc.sys.getDirectories(directoryName)
       },
       directoryExists: (directoryName) => {
-        return ts.sys.directoryExists(directoryName)
+        return tsc.sys.directoryExists(directoryName)
       },
     }
     /* eslint-enable @typescript-eslint/unbound-method, arrow-body-style */
-    const docReg = ts.createDocumentRegistry()
-    this.tsLangService = ts.createLanguageService(servicesHost, docReg)
+    const docReg = tsc.createDocumentRegistry()
+    this.tsLangService = tsc.createLanguageService(servicesHost, docReg)
 
     // get the exports of a file
     const wxmlEnvGetter = (tsFullPath: string, wxmlFullPath: string): string | null => {
@@ -372,7 +377,7 @@ ${usingComponensItems.join('')}[other: string]: UnknownElement }`
     const pos = this.getWxmlSourcePos(fullPath, position)
     if (pos === null) return null
     const quickInfo = this.tsLangService.getQuickInfoAtPosition(tsFullPath, pos.dest)
-    return ts.displayPartsToString(quickInfo?.displayParts ?? [])
+    return this.tsc.displayPartsToString(quickInfo?.displayParts ?? [])
   }
 
   private toLocationLink(
@@ -564,13 +569,13 @@ ${usingComponensItems.join('')}[other: string]: UnknownElement }`
       character: 0,
     }
     let level = DiagnosticLevel.Unknown
-    if (diagnostic.category === ts.DiagnosticCategory.Error) {
+    if (diagnostic.category === this.tsc.DiagnosticCategory.Error) {
       level = DiagnosticLevel.Error
-    } else if (diagnostic.category === ts.DiagnosticCategory.Warning) {
+    } else if (diagnostic.category === this.tsc.DiagnosticCategory.Warning) {
       level = DiagnosticLevel.Warning
-    } else if (diagnostic.category === ts.DiagnosticCategory.Suggestion) {
+    } else if (diagnostic.category === this.tsc.DiagnosticCategory.Suggestion) {
       level = DiagnosticLevel.Info
-    } else if (diagnostic.category === ts.DiagnosticCategory.Message) {
+    } else if (diagnostic.category === this.tsc.DiagnosticCategory.Message) {
       level = DiagnosticLevel.Note
     }
     const fileName = file?.fileName ?? ''
@@ -582,7 +587,7 @@ ${usingComponensItems.join('')}[other: string]: UnknownElement }`
       end,
       code: diagnostic.code,
       level,
-      message: ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
+      message: this.tsc.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
     }
   }
 

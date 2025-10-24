@@ -1,5 +1,5 @@
 import path from 'node:path'
-import * as ts from 'typescript'
+import type * as ts from 'typescript'
 import { type TmplConvertedExpr, TmplGroup } from 'glass-easel-template-compiler'
 import { VirtualFileSystem } from './virtual_fs'
 
@@ -101,6 +101,7 @@ type ConvertedExprCache = {
 
 export class ProjectDirManager {
   readonly vfs: VirtualFileSystem
+  private tsc: typeof ts
   private readonly rootPath: string
   private tmplGroup = new TmplGroup()
   private trackingComponents = Object.create(null) as Record<string, ComponentJsonData>
@@ -109,7 +110,8 @@ export class ProjectDirManager {
   onEntranceFileRemoved: (fullPath: string) => void = () => {}
   onConvertedExprCacheInvalidated: (wxmlFullPath: string) => void = () => {}
 
-  constructor(rootPath: string, firstScanCallback: () => void) {
+  constructor(tsc: typeof ts, rootPath: string, firstScanCallback: () => void) {
+    this.tsc = tsc
     this.rootPath = rootPath
     this.vfs = new VirtualFileSystem(rootPath, firstScanCallback)
     this.vfs.onFileFound = (fullPath) => {
@@ -228,7 +230,7 @@ export class ProjectDirManager {
     if (!env) return null
     const expr = this.tmplGroup.getTmplConvertedExpr(relPath, env)
     cache.expr = expr
-    cache.source = ts.createSourceFile(wxmlFullPath, content, ts.ScriptTarget.Latest)
+    cache.source = this.tsc.createSourceFile(wxmlFullPath, content, this.tsc.ScriptTarget.Latest)
     cache.version += 1
     return expr.code() ?? ''
   }
