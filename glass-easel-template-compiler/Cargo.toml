@@ -1,6 +1,6 @@
 [package]
 name = "glass-easel-template-compiler"
-version = "0.15.1"
+version = "0.15.2"
 authors = ["LastLeaf <bqfu@163.com>"]
 description = "The template compiler of the glass-easel project."
 license = "MIT"
