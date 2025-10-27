@@ -22,6 +22,7 @@ if (!message) {
   'glass-easel',
   'glass-easel-miniprogram-adapter',
   'glass-easel-miniprogram-webpack-plugin',
+  'glass-easel-miniprogram-typescript',
   'glass-easel-miniprogram-template',
   'glass-easel-shadow-sync',
 ].forEach((p) => {
