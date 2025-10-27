@@ -523,9 +523,8 @@ impl TmplGroup {
     ) -> Result<TmplConvertedExpr, TmplError> {
         let tree = self.get_tree(path)?;
         let env = crate::stringify::typescript::tmpl_converted_expr_runtime_string();
-        let (code, source_map) = crate::stringify::typescript::generate_tmpl_converted_expr(
-            tree, ts_env, env,
-        );
+        let (code, source_map) =
+            crate::stringify::typescript::generate_tmpl_converted_expr(tree, ts_env, env);
         Ok(TmplConvertedExpr { code, source_map })
     }
 
@@ -546,7 +545,7 @@ impl TmplGroup {
 }
 
 /// A string for TypeScript type checks with metadata.
-/// 
+///
 /// This is the result of `get_tmpl_converted_expr`.
 #[wasm_bindgen]
 pub struct TmplConvertedExpr {
@@ -562,29 +561,40 @@ impl TmplConvertedExpr {
 
     /// Get the source code location for given TypeScript code location.
     pub fn get_source_location(&self, loc: Range<Position>) -> Option<Range<Position>> {
-        let start = self.source_map.lookup_token(loc.start.line, loc.start.utf16_col)?;
+        let start = self
+            .source_map
+            .lookup_token(loc.start.line, loc.start.utf16_col)?;
         let (line, utf16_col) = start.get_src();
         let ret_pos = Position { line, utf16_col };
         if loc.start == loc.end {
             return Some(ret_pos..ret_pos);
         }
         let end_diff = if loc.end.utf16_col > 0 { 1 } else { 0 };
-        let ret_end_pos = match self.source_map.lookup_token(loc.end.line, loc.end.utf16_col - end_diff) {
+        let ret_end_pos = match self
+            .source_map
+            .lookup_token(loc.end.line, loc.end.utf16_col - end_diff)
+        {
             None => ret_pos,
             Some(token) => {
                 let line = token.get_src_line();
                 let col = token.get_src_col();
                 let len = token.get_name().map(|s| s.len() as u32).unwrap_or(0);
-                Position { line, utf16_col: col + len }
+                Position {
+                    line,
+                    utf16_col: col + len,
+                }
             }
         };
         Some(ret_pos..ret_end_pos)
     }
 
     /// Get the token information of the given source code location.
-    /// 
+    ///
     /// Returns the range in the source code and the start position in the TypeScript code.
-    pub fn get_token_at_source_position(&self, pos: Position) -> Option<(Range<Position>, Position)> {
+    pub fn get_token_at_source_position(
+        &self,
+        pos: Position,
+    ) -> Option<(Range<Position>, Position)> {
         for token in self.source_map.tokens() {
             let Some(name) = token.get_name() else {
                 continue;
@@ -599,9 +609,18 @@ impl TmplConvertedExpr {
                 continue;
             }
             let (dst_start_line, dst_start_col) = token.get_dst();
-            let source_start = Position { line: src_start_line, utf16_col: src_start_col };
-            let source_end = Position { line: src_end_line, utf16_col: src_end_col };
-            let dest = Position { line: dst_start_line, utf16_col: dst_start_col };
+            let source_start = Position {
+                line: src_start_line,
+                utf16_col: src_start_col,
+            };
+            let source_end = Position {
+                line: src_end_line,
+                utf16_col: src_end_col,
+            };
+            let dest = Position {
+                line: dst_start_line,
+                utf16_col: dst_start_col,
+            };
             return Some((source_start..source_end, dest));
         }
         None
@@ -623,15 +642,36 @@ impl TmplConvertedExpr {
         end_line: u32,
         end_col: u32,
     ) -> Option<Vec<u32>> {
-        let start = Position { line: start_line, utf16_col: start_col };
-        let end = Position { line: end_line, utf16_col: end_col };
+        let start = Position {
+            line: start_line,
+            utf16_col: start_col,
+        };
+        let end = Position {
+            line: end_line,
+            utf16_col: end_col,
+        };
         let ret = self.get_source_location(start..end)?;
-        Some(vec![ret.start.line, ret.start.utf16_col, ret.end.line, ret.end.utf16_col])
+        Some(vec![
+            ret.start.line,
+            ret.start.utf16_col,
+            ret.end.line,
+            ret.end.utf16_col,
+        ])
     }
 
     #[wasm_bindgen(js_name = "getTokenAtSourcePosition")]
     pub fn js_get_token_at_source_position(&self, line: u32, col: u32) -> Option<Vec<u32>> {
-        let (src, dest) = self.get_token_at_source_position(Position { line, utf16_col: col })?;
-        Some(vec![src.start.line, src.start.utf16_col, src.end.line, src.end.utf16_col, dest.line, dest.utf16_col])
+        let (src, dest) = self.get_token_at_source_position(Position {
+            line,
+            utf16_col: col,
+        })?;
+        Some(vec![
+            src.start.line,
+            src.start.utf16_col,
+            src.end.line,
+            src.end.utf16_col,
+            dest.line,
+            dest.utf16_col,
+        ])
     }
 }
