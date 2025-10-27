@@ -3,11 +3,13 @@
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Write;
+use std::ops::Range;
+use std::str::FromStr as _;
 
-use sourcemap::SourceMap;
+use wasm_bindgen::prelude::*;
 
 use crate::escape::gen_lit_str;
-use crate::parse::{ParseError, Template};
+use crate::parse::{ParseError, Position, Template};
 use crate::proc_gen::{JsFunctionScopeWriter, JsTopScopeWriter};
 use crate::stringify::Stringify;
 
@@ -514,16 +516,17 @@ impl TmplGroup {
     }
 
     /// Get a string that used to check TypeScript problems.
-    pub(crate) fn get_tmpl_converted_expr(
+    pub fn get_tmpl_converted_expr(
         &self,
         path: &str,
         ts_env: &str,
-    ) -> Result<(String, SourceMap), TmplError> {
+    ) -> Result<TmplConvertedExpr, TmplError> {
         let tree = self.get_tree(path)?;
         let env = crate::stringify::typescript::tmpl_converted_expr_runtime_string();
-        Ok(crate::stringify::typescript::generate_tmpl_converted_expr(
+        let (code, source_map) = crate::stringify::typescript::generate_tmpl_converted_expr(
             tree, ts_env, env,
-        ))
+        );
+        Ok(TmplConvertedExpr { code, source_map })
     }
 
     /// Returns the number of templates in the group.
@@ -539,5 +542,96 @@ impl TmplGroup {
     /// List all available templates.
     pub fn list_template_trees(&self) -> impl Iterator<Item = (&str, &Template)> {
         self.trees.iter().map(|(name, tmpl)| (name.as_str(), tmpl))
+    }
+}
+
+/// A string for TypeScript type checks with metadata.
+/// 
+/// This is the result of `get_tmpl_converted_expr`.
+#[wasm_bindgen]
+pub struct TmplConvertedExpr {
+    code: String,
+    source_map: sourcemap::SourceMap,
+}
+
+impl TmplConvertedExpr {
+    /// Get the result TypeScript code as string.
+    pub fn code(&self) -> &str {
+        &self.code
+    }
+
+    /// Get the source code location for given TypeScript code location.
+    pub fn get_source_location(&self, loc: Range<Position>) -> Option<Range<Position>> {
+        let start = self.source_map.lookup_token(loc.start.line, loc.start.utf16_col)?;
+        let (line, utf16_col) = start.get_src();
+        let ret_pos = Position { line, utf16_col };
+        if loc.start == loc.end {
+            return Some(ret_pos..ret_pos);
+        }
+        let end_diff = if loc.end.utf16_col > 0 { 1 } else { 0 };
+        let ret_end_pos = match self.source_map.lookup_token(loc.end.line, loc.end.utf16_col - end_diff) {
+            None => ret_pos,
+            Some(token) => {
+                let line = token.get_src_line();
+                let col = token.get_src_col();
+                let len = token.get_name().map(|s| s.len() as u32).unwrap_or(0);
+                Position { line, utf16_col: col + len }
+            }
+        };
+        Some(ret_pos..ret_end_pos)
+    }
+
+    /// Get the token information of the given source code location.
+    /// 
+    /// Returns the range in the source code and the start position in the TypeScript code.
+    pub fn get_token_at_source_position(&self, pos: Position) -> Option<(Range<Position>, Position)> {
+        for token in self.source_map.tokens() {
+            let Some(name) = token.get_name() else {
+                continue;
+            };
+            let (src_start_line, src_start_col) = token.get_src();
+            if src_start_line != pos.line {
+                continue;
+            };
+            let src_end_line = src_start_line;
+            let src_end_col = src_start_col + name.len() as u32;
+            if !(src_start_col..=src_end_col).contains(&pos.utf16_col) {
+                continue;
+            }
+            let (dst_start_line, dst_start_col) = token.get_dst();
+            let source_start = Position { line: src_start_line, utf16_col: src_start_col };
+            let source_end = Position { line: src_end_line, utf16_col: src_end_col };
+            let dest = Position { line: dst_start_line, utf16_col: dst_start_col };
+            return Some((source_start..source_end, dest));
+        }
+        None
+    }
+}
+
+#[wasm_bindgen]
+impl TmplConvertedExpr {
+    #[wasm_bindgen(js_name = "code")]
+    pub fn js_code(&self) -> Option<js_sys::JsString> {
+        js_sys::JsString::from_str(&self.code).ok()
+    }
+
+    #[wasm_bindgen(js_name = "getSourceLocation")]
+    pub fn js_get_source_location(
+        &self,
+        start_line: u32,
+        start_col: u32,
+        end_line: u32,
+        end_col: u32,
+    ) -> Option<Vec<u32>> {
+        let start = Position { line: start_line, utf16_col: start_col };
+        let end = Position { line: end_line, utf16_col: end_col };
+        let ret = self.get_source_location(start..end)?;
+        Some(vec![ret.start.line, ret.start.utf16_col, ret.end.line, ret.end.utf16_col])
+    }
+
+    #[wasm_bindgen(js_name = "getTokenAtSourcePosition")]
+    pub fn js_get_token_at_source_position(&self, line: u32, col: u32) -> Option<Vec<u32>> {
+        let (src, dest) = self.get_token_at_source_position(Position { line, utf16_col: col })?;
+        Some(vec![src.start.line, src.start.utf16_col, src.end.line, src.end.utf16_col, dest.line, dest.utf16_col])
     }
 }

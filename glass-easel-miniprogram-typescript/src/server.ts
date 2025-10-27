@@ -7,7 +7,10 @@ import {
   type Position,
   type PositionRange,
   ProjectDirManager,
+  type TmplGroup,
 } from './project'
+
+export { type TmplGroup, type TmplConvertedExpr } from './project'
 
 export const enum DiagnosticLevel {
   Unknown = 0,
@@ -50,6 +53,8 @@ const getDefaultExportOfSourceFile = (
 export type ServerOptions = {
   /** the typescript node module */
   typescriptNodeModule: typeof ts
+  /** the `TmplGroup` of glass-easel-template-compiler */
+  tmplGroup: TmplGroup
   /** the path of the project root */
   projectPath: string
   /** the working directory */
@@ -67,6 +72,7 @@ export type ServerOptions = {
 export class Server {
   private options: ServerOptions
   private tsc: typeof ts
+  private tmplGroup: TmplGroup
   private projectPath: string
   private workingDirectory: string
   private tsLangService: ts.LanguageService
@@ -74,18 +80,22 @@ export class Server {
   private rootFilePaths: string[]
   private rootFilePathsVersion: number
   private configErrors: ts.Diagnostic[]
+  private pendingAsyncTasksListeners: (() => void)[] = []
 
   constructor(options: ServerOptions) {
     this.tsc = options.typescriptNodeModule
     const tsc = this.tsc
+    this.tmplGroup = options.tmplGroup
+    const tmplGroup = this.tmplGroup
     this.options = options
     this.workingDirectory = options.workingDirectory ?? process.cwd()
     this.projectPath = path.resolve(this.workingDirectory, options.projectPath)
 
     // initialize virtual file system
-    this.projectDirManager = new ProjectDirManager(tsc, this.projectPath, () => {
+    this.projectDirManager = new ProjectDirManager(tsc, tmplGroup, this.projectPath, () => {
       this.options.onFirstScanDone?.call(this)
     })
+    this.projectDirManager.wxmlEnvGetter = this.wxmlEnvGetter.bind(this)
     this.projectDirManager.onEntranceFileAdded = (fullPath) => {
       this.logVerboseMessage(`Opened component WXML: ${fullPath}`)
       const p = getWxmlConvertedTsPath(fullPath)
@@ -105,10 +115,15 @@ export class Server {
         }
       }
     }
-    this.projectDirManager.onConvertedExprCacheInvalidated = (wxmlFullPath) => {
-      this.logVerboseMessage(`Component WXML needs update: ${wxmlFullPath}`)
+    this.projectDirManager.onConvertedExprCacheUpdated = (wxmlFullPath) => {
+      this.logVerboseMessage(`Component WXML updated: ${wxmlFullPath}`)
       this.rootFilePathsVersion += 1
       this.options.onDiagnosticsNeedUpdate?.call(this, wxmlFullPath)
+    }
+    this.projectDirManager.onPendingAsyncTasksEmpty = () => {
+      const f = this.pendingAsyncTasksListeners
+      this.pendingAsyncTasksListeners = []
+      f.forEach((f) => f.call(this))
     }
 
     // initialize ts language service
@@ -158,7 +173,7 @@ export class Server {
         return this.projectDirManager.getFileVersion(fullPath)?.toString() ?? ''
       },
       getScriptSnapshot: (fullPath) => {
-        const content = this.projectDirManager.getFileTsContent(fullPath, wxmlEnvGetter)
+        const content = this.projectDirManager.getFileTsContent(fullPath)
         if (content === null) return undefined
         return tsc.ScriptSnapshot.fromString(content)
       },
@@ -200,85 +215,6 @@ export class Server {
     const docReg = tsc.createDocumentRegistry()
     this.tsLangService = tsc.createLanguageService(servicesHost, docReg)
 
-    // get the exports of a file
-    const wxmlEnvGetter = (tsFullPath: string, wxmlFullPath: string): string | null => {
-      const program = this.tsLangService.getProgram()
-      if (!program) return null
-      const source = program.getSourceFile(tsFullPath)
-      if (!source) return null
-      const compFullPath = tsFullPath.slice(0, -3)
-      const compDir = path.dirname(wxmlFullPath)
-      const tc = program.getTypeChecker()
-
-      // escape helper
-      const escapeJsString = (str: string) => str.replace(/['\\]/g, (a) => `\\${a}`)
-
-      // get exports from corresponding ts file
-      const defaultExport = getDefaultExportOfSourceFile(tc, source)
-      const relPath = path.relative(compDir, tsFullPath.slice(0, -3))
-      const adapterTypesLine = `type _Component_<P, W, M> = { propertyValues: P, dataWithProperties: W, methods: M }
-type _ComponentFieldTypes_<T> = (T & Record<string, never>)['_$fieldTypes']`
-      // eslint-disable-next-line no-nested-ternary
-      const tsImportLine = defaultExport
-        ? `import type component from './${escapeJsString(relPath)}'`
-        : 'declare const component: UnknownElement'
-      const dataLine = `
-declare const data: _ComponentFieldTypes_<typeof component> extends _Component_<any, infer W, any>
-  ? W
-  : { [k: string]: any }`
-      const methodsLine = `
-declare const methods: _ComponentFieldTypes_<typeof component> extends _Component_<any, any, infer M>
-  ? M
-  : { [k: string]: any }`
-
-      // get exports from using components
-      const propertiesHelperLine = `
-type Properties<T> = _ComponentFieldTypes_<T> extends _Component_<infer P, any, any>
-  ? P
-  : { [k: string]: any }`
-      let usingComponentsImports = ''
-      const usingComponensItems = [] as string[]
-      const usingComponents = this.projectDirManager.getUsingComponents(compFullPath)
-      Object.entries(usingComponents).forEach(([tagName, compPath]) => {
-        const source = program.getSourceFile(`${compPath}.ts`)
-        if (!source) return
-        const defaultExport = getDefaultExportOfSourceFile(tc, source)
-        if (!defaultExport) return
-        const relPath = path.relative(compDir, compPath)
-        const entryName = `_component_${tagName.replace(/-/g, '_')}`
-        usingComponentsImports += `import type ${entryName} from './${escapeJsString(relPath)}'\n`
-        usingComponensItems.push(`'${tagName}': Properties<typeof ${entryName}>;\n`)
-      })
-
-      // treat generics as any type tags
-      const generics = this.projectDirManager.getGenerics(compFullPath)
-      generics.forEach((tagName) => {
-        usingComponensItems.push(`'${tagName}': any;\n`)
-      })
-
-      // TODO handling placeholders
-
-      // compose tags types
-      const unknownElementLine = this.options.strictMode
-        ? 'interface UnknownElement {}'
-        : 'type UnknownElement = { [k: string]: any }'
-      const tagsLine = `
-declare const tags: {
-${usingComponensItems.join('')}[other: string]: UnknownElement }`
-
-      return [
-        tsImportLine,
-        usingComponentsImports,
-        adapterTypesLine,
-        unknownElementLine,
-        propertiesHelperLine,
-        dataLine,
-        methodsLine,
-        tagsLine,
-        '',
-      ].join('\n')
-    }
-
     // collect config errors
     const optionsDiag = this.tsLangService.getCompilerOptionsDiagnostics()
     this.configErrors.push(...optionsDiag)
@@ -289,6 +225,15 @@ ${usingComponensItems.join('')}[other: string]: UnknownElement }`
     this.projectDirManager.stop()
   }
 
+  async waitPendingAsyncTasks(): Promise<void> {
+    if (this.projectDirManager.pendingAsyncTasksCount() > 0) {
+      return new Promise((resolve) => {
+        this.pendingAsyncTasksListeners.push(resolve)
+      })
+    }
+    return undefined
+  }
+
   getConfigErrors(): Diagnostic[] {
     const ret: Diagnostic[] = []
     this.configErrors.forEach((diag) => {
@@ -296,6 +241,84 @@ ${usingComponensItems.join('')}[other: string]: UnknownElement }`
       if (item) ret.push(item)
     })
     return ret
+  }
+
+  private wxmlEnvGetter(tsFullPath: string, wxmlFullPath: string): string | null {
+    const program = this.tsLangService.getProgram()
+    if (!program) return null
+    const source = program.getSourceFile(tsFullPath)
+    if (!source) return null
+    const compFullPath = tsFullPath.slice(0, -3)
+    const compDir = path.dirname(wxmlFullPath)
+    const tc = program.getTypeChecker()
+
+    // escape helper
+    const escapeJsString = (str: string) => str.replace(/['\\]/g, (a) => `\\${a}`)
+
+    // get exports from corresponding ts file
+    const defaultExport = getDefaultExportOfSourceFile(tc, source)
+    const relPath = path.relative(compDir, tsFullPath.slice(0, -3))
+    const adapterTypesLine = `type _Component_<P, W, M> = { propertyValues: P, dataWithProperties: W, methods: M }
+type _ComponentFieldTypes_<T> = (T & Record<string, never>)['_$fieldTypes']`
+    // eslint-disable-next-line no-nested-ternary
+    const tsImportLine = defaultExport
+      ? `import type component from './${escapeJsString(relPath)}'`
+      : 'declare const component: UnknownElement'
+    const dataLine = `
+declare const data: _ComponentFieldTypes_<typeof component> extends _Component_<any, infer W, any>
+? W
+: { [k: string]: any }`
+    const methodsLine = `
+declare const methods: _ComponentFieldTypes_<typeof component> extends _Component_<any, any, infer M>
+? M
+: { [k: string]: any }`
+
+    // get exports from using components
+    const propertiesHelperLine = `
+type Properties<T> = _ComponentFieldTypes_<T> extends _Component_<infer P, any, any>
+? P
+: { [k: string]: any }`
+    let usingComponentsImports = ''
+    const usingComponensItems = [] as string[]
+    const usingComponents = this.projectDirManager.getUsingComponents(compFullPath)
+    Object.entries(usingComponents).forEach(([tagName, compPath]) => {
+      const source = program.getSourceFile(`${compPath}.ts`)
+      if (!source) return
+      const defaultExport = getDefaultExportOfSourceFile(tc, source)
+      if (!defaultExport) return
+      const relPath = path.relative(compDir, compPath)
+      const entryName = `_component_${tagName.replace(/-/g, '_')}`
+      usingComponentsImports += `import type ${entryName} from './${escapeJsString(relPath)}'\n`
+      usingComponensItems.push(`'${tagName}': Properties<typeof ${entryName}>;\n`)
+    })
+
+    // treat generics as any type tags
+    const generics = this.projectDirManager.getGenerics(compFullPath)
+    generics.forEach((tagName) => {
+      usingComponensItems.push(`'${tagName}': any;\n`)
+    })
+
+    // TODO handling placeholders
+
+    // compose tags types
+    const unknownElementLine = this.options.strictMode
+      ? 'interface UnknownElement {}'
+      : 'type UnknownElement = { [k: string]: any }'
+    const tagsLine = `
+declare const tags: {
+${usingComponensItems.join('')}[other: string]: UnknownElement }`
+
+    return [
+      tsImportLine,
+      usingComponentsImports,
+      adapterTypesLine,
+      unknownElementLine,
+      propertiesHelperLine,
+      dataLine,
+      methodsLine,
+      tagsLine,
+      '',
+    ].join('\n')
   }
 
   analyzeTsFile(fullPath: string): Diagnostic[] {
@@ -316,44 +339,46 @@ ${usingComponensItems.join('')}[other: string]: UnknownElement }`
     return ret
   }
 
-  analyzeWxmlFile(fullPath: string): Diagnostic[] {
+  async analyzeWxmlFile(fullPath: string): Promise<Diagnostic[]> {
     if (!this.projectDirManager.isComponentTracking(fullPath)) return []
     const tsFullPath = getWxmlConvertedTsPath(fullPath)
     if (tsFullPath === null) return []
     const ret = this.analyzeTsFile(tsFullPath)
-    ret.forEach((diag) => {
-      const loc = this.projectDirManager.getWxmlSource(
-        fullPath,
-        diag.start.line,
-        diag.start.character,
-        diag.end.line,
-        diag.end.character,
-      )
-      diag.file = diag.file === tsFullPath ? fullPath : diag.file
-      diag.source = loc?.source ?? null
-      diag.start = { line: loc?.startLine ?? 0, character: loc?.startCol ?? 0 }
-      diag.end = { line: loc?.endLine ?? 0, character: loc?.endCol ?? 0 }
-    })
+    await Promise.all(
+      ret.map(async (diag) => {
+        const loc = await this.projectDirManager.getWxmlSource(
+          fullPath,
+          diag.start.line,
+          diag.start.character,
+          diag.end.line,
+          diag.end.character,
+        )
+        diag.file = diag.file === tsFullPath ? fullPath : diag.file
+        diag.source = loc?.source ?? null
+        diag.start = { line: loc?.startLine ?? 0, character: loc?.startCol ?? 0 }
+        diag.end = { line: loc?.endLine ?? 0, character: loc?.endCol ?? 0 }
+      }),
+    )
     return ret
   }
 
-  private getWxmlSourcePos(
+  private async getWxmlSourcePos(
     fullPath: string,
     position: Position,
-  ): {
+  ): Promise<{
     tsFullPath: string
     sourceStart: Position
     sourceEnd: Position
     destStart: Position
     dest: number
-  } | null {
+  } | null> {
     const tsFullPath = getWxmlConvertedTsPath(fullPath)
     if (tsFullPath === null) return null
     const program = this.tsLangService.getProgram()
     if (!program) return null
     const source = program.getSourceFile(tsFullPath)
     if (!source) return null
-    const tokenInfo = this.projectDirManager.getTokenInfoAtPosition(fullPath, position)
+    const tokenInfo = await this.projectDirManager.getTokenInfoAtPosition(fullPath, position)
     if (!tokenInfo) return null
     if (
       tokenInfo.sourceStart.line === tokenInfo.sourceEnd.line &&
@@ -371,19 +396,19 @@ ${usingComponensItems.join('')}[other: string]: UnknownElement }`
     }
   }
 
-  getWxmlHoverContent(fullPath: string, position: Position): string | null {
+  async getWxmlHoverContent(fullPath: string, position: Position): Promise<string | null> {
     const tsFullPath = getWxmlConvertedTsPath(fullPath)
     if (tsFullPath === null) return null
-    const pos = this.getWxmlSourcePos(fullPath, position)
+    const pos = await this.getWxmlSourcePos(fullPath, position)
     if (pos === null) return null
     const quickInfo = this.tsLangService.getQuickInfoAtPosition(tsFullPath, pos.dest)
     return this.tsc.displayPartsToString(quickInfo?.displayParts ?? [])
   }
 
-  private toLocationLink(
+  private async toLocationLink(
     originSelectionRange: PositionRange,
     refInfo: ts.DocumentSpan,
-  ): LocationLink | null {
+  ): Promise<LocationLink | null> {
     const program = this.tsLangService.getProgram()
     if (!program) return null
     const targetOrigUri = refInfo.fileName
@@ -395,7 +420,7 @@ ${usingComponensItems.join('')}[other: string]: UnknownElement }`
     }
     const targetWxmlUri = getWxmlTsPathReverted(targetOrigUri)
     if (targetWxmlUri) {
-      const wxmlPosInfo = this.projectDirManager.getWxmlSource(
+      const wxmlPosInfo = await this.projectDirManager.getWxmlSource(
         targetWxmlUri,
         targetRange.start.line,
         targetRange.start.character,
@@ -419,10 +444,10 @@ ${usingComponensItems.join('')}[other: string]: UnknownElement }`
     }
   }
 
-  getWxmlDefinition(fullPath: string, position: Position): LocationLink[] | null {
+  async getWxmlDefinition(fullPath: string, position: Position): Promise<LocationLink[] | null> {
     const tsFullPath = getWxmlConvertedTsPath(fullPath)
     if (tsFullPath === null) return null
-    const pos = this.getWxmlSourcePos(fullPath, position)
+    const pos = await this.getWxmlSourcePos(fullPath, position)
     if (pos === null) return null
     const list = this.tsLangService.getDefinitionAtPosition(tsFullPath, pos.dest)
     if (!list) return null
@@ -430,16 +455,17 @@ ${usingComponensItems.join('')}[other: string]: UnknownElement }`
       start: pos.sourceStart,
       end: pos.sourceEnd,
     }
-    const ret = list
-      .map((item) => this.toLocationLink(originSelectionRange, item))
-      .filter((x) => x !== null)
+    const links = await Promise.all(
+      list.map((item) => this.toLocationLink(originSelectionRange, item)),
+    )
+    const ret = links.filter((x) => x !== null)
     return ret as LocationLink[]
   }
 
-  getWxmlReferences(fullPath: string, position: Position): LocationLink[] | null {
+  async getWxmlReferences(fullPath: string, position: Position): Promise<LocationLink[] | null> {
     const tsFullPath = getWxmlConvertedTsPath(fullPath)
     if (tsFullPath === null) return null
-    const pos = this.getWxmlSourcePos(fullPath, position)
+    const pos = await this.getWxmlSourcePos(fullPath, position)
     if (pos === null) return null
     const list = this.tsLangService.getReferencesAtPosition(tsFullPath, pos.dest)
     if (!list) return null
@@ -447,19 +473,23 @@ ${usingComponensItems.join('')}[other: string]: UnknownElement }`
       start: pos.sourceStart,
       end: pos.sourceEnd,
     }
-    const ret = list
-      .map((item) => this.toLocationLink(originSelectionRange, item))
-      .filter((x) => x !== null)
+    const links = await Promise.all(
+      list.map((item) => this.toLocationLink(originSelectionRange, item)),
+    )
+    const ret = links.filter((x) => x !== null)
     return ret as LocationLink[]
   }
 
-  getWxmlCompletion(
+  async getWxmlCompletion(
     fullPath: string,
     position: Position,
-  ): { items: { label: string; kind: string; sortText: string }[]; isIncomplete: boolean } | null {
+  ): Promise<{
+    items: { label: string; kind: string; sortText: string }[]
+    isIncomplete: boolean
+  } | null> {
     const tsFullPath = getWxmlConvertedTsPath(fullPath)
     if (tsFullPath === null) return null
-    const pos = this.getWxmlSourcePos(fullPath, position)
+    const pos = await this.getWxmlSourcePos(fullPath, position)
     if (pos === null) return null
     const ret = this.tsLangService.getCompletionsAtPosition(tsFullPath, pos.dest, undefined)
     if (!ret || ret.isGlobalCompletion || !ret.isMemberCompletion) return null

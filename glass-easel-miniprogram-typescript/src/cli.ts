@@ -1,5 +1,6 @@
 import { parseArgs } from 'util'
 import * as ts from 'typescript'
+import { TmplGroup } from 'glass-easel-template-compiler'
 import { type Diagnostic, DiagnosticLevel, Server } from './server'
 
 const { values } = parseArgs({
@@ -60,32 +61,36 @@ const logDiagnostic = (diag: Diagnostic) => {
   }
 }
 
+let success = true
+
 const server = new Server({
   typescriptNodeModule: ts,
+  tmplGroup: new TmplGroup(),
   projectPath: values.path,
   verboseMessages: values.verbose,
   strictMode: values.strict,
   onFirstScanDone() {
-    let success = true
     this.getConfigErrors().forEach((diag) => {
       success = false
       logDiagnostic(diag)
     })
-    if (success) {
-      this.listTrackingComponents().forEach((compPath) => {
-        const diags = this.analyzeWxmlFile(`${compPath}.wxml`)
-        if (diags.length) success = false
-        diags.forEach(logDiagnostic)
-      })
-    }
-    if (!values.watch) {
-      server.end()
-      if (!success) process.exit(1)
-    }
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    ;(async () => {
+      await this.waitPendingAsyncTasks()
+      if (!values.watch) {
+        server.end()
+        if (!success) process.exit(1)
+      }
+      return undefined
+    })()
   },
   onDiagnosticsNeedUpdate(fullPath: string) {
-    if (!values.watch) return
-    const diags = this.analyzeWxmlFile(fullPath)
-    diags.forEach(logDiagnostic)
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    ;(async () => {
+      const diags = await this.analyzeWxmlFile(fullPath)
+      if (diags.length) success = false
+      diags.forEach(logDiagnostic)
+      return undefined
+    })()
   },
 })

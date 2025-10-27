@@ -1,7 +1,39 @@
 import path from 'node:path'
 import type * as ts from 'typescript'
-import { type TmplConvertedExpr, TmplGroup } from 'glass-easel-template-compiler'
+import type { TmplGroup as CompilerTmplGroup } from 'glass-easel-template-compiler'
 import { VirtualFileSystem } from './virtual_fs'
+
+export interface TmplGroup {
+  free: CompilerTmplGroup['free']
+  addTmpl: CompilerTmplGroup['addTmpl']
+  getTmplConvertedExpr: (
+    path: string,
+    tsEnv: string,
+  ) => Promise<TmplConvertedExpr> | TmplConvertedExpr
+}
+
+export interface TmplConvertedExpr {
+  free(): void
+  code(): string | undefined
+  getSourceLocation: (
+    startLine: number,
+    startCol: number,
+    endLine: number,
+    endCol: number,
+  ) =>
+    | Promise<[number, number, number, number] | Uint32Array | undefined>
+    | [number, number, number, number]
+    | Uint32Array
+    | undefined
+  getTokenAtSourcePosition: (
+    line: number,
+    col: number,
+  ) =>
+    | Promise<[number, number, number, number, number, number] | Uint32Array | undefined>
+    | [number, number, number, number, number, number]
+    | Uint32Array
+    | undefined
+}
 
 export type Position = {
   line: number
@@ -102,16 +134,25 @@ type ConvertedExprCache = {
 export class ProjectDirManager {
   readonly vfs: VirtualFileSystem
   private tsc: typeof ts
+  private tmplGroup: TmplGroup
   private readonly rootPath: string
-  private tmplGroup = new TmplGroup()
   private trackingComponents = Object.create(null) as Record<string, ComponentJsonData>
   private convertedExpr = Object.create(null) as Record<string, ConvertedExprCache>
+  private pendingAsyncTasks = 0
+  wxmlEnvGetter: (tsFullPath: string, wxmlFullPath: string) => string | null = () => null
   onEntranceFileAdded: (fullPath: string) => void = () => {}
   onEntranceFileRemoved: (fullPath: string) => void = () => {}
-  onConvertedExprCacheInvalidated: (wxmlFullPath: string) => void = () => {}
+  onConvertedExprCacheUpdated: (wxmlFullPath: string) => void = () => {}
+  onPendingAsyncTasksEmpty: () => void = () => {}
 
-  constructor(tsc: typeof ts, rootPath: string, firstScanCallback: () => void) {
+  constructor(
+    tsc: typeof ts,
+    tmplGroup: TmplGroup,
+    rootPath: string,
+    firstScanCallback: () => void,
+  ) {
     this.tsc = tsc
+    this.tmplGroup = tmplGroup
     this.rootPath = rootPath
     this.vfs = new VirtualFileSystem(rootPath, firstScanCallback)
     this.vfs.onFileFound = (fullPath) => {
@@ -131,6 +172,10 @@ export class ProjectDirManager {
     return this.vfs.stop()
   }
 
+  pendingAsyncTasksCount() {
+    return this.pendingAsyncTasks
+  }
+
   private handleFileOpened(fullPath: string) {
     const compPath = possibleComponentPath(fullPath)
     if (compPath !== null) {
@@ -138,6 +183,7 @@ export class ProjectDirManager {
         const isComp = !!this.trackingComponents[compPath]
         const newIsComp = this.updateComponentJsonData(fullPath) !== null
         if (!isComp && newIsComp) {
+          this.asyncWxmlConvertedExprUpdate(`${compPath}.wxml`)
           this.onEntranceFileAdded(`${compPath}.wxml`)
         }
       }
@@ -148,21 +194,24 @@ export class ProjectDirManager {
     const compPath = possibleComponentPath(fullPath)
     if (compPath !== null) {
       if (isJsonFile(fullPath)) {
-        this.removeConvertedExprCache(`${compPath}.wxml`)
         const isComp = !!this.trackingComponents[compPath]
         const newIsComp = this.updateComponentJsonData(fullPath) !== null
-        if (!isComp && newIsComp) {
-          this.onEntranceFileAdded(`${compPath}.wxml`)
-        } else if (isComp && !newIsComp) {
+        if (newIsComp) {
+          this.asyncWxmlConvertedExprUpdate(`${compPath}.wxml`)
+          if (!isComp) {
+            this.onEntranceFileAdded(`${compPath}.wxml`)
+          }
+        } else if (isComp) {
+          this.deleteConvertedExprCache(`${compPath}.wxml`)
           this.onEntranceFileRemoved(`${compPath}.wxml`)
         }
       } else if (isTsFile(fullPath)) {
-        this.removeConvertedExprCache(`${compPath}.wxml`)
+        this.checkConvertedExprCache(`${compPath}.wxml`)
         this.forEachDirectDependantComponents(compPath, (compPath) => {
-          this.removeConvertedExprCache(`${compPath}.wxml`)
+          this.checkConvertedExprCache(`${compPath}.wxml`)
         })
       } else {
-        this.removeConvertedExprCache(fullPath)
+        this.checkConvertedExprCache(fullPath)
       }
     }
   }
@@ -171,18 +220,18 @@ export class ProjectDirManager {
     const compPath = possibleComponentPath(fullPath)
     if (compPath !== null) {
       if (isJsonFile(fullPath)) {
-        this.removeConvertedExprCache(`${compPath}.wxml`)
         const isComp = !!this.trackingComponents[compPath]
         if (isComp) {
+          this.deleteConvertedExprCache(`${compPath}.wxml`)
           this.onEntranceFileRemoved(`${compPath}.wxml`)
         }
       } else if (isTsFile(fullPath)) {
-        this.removeConvertedExprCache(`${compPath}.wxml`)
+        this.checkConvertedExprCache(`${compPath}.wxml`)
         this.forEachDirectDependantComponents(compPath, (compPath) => {
-          this.removeConvertedExprCache(`${compPath}.wxml`)
+          this.checkConvertedExprCache(`${compPath}.wxml`)
         })
       } else {
-        this.removeConvertedExprCache(fullPath)
+        this.deleteConvertedExprCache(fullPath)
       }
     }
   }
@@ -191,28 +240,31 @@ export class ProjectDirManager {
     return this.vfs.trackFile(fullPath)
   }
 
-  removeConvertedExprCache(fullPath: string) {
-    if (isWxmlFile(fullPath)) {
-      const ce = this.convertedExpr[fullPath]
-      if (ce) {
-        ce.expr?.free()
-        ce.expr = undefined
-        ce.source = undefined
-        ce.version += 1
-        this.onConvertedExprCacheInvalidated(fullPath)
-      }
+  private checkConvertedExprCache(fullPath: string) {
+    if (!isWxmlFile(fullPath)) return
+    if (this.trackingComponents[fullPath.slice(0, -5)]) {
+      this.asyncWxmlConvertedExprUpdate(fullPath)
+    } else {
+      this.deleteConvertedExprCache(fullPath)
     }
   }
 
-  getWxmlConvertedExpr(
-    wxmlFullPath: string,
-    wxmlEnvGetter: (fullPath: string, importTargetFullPath: string) => string | null,
-  ): string | null {
-    const tsFullPath = `${wxmlFullPath.slice(0, -5)}.ts`
-    let cache = this.convertedExpr[wxmlFullPath]
-    if (cache?.expr) {
-      return cache.expr.code() ?? ''
+  private deleteConvertedExprCache(fullPath: string) {
+    const ce = this.convertedExpr[fullPath]
+    if (ce && ce.expr) {
+      ce.expr?.free()
+      ce.expr = undefined
+      ce.source = undefined
+      ce.version += 1
+      this.onConvertedExprCacheUpdated(fullPath)
     }
+  }
+
+  private asyncWxmlConvertedExprUpdate(wxmlFullPath: string) {
+    const compPath = wxmlFullPath.slice(0, -5)
+    const tsFullPath = `${compPath}.ts`
+    let cache = this.convertedExpr[wxmlFullPath]
+    if (cache?.expr) return
     if (!cache) {
       cache = {
         expr: undefined,
@@ -222,49 +274,64 @@ export class ProjectDirManager {
       this.convertedExpr[wxmlFullPath] = cache
     }
     const content = this.getFileContent(wxmlFullPath)
-    if (!content) return null
+    if (!content) return
     const relPath = path.relative(this.vfs.rootPath, wxmlFullPath).split(path.sep).join('/')
-    if (relPath.startsWith('../')) return null
+    if (relPath.startsWith('../')) return
     this.tmplGroup.addTmpl(relPath, content)
-    const env = wxmlEnvGetter(tsFullPath, wxmlFullPath)
-    if (!env) return null
-    const expr = this.tmplGroup.getTmplConvertedExpr(relPath, env)
-    cache.expr = expr
-    cache.source = this.tsc.createSourceFile(wxmlFullPath, content, this.tsc.ScriptTarget.Latest)
-    cache.version += 1
-    return expr.code() ?? ''
+    const env = this.wxmlEnvGetter(tsFullPath, wxmlFullPath)
+    if (!env) return
+    this.pendingAsyncTasks += 1
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    ;(async () => {
+      try {
+        const expr = await this.tmplGroup.getTmplConvertedExpr(relPath, env)
+        cache.expr = expr
+        cache.source = this.tsc.createSourceFile(
+          wxmlFullPath,
+          content,
+          this.tsc.ScriptTarget.Latest,
+        )
+        cache.version += 1
+      } finally {
+        this.pendingAsyncTasks -= 1
+        if (this.pendingAsyncTasks === 0) {
+          this.onPendingAsyncTasksEmpty()
+        }
+      }
+      this.onConvertedExprCacheUpdated(wxmlFullPath)
+    })()
   }
 
-  getTokenInfoAtPosition(
+  async getTokenInfoAtPosition(
     wxmlFullPath: string,
     pos: Position,
-  ): { sourceStart: Position; sourceEnd: Position; dest: Position } | null {
-    const arr = this.convertedExpr[wxmlFullPath]?.expr?.getTokenAtSourcePosition(
+  ): Promise<{ sourceStart: Position; sourceEnd: Position; dest: Position } | null> {
+    const arr = await this.convertedExpr[wxmlFullPath]?.expr?.getTokenAtSourcePosition(
       pos.line,
       pos.character,
     )
     if (!arr) return null
     return {
-      sourceStart: { line: arr[0]!, character: arr[1]! },
-      sourceEnd: { line: arr[2]!, character: arr[3]! },
-      dest: { line: arr[4]!, character: arr[5]! },
+      sourceStart: { line: arr[0], character: arr[1] },
+      sourceEnd: { line: arr[2], character: arr[3] },
+      dest: { line: arr[4], character: arr[5] },
     }
   }
 
-  getWxmlSource(
+  async getWxmlSource(
     wxmlFullPath: string,
     startLine: number,
     startCol: number,
     endLine: number,
     endCol: number,
-  ): {
+  ): Promise<{
     source: ts.SourceFile
     startLine: number
     startCol: number
     endLine: number
     endCol: number
-  } | null {
-    const arr = this.convertedExpr[wxmlFullPath]?.expr?.getSourceLocation(
+  } | null> {
+    const arr = await this.convertedExpr[wxmlFullPath]?.expr?.getSourceLocation(
       startLine,
       startCol,
       endLine,
@@ -273,20 +340,17 @@ export class ProjectDirManager {
     if (!arr) return null
     return {
       source: this.convertedExpr[wxmlFullPath]!.source!,
-      startLine: arr[0]!,
-      startCol: arr[1]!,
-      endLine: arr[2]!,
-      endCol: arr[3]!,
+      startLine: arr[0],
+      startCol: arr[1],
+      endLine: arr[2],
+      endCol: arr[3],
     }
   }
 
-  getFileTsContent(
-    fullPath: string,
-    wxmlEnvGetter: (tsFullPath: string, wxmlFullPath: string) => string | null,
-  ): string | null {
+  getFileTsContent(fullPath: string): string | null {
     const p = getWxmlTsPathReverted(fullPath)
     if (p !== null) {
-      return this.getWxmlConvertedExpr(p, wxmlEnvGetter) ?? ''
+      return this.convertedExpr[p]?.expr?.code() ?? ''
     }
     return this.getFileContent(fullPath)
   }
