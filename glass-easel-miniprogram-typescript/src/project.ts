@@ -264,7 +264,6 @@ export class ProjectDirManager {
     const compPath = wxmlFullPath.slice(0, -5)
     const tsFullPath = `${compPath}.ts`
     let cache = this.convertedExpr[wxmlFullPath]
-    if (cache?.expr) return
     if (!cache) {
       cache = {
         expr: undefined,
