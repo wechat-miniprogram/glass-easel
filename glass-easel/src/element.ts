@@ -2565,10 +2565,12 @@ export class Element implements NodeCast {
   /** Set a dataset on the element */
   setDataset(name: string, value: unknown) {
     this.dataset[name] = value
-    if (BM.SHADOW || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Shadow)) {
-      if (ENV.DEV) performanceMeasureStart('backend.setDataset')
-      ;(this._$backendElement as backend.Element).setDataset(name, value)
-      if (ENV.DEV) performanceMeasureEnd()
+    if (this._$backendElement) {
+      if (BM.SHADOW || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Shadow)) {
+        if (ENV.DEV) performanceMeasureStart('backend.setDataset')
+        ;(this._$backendElement as backend.Element).setDataset(name, value)
+        if (ENV.DEV) performanceMeasureEnd()
+      }
     }
     if (this._$mutationObserverTarget) {
       MutationObserverTarget.callAttrObservers(this, {
