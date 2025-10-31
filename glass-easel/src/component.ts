@@ -878,6 +878,7 @@ export class Component<
       propertyPassingDeepCopy,
       options.reflectToAttributes,
       comp._$dataGroupObserverTree,
+      options.propertyComparer,
     )
     comp._$dataGroup = dataGroup
 
