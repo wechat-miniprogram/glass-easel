@@ -292,6 +292,20 @@ describe('Component Space', () => {
     expect((b.$$ as unknown as HTMLElement).tagName).toBe('SPAN')
   })
 
+  test('normalizeUrl with backward capability', () => {
+    const cs = new glassEasel.ComponentSpace()
+    const behavior = cs.define('beh').registerBehavior()
+    cs.exportBehavior('beh', 'beh')
+    cs.importSpace('wx', cs, false)
+    const component = cs.defineComponent({
+      is: 'wx://comp',
+      behaviors: ['beh'],
+    })
+    const comp = glassEasel.Component.createWithContext('root', component, domBackend)
+    expect(comp.asInstanceOf(component)).toEqual(comp)
+    expect(comp.hasBehavior(behavior)).toBe(true)
+  })
+
   describe('Hooks', () => {
     test('`createTextNode` hook', () => {
       const cs = new glassEasel.ComponentSpace()

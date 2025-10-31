@@ -81,6 +81,16 @@ export const normalizeUrl = (
       absPath,
     }
   }
+  // Hack for invalid relPath like `wx://the-comp`, privide some compatibility
+  const relProtoSep = relPath.indexOf('://')
+  if (relProtoSep > 0) {
+    const domain = relPath.slice(0, relProtoSep)
+    const absPath = normalizePath(path, relPath.slice(relProtoSep + 3))
+    return {
+      domain,
+      absPath,
+    }
+  }
   return {
     domain: null,
     absPath: normalizePath(path, relPath),
