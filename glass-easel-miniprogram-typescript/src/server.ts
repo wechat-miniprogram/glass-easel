@@ -303,10 +303,13 @@ type Properties<T> = _ComponentFieldTypes_<T> extends _Component_<infer P, any, 
     // compose tags types
     const unknownElementLine = this.options.strictMode
       ? 'interface UnknownElement {}'
-      : 'type UnknownElement = { [k: string]: any }'
+      : 'type UnknownElement = { _$fieldTypes: null, [k: string]: any }'
     const tagsLine = `
 declare const tags: {
-${usingComponensItems.join('')}[other: string]: UnknownElement }`
+${usingComponensItems.join('')}[other: string]: { [k: string]: any } }`
+
+    // add an empty export to avoid some tsc behavior
+    const exportLine = 'export default {}'
 
     return [
       tsImportLine,
@@ -317,6 +320,7 @@ ${usingComponensItems.join('')}[other: string]: UnknownElement }`
       dataLine,
       methodsLine,
       tagsLine,
+      exportLine,
       '',
     ].join('\n')
   }
