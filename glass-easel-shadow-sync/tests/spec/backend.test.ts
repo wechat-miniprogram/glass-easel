@@ -108,7 +108,7 @@ describe('backend', () => {
     expect(ops).toEqual([{ foo: 'foo' }])
   })
   test('hook to sync behavior builder', async () => {
-    const beh = hookBuilderToSyncData(glassEasel, componentSpace.define())
+    const beh = hookBuilderToSyncData(componentSpace.define())
       .property('name', String)
       .property('value', String)
       .registerBehavior()
@@ -121,6 +121,48 @@ describe('backend', () => {
     })
 
     const root = glassEasel.Component.createWithContext('root', compDef, shadowSyncBackend)
+    root.destroyBackendElementOnDetach()
+
+    const viewRoot = getViewNode(root) as glassEasel.GeneralComponent
+
+    expect(domHtml(root)).toEqual('<view>-</view>')
+    expect(viewRoot.data.name).toEqual('')
+    expect(viewRoot.data.value).toEqual('')
+
+    root.setData({ name: 'a', value: 'b' })
+    await Promise.resolve()
+    expect(domHtml(root)).toEqual('<view>a-b</view>')
+    expect(viewRoot.data.name).toEqual('a')
+    expect(viewRoot.data.value).toEqual('b')
+  })
+  test('hook to sync behavior builder with method caller', async () => {
+    const methodCallerMap = new WeakMap<any, glassEasel.GeneralComponent>()
+
+    const beh = hookBuilderToSyncData(componentSpace.define(), (methodCaller) =>
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+      methodCallerMap.get(methodCaller),
+    )
+      .property('name', String)
+      .property('value', String)
+      .registerBehavior()
+
+    const compDef = componentSpace
+      .define()
+      .behavior(beh)
+      .template(
+        tmpl(`
+        <view>{{name}}-{{value}}</view>
+      `),
+      )
+      .methodCallerInit(function () {
+        const methodCaller = {}
+        methodCallerMap.set(methodCaller, this)
+        return methodCaller
+      })
+      .registerComponent()
+
+    const root = glassEasel.Component.createWithContext('root', compDef, shadowSyncBackend)
+
     root.destroyBackendElementOnDetach()
 
     const viewRoot = getViewNode(root) as glassEasel.GeneralComponent
