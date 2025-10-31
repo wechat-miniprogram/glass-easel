@@ -296,7 +296,7 @@ describe('Component Space', () => {
     const cs = new glassEasel.ComponentSpace()
     const behavior = cs.define('beh').registerBehavior()
     cs.exportBehavior('beh', 'beh')
-    cs.importSpace('wx', cs, false)
+    cs.importSpace('wx://', cs, false)
     const component = cs.defineComponent({
       is: 'wx://comp',
       behaviors: ['beh'],
