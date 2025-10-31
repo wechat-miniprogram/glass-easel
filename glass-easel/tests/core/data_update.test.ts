@@ -910,6 +910,97 @@ describe('partial update', () => {
     expect(execArr).toStrictEqual(['A', 'B', 'C'])
   })
 
+  test('should support global property value comparer', () => {
+    let execArr = [] as string[]
+    const childCompDef = componentSpace
+      .define()
+      .options({
+        propertyComparer: (newValue, oldValue) => {
+          execArr.push('A')
+          return newValue !== oldValue
+        },
+      })
+      .property('p', {
+        type: String,
+        value: 'def',
+        comparer: (newValue, oldValue) => {
+          execArr.push('B')
+          if (newValue === 'abc') return false
+          if (newValue === 'ghi') return true
+          return newValue !== oldValue
+        },
+        observer() {
+          execArr.push('C')
+        },
+      })
+      .property('pp', {
+        type: String,
+        value: 'def',
+        observer() {
+          execArr.push('D')
+        },
+      })
+      .observer('p', () => {
+        execArr.push('E')
+      })
+      .observer('pp', () => {
+        execArr.push('F')
+      })
+      .registerComponent()
+    const compDef = componentSpace
+      .define()
+      .usingComponents({
+        child: childCompDef.general(),
+      })
+      .template(
+        tmpl(`
+          <child p="{{p}}" pp="{{pp}}" />
+        `),
+      )
+      .data(() => ({
+        p: 'def',
+        pp: 'def',
+      }))
+      .registerComponent()
+    const comp = glassEasel.Component.createWithContext('root', compDef, domBackend)
+    const child = comp.getShadowRoot()!.childNodes[0]!.asInstanceOf(childCompDef)!
+    expect(execArr).toStrictEqual(['B', 'A', 'E', 'F'])
+    execArr = []
+    glassEasel.Element.pretendAttached(comp)
+    comp.setData({ p: '' })
+    expect(execArr).toStrictEqual(['B', 'E', 'C'])
+    execArr = []
+    comp.setData({ p: 'abc' })
+    expect(execArr).toStrictEqual(['B', 'E'])
+    execArr = []
+    comp.setData({ p: '' })
+    expect(execArr).toStrictEqual(['B', 'E', 'C'])
+    execArr = []
+    comp.setData({ p: 'ghi' })
+    expect(execArr).toStrictEqual(['B', 'E', 'C'])
+    execArr = []
+    comp.setData({ p: 'ghi' })
+    expect(execArr).toStrictEqual(['B', 'E', 'C'])
+    execArr = []
+    child.setData({ p: 'ghi' })
+    expect(execArr).toStrictEqual(['B', 'E', 'C'])
+    execArr = []
+    comp.setData({ pp: 'abc' })
+    expect(execArr).toStrictEqual(['A', 'F', 'D'])
+    execArr = []
+    comp.setData({ pp: 'abc' })
+    expect(execArr).toStrictEqual(['A', 'F'])
+    execArr = []
+    child.setData({ pp: 'abc' })
+    expect(execArr).toStrictEqual(['A', 'F'])
+    execArr = []
+    comp.setData({ p: 'abc', pp: 'abc' })
+    expect(execArr).toStrictEqual(['B', 'A', 'E', 'F'])
+    execArr = []
+    comp.setData({ p: 'ghi', pp: 'ghi' })
+    expect(execArr).toStrictEqual(['B', 'A', 'E', 'F', 'C', 'D'])
+  })
+
   test('should not allow updates before init done', () => {
     const compDef = componentSpace
       .define()

@@ -292,7 +292,7 @@ describe('Component Space', () => {
     expect((b.$$ as unknown as HTMLElement).tagName).toBe('SPAN')
   })
 
-  test('normalizeUrl with backward capability', () => {
+  test('normalizeUrl with prefixed `is` compatibility', () => {
     const cs = new glassEasel.ComponentSpace()
     const behavior = cs.define('beh').registerBehavior()
     cs.exportBehavior('beh', 'beh')
