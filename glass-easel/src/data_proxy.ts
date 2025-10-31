@@ -305,8 +305,7 @@ export type DataObserver = (...values: unknown[]) => void
 
 export type DataChange = DataReplace | DataSplice
 // for replace
-export type DataReplace = [DataPath, DataValue, RequireComparer, undefined]
-export type RequireComparer = true | undefined
+export type DataReplace = [DataPath, DataValue, undefined, undefined]
 // for splice, numbers are index, removal count
 export type DataSplice = [DataPath, DataValue[], number, number]
 
@@ -525,6 +524,8 @@ export class DataGroup<
   } | null = null
   /* @internal */
   private _$recUpdateLevel = 0
+  /* @internal */
+  private _$propertyComparer: ((a: DataValue, b: DataValue) => boolean) | null
 
   /* @internal */
   private _$generateInnerData(data: { [key: string]: DataValue }) {
@@ -558,6 +559,7 @@ export class DataGroup<
     propertyPassingDeepCopy: DeepCopyStrategy,
     reflectToAttributes: boolean,
     observerTree: DataGroupObserverTree,
+    propertyComparer: ((a: DataValue, b: DataValue) => boolean) | null,
   ) {
     this._$comp = associatedComponent
     this.data = data
@@ -568,6 +570,7 @@ export class DataGroup<
     this._$propFields = observerTree.propFields
     this._$observerTree = observerTree
     this._$observerStatus = new Array(observerTree.observers.length) as boolean[]
+    this._$propertyComparer = propertyComparer
     this.innerData = this._$generateInnerData(data)
   }
 
@@ -581,6 +584,7 @@ export class DataGroup<
       DeepCopyStrategy.None,
       false,
       new DataGroupObserverTree({}),
+      null,
     )
   }
 
@@ -637,7 +641,7 @@ export class DataGroup<
         data = simpleDeepCopy(newData)
       }
     }
-    this._$pendingChanges.push([[propName], data, true, undefined])
+    this._$pendingChanges.push([[propName], data, undefined, undefined])
     return true
   }
 
@@ -794,19 +798,14 @@ export class DataGroup<
 
         // run comparer for properties
         let comparerResult: boolean
-        if (!isSplice && maybeSpliceIndex === true) {
-          if (prop.comparer) {
-            change[2] = undefined
-            comparerResult = !!safeCallback(
-              'Property Comparer',
-              prop.comparer,
-              comp!,
-              [newData, oldData],
-              comp?.general(),
-            )
-          } else {
-            comparerResult = oldData !== filteredData
-          }
+        if (!isSplice && (prop.comparer || this._$propertyComparer)) {
+          comparerResult = !!safeCallback(
+            'Property Comparer',
+            prop.comparer || this._$propertyComparer!,
+            comp!,
+            [newData, oldData],
+            comp?.general(),
+          )
           changed = comparerResult
         } else {
           comparerResult = oldData !== filteredData

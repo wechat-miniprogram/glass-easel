@@ -907,7 +907,7 @@ describe('partial update', () => {
     expect(execArr).toStrictEqual(['A', 'B', 'C'])
     execArr = []
     child.setData({ p: 'ghi' })
-    expect(execArr).toStrictEqual(['B'])
+    expect(execArr).toStrictEqual(['A', 'B', 'C'])
   })
 
   test('should not allow updates before init done', () => {
@@ -1051,5 +1051,98 @@ describe('partial update', () => {
     comp.applyDataUpdates()
     expect(domHtml(comp)).toBe('<child>1-0</child>')
     expect(execArr).toEqual(['update:1-0'])
+  })
+
+  test('should update data in nesting components', () => {
+    let execArr: string[] = []
+    const childCompDef = componentSpace
+      .define()
+      .options({ virtualHost: true })
+      .property('a', {
+        type: Boolean,
+        value: false,
+        observer(a) {
+          execArr.push(`child:property:${a}`)
+        },
+      })
+      .observer('a', function () {
+        execArr.push(`child:observer:${this.data.a}`)
+      })
+      .template(
+        tmpl(`
+          <block>{{a}}</block>
+        `),
+      )
+      .registerComponent()
+
+    const middleCompDef = componentSpace
+      .define()
+      .options({ virtualHost: true })
+      .usingComponents({
+        child: childCompDef,
+      })
+      .property('a', {
+        type: Boolean,
+        value: false,
+        observer(a) {
+          execArr.push(`middle:property:${a}`)
+        },
+      })
+      .observer('a', function () {
+        execArr.push(`middle:observer:${this.data.a}`)
+      })
+      .template(
+        tmpl(`
+          <child id="child" a="{{a}}"/>
+        `),
+      )
+      .registerComponent()
+
+    const compDef = componentSpace
+      .define()
+      .usingComponents({
+        middle: middleCompDef,
+      })
+      .data(() => ({
+        a: false,
+      }))
+      .template(
+        tmpl(`
+          <middle id="middle" a="{{a}}"/>
+        `),
+      )
+      .registerComponent()
+
+    const comp = glassEasel.Component.createWithContext('root', compDef, domBackend)
+    const middle = comp.$.middle as glassEasel.GeneralComponent
+    const child = middle.$.child as glassEasel.GeneralComponent
+    glassEasel.Element.pretendAttached(comp)
+
+    expect(domHtml(comp)).toBe('false')
+    expect(execArr).toEqual([
+      'child:observer:false',
+      'middle:observer:false',
+      'child:observer:false',
+    ])
+
+    execArr = []
+    comp.setData({ a: true })
+    expect(domHtml(comp)).toBe('true')
+    expect(execArr).toEqual([
+      'middle:observer:true',
+      'child:observer:true',
+      'child:property:true',
+      'middle:property:true',
+    ])
+
+    execArr = []
+    child.setData({ a: false })
+    expect(domHtml(comp)).toBe('false')
+    expect(execArr).toEqual(['child:observer:false', 'child:property:false'])
+
+    execArr = []
+    comp.setData({ a: true })
+    expect(domHtml(comp)).toBe('true')
+    expect(execArr).toEqual(['middle:observer:true', 'child:observer:true', 'child:property:true'])
   })
 })
