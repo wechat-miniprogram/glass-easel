@@ -662,6 +662,62 @@ describe('define', () => {
     expect(callOrder).toStrictEqual([1])
   })
 
+  test('options propertyComparer', () => {
+    const env = new MiniProgramEnv()
+    const codeSpace = env.createCodeSpace('', true)
+    let execArr: string[] = []
+
+    codeSpace.addCompiledTemplate(
+      'child/comp',
+      tmpl(`
+      <div>{{a}}</div>
+    `),
+    )
+
+    codeSpace.componentEnv('child/comp', ({ Component }) =>
+      Component()
+        .property('a', { type: Number, value: 123 })
+        .observer('a', () => {
+          execArr.push('a')
+        })
+        .register(),
+    )
+
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
+      <child a="{{a}}" />
+    `),
+    )
+
+    codeSpace.addComponentStaticConfig('path/to/comp', {
+      usingComponents: {
+        child: '/child/comp',
+      },
+    })
+
+    codeSpace.componentEnv('path/to/comp', ({ Component }) =>
+      Component()
+        .options({
+          propertyComparer: (a: unknown, b: unknown) => a !== b,
+        })
+        .property('a', { type: Number, value: 123 })
+        .register(),
+    )
+
+    const ab = env.associateBackend()
+    const root = ab.createRoot('body', codeSpace, 'path/to/comp')
+    const rootComp = root.getComponent()
+
+    expect(execArr).toEqual(['a'])
+    execArr = []
+    rootComp.setData({ a: 233 })
+    expect(execArr).toEqual(['a'])
+    execArr = []
+    rootComp.setData({ a: 233 })
+    expect(execArr).toEqual([])
+  })
+
   test('definition filter', () => {
     const env = new MiniProgramEnv()
     const codeSpace = env.createCodeSpace('', true)

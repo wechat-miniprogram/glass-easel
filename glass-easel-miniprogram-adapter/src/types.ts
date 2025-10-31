@@ -35,6 +35,7 @@ export type ComponentDefinitionOptions = {
   dataDeepCopy?: DeepCopyKind
   propertyPassingDeepCopy?: DeepCopyKind
   propertyEarlyInit?: boolean
+  propertyComparer?: (a: any, b: any) => boolean
 }
 
 type ComponentMethod = utils.ComponentMethod
