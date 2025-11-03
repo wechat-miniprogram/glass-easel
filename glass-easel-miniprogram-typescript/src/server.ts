@@ -279,7 +279,7 @@ type Properties<T> = _ComponentFieldTypes_<T> extends _Component_<infer P, any, 
 ? P
 : { [k: string]: any }`
     let usingComponentsImports = ''
-    const usingComponensItems = [] as string[]
+    const usingComponentsItems = [] as string[]
     const usingComponents = this.projectDirManager.getUsingComponents(compFullPath)
     Object.entries(usingComponents).forEach(([tagName, compPath]) => {
       const source = program.getSourceFile(`${compPath}.ts`)
@@ -289,24 +289,27 @@ type Properties<T> = _ComponentFieldTypes_<T> extends _Component_<infer P, any, 
       const relPath = path.relative(compDir, compPath)
       const entryName = `_component_${tagName.replace(/-/g, '_')}`
       usingComponentsImports += `import type ${entryName} from './${escapeJsString(relPath)}'\n`
-      usingComponensItems.push(`'${tagName}': Properties<typeof ${entryName}>;\n`)
+      usingComponentsItems.push(`'${tagName}': Properties<typeof ${entryName}>;\n`)
     })
 
     // treat generics as any type tags
     const generics = this.projectDirManager.getGenerics(compFullPath)
     generics.forEach((tagName) => {
-      usingComponensItems.push(`'${tagName}': any;\n`)
+      usingComponentsItems.push(`'${tagName}': any;\n`)
     })
 
     // TODO handling placeholders
 
     // compose tags types
     const unknownElementLine = this.options.strictMode
-      ? 'interface UnknownElement {}'
+      ? 'interface UnknownElement { _$fieldTypes: { propertyValues: Record<string, never>, dataWithProperties: Record<string, never>, methods: Record<string, never> } }'
       : 'type UnknownElement = { _$fieldTypes: null, [k: string]: any }'
+    const otherComponents = this.options.strictMode
+      ? '[other: string]: unknown'
+      : '[other: string]: { [k: string]: any }'
     const tagsLine = `
 declare const tags: {
-${usingComponensItems.join('')}[other: string]: { [k: string]: any } }`
+${usingComponentsItems.join('')}${otherComponents} }`
 
     // add an empty export to avoid some tsc behavior
     const exportLine = 'export default {}'
