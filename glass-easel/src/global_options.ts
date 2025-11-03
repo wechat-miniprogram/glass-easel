@@ -81,6 +81,8 @@ export type ComponentOptions = {
   virtualHost?: boolean
   /** Init component with property values or not */
   propertyEarlyInit?: boolean
+  /** Property comparer function, return false if properties are equal */
+  propertyComparer?: ((a: any, b: any) => boolean) | null
 }
 
 export type NormalizedComponentOptions = {
@@ -102,6 +104,7 @@ export type NormalizedComponentOptions = {
   listenerChangeLifetimes: boolean
   virtualHost: boolean
   propertyEarlyInit: boolean
+  propertyComparer: ((a: any, b: any) => boolean) | null
 }
 
 /**
@@ -143,6 +146,7 @@ export const globalOptions: NormalizedComponentOptions & EnvironmentOptions = {
   listenerChangeLifetimes: false,
   virtualHost: false,
   propertyEarlyInit: false,
+  propertyComparer: null,
   throwGlobalError: false,
   writeExtraInfoToAttr: false,
   backendContext: null,
@@ -191,5 +195,6 @@ export const normalizeComponentOptions = (
     virtualHost: p.virtualHost !== undefined ? p.virtualHost : b.virtualHost,
     propertyEarlyInit:
       p.propertyEarlyInit !== undefined ? p.propertyEarlyInit : b.propertyEarlyInit,
+    propertyComparer: p.propertyComparer !== undefined ? p.propertyComparer : b.propertyComparer,
   }
 }

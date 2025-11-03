@@ -320,6 +320,7 @@ export class CodeSpace {
       dataDeepCopy: options?.dataDeepCopy,
       propertyPassingDeepCopy: options?.propertyPassingDeepCopy,
       propertyEarlyInit: options?.propertyEarlyInit,
+      propertyComparer: options?.propertyComparer,
     }
     return [ret, styleIsolation]
   }

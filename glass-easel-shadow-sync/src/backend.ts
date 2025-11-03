@@ -802,14 +802,13 @@ export class ShadowSyncBackendContext implements GlassEaselBackend.Context {
 }
 
 export const hookBuilderToSyncData = <TBuilder extends GeneralBehaviorBuilder>(
-  glassEasel: typeof import('glass-easel'),
   builder: TBuilder,
+  getComponentFromMethodCaller?: (methodCaller: GeneralComponent) => GeneralComponent | undefined
 ): TBuilder => {
   const properties: string[] = []
-  const methodCallerMap = new WeakMap<any, GeneralComponent>()
 
   const getContextFromMethodCaller = (methodCaller: GeneralComponent) => {
-    const component: GeneralComponent = methodCallerMap.get(methodCaller) || methodCaller
+    const component: GeneralComponent = getComponentFromMethodCaller?.(methodCaller) || methodCaller
     const context = component.getBackendContext() as ShadowSyncBackendContext
     const backendElement = component.getBackendElement() as ShadowSyncElement
     if (!(context instanceof ShadowSyncBackendContext)) {
@@ -867,30 +866,16 @@ export const hookBuilderToSyncData = <TBuilder extends GeneralBehaviorBuilder>(
           return this
         },
       },
-      methodCallerInit: {
-        value(func: (this: GeneralComponent) => any) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-          builderPrototype.methodCaller.call(this, function (this: GeneralComponent) {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-            const methodCaller = func.call(this)
-            methodCallerMap.set(methodCaller, this)
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-            return methodCaller
-          })
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-          return this
-        },
-      },
     }),
   )
 
   return builder.init(({ self, lifetime }) => {
     lifetime('created', () => {
-      const { context, backendElement } = getContextFromMethodCaller(self)
+      const { component, context, backendElement } = getContextFromMethodCaller(self)
       context.channel.initValues(
         backendElement._id,
         properties.reduce((initValues, property) => {
-          initValues[property] = self.data[property]
+          initValues[property] = component.data[property]
           return initValues
         }, {} as Record<string, unknown>),
       )

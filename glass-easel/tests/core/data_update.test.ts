@@ -907,7 +907,98 @@ describe('partial update', () => {
     expect(execArr).toStrictEqual(['A', 'B', 'C'])
     execArr = []
     child.setData({ p: 'ghi' })
-    expect(execArr).toStrictEqual(['B'])
+    expect(execArr).toStrictEqual(['A', 'B', 'C'])
+  })
+
+  test('should support global property value comparer', () => {
+    let execArr = [] as string[]
+    const childCompDef = componentSpace
+      .define()
+      .options({
+        propertyComparer: (newValue, oldValue) => {
+          execArr.push('A')
+          return newValue !== oldValue
+        },
+      })
+      .property('p', {
+        type: String,
+        value: 'def',
+        comparer: (newValue, oldValue) => {
+          execArr.push('B')
+          if (newValue === 'abc') return false
+          if (newValue === 'ghi') return true
+          return newValue !== oldValue
+        },
+        observer() {
+          execArr.push('C')
+        },
+      })
+      .property('pp', {
+        type: String,
+        value: 'def',
+        observer() {
+          execArr.push('D')
+        },
+      })
+      .observer('p', () => {
+        execArr.push('E')
+      })
+      .observer('pp', () => {
+        execArr.push('F')
+      })
+      .registerComponent()
+    const compDef = componentSpace
+      .define()
+      .usingComponents({
+        child: childCompDef.general(),
+      })
+      .template(
+        tmpl(`
+          <child p="{{p}}" pp="{{pp}}" />
+        `),
+      )
+      .data(() => ({
+        p: 'def',
+        pp: 'def',
+      }))
+      .registerComponent()
+    const comp = glassEasel.Component.createWithContext('root', compDef, domBackend)
+    const child = comp.getShadowRoot()!.childNodes[0]!.asInstanceOf(childCompDef)!
+    expect(execArr).toStrictEqual(['B', 'A', 'E', 'F'])
+    execArr = []
+    glassEasel.Element.pretendAttached(comp)
+    comp.setData({ p: '' })
+    expect(execArr).toStrictEqual(['B', 'E', 'C'])
+    execArr = []
+    comp.setData({ p: 'abc' })
+    expect(execArr).toStrictEqual(['B', 'E'])
+    execArr = []
+    comp.setData({ p: '' })
+    expect(execArr).toStrictEqual(['B', 'E', 'C'])
+    execArr = []
+    comp.setData({ p: 'ghi' })
+    expect(execArr).toStrictEqual(['B', 'E', 'C'])
+    execArr = []
+    comp.setData({ p: 'ghi' })
+    expect(execArr).toStrictEqual(['B', 'E', 'C'])
+    execArr = []
+    child.setData({ p: 'ghi' })
+    expect(execArr).toStrictEqual(['B', 'E', 'C'])
+    execArr = []
+    comp.setData({ pp: 'abc' })
+    expect(execArr).toStrictEqual(['A', 'F', 'D'])
+    execArr = []
+    comp.setData({ pp: 'abc' })
+    expect(execArr).toStrictEqual(['A', 'F'])
+    execArr = []
+    child.setData({ pp: 'abc' })
+    expect(execArr).toStrictEqual(['A', 'F'])
+    execArr = []
+    comp.setData({ p: 'abc', pp: 'abc' })
+    expect(execArr).toStrictEqual(['B', 'A', 'E', 'F'])
+    execArr = []
+    comp.setData({ p: 'ghi', pp: 'ghi' })
+    expect(execArr).toStrictEqual(['B', 'A', 'E', 'F', 'C', 'D'])
   })
 
   test('should not allow updates before init done', () => {
@@ -1051,5 +1142,98 @@ describe('partial update', () => {
     comp.applyDataUpdates()
     expect(domHtml(comp)).toBe('<child>1-0</child>')
     expect(execArr).toEqual(['update:1-0'])
+  })
+
+  test('should update data in nesting components', () => {
+    let execArr: string[] = []
+    const childCompDef = componentSpace
+      .define()
+      .options({ virtualHost: true })
+      .property('a', {
+        type: Boolean,
+        value: false,
+        observer(a) {
+          execArr.push(`child:property:${a}`)
+        },
+      })
+      .observer('a', function () {
+        execArr.push(`child:observer:${this.data.a}`)
+      })
+      .template(
+        tmpl(`
+          <block>{{a}}</block>
+        `),
+      )
+      .registerComponent()
+
+    const middleCompDef = componentSpace
+      .define()
+      .options({ virtualHost: true })
+      .usingComponents({
+        child: childCompDef,
+      })
+      .property('a', {
+        type: Boolean,
+        value: false,
+        observer(a) {
+          execArr.push(`middle:property:${a}`)
+        },
+      })
+      .observer('a', function () {
+        execArr.push(`middle:observer:${this.data.a}`)
+      })
+      .template(
+        tmpl(`
+          <child id="child" a="{{a}}"/>
+        `),
+      )
+      .registerComponent()
+
+    const compDef = componentSpace
+      .define()
+      .usingComponents({
+        middle: middleCompDef,
+      })
+      .data(() => ({
+        a: false,
+      }))
+      .template(
+        tmpl(`
+          <middle id="middle" a="{{a}}"/>
+        `),
+      )
+      .registerComponent()
+
+    const comp = glassEasel.Component.createWithContext('root', compDef, domBackend)
+    const middle = comp.$.middle as glassEasel.GeneralComponent
+    const child = middle.$.child as glassEasel.GeneralComponent
+    glassEasel.Element.pretendAttached(comp)
+
+    expect(domHtml(comp)).toBe('false')
+    expect(execArr).toEqual([
+      'child:observer:false',
+      'middle:observer:false',
+      'child:observer:false',
+    ])
+
+    execArr = []
+    comp.setData({ a: true })
+    expect(domHtml(comp)).toBe('true')
+    expect(execArr).toEqual([
+      'middle:observer:true',
+      'child:observer:true',
+      'child:property:true',
+      'middle:property:true',
+    ])
+
+    execArr = []
+    child.setData({ a: false })
+    expect(domHtml(comp)).toBe('false')
+    expect(execArr).toEqual(['child:observer:false', 'child:property:false'])
+
+    execArr = []
+    comp.setData({ a: true })
+    expect(domHtml(comp)).toBe('true')
+    expect(execArr).toEqual(['middle:observer:true', 'child:observer:true', 'child:property:true'])
   })
 })
