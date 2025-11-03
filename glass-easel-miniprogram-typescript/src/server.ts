@@ -36,6 +36,29 @@ type LocationLink = {
   targetRange: PositionRange
 }
 
+class Cache<T> {
+  private cache: T
+  private dirty: boolean
+  private updater: (this: void, cache: T) => T
+
+  constructor(updater: (this: void, cache: T) => T, init: T) {
+    this.cache = init
+    this.dirty = false
+    this.updater = updater
+  }
+
+  get(): T {
+    if (this.dirty) {
+      this.cache = this.updater(this.cache)
+    }
+    return this.cache
+  }
+
+  invalidate(): void {
+    this.dirty = true
+  }
+}
+
 const getDefaultExportOfSourceFile = (
   tc: ts.TypeChecker,
   source: ts.SourceFile,
@@ -77,7 +100,8 @@ export class Server {
   private workingDirectory: string
   private tsLangService: ts.LanguageService
   private projectDirManager: ProjectDirManager
-  private rootFilePaths: string[]
+  private rootFilePaths: Cache<string[]>
+  private rootTsFileCount: number
   private rootFilePathsVersion: number
   private configErrors: ts.Diagnostic[]
   private pendingAsyncTasksListeners: (() => void)[] = []
@@ -100,7 +124,7 @@ export class Server {
       this.logVerboseMessage(`Opened component WXML: ${fullPath}`)
       const p = getWxmlConvertedTsPath(fullPath)
       if (p) {
-        this.rootFilePaths.push(p)
+        this.rootFilePaths.get().push(p)
         this.rootFilePathsVersion += 1
       }
     }
@@ -108,9 +132,10 @@ export class Server {
       this.logVerboseMessage(`Closed component WXML: ${fullPath}`)
       const p = getWxmlConvertedTsPath(fullPath)
       if (p) {
-        const index = this.rootFilePaths.lastIndexOf(p)
+        const rootFilePaths = this.rootFilePaths.get()
+        const index = rootFilePaths.lastIndexOf(p)
         if (index >= 0) {
-          this.rootFilePaths[index] = this.rootFilePaths.pop()!
+          rootFilePaths[index] = rootFilePaths.pop()!
           this.rootFilePathsVersion += 1
         }
       }
@@ -126,6 +151,14 @@ export class Server {
       f.forEach((f) => f.call(this))
     }
 
+    // handling root ts file changes
+    const handleRootTsFileChanges = () => {
+      this.rootFilePathsVersion += 1
+      this.rootFilePaths.invalidate()
+    }
+    this.projectDirManager.onScriptFileAdded = handleRootTsFileChanges
+    this.projectDirManager.onScriptFileRemoved = handleRootTsFileChanges
+
     // initialize ts language service
     /* eslint-disable @typescript-eslint/unbound-method, arrow-body-style */
     const configPath = tsc.findConfigFile(this.projectPath, tsc.sys.fileExists, 'tsconfig.json')
@@ -134,20 +167,29 @@ export class Server {
     if (configPath !== undefined) {
       // eslint-disable-next-line @typescript-eslint/unbound-method
       const configFile = tsc.readJsonConfigFile(configPath, tsc.sys.readFile)
-      config = tsc.parseJsonSourceFileConfigFileContent(
-        configFile,
-        {
-          useCaseSensitiveFileNames: false,
-          readDirectory: tsc.sys.readDirectory,
-          fileExists: tsc.sys.fileExists,
-          readFile: tsc.sys.readFile,
-        },
-        path.dirname(configPath),
-        { noEmit: true },
-        // undefined,
-        // undefined,
-        // [{ extension: '.wxml', isMixedContent: true, scriptKind: ts.ScriptKind.TS }],
-      )
+      const getConfig = () =>
+        tsc.parseJsonSourceFileConfigFileContent(
+          configFile,
+          {
+            useCaseSensitiveFileNames: false,
+            readDirectory: tsc.sys.readDirectory,
+            fileExists: tsc.sys.fileExists,
+            readFile: tsc.sys.readFile,
+          },
+          path.dirname(configPath),
+          { noEmit: true },
+          // undefined,
+          // undefined,
+          // [{ extension: '.wxml', isMixedContent: true, scriptKind: ts.ScriptKind.TS }],
+        )
+      config = getConfig()
+      this.rootFilePaths = new Cache((old) => {
+        const extra = old.slice(this.rootTsFileCount)
+        const ret = getConfig().fileNames
+        this.rootTsFileCount = ret.length
+        return ret.concat(extra)
+      }, config.fileNames)
+      this.rootTsFileCount = config.fileNames.length
     } else {
       const compilerOptions = tsc.getDefaultCompilerOptions()
       config = {
@@ -155,9 +197,10 @@ export class Server {
         fileNames: [],
         errors: [],
       }
+      this.rootFilePaths = new Cache((x) => x, [] as string[])
+      this.rootTsFileCount = 0
     }
     this.configErrors = config.errors
-    this.rootFilePaths = config.fileNames
     this.rootFilePathsVersion = 1
     const servicesHost: ts.LanguageServiceHost = {
       getCompilationSettings() {
@@ -167,7 +210,7 @@ export class Server {
         return String(this.rootFilePathsVersion)
       },
       getScriptFileNames: () => {
-        return this.rootFilePaths
+        return this.rootFilePaths.get()
       },
       getScriptVersion: (fullPath) => {
         return this.projectDirManager.getFileVersion(fullPath)?.toString() ?? ''

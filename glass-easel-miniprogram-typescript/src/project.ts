@@ -142,6 +142,8 @@ export class ProjectDirManager {
   wxmlEnvGetter: (tsFullPath: string, wxmlFullPath: string) => string | null = () => null
   onEntranceFileAdded: (fullPath: string) => void = () => {}
   onEntranceFileRemoved: (fullPath: string) => void = () => {}
+  onScriptFileAdded: (fullPath: string) => void = () => {}
+  onScriptFileRemoved: (fullPath: string) => void = () => {}
   onConvertedExprCacheUpdated: (wxmlFullPath: string) => void = () => {}
   onPendingAsyncTasksEmpty: () => void = () => {}
 
@@ -178,6 +180,9 @@ export class ProjectDirManager {
 
   private handleFileOpened(fullPath: string) {
     const compPath = possibleComponentPath(fullPath)
+    if (isTsFile(fullPath)) {
+      this.onScriptFileAdded(fullPath)
+    }
     if (compPath !== null) {
       if (isJsonFile(fullPath)) {
         const isComp = !!this.trackingComponents[compPath]
@@ -186,6 +191,11 @@ export class ProjectDirManager {
           this.asyncWxmlConvertedExprUpdate(`${compPath}.wxml`)
           this.onEntranceFileAdded(`${compPath}.wxml`)
         }
+      } else if (isTsFile(fullPath)) {
+        this.checkConvertedExprCache(`${compPath}.wxml`)
+        this.forEachDirectDependantComponents(compPath, (compPath) => {
+          this.checkConvertedExprCache(`${compPath}.wxml`)
+        })
       }
     }
   }
@@ -202,6 +212,7 @@ export class ProjectDirManager {
             this.onEntranceFileAdded(`${compPath}.wxml`)
           }
         } else if (isComp) {
+          delete this.trackingComponents[compPath]
           this.deleteConvertedExprCache(`${compPath}.wxml`)
           this.onEntranceFileRemoved(`${compPath}.wxml`)
         }
@@ -218,10 +229,14 @@ export class ProjectDirManager {
 
   private handleFileRemoved(fullPath: string) {
     const compPath = possibleComponentPath(fullPath)
+    if (isTsFile(fullPath)) {
+      this.onScriptFileRemoved(fullPath)
+    }
     if (compPath !== null) {
       if (isJsonFile(fullPath)) {
         const isComp = !!this.trackingComponents[compPath]
         if (isComp) {
+          delete this.trackingComponents[compPath]
           this.deleteConvertedExprCache(`${compPath}.wxml`)
           this.onEntranceFileRemoved(`${compPath}.wxml`)
         }
@@ -273,12 +288,21 @@ export class ProjectDirManager {
       this.convertedExpr[wxmlFullPath] = cache
     }
     const content = this.getFileContent(wxmlFullPath)
-    if (!content) return
+    if (!content) {
+      this.deleteConvertedExprCache(wxmlFullPath)
+      return
+    }
     const relPath = path.relative(this.vfs.rootPath, wxmlFullPath).split(path.sep).join('/')
-    if (relPath.startsWith('../')) return
+    if (relPath.startsWith('../')) {
+      this.deleteConvertedExprCache(wxmlFullPath)
+      return
+    }
     this.tmplGroup.addTmpl(relPath, content)
     const env = this.wxmlEnvGetter(tsFullPath, wxmlFullPath)
-    if (!env) return
+    if (!env) {
+      this.deleteConvertedExprCache(wxmlFullPath)
+      return
+    }
     this.pendingAsyncTasks += 1
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     ;(async () => {
