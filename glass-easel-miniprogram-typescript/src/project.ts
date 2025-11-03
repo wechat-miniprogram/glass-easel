@@ -139,6 +139,7 @@ export class ProjectDirManager {
   private trackingComponents = Object.create(null) as Record<string, ComponentJsonData>
   private convertedExpr = Object.create(null) as Record<string, ConvertedExprCache>
   private pendingAsyncTasks = 0
+  private firstScanDone = false
   wxmlEnvGetter: (tsFullPath: string, wxmlFullPath: string) => string | null = () => null
   onEntranceFileAdded: (fullPath: string) => void = () => {}
   onEntranceFileRemoved: (fullPath: string) => void = () => {}
@@ -156,7 +157,10 @@ export class ProjectDirManager {
     this.tsc = tsc
     this.tmplGroup = tmplGroup
     this.rootPath = rootPath
-    this.vfs = new VirtualFileSystem(rootPath, firstScanCallback)
+    this.vfs = new VirtualFileSystem(rootPath, () => {
+      this.firstScanDone = true
+      firstScanCallback()
+    })
     this.vfs.onFileFound = (fullPath) => {
       this.handleFileOpened(fullPath)
     }
@@ -191,7 +195,7 @@ export class ProjectDirManager {
           this.asyncWxmlConvertedExprUpdate(`${compPath}.wxml`)
           this.onEntranceFileAdded(`${compPath}.wxml`)
         }
-      } else if (isTsFile(fullPath)) {
+      } else if (isTsFile(fullPath) && this.firstScanDone) {
         this.checkConvertedExprCache(`${compPath}.wxml`)
         this.forEachDirectDependantComponents(compPath, (compPath) => {
           this.checkConvertedExprCache(`${compPath}.wxml`)
