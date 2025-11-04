@@ -136,6 +136,7 @@ export class ProjectDirManager {
   private tsc: typeof ts
   private tmplGroup: TmplGroup
   private readonly rootPath: string
+  private appJsonData: ComponentJsonData | null = null
   private trackingComponents = Object.create(null) as Record<string, ComponentJsonData>
   private convertedExpr = Object.create(null) as Record<string, ConvertedExprCache>
   private pendingAsyncTasks = 0
@@ -170,6 +171,7 @@ export class ProjectDirManager {
     this.vfs.onTrackedFileRemoved = (fullPath) => {
       this.handleFileRemoved(fullPath)
     }
+    this.appJsonData = this.readComponentJsonData(this.appPath())
   }
 
   stop() {
@@ -182,8 +184,15 @@ export class ProjectDirManager {
     return this.pendingAsyncTasks
   }
 
+  private appPath() {
+    return path.join(this.rootPath, 'app')
+  }
+
   private handleFileOpened(fullPath: string) {
     const compPath = possibleComponentPath(fullPath)
+    if (compPath === this.appPath()) {
+      return
+    }
     if (isTsFile(fullPath)) {
       this.onScriptFileAdded(fullPath)
     }
@@ -206,6 +215,13 @@ export class ProjectDirManager {
 
   private handleFileUpdated(fullPath: string) {
     const compPath = possibleComponentPath(fullPath)
+    if (compPath === this.appPath()) {
+      this.appJsonData = this.readComponentJsonData(compPath)
+      Object.keys(this.trackingComponents).forEach((p) => {
+        this.checkConvertedExprCache(`${p}.wxml`)
+      })
+      return
+    }
     if (compPath !== null) {
       if (isJsonFile(fullPath)) {
         const isComp = !!this.trackingComponents[compPath]
@@ -233,6 +249,13 @@ export class ProjectDirManager {
 
   private handleFileRemoved(fullPath: string) {
     const compPath = possibleComponentPath(fullPath)
+    if (compPath === this.appPath()) {
+      this.appJsonData = null
+      Object.keys(this.trackingComponents).forEach((p) => {
+        this.checkConvertedExprCache(`${p}.wxml`)
+      })
+      return
+    }
     if (isTsFile(fullPath)) {
       this.onScriptFileRemoved(fullPath)
     }
@@ -408,10 +431,6 @@ export class ProjectDirManager {
   private updateComponentJsonData(fullPath: string): string | null {
     const compPath = possibleComponentPath(fullPath)
     if (compPath === null) return null
-    const version = this.getFileVersion(`${compPath}.json`)
-    if (version !== null && version === this.trackingComponents[compPath]?.jsonFileVersion) {
-      return compPath
-    }
     const compJson = this.readComponentJsonData(compPath)
     if (compJson !== null) {
       this.trackingComponents[compPath] = compJson
@@ -432,10 +451,13 @@ export class ProjectDirManager {
   }
 
   getUsingComponents(compPath: string): Record<string, string> {
-    const comp = this.trackingComponents[compPath]
+    const comp = this.trackingComponents[compPath]?.usingComponents ?? {}
+    const app = this.appJsonData?.usingComponents ?? {}
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    if (!comp) return Object.create(null)
-    return comp.usingComponents
+    return {
+      ...app,
+      ...comp,
+    }
   }
 
   getGenerics(compPath: string): string[] {
