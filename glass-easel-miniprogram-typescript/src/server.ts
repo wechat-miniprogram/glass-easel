@@ -349,7 +349,7 @@ type Properties<T> = _ComponentFieldTypes_<T> extends _Component_<infer P, any, 
       : 'type UnknownElement = { _$fieldTypes: null, [k: string]: any }'
     const otherComponents = this.options.strictMode
       ? '[other: string]: unknown'
-      : '[other: string]: { [k: string]: any }'
+      : '[other: string]: any'
     const tagsLine = `
 declare const tags: {
 ${usingComponentsItems.join('')}${otherComponents} }`
