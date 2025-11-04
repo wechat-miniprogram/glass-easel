@@ -1,6 +1,6 @@
 {
   "name": "glass-easel-shadow-sync",
-  "version": "0.15.5",
+  "version": "0.16.0",
   "main": "dist/glass-easel-shadow-sync.js",
   "scripts": {
     "build": "rollup -c rollup.config.mjs",
