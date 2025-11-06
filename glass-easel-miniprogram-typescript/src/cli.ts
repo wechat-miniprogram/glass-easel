@@ -1,5 +1,4 @@
 import { parseArgs } from 'util'
-import fs from 'node:fs'
 import * as ts from 'typescript'
 import { TmplGroup } from 'glass-easel-template-compiler'
 import { type Diagnostic, DiagnosticLevel, Server } from './server'

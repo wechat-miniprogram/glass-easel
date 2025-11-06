@@ -29,8 +29,8 @@ const PRESERVED_VAR_NAMES: [&'static str; 3] = ["component", "data", "methods"];
 
 pub(crate) const fn tmpl_converted_expr_runtime_string() -> &'static str {
     r#"
-type _ForIndex_<T> = T extends any[] ? number : T extends { [key: string | symbol]: any } ? string | symbol : number;
-type _ForItem_<T> = T extends (infer T)[] ? T : T extends { [key: string | symbol]: infer V } ? V : any;
+type _ForIndex_<T> = T extends any[] ? number : T extends { [key: string]: any } ? string : any;
+type _ForItem_<T> = T extends (infer T)[] ? T : T extends { [key: string]: infer V } ? V : any;
 type _ForKey_<T, N extends string> = N extends "*this" ? _ForItem_<T> : _ForItem_<T> extends { [k: string]: any } ? _ForItem_<T>[N] : unknown;
 "#
 }
