@@ -52,7 +52,28 @@ pub(crate) fn generate_tmpl_converted_expr(
         w.write_line(|w| w.write_str(ts_env))?;
         w.write_line(|w| w.write_str(runtime))?;
         for script in tree.globals.scripts.iter() {
-            w.add_scope_with_ts_keyword_escape(&script.module_name().name, &PRESERVED_VAR_NAMES);
+            let location = &script.module_name().location;
+            let scope_name = &script.module_name().name;
+            w.add_scope_with_ts_keyword_escape(scope_name, &PRESERVED_VAR_NAMES);
+            w.write_line(|w| {
+                let pos = location.start;
+                write_token_series(
+                    ["const "],
+                    &(pos..pos),
+                    w,
+                )?;
+                w.write_token_state(
+                    scope_name,
+                    Some(scope_name),
+                    &location,
+                    StringifierLineState::Normal,
+                )?;
+                write_token_series(
+                    ["=", "{", "}", "as", "{", "[", "k", ":", "string", "]", ":", "any", "}", ";"],
+                    &(pos..pos),
+                    w,
+                )
+            })?;
         }
 
         // TODO tree.globals.imports
@@ -96,11 +117,13 @@ impl ConvertedExprWriteBlock for Node {
         &self,
         w: &mut StringifierBlock<'s, 't, W>,
     ) -> FmtResult {
-        match self {
-            Self::Text(x) => write_dynamic_value(x, w),
-            Self::Element(x) => x.converted_expr_write(w),
-            Self::Comment(_) | Self::UnknownMetaTag(_) => Ok(()),
-        }
+        w.new_scope_space(|w| {
+            match self {
+                Self::Text(x) => write_dynamic_value(x, w),
+                Self::Element(x) => x.converted_expr_write(w),
+                Self::Comment(_) | Self::UnknownMetaTag(_) => Ok(()),
+            }
+        })
     }
 }
 
@@ -643,13 +666,19 @@ impl ConvertedExprWriteInline for Value {
             ),
             Self::Dynamic {
                 expression,
-                double_brace_location: _,
+                double_brace_location,
                 binding_map_keys: _,
             } => {
+                let has_multi_segs = expression.has_multiple_static_or_dynamic_parts();
                 let mut prev_loc = None;
                 expression.for_each_static_or_dynamic_part::<std::fmt::Error>(|part, loc| {
                     if let Some(prev_loc) = prev_loc.take() {
                         w.write_token_state("+", None, &prev_loc, StringifierLineState::Normal)?;
+                    }
+                    let is_static_str = if let Expression::LitStr { .. } = part { true } else { false };
+                    let need_paren = !is_static_str && has_multi_segs;
+                    if need_paren {
+                        w.write_token_state("(", None, &double_brace_location.0, StringifierLineState::Normal)?;
                     }
                     if let Expression::ToStringWithoutUndefined { value, location } = part {
                         value.converted_expr_write(w)?;
@@ -658,6 +687,9 @@ impl ConvertedExprWriteInline for Value {
                         part.converted_expr_write(w)?;
                         let pos = loc.end;
                         prev_loc = Some(pos..pos);
+                    }
+                    if need_paren {
+                        w.write_token_state(")", None, &double_brace_location.1, StringifierLineState::Normal)?;
                     }
                     Ok(())
                 })
@@ -858,15 +890,15 @@ mod test {
     #[test]
     fn composed_text_node() {
         let src = r#"Hello {{ world }}!"#;
-        let expect = r#""Hello "+data.world+"!";"#;
+        let expect = r#""Hello "+(data.world)+"!";"#;
         let (out, sm) = convert(src);
         assert_eq!(out, expect);
         assert_eq!(find_token(&sm, 0, 0), Some((0, 0)));
         assert_eq!(find_token(&sm, 0, 8), Some((0, 6)));
-        assert_eq!(find_token(&sm, 0, 9), Some((0, 9)));
-        assert_eq!(find_token(&sm, 0, 14), Some((0, 9)));
-        assert_eq!(find_token(&sm, 0, 19), Some((0, 17)));
-        assert_eq!(find_token(&sm, 0, 23), Some((0, 18)));
+        assert_eq!(find_token(&sm, 0, 10), Some((0, 9)));
+        assert_eq!(find_token(&sm, 0, 15), Some((0, 9)));
+        assert_eq!(find_token(&sm, 0, 21), Some((0, 17)));
+        assert_eq!(find_token(&sm, 0, 25), Some((0, 18)));
     }
 
     #[test]
@@ -961,7 +993,7 @@ mod test {
     #[test]
     fn element_class_single() {
         let src = r#"<view class="a {{ b }}" />"#;
-        let expect = r#"{const _tag_=tags['view'];var _class_:string="a "+data.b;}"#;
+        let expect = r#"{const _tag_=tags['view'];var _class_:string="a "+(data.b);}"#;
         let (out, sm) = convert(src);
         assert_eq!(out, expect);
         assert_eq!(find_token(&sm, 0, 26), Some((0, 6)));
@@ -1107,11 +1139,12 @@ mod test {
     #[test]
     fn element_with_scripts() {
         let src = r#"<view let:a="{{ b.c() }}" /><wxs module="b">;</wxs>"#;
-        let expect = r#"{const _tag_=tags['view'];const a=b?.c?.();}"#;
+        let expect = r#"const b={}as{[k:string]:any};{const _tag_=tags['view'];const a=b?.c?.();}"#;
         let (out, sm) = convert(src);
         assert_eq!(out, expect);
-        assert_eq!(find_token(&sm, 0, 32), Some((0, 10)));
-        assert_eq!(find_token(&sm, 0, 34), Some((0, 16)));
+        assert_eq!(find_token(&sm, 0, 6), Some((0, 41)));
+        assert_eq!(find_token(&sm, 0, 61), Some((0, 10)));
+        assert_eq!(find_token(&sm, 0, 63), Some((0, 16)));
     }
 
     #[test]
@@ -1216,6 +1249,14 @@ mod test {
         assert_eq!(find_token(&sm, 0, 120), Some((0, 59)));
         assert_eq!(find_token(&sm, 0, 196), Some((0, 67)));
         assert_eq!(find_token(&sm, 0, 202), Some((0, 1)));
+    }
+
+    #[test]
+    fn mixed_scopes() {
+        let src = r#"<view wx:for="{{ list }}" wx:for-item="v" wx:for-index="k" hidden="{{ k && v }}" /><view let:a="{{ b }}">{{ a }}</view>"#;
+        let expect = r#"{const _for_=data.list;const v=0 as unknown as _ForItem_<typeof _for_>;const k=0 as unknown as _ForIndex_<typeof _for_>;{const _tag_=tags['view'];_tag_.hidden=k&&v;}}{const _tag_=tags['view'];const a=data.b;a;}"#;
+        let (out, _) = convert(src);
+        assert_eq!(out, expect);
     }
 
     #[test]

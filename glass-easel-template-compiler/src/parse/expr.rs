@@ -1270,6 +1270,30 @@ impl Expression {
         }
     }
 
+    pub fn has_multiple_static_or_dynamic_parts(&self) -> bool {
+        match self {
+            Expression::Plus {
+                left,
+                right,
+                location: _,
+            } => {
+                let split = if let Expression::ToStringWithoutUndefined { .. }
+                | Expression::LitStr { .. } = &**left
+                {
+                    true
+                } else if let Expression::ToStringWithoutUndefined { .. }
+                | Expression::LitStr { .. } = &**right
+                {
+                    true
+                } else {
+                    false
+                };
+                split
+            }
+            _ => false,
+        }
+    }
+
     pub(super) fn validate_scopes(
         &self,
         ps: &mut ParseState,

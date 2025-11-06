@@ -268,9 +268,19 @@ export class Server {
         return tsc.sys.readDirectory(fullPath, extensions, exclude, include, depth)
       },
       readFile: (fullPath, encoding) => {
+        if (fullPath === this.options.templateBackendConfigPath) {
+          if (this.options.templateBackendConfig !== null) {
+            return this.options.templateBackendConfig
+          }
+        }
         return tsc.sys.readFile(fullPath, encoding)
       },
       fileExists: (fullPath) => {
+        if (fullPath === this.options.templateBackendConfigPath) {
+          if (this.templateBackendConfig !== null) {
+            return true
+          }
+        }
         return tsc.sys.fileExists(fullPath)
       },
       getDirectories: (directoryName) => {
