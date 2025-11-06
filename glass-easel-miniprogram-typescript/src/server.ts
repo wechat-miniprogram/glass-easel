@@ -177,7 +177,11 @@ export class Server {
             readFile: tsc.sys.readFile,
           },
           path.dirname(configPath),
-          { noEmit: true },
+          {
+            noEmit: true,
+            noUnusedLocals: false,
+            noUnusedParameters: false,
+          },
           // undefined,
           // undefined,
           // [{ extension: '.wxml', isMixedContent: true, scriptKind: ts.ScriptKind.TS }],
