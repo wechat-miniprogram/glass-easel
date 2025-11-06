@@ -57,11 +57,7 @@ pub(crate) fn generate_tmpl_converted_expr(
             w.add_scope_with_ts_keyword_escape(scope_name, &PRESERVED_VAR_NAMES);
             w.write_line(|w| {
                 let pos = location.start;
-                write_token_series(
-                    ["const "],
-                    &(pos..pos),
-                    w,
-                )?;
+                write_token_series(["const "], &(pos..pos), w)?;
                 w.write_token_state(
                     scope_name,
                     Some(scope_name),
@@ -69,7 +65,10 @@ pub(crate) fn generate_tmpl_converted_expr(
                     StringifierLineState::Normal,
                 )?;
                 write_token_series(
-                    ["=", "{", "}", "as", "{", "[", "k", ":", "string", "]", ":", "any", "}", ";"],
+                    [
+                        "=", "{", "}", "as", "{", "[", "k", ":", "string", "]", ":", "any", "}",
+                        ";",
+                    ],
                     &(pos..pos),
                     w,
                 )
@@ -117,12 +116,10 @@ impl ConvertedExprWriteBlock for Node {
         &self,
         w: &mut StringifierBlock<'s, 't, W>,
     ) -> FmtResult {
-        w.new_scope_space(|w| {
-            match self {
-                Self::Text(x) => write_dynamic_value(x, w),
-                Self::Element(x) => x.converted_expr_write(w),
-                Self::Comment(_) | Self::UnknownMetaTag(_) => Ok(()),
-            }
+        w.new_scope_space(|w| match self {
+            Self::Text(x) => write_dynamic_value(x, w),
+            Self::Element(x) => x.converted_expr_write(w),
+            Self::Comment(_) | Self::UnknownMetaTag(_) => Ok(()),
         })
     }
 }
@@ -675,10 +672,19 @@ impl ConvertedExprWriteInline for Value {
                     if let Some(prev_loc) = prev_loc.take() {
                         w.write_token_state("+", None, &prev_loc, StringifierLineState::Normal)?;
                     }
-                    let is_static_str = if let Expression::LitStr { .. } = part { true } else { false };
+                    let is_static_str = if let Expression::LitStr { .. } = part {
+                        true
+                    } else {
+                        false
+                    };
                     let need_paren = !is_static_str && has_multi_segs;
                     if need_paren {
-                        w.write_token_state("(", None, &double_brace_location.0, StringifierLineState::Normal)?;
+                        w.write_token_state(
+                            "(",
+                            None,
+                            &double_brace_location.0,
+                            StringifierLineState::Normal,
+                        )?;
                     }
                     if let Expression::ToStringWithoutUndefined { value, location } = part {
                         value.converted_expr_write(w)?;
@@ -689,7 +695,12 @@ impl ConvertedExprWriteInline for Value {
                         prev_loc = Some(pos..pos);
                     }
                     if need_paren {
-                        w.write_token_state(")", None, &double_brace_location.1, StringifierLineState::Normal)?;
+                        w.write_token_state(
+                            ")",
+                            None,
+                            &double_brace_location.1,
+                            StringifierLineState::Normal,
+                        )?;
                     }
                     Ok(())
                 })
