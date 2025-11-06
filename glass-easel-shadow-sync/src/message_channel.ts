@@ -618,11 +618,14 @@ export const MessageChannelDataSide = (
     ) => publish([ChannelEventType.SET_SCROLL_POSITION, elementId, scrollLeft, scrollTop, duration]),
     getPseudoTypes: (elementId: number, cb: (res: string[]) => void) => publish([ChannelEventType.GET_PSEUDO_TYPES, elementId, callback2id(cb)]),
     startOverlayInspect: (cb: (event: string, elementId: number | null) => void) => {
+      if (overlayInspectCallbackId !== null) return
       const callbackId = overlayInspectCallbackId = callback2id(cb)
       publish([ChannelEventType.START_OVERLAY_INSPECT, callbackId])
     },
     stopOverlayInspect: () => {
-      if (overlayInspectCallbackId) releaseCallbackId(overlayInspectCallbackId)
+      if (overlayInspectCallbackId === null) return
+      releaseCallbackId(overlayInspectCallbackId)
+      overlayInspectCallbackId = null
       publish([ChannelEventType.STOP_OVERLAY_INSPECT])
     },
 
