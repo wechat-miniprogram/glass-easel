@@ -1,4 +1,5 @@
 import { parseArgs } from 'util'
+import fs from 'node:fs'
 import * as ts from 'typescript'
 import { TmplGroup } from 'glass-easel-template-compiler'
 import { type Diagnostic, DiagnosticLevel, Server } from './server'
@@ -26,6 +27,10 @@ const { values } = parseArgs({
       type: 'boolean',
       short: 'w',
     },
+    templateBackendConfig: {
+      type: 'string',
+      short: 'c',
+    },
   },
   strict: true,
 })
@@ -35,11 +40,12 @@ if (values.help) {
   console.log(`Usage: miniprogram-typescript-check [options]
 
 Options:
-  -h, --help            Show this help message and exit
-  -p, --path <path>     The path of the mini-program project (default: .)
-  -w, --watch           Watch the project and analyze on change
-  -s, --strict          Enable strict mode (avoid using \`any\` types when possible)
-  -v, --verbose         Print verbose messages
+  -h, --help                          Show this help message and exit
+  -p, --path <path>                   The path of the mini-program project (default: .)
+  -c, --templateBackendConfig <path>  The path of the template backend config (including the extension)
+  -w, --watch                         Watch the project and analyze on change
+  -s, --strict                        Enable strict mode (avoid using \`any\` types when possible)
+  -v, --verbose                       Print verbose messages
 `)
   process.exit(0)
 }
@@ -67,6 +73,7 @@ const server = new Server({
   typescriptNodeModule: ts,
   tmplGroup: new TmplGroup(),
   projectPath: values.path,
+  templateBackendConfigPath: values.templateBackendConfig,
   verboseMessages: values.verbose,
   strictMode: values.strict,
   onFirstScanDone() {

@@ -82,6 +82,10 @@ export type ServerOptions = {
   projectPath: string
   /** the working directory */
   workingDirectory?: string
+  /** the path to the template backend configuration */
+  templateBackendConfigPath?: string
+  /** the content of the template backend configuration */
+  templateBackendConfig?: string
   /** whether to print verbose messages */
   verboseMessages?: boolean
   /** Whether to enable strict checks (avoid `any` type fallbacks) */
@@ -103,6 +107,8 @@ export class Server {
   private rootFilePaths: Cache<string[]>
   private rootTsFileCount: number
   private rootFilePathsVersion: number
+  private templateBackendConfigPath: string
+  private templateBackendConfig: ts.IScriptSnapshot | null
   private configErrors: ts.Diagnostic[]
   private pendingAsyncTasksListeners: (() => void)[] = []
 
@@ -111,9 +117,15 @@ export class Server {
     const tsc = this.tsc
     this.tmplGroup = options.tmplGroup
     const tmplGroup = this.tmplGroup
-    this.options = options
     this.workingDirectory = options.workingDirectory ?? process.cwd()
     this.projectPath = path.resolve(this.workingDirectory, options.projectPath)
+    this.templateBackendConfig = options.templateBackendConfig
+      ? tsc.ScriptSnapshot.fromString(options.templateBackendConfig)
+      : null
+    this.templateBackendConfigPath = options.templateBackendConfigPath
+      ? path.resolve(this.workingDirectory, options.templateBackendConfigPath)
+      : ''
+    this.options = options
 
     // initialize virtual file system
     this.projectDirManager = new ProjectDirManager(tsc, tmplGroup, this.projectPath, () => {
@@ -217,9 +229,19 @@ export class Server {
         return this.rootFilePaths.get()
       },
       getScriptVersion: (fullPath) => {
+        if (fullPath === this.options.templateBackendConfigPath) {
+          if (this.templateBackendConfig !== null) {
+            return '1'
+          }
+        }
         return this.projectDirManager.getFileVersion(fullPath)?.toString() ?? ''
       },
       getScriptSnapshot: (fullPath) => {
+        if (fullPath === this.options.templateBackendConfigPath) {
+          if (this.templateBackendConfig !== null) {
+            return this.templateBackendConfig
+          }
+        }
         const content = this.projectDirManager.getFileTsContent(fullPath)
         if (content === null) return undefined
         return tsc.ScriptSnapshot.fromString(content)
@@ -302,6 +324,13 @@ export class Server {
     // escape helper
     const escapeJsString = (str: string) => str.replace(/['\\]/g, (a) => `\\${a}`)
 
+    // get global backend configuraion fields
+    const globalBackendConfigLine = this.templateBackendConfigPath
+      ? `import type { ComponentProperties as _GlobalComponentProperties_ } from '${escapeJsString(
+          this.templateBackendConfigPath,
+        )}'`
+      : 'type _GlobalComponentProperties_ = Record<string, never>'
+
     // get exports from corresponding ts file
     const defaultExport = getDefaultExportOfSourceFile(tc, source)
     const relPath = path.relative(compDir, tsFullPath.slice(0, -3))
@@ -322,7 +351,7 @@ declare const methods: _ComponentFieldTypes_<typeof component> extends _Componen
 
     // get exports from using components
     const propertiesHelperLine = `
-type Properties<T> = _ComponentFieldTypes_<T> extends _Component_<infer P, any, any>
+type _Properties_<T> = _ComponentFieldTypes_<T> extends _Component_<infer P, any, any>
 ? P
 : { [k: string]: any }`
     let usingComponentsImports = ''
@@ -336,7 +365,7 @@ type Properties<T> = _ComponentFieldTypes_<T> extends _Component_<infer P, any, 
       const relPath = path.relative(compDir, compPath)
       const entryName = `_component_${tagName.replace(/-/g, '_')}`
       usingComponentsImports += `import type ${entryName} from './${escapeJsString(relPath)}'\n`
-      usingComponentsItems.push(`'${tagName}': Properties<typeof ${entryName}>;\n`)
+      usingComponentsItems.push(`'${tagName}': _Properties_<typeof ${entryName}>;\n`)
     })
 
     // treat generics as any type tags
@@ -355,13 +384,14 @@ type Properties<T> = _ComponentFieldTypes_<T> extends _Component_<infer P, any, 
       ? '[other: string]: unknown'
       : '[other: string]: any'
     const tagsLine = `
-declare const tags: {
+declare const tags: _GlobalComponentProperties_ & {
 ${usingComponentsItems.join('')}${otherComponents} }`
 
     // add an empty export to avoid some tsc behavior
     const exportLine = 'export default {}'
 
     return [
+      globalBackendConfigLine,
       tsImportLine,
       usingComponentsImports,
       adapterTypesLine,
