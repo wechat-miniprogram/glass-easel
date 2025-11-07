@@ -137,7 +137,7 @@ export class GlassEaselTemplateDOMInstance implements TemplateInstance, External
     const evName = event.getEventName()
     const bubbles = event.bubbles
     for (;;) {
-      const shadowedEvent = event.wrapShadowedEvent(target as any, null, cur as any, this.comp)
+      const shadowedEvent = event.wrapShadowedEvent(target as any, null, cur as any)
       const f = (cur as unknown as ElementWithEvent)._$wxTmplEv?.[evName]
       if (f) {
         const r = f.call(cur, shadowedEvent)

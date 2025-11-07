@@ -1234,13 +1234,6 @@ export class Component<
   }
 
   /**
-   * Get the final event object
-   */
-  getEventObject(e: ShadowedEvent<unknown>): ShadowedEvent<any> {
-    return this._$behavior._$listenerEventReplacer?.(e) || e
-  }
-
-  /**
    * Add a lifetime event listener on the component
    */
   addLifetimeListener<N extends keyof Lifetimes>(name: N, func: Lifetimes[N]) {
