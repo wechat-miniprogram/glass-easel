@@ -103,7 +103,7 @@ class GlassEaselTemplate implements Template {
   }
 }
 
-class GlassEaselTemplateInstance implements TemplateInstance {
+export class GlassEaselTemplateInstance implements TemplateInstance {
   comp: GeneralComponent
   shadowRoot: ShadowRoot
   procGenWrapper!: ProcGenWrapper
