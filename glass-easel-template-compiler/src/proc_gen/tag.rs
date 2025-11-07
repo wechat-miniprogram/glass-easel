@@ -67,11 +67,11 @@ impl Template {
                                         write!(w, "R.setFnFilter(Q.A,Q.B)")?;
                                         Ok(())
                                     })?;
-                                    w.expr_stmt(|w| {
-                                        write!(w, "if(typeof R.setEventListenerWrapper==='function')R.setEventListenerWrapper(Q.C)")?;
-                                        Ok(())
-                                    })?;
                                 }
+                                w.expr_stmt(|w| {
+                                    write!(w, "if(typeof R.setEventListenerWrapper==='function')R.setEventListenerWrapper(Q.C)")?;
+                                    Ok(())
+                                })?;
                                 let mut writer = JsTopScopeWriter::new(String::new());
                                 writer.align(w);
                                 let define_root_ident = writer.function_scope(|w| {
