@@ -1,7 +1,7 @@
 {
   "name": "glass-easel-miniprogram-typescript",
   "description": "A checker for the glass-easel project in MiniProgram file structure",
-  "version": "0.16.1",
+  "version": "0.16.2",
   "engines": {
     "node": ">=20.0.0"
   },
