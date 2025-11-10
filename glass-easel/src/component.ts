@@ -447,8 +447,7 @@ export class Component<
   /** @internal */
   _$external: boolean
   shadowRoot: ShadowRoot | ExternalShadowRoot
-  /** @internal */
-  _$tmplInst: TemplateInstance | undefined
+  templateInstance: TemplateInstance | undefined
   /** @internal */
   _$relation: Relation | null
   /** @internal */
@@ -677,6 +676,7 @@ export class Component<
       // eslint-disable-next-line @typescript-eslint/unbound-method
       ShadowRoot.createShadowRoot,
     )
+    comp.templateInstance = tmplInst
 
     // write attr
     if (writeExtraInfoToAttr && backendElement) {
@@ -891,7 +891,6 @@ export class Component<
     } else {
       tmplInst.initValues(dataGroup.innerData || dataGroup.data)
     }
-    comp._$tmplInst = tmplInst
     dataGroup.setUpdateListener((data, combinedChanges) => {
       if (ENV.DEV) {
         performanceMeasureRenderWaterfall('component.render', 'backend.render', comp, () => {
@@ -1091,13 +1090,13 @@ export class Component<
    * This method throws error if the template engine does not support template update.
    */
   applyTemplateUpdates(): void {
-    if (!this._$tmplInst?.updateTemplate) {
+    if (!this.templateInstance?.updateTemplate) {
       throw new Error(
         `The template engine of component "${this.is}" does not support template update`,
       )
     }
     const dataGroup = this._$dataGroup
-    this._$tmplInst.updateTemplate(
+    this.templateInstance.updateTemplate(
       this._$definition._$detail!.template,
       dataGroup.innerData || dataGroup.data,
     )
