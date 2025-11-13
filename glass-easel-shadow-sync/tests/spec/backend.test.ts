@@ -461,17 +461,27 @@ describe('backend', () => {
   test('wxs', () => {
     const customHandler = jest.fn().mockReturnThis()
 
-    shadowSyncBackend.onWXSCallMethod((component, method, args) => {
+    shadowSyncBackend.onCustomMethodFromView((element, options) => {
+      const component = element as glassEasel.GeneralComponent
+      const { method, args } = options as { method: string; args: any[] }
       component.callMethod(method, args)
     })
 
-    syncController.setWXSListenerStats = (
+    syncController.handleCustomMethod = (
       element: glassEasel.Element,
-      eventName: string,
-      final: boolean,
-      mutated: boolean,
-      capture: boolean,
-      lvaluePath: (string | number)[],
+      {
+        evName: eventName,
+        final,
+        mutated,
+        capture,
+        generalLvaluePath: lvaluePath,
+      }: {
+        evName: string
+        final: boolean
+        mutated: boolean
+        capture: boolean
+        generalLvaluePath: (string | number)[]
+      },
     ) => {
       const isWXS =
         lvaluePath?.[0] === glassEasel.template.GeneralLvaluePathPrefix.InlineScript ||
@@ -501,9 +511,10 @@ describe('backend', () => {
             ? glassEasel.EventMutLevel.Mut
             : glassEasel.EventMutLevel.None,
           function (this: glassEasel.GeneralComponent, _ev: glassEasel.ShadowedEvent<unknown>) {
-            syncController.onWXSCallMethod(this.ownerShadowRoot!.getHostNode(), 'customHandler', [
-              true,
-            ])
+            syncController.sendCustomMethod(this.ownerShadowRoot!.getHostNode(), {
+              method: 'customHandler',
+              args: [true],
+            })
           },
         )
       } else {
@@ -528,13 +539,13 @@ describe('backend', () => {
               prefix === glassEasel.template.GeneralLvaluePathPrefix.Script ||
               prefix === glassEasel.template.GeneralLvaluePathPrefix.InlineScript
             if (isWxsHandler) {
-              ;(elem.getBackendElement() as ShadowSyncElement).setWXSListenerStats(
+              ;(elem.getBackendElement() as ShadowSyncElement).sendCustomMethod({
                 evName,
                 final,
                 mutated,
                 capture,
-                generalLvaluePath!,
-              )
+                generalLvaluePath,
+              })
               return null
             }
 

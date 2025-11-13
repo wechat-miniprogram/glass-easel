@@ -377,25 +377,8 @@ export class ShadowSyncElement implements GlassEaselBackend.Element {
     this._context.channel.getContext(this._id, cb)
   }
 
-  setWXSListenerStats(
-    eventName: string,
-    final: boolean,
-    mutated: boolean,
-    capture: boolean,
-    lvaluePath: (string | number)[],
-  ): void {
-    this._context.channel.setWXSListenerStats(
-      this._id,
-      eventName,
-      final,
-      mutated,
-      capture,
-      lvaluePath,
-    )
-  }
-
-  callWxsPropChangeListener(newValue: any, oldValue: any, lvaluePath: (string | number)[]): void {
-    this._context.channel.callWXSPropChangeListener(this._id, newValue, oldValue, lvaluePath)
+  sendCustomMethod(options: unknown) {
+    this._context.channel.callCustomMethod(this._id, options)
   }
 }
 
@@ -687,6 +670,11 @@ export class ShadowSyncBackendContext implements GlassEaselBackend.Context {
     glassEasel: typeof import('glass-easel'),
     roots: Node[],
     getShadowSyncElement: (elem: Node) => ShadowSyncElement,
+    afterReplayElement?: (
+      ownerShadowRoot: ShadowSyncShadowRoot,
+      elem: Node,
+      be: ShadowSyncElement,
+    ) => void,
   ) {
     roots.forEach((root) => {
       replayShadowBackend(glassEasel, this, root, {
@@ -736,15 +724,21 @@ export class ShadowSyncBackendContext implements GlassEaselBackend.Context {
           }
           return be
         },
+        afterReplayElement,
       })
       this._shadowRoot.appendChild(getShadowSyncElement(root))
     })
   }
 
-  onWXSCallMethod(handler: (component: GeneralComponent, method: string, args: any[]) => void) {
-    this.channel.onWXSCallMethod((componentId, method, args) => {
-      const component = this._getElementId(componentId)!.__wxElement as GeneralComponent
-      handler(component, method, args)
+  sendCustomMethod(options: unknown) {
+    this.channel.callCustomMethod(null, options)
+  }
+
+  onCustomMethodFromView(handler: (element: Element | null, options: any) => void) {
+    this.channel.onCustenMethod((elementId, options) => {
+      const element =
+        elementId !== null ? (this._getElementId(elementId)!.__wxElement as GeneralComponent) : null
+      handler(element, options)
     })
   }
 
@@ -803,7 +797,7 @@ export class ShadowSyncBackendContext implements GlassEaselBackend.Context {
 
 export const hookBuilderToSyncData = <TBuilder extends GeneralBehaviorBuilder>(
   builder: TBuilder,
-  getComponentFromMethodCaller?: (methodCaller: GeneralComponent) => GeneralComponent | undefined
+  getComponentFromMethodCaller?: (methodCaller: GeneralComponent) => GeneralComponent | undefined,
 ): TBuilder => {
   const properties: string[] = []
 

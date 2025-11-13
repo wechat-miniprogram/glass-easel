@@ -5,6 +5,11 @@ export interface ReplayHandler {
     ownerShadowRoot: ShadowBackend.ShadowRootContext,
     elem: Node,
   ): ShadowBackend.Element
+  afterReplayElement?(
+    ownerShadowRoot: ShadowBackend.ShadowRootContext,
+    elem: Node,
+    be: ShadowBackend.Element,
+  ): void
 }
 
 export function replayShadowBackend(
@@ -74,7 +79,7 @@ export function replayShadowBackend(
       if (mutLevel !== undefined) be.setListenerStats(name, false, mutLevel)
       if (captureMutLevel !== undefined) be.setListenerStats(name, true, captureMutLevel)
     })
-    const slotName = glassEasel.Element.getSlotName(elem)
+    const slotName = elem.slot
     if (slotName) be.setSlot(slotName)
   }
 
@@ -165,6 +170,7 @@ export function replayShadowBackend(
     } else {
       throw new Error(`Unknown elem type ${elem.constructor.name}`)
     }
+    handlers.afterReplayElement?.(ownerShadowRoot, elem, be)
     backendElementMap.set(elem, be)
     return be
   }

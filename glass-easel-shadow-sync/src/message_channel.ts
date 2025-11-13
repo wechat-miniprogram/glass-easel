@@ -18,7 +18,6 @@ export const enum ChannelEventType {
   CREATE = 1,
   CREATE_CALLBACK,
   DESTROY,
-  INIT_DATA,
 
   ON_WINDOW_RESIZE,
   ON_WINDOW_RESIZE_CALLBACK,
@@ -110,9 +109,7 @@ export const enum ChannelEventType {
   PERFORMANCE_END_TRACE,
   PERFORMANCE_STATS_CALLBACK,
 
-  SET_WXS_LISTENER_STATS,
-  CALL_WXS_PROP_CHANGE_LISTENER,
-  ON_WXS_CALL_METHOD,
+  CUSTOM_METHOD,
 }
 
 export type ChannelEventTypeViewSide =
@@ -138,9 +135,11 @@ export type ChannelEventTypeViewSide =
   | ChannelEventType.ON_EVENT
   | ChannelEventType.ON_RELEASE_EVENT
   | ChannelEventType.PERFORMANCE_STATS_CALLBACK
-  | ChannelEventType.ON_WXS_CALL_METHOD
+  | ChannelEventType.CUSTOM_METHOD
 
-export type ChannelEventTypeDataSide = Exclude<ChannelEventType, ChannelEventTypeViewSide>
+export type ChannelEventTypeDataSide =
+  | Exclude<ChannelEventType, ChannelEventTypeViewSide>
+  | ChannelEventType.CUSTOM_METHOD
 
 type ExhaustiveChannelEvent<T extends Record<ChannelEventType, any>> = T
 
@@ -148,7 +147,6 @@ export type ChannelArgs = ExhaustiveChannelEvent<{
   [ChannelEventType.CREATE]: [number]
   [ChannelEventType.CREATE_CALLBACK]: [number, number, number, number, string]
   [ChannelEventType.DESTROY]: []
-  [ChannelEventType.INIT_DATA]: [string]
 
   [ChannelEventType.ON_WINDOW_RESIZE]: [number]
   [ChannelEventType.ON_WINDOW_RESIZE_CALLBACK]: [number, number, number, number]
@@ -261,16 +259,7 @@ export type ChannelArgs = ExhaustiveChannelEvent<{
   [ChannelEventType.START_OVERLAY_INSPECT_CALLBACK]: [number, string, number | null]
   [ChannelEventType.STOP_OVERLAY_INSPECT]: []
 
-  [ChannelEventType.SET_WXS_LISTENER_STATS]: [
-    number,
-    string,
-    boolean,
-    boolean,
-    boolean,
-    (string | number)[],
-  ]
-  [ChannelEventType.CALL_WXS_PROP_CHANGE_LISTENER]: [number, unknown, unknown, (string | number)[]]
-  [ChannelEventType.ON_WXS_CALL_METHOD]: [number, string, string]
+  [ChannelEventType.CUSTOM_METHOD]: [number | null, unknown]
 }>
 
 export type Channel = ReturnType<typeof MessageChannelDataSide>
@@ -317,8 +306,7 @@ export const MessageChannelDataSide = (
       ) => void)
     | null = null
 
-  let handleWXSCallMethod: ((elementId: number, method: string, args: unknown[]) => void) | null =
-    null
+  let handleCustomMethod: ((elementId: number | null, options: any) => void) | null = null
   let overlayInspectCallbackId: number | null = null
 
   const callback2id = (cb: (...args: any[]) => void) => {
@@ -472,9 +460,9 @@ export const MessageChannelDataSide = (
         })
         break
       }
-      case ChannelEventType.ON_WXS_CALL_METHOD: {
-        const [, elementId, method, args] = arg
-        handleWXSCallMethod!(elementId, method, JSON.parse(args) as unknown[])
+      case ChannelEventType.CUSTOM_METHOD: {
+        const [, elementId, options] = arg
+        handleCustomMethod?.(elementId, options)
         break
       }
       default:
@@ -491,7 +479,6 @@ export const MessageChannelDataSide = (
       }) => void,
     ) => publish([ChannelEventType.CREATE, callback2id(init)]),
     destroy: () => publish([ChannelEventType.DESTROY]),
-    initData: (initData: Record<string, unknown>) => publish([ChannelEventType.INIT_DATA, JSON.stringify(initData)]),
 
     onWindowResize: (
       cb: (res: { width: number; height: number; devicePixelRatio: number }) => void,
@@ -632,11 +619,10 @@ export const MessageChannelDataSide = (
     performanceStartTrace: (index: number) => publish([ChannelEventType.PERFORMANCE_START_TRACE, index]),
     performanceEndTrace: (id: number, cb: (stats: { startTimestamp: number; endTimestamp: number }) => void,) => publish([ChannelEventType.PERFORMANCE_END_TRACE, id, callback2id(cb)]),
 
-    setWXSListenerStats: (elementId: number, eventName: string, final: boolean, mutated: boolean, capture: boolean, lvaluePath: (string | number)[]) => publish([ChannelEventType.SET_WXS_LISTENER_STATS, elementId, eventName, final, mutated, capture, lvaluePath]),
-    callWXSPropChangeListener: (elementId: number, newValue: any, oldValue: any, lvaluePath: (string | number)[]) => publish([ChannelEventType.CALL_WXS_PROP_CHANGE_LISTENER, elementId, newValue, oldValue, lvaluePath]),
-    onWXSCallMethod: (handler: (elementId: number, method: string, args: unknown[]) => void) => {
-      handleWXSCallMethod = handler
-    },
+    callCustomMethod: (elementId: number | null, options: any) => publish([ChannelEventType.CUSTOM_METHOD, elementId, options]),
+    onCustenMethod: (handler: (elementId: number | null, options: any) => void) => {
+      handleCustomMethod = handler
+    }
   }
 }
 
@@ -721,12 +707,12 @@ export const MessageChannelViewSide = (
     }
   }
 
-  const wxsCallMethodHandler = (elem: Element, method: string, args: any[]) => {
-    const elemId = getNodeId(elem)!
-    publish([ChannelEventType.ON_WXS_CALL_METHOD, elemId, method, JSON.stringify(args)])
+  const sendCustomMethodHandler = (elem: Element | null, options: any) => {
+    const elemId = elem ? getNodeId(elem)! : null
+    publish([ChannelEventType.CUSTOM_METHOD, elemId, options])
   }
 
-  controller.setWXSCallMethodHandler(wxsCallMethodHandler)
+  controller.onCustomMethod(sendCustomMethodHandler)
 
   // eslint-disable-next-line consistent-return
   subscribe((arg) => {
@@ -748,11 +734,6 @@ export const MessageChannelViewSide = (
       case ChannelEventType.DESTROY:
         controller.destroy()
         break
-      case ChannelEventType.INIT_DATA: {
-        const [, initData] = arg
-        controller.initData(JSON.parse(initData))
-        break
-      }
       case ChannelEventType.ON_WINDOW_RESIZE: {
         const [, callbackId] = arg
         controller.onWindowResize(({ width, height, devicePixelRatio }) => {
@@ -1246,24 +1227,10 @@ export const MessageChannelViewSide = (
         })
         break
       }
-      case ChannelEventType.SET_WXS_LISTENER_STATS: {
-        const [, elementId, eventName, final, mutated, capture, lvaluePath] = arg
-        const element = nodeMap[elementId]! as Element
-        controller.setWXSListenerStats(
-          element,
-          eventName,
-          final,
-          mutated,
-          capture,
-          lvaluePath,
-          eventHandler,
-        )
-        break
-      }
-      case ChannelEventType.CALL_WXS_PROP_CHANGE_LISTENER: {
-        const [, elementId, newValue, oldValue, lvaluepath] = arg
-        const element = nodeMap[elementId]! as Element
-        controller.callWXSPropChangeListener(element, newValue, oldValue, lvaluepath)
+      case ChannelEventType.CUSTOM_METHOD: {
+        const [, elementId, options] = arg
+        const element = elementId ? (nodeMap[elementId]! as Element) : null
+        controller.handleCustomMethod(element, options)
         break
       }
       default:

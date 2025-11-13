@@ -58,9 +58,7 @@ export class ViewController {
 
   private _traceStartTimestampMapping = Object.create(null) as Record<number, number>
 
-  private _WXSCallMethodHandler:
-    | ((element: Element, method: string, args: unknown[]) => void)
-    | undefined
+  private _customMethodHandler: ((element: Element | null, options: any) => void) | undefined
 
   // eslint-disable-next-line no-useless-constructor
   constructor(
@@ -92,10 +90,6 @@ export class ViewController {
   }
 
   destroy(): void {
-    //
-  }
-
-  initData(_initData: Record<string, unknown>): void {
     //
   }
 
@@ -662,46 +656,16 @@ export class ViewController {
     cb({ startTimestamp, endTimestamp })
   }
 
-  setWXSListenerStats(
-    element: Element,
-    eventName: string,
-    final: boolean,
-    mutated: boolean,
-    capture: boolean,
-    lvaluePath: (string | number)[],
-    listener: EventListener<unknown>,
-  ): void {
-    // To be override
-    const { _glassEasel } = this
-    this.setListenerStats(
-      element,
-      eventName,
-      capture,
-      // eslint-disable-next-line no-nested-ternary
-      final
-        ? _glassEasel.EventMutLevel.Final
-        : mutated
-        ? _glassEasel.EventMutLevel.Mut
-        : _glassEasel.EventMutLevel.None,
-      listener,
-    )
-  }
-
-  callWXSPropChangeListener(
-    _element: Element,
-    _newValue: any,
-    _oldValue: any,
-    _lvaluePath: (string | number)[],
-  ): void {
+  handleCustomMethod(_element: Element | null, _options: unknown): void {
     // To be override
   }
 
-  setWXSCallMethodHandler(handler: (element: Element, method: string, args: unknown[]) => void) {
-    this._WXSCallMethodHandler = handler
+  onCustomMethod(handler: (element: Element | null, options: any) => void) {
+    this._customMethodHandler = handler
   }
 
-  onWXSCallMethod(element: Element, method: string, args: unknown[]): void {
-    this._WXSCallMethodHandler?.(element, method, args)
+  sendCustomMethod(element: Element | null, options: unknown): void {
+    this._customMethodHandler?.(element, options)
   }
 }
 
