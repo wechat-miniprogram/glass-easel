@@ -9,6 +9,8 @@ import {
   type IntersectionStatus,
   type MediaQueryStatus,
   type Observer,
+  type ResizeObserverMode,
+  type ResizeStatus,
   type ScrollOffset,
 } from './shared'
 
@@ -37,6 +39,7 @@ export type Element<E> = {
     thresholds: number[],
     listener: (res: IntersectionStatus) => void,
   ): Observer
+  createResizeObserver(mode: ResizeObserverMode, listener: (res: ResizeStatus) => void): Observer
   getMatchedRules(cb: (res: GetMatchedRulesResponses) => void): void
   getPseudoMatchedRules(pseudoType: string, cb: (res: GetMatchedRulesResponses) => void): void
   getInheritedRules(cb: (res: GetInheritedRulesResponses) => void): void
