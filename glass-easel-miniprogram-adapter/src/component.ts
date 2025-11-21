@@ -364,7 +364,7 @@ export class ComponentCaller<
   }
 
   /** Create a resize observer */
-  createResizeObserver(options: { observeAll?: boolean }): ResizeObserver {
+  createResizeObserver(options?: { observeAll?: boolean }): ResizeObserver {
     return new ResizeObserver(this, !!options?.observeAll)
   }
 

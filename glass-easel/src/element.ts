@@ -3263,7 +3263,6 @@ export class Element implements NodeCast {
    * Create a resize observer
    *
    * It is possible to choose to observe either the content box or the border box.
-   * The listener always triggers once immediately after this call.
    */
   createResizeObserver(
     mode: ResizeObserverMode,

@@ -13,7 +13,7 @@ import {
   type MediaQueryStatus,
   type Observer,
 } from './shared'
-import type * as shared from './shared'
+import * as shared from './shared'
 
 const DELEGATE_EVENTS = [
   'touchstart',
@@ -446,6 +446,47 @@ export class CurrentWindowBackendContext implements Context {
       },
     )
     observer.observe(targetElement as unknown as HTMLElement)
+    return {
+      disconnect() {
+        observer.disconnect()
+      },
+    }
+  }
+
+  createResizeObserver(
+    targetElement: Element,
+    mode: shared.ResizeObserverMode,
+    listener: (res: shared.ResizeStatus) => void,
+  ): Observer {
+    const observer = new ResizeObserver((entries) => {
+      entries.forEach((entry) => {
+        const elem = entry.target
+        const isVertialWritingMode = window
+          .getComputedStyle(elem)
+          .writingMode.startsWith('vertical-')
+        if (entry.contentBoxSize.length !== 1 || entry.borderBoxSize.length !== 1) {
+          // eslint-disable-next-line no-console
+          console.error('currently multiple boxes are not supported in resize observer')
+          return
+        }
+        const contentBox = entry.contentBoxSize[0]!
+        const borderBox = entry.borderBoxSize[0]!
+        listener({
+          boundingContentBoxWidth: isVertialWritingMode
+            ? contentBox.blockSize
+            : contentBox.inlineSize,
+          boundingContentBoxHeight: isVertialWritingMode
+            ? contentBox.inlineSize
+            : contentBox.blockSize,
+          boundingBorderBoxWidth: isVertialWritingMode ? borderBox.blockSize : borderBox.inlineSize,
+          boundingBorderBoxHeight: isVertialWritingMode
+            ? borderBox.inlineSize
+            : borderBox.blockSize,
+        })
+      })
+    })
+    const box = mode === shared.ResizeObserverMode.BorderBox ? 'border-box' : 'content-box'
+    observer.observe(targetElement as unknown as HTMLElement, { box })
     return {
       disconnect() {
         observer.disconnect()

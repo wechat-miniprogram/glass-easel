@@ -85,10 +85,10 @@ export const enum ResizeObserverMode {
 }
 
 export type ResizeStatus = {
-  borderWidth: number
-  borderHeight: number
-  contentWidth: number
-  contentHeight: number
+  boundingContentBoxWidth: number
+  boundingContentBoxHeight: number
+  boundingBorderBoxWidth: number
+  boundingBorderBoxHeight: number
 }
 
 export type MediaQueryStatus = {
