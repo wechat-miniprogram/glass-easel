@@ -83,6 +83,10 @@ export type ComponentOptions = {
   propertyEarlyInit?: boolean
   /** Property comparer function, return false if properties are equal */
   propertyComparer?: ((a: any, b: any) => boolean) | null
+  /** Handle unknown properties or not */
+  unknownPropertyHandler?:
+    | ((this: GeneralComponent, name: string, value: any) => boolean | void)
+    | null
 }
 
 export type NormalizedComponentOptions = {
@@ -105,6 +109,9 @@ export type NormalizedComponentOptions = {
   virtualHost: boolean
   propertyEarlyInit: boolean
   propertyComparer: ((a: any, b: any) => boolean) | null
+  unknownPropertyHandler:
+    | ((this: GeneralComponent, name: string, value: any) => boolean | void)
+    | null
 }
 
 /**
@@ -147,6 +154,7 @@ export const globalOptions: NormalizedComponentOptions & EnvironmentOptions = {
   virtualHost: false,
   propertyEarlyInit: false,
   propertyComparer: null,
+  unknownPropertyHandler: null,
   throwGlobalError: false,
   writeExtraInfoToAttr: false,
   backendContext: null,
@@ -196,5 +204,7 @@ export const normalizeComponentOptions = (
     propertyEarlyInit:
       p.propertyEarlyInit !== undefined ? p.propertyEarlyInit : b.propertyEarlyInit,
     propertyComparer: p.propertyComparer !== undefined ? p.propertyComparer : b.propertyComparer,
+    unknownPropertyHandler:
+      p.unknownPropertyHandler !== undefined ? p.unknownPropertyHandler : b.unknownPropertyHandler,
   }
 }

@@ -526,6 +526,10 @@ export class DataGroup<
   private _$recUpdateLevel = 0
   /* @internal */
   private _$propertyComparer: ((a: DataValue, b: DataValue) => boolean) | null
+  /* @internal */
+  private _$unknownPropertyHandler:
+    | ((this: GeneralComponent, name: string, value: DataValue) => boolean | void)
+    | null
 
   /* @internal */
   private _$generateInnerData(data: { [key: string]: DataValue }) {
@@ -560,6 +564,9 @@ export class DataGroup<
     reflectToAttributes: boolean,
     observerTree: DataGroupObserverTree,
     propertyComparer: ((a: DataValue, b: DataValue) => boolean) | null,
+    unknownPropertyHandler:
+      | ((this: GeneralComponent, name: string, value: DataValue) => boolean | void)
+      | null,
   ) {
     this._$comp = associatedComponent
     this.data = data
@@ -571,6 +578,7 @@ export class DataGroup<
     this._$observerTree = observerTree
     this._$observerStatus = new Array(observerTree.observers.length) as boolean[]
     this._$propertyComparer = propertyComparer
+    this._$unknownPropertyHandler = unknownPropertyHandler
     this.innerData = this._$generateInnerData(data)
   }
 
@@ -584,6 +592,7 @@ export class DataGroup<
       DeepCopyStrategy.None,
       false,
       new DataGroupObserverTree({}),
+      null,
       null,
     )
   }
@@ -633,7 +642,7 @@ export class DataGroup<
   replaceProperty(propName: string, newData: DataValue): boolean {
     let data = newData
     const prop = this._$propFields[propName]
-    if (!prop) return false
+    if (!prop) return this._$unknownPropertyHandler?.call(this._$comp!, propName, newData) ?? false
     if (this._$propertyPassingDeepCopy !== DeepCopyStrategy.None) {
       if (this._$propertyPassingDeepCopy === DeepCopyStrategy.SimpleWithRecursion) {
         data = deepCopy(newData, true)
