@@ -398,6 +398,12 @@ export class BehaviorBuilder<
     return this as any
   }
 
+  static getProperties<TProperty extends PropertyList = Empty>(
+    builder: BehaviorBuilder<any, any, TProperty, any, any, any, any>,
+  ) {
+    return builder._$properties
+  }
+
   /**
    * Add a single property
    *
