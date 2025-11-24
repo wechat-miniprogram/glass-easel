@@ -79,6 +79,18 @@ export type IntersectionStatus = {
   time: number
 }
 
+export const enum ResizeObserverMode {
+  ContentBox = 1,
+  BorderBox = 2,
+}
+
+export type ResizeStatus = {
+  boundingContentBoxWidth: number
+  boundingContentBoxHeight: number
+  boundingBorderBoxWidth: number
+  boundingBorderBoxHeight: number
+}
+
 export type MediaQueryStatus = {
   minWidth?: number
   maxWidth?: number

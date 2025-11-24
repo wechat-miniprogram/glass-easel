@@ -3,6 +3,7 @@ import { type utils as typeUtils } from './types'
 import { type ComponentType, type GeneralBehavior, type TraitBehavior } from './behavior'
 import { SelectorQuery } from './selector_query'
 import { IntersectionObserver } from './intersection'
+import { ResizeObserver } from './resize'
 import { MediaQueryObserver } from './media_query'
 
 type DataList = typeUtils.DataList
@@ -360,6 +361,11 @@ export class ComponentCaller<
       options?.initialRatio || 0,
       options?.observeAll || false,
     )
+  }
+
+  /** Create a resize observer */
+  createResizeObserver(options?: { observeAll?: boolean }): ResizeObserver {
+    return new ResizeObserver(this, !!options?.observeAll)
   }
 
   /** Create an media query observer */

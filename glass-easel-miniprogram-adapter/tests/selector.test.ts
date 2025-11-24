@@ -700,6 +700,46 @@ describe('intersection observer', () => {
   })
 })
 
+describe('resize observer', () => {
+  test('create resize observer', () => {
+    const env = new MiniProgramEnv()
+    const codeSpace = env.createCodeSpace('', true)
+
+    codeSpace.addComponentStaticConfig('path/to/comp', {
+      usingComponents: {},
+    })
+    codeSpace.addCompiledTemplate(
+      'path/to/comp',
+      tmpl(`
+        <div id="a" />
+        <div id="a" />
+      `),
+    )
+    // eslint-disable-next-line arrow-body-style
+    codeSpace.componentEnv('path/to/comp', ({ Component }) => {
+      return Component()
+        .lifetime('attached', function () {
+          const o1 = this.createResizeObserver()
+          o1.observe('#a', () => {
+            /* empty */
+          })
+          const o2 = this.createResizeObserver({ observeAll: true })
+          o2.borderBox().observe('#a', () => {
+            /* empty */
+          })
+          o1.disconnect()
+          o2.disconnect()
+        })
+        .register()
+    })
+
+    const backendContext = new glassEasel.EmptyComposedBackendContext()
+    const ab = env.associateBackend(backendContext)
+    const root = ab.createRoot('body', codeSpace, 'path/to/comp')
+    glassEasel.Element.pretendAttached(root.getComponent())
+  })
+})
+
 describe('media query observer', () => {
   test('create media query observer', () => {
     const env = new MiniProgramEnv()

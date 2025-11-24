@@ -6,6 +6,8 @@ import {
   type GeneralBackendElement,
   type IntersectionStatus,
   type Observer,
+  type ResizeObserverMode,
+  type ResizeStatus,
   type ScrollOffset,
   type backend,
   type composedBackend,
@@ -3253,6 +3255,33 @@ export class Element implements NodeCast {
         thresholds,
         listener as any,
       )
+    }
+    return null
+  }
+
+  /**
+   * Create a resize observer
+   *
+   * It is possible to choose to observe either the content box or the border box.
+   */
+  createResizeObserver(
+    mode: ResizeObserverMode,
+    listener: ((res: ResizeStatus) => void) | null,
+  ): Observer | null {
+    const backendElement = this._$backendElement
+    if (backendElement) {
+      if (BM.DOMLIKE || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Domlike)) {
+        const context = this._$nodeTreeContext as domlikeBackend.Context | null
+        if (!context || !context.createResizeObserver) return null
+        return context.createResizeObserver(
+          backendElement as domlikeBackend.Element,
+          mode,
+          listener!,
+        )
+      }
+      const be = backendElement as backend.Element | composedBackend.Element
+      if (!be.createResizeObserver) return null
+      return be.createResizeObserver(mode, listener as any)
     }
     return null
   }
