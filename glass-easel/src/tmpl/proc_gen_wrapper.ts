@@ -1058,10 +1058,8 @@ export class ProcGenWrapper {
 
   // set style (or property named `style`)
   y = (elem: Element, v: string) => {
-    if (isComponent(elem) && Component.hasProperty(elem, 'style')) {
-      const nodeDataProxy = Component.getDataProxy(elem)
-      const camelName = dashToCamelCase('style')
-      nodeDataProxy.replaceProperty(camelName, v)
+    if (isComponent(elem) && Component.getDataProxy(elem).replaceProperty('style', v)) {
+      // empty
     } else {
       elem.setNodeStyle(dataValueToString(v), StyleSegmentIndex.MAIN)
     }
@@ -1101,10 +1099,8 @@ export class ProcGenWrapper {
       const value = arr[i + 1]
       v += `${name}:${value};`
     }
-    if (isComponent(elem) && Component.hasProperty(elem, 'style')) {
-      const nodeDataProxy = Component.getDataProxy(elem)
-      const camelName = dashToCamelCase('style')
-      nodeDataProxy.replaceProperty(camelName, v)
+    if (isComponent(elem) && Component.getDataProxy(elem).replaceProperty('style', v)) {
+      // empty
     } else {
       elem.setNodeStyle(dataValueToString(v), StyleSegmentIndex.MAIN)
     }

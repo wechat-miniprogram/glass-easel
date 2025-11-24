@@ -1236,4 +1236,62 @@ describe('partial update', () => {
     expect(domHtml(comp)).toBe('true')
     expect(execArr).toEqual(['middle:observer:true', 'child:observer:true', 'child:property:true'])
   })
+
+  test('should support unknown property handler', () => {
+    let execArr = [] as [string, unknown][]
+    let execReturn: boolean = true
+    const childCompDef = componentSpace
+      .define()
+      .options({
+        unknownPropertyHandler(propName: string, value: unknown) {
+          execArr.push([propName, value])
+          return execReturn
+        },
+      })
+      .property('a', String)
+      .property('b', String)
+      .registerComponent()
+
+    const compDef = componentSpace
+      .define()
+      .usingComponents({
+        child: childCompDef.general(),
+      })
+      .template(
+        tmpl(`
+          <child id="child" style="{{style}}" p="{{p}}" a="{{a}}" bindff="ff" data-dd="{{dd}}" />
+        `),
+      )
+      .data(() => ({
+        p: 'p',
+        a: 'a',
+        dd: 'dd',
+        style: 'style',
+      }))
+      .registerComponent()
+
+    const comp = glassEasel.Component.createWithContext('root', compDef, domBackend)
+    const child = (comp.$.child as glassEasel.Element).asInstanceOf(childCompDef)!
+
+    expect(execArr).toEqual([
+      ['style', 'style'],
+      ['p', 'p'],
+      ['bindff', 'ff'],
+      ['dataDd', 'dd'],
+    ])
+    expect(child.style).toBe('')
+    expect(child.getListeners()).toEqual({})
+    expect(child.dataset).toEqual({})
+
+    execArr = []
+    execReturn = false
+    comp.setData({ a: 'a2', dd: 'dd2', style: 'style2' })
+    expect(execArr).toEqual([
+      ['style', 'style2'],
+      ['dataDd', 'dd2'],
+      ['data-dd', 'dd2'],
+    ])
+    expect(child.style).toBe('style2')
+    expect(child.dataset).toEqual({ dd: 'dd2' })
+  })
 })

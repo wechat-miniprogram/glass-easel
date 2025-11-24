@@ -879,6 +879,7 @@ export class Component<
       options.reflectToAttributes,
       comp._$dataGroupObserverTree,
       options.propertyComparer,
+      options.unknownPropertyHandler,
     )
     comp._$dataGroup = dataGroup
 
