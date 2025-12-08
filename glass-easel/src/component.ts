@@ -53,7 +53,7 @@ import {
   performanceMeasureStart,
 } from './dev_tools'
 import { Element } from './element'
-import { type ShadowedEvent, type EventListener, type EventListenerOptions } from './event'
+import { type EventListener, type EventListenerOptions } from './event'
 import { type ExternalShadowRoot } from './external_shadow_tree'
 import { FuncArr, safeCallback, type GeneralFuncType } from './func_arr'
 import {
