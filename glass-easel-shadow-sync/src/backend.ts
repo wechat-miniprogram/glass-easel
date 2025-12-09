@@ -437,7 +437,7 @@ export class ShadowSyncBackendContext implements GlassEaselBackend.Context {
   private _$registeredStyleSheets = [] as [string, unknown][]
   private _$appendedStyleSheets = [] as [number, string, number | undefined][]
   private _$styleSheetIdInc = 1
-  private _$styleScopeMap = new Map<number, string | undefined>()
+  private _$styleScopeMap = [''] as (string | undefined)[]
   private _windowInfo = {
     width: 0,
     height: 0,
@@ -545,9 +545,9 @@ export class ShadowSyncBackendContext implements GlassEaselBackend.Context {
   }
 
   _checkStyleScope(styleScope: number | null | undefined) {
-    if (styleScope !== null && styleScope !== undefined && !this._$styleScopeMap.has(styleScope)) {
+    if (styleScope !== null && styleScope !== undefined && !this._$styleScopeMap[styleScope]) {
       const stylePrefix = this.styleScopeManager.queryName(styleScope)
-      this._$styleScopeMap.set(styleScope, stylePrefix)
+      this._$styleScopeMap[styleScope] = stylePrefix
       this.channel.registerStyleScope(styleScope, stylePrefix)
     }
   }

@@ -54,7 +54,7 @@ export class ViewController {
   >()
 
   private _styleSheetIdMapping = Object.create(null) as Record<number, number>
-  private _styleScopeIdMapping = Object.create(null) as Record<number, number>
+  private _styleScopeIdMapping = [0] as Record<number, number>
 
   private _traceStartTimestampMapping = Object.create(null) as Record<number, number>
 
@@ -631,8 +631,9 @@ export class ViewController {
   }
 
   appendStyleSheetPath(index: number, path: string, styleScope?: number): void {
-    const { _backendContext, _styleSheetIdMapping } = this
-    const styleSheetIndex = _backendContext.appendStyleSheetPath(path, styleScope)
+    const { _backendContext, _styleSheetIdMapping, _styleScopeIdMapping } = this
+    const actualStyleScope = styleScope !== undefined ? _styleScopeIdMapping[styleScope] : undefined
+    const styleSheetIndex = _backendContext.appendStyleSheetPath(path, actualStyleScope)
     _styleSheetIdMapping[index] = styleSheetIndex
   }
 
