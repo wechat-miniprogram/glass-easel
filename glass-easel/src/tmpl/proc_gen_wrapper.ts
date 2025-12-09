@@ -786,7 +786,13 @@ export class ProcGenWrapper {
           for (let i = 0; i < sortedSlots.length; i += 1) {
             const slotNodes = sortedSlots[i]!.slotNodes!
             const firstIndex = slotNodes[0]!.parentIndex
-            const lastIndex = slotNodes.findLast((node) => node.parentNode === elem)!.parentIndex
+            let lastIndex = firstIndex
+            for (let j = slotNodes.length - 1; j > 0; j -= 1) {
+              if (slotNodes[j]!.parentNode === elem) {
+                lastIndex = slotNodes[j]!.parentIndex
+                break
+              }
+            }
             if (r !== firstIndex) {
               if (l >= 0) elem.removeChildren(l, r - l)
               l = firstIndex

@@ -79,8 +79,10 @@ export const determineComponentExports = (
   selfExport: ((source: GeneralComponent | null) => any) | undefined,
 ) => {
   if (selfExport !== undefined) return selfExport
-  const targetBehavior = parent.findLast((behavior) => behavior._$export !== undefined)
-  if (targetBehavior !== undefined) return targetBehavior._$export
+  for (let i = parent.length - 1; i >= 0; i -= 1) {
+    const behavior = parent[i]!
+    if (behavior._$export !== undefined) return behavior._$export
+  }
   return undefined
 }
 
