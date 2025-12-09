@@ -107,67 +107,12 @@ export const createViewContext = (
   backendContext: glassEasel.GeneralBackendContext,
   viewComponentSpace: glassEasel.ComponentSpace,
 ) => {
-  const syncController = new (class extends ViewController {
-    private _registeredStyleScope = new Set<number>()
-
-    private _checkStyleScope(styleScope: number | null) {
-      if (styleScope === null) return
-      if (this._registeredStyleScope.has(styleScope)) return
-      this._registeredStyleScope.add(styleScope)
-      this.registerStyleScope(
-        styleScope,
-        dataComponentSpace.styleScopeManager.queryName(styleScope),
-      )
-    }
-
-    override createSimpleComponent(
-      tagName: string,
-      external: boolean,
-      ownerShadowRoot: glassEasel.ShadowRoot | undefined,
-      virtualHost: boolean,
-      styleScope: number,
-      extraStyleScope: number | null,
-      externalClasses: string[] | undefined,
-      slotMode: glassEasel.SlotMode | null,
-      writeIdToDOM: boolean,
-      chainDefinition:
-        | ((
-            def: glassEasel.BehaviorBuilder<
-              glassEasel.typeUtils.Empty,
-              glassEasel.typeUtils.Empty,
-              glassEasel.typeUtils.Empty,
-              glassEasel.typeUtils.Empty,
-              never,
-              never
-            >,
-          ) => glassEasel.BehaviorBuilder<
-            glassEasel.typeUtils.Empty,
-            glassEasel.typeUtils.Empty,
-            glassEasel.typeUtils.Empty,
-            glassEasel.typeUtils.Empty,
-            never,
-            never
-          >)
-        | undefined,
-      cb: (component: glassEasel.GeneralComponent) => void,
-    ): void {
-      this._checkStyleScope(styleScope)
-      this._checkStyleScope(extraStyleScope)
-      return super.createSimpleComponent(
-        tagName,
-        external,
-        ownerShadowRoot,
-        virtualHost,
-        styleScope,
-        extraStyleScope,
-        externalClasses,
-        slotMode,
-        writeIdToDOM,
-        chainDefinition,
-        cb,
-      )
-    }
-  })(glassEasel, rootNode, backendContext, viewComponentSpace)
+  const syncController = new ViewController(
+    glassEasel,
+    rootNode,
+    backendContext,
+    viewComponentSpace,
+  )
 
   const bridgeOnView = new Bridge()
 
