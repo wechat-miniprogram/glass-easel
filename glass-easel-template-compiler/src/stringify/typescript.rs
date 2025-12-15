@@ -672,12 +672,15 @@ impl ConvertedExprWriteInline for Value {
                     if let Some(prev_loc) = prev_loc.take() {
                         w.write_token_state("+", None, &prev_loc, StringifierLineState::Normal)?;
                     }
-                    let is_static_str = if let Expression::LitStr { .. } = part {
-                        true
-                    } else {
-                        false
+                    let is_static_str = match part {
+                        Expression::LitStr { .. } => true,
+                        _ => false,
                     };
-                    let need_paren = !is_static_str && has_multi_segs;
+                    let is_lit_obj = match part {
+                        Expression::LitObj { .. } => true,
+                        _ => false,
+                    };
+                    let need_paren = !is_static_str && (has_multi_segs || is_lit_obj);
                     if need_paren {
                         w.write_token_state(
                             "(",
@@ -999,6 +1002,20 @@ mod test {
         assert_eq!(find_token(&sm, 0, 11), Some((0, 7)));
         assert_eq!(find_token(&sm, 0, 16), Some((0, 7)));
         assert_eq!(find_token(&sm, 0, 17), Some((0, 8)));
+    }
+
+    #[test]
+    fn expr_object_shortcut() {
+        let src = r#"{{ a: 1, b: 2 }}"#;
+        let expect = r#"({a:1,b:2});"#;
+        let (out, sm) = convert(src);
+        assert_eq!(out, expect);
+        assert_eq!(find_token(&sm, 0, 1), Some((0, 2)));
+        assert_eq!(find_token(&sm, 0, 2), Some((0, 3)));
+        assert_eq!(find_token(&sm, 0, 4), Some((0, 6)));
+        assert_eq!(find_token(&sm, 0, 6), Some((0, 9)));
+        assert_eq!(find_token(&sm, 0, 8), Some((0, 12)));
+        assert_eq!(find_token(&sm, 0, 10), Some((0, 14)));
     }
 
     #[test]

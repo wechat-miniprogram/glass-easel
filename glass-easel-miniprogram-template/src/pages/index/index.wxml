@@ -4,6 +4,6 @@
 <view class="hello" bind:tap="helloTap">
   Hello world!
 </view>
-<view class="hello" hidden="{{ !showAgain }}">
+<view class="hello" hidden="{{ !showAgain }}" mark:a="{{ a: 1, b: 2 }}">
   Hello world again!
 </view>
