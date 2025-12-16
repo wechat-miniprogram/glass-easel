@@ -345,7 +345,7 @@ export class Server {
     const defaultExport = getDefaultExportOfSourceFile(tc, source)
     const relPath = path.relative(compDir, tsFullPath.slice(0, -3))
     const adapterTypesLine = `type _Component_<P, W, M> = { propertyValues: P, dataWithProperties: W, methods: M }
-type _ComponentFieldTypes_<T> = (T & Record<string, never>)['_$fieldTypes']`
+type _ComponentFieldTypes_<T> = (T & Record<string, unknown>)['_$fieldTypes']`
     // eslint-disable-next-line no-nested-ternary
     const tsImportLine = defaultExport
       ? `import type component from './${escapeJsString(relPath)}'`
