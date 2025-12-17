@@ -50,7 +50,7 @@ import {
   type PropertyDefinition,
 } from './data_proxy'
 import { simpleDeepCopy } from './data_utils'
-import { type EventListener, type ShadowedEvent } from './event'
+import { type EventListener } from './event'
 import { FuncArr, safeCallback } from './func_arr'
 import { type ComponentOptions } from './global_options'
 import { normalizeRelation, type RelationDefinition, type RelationHandler } from './relation'
