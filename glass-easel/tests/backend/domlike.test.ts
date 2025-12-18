@@ -14,7 +14,7 @@ componentSpace.defineComponent({
 
 describe('domlike backend', () => {
   beforeAll(() => {
-    domBackend.onEvent(glassEasel.Event.triggerEvent)
+    domBackend.onEvent(glassEasel.Event.triggerExternalEvent)
   })
 
   describe('events', () => {
@@ -237,6 +237,102 @@ describe('domlike backend', () => {
       })
       button.dispatchEvent(focus)
       expect(ops).toEqual([6])
+    })
+    it('native-rendering event', () => {
+      let ops: number[] = []
+
+      const Native = componentSpace
+        .define()
+        .options({
+          externalComponent: true,
+        })
+        .template(
+          tmpl(`
+          <div id="div" bind:click="onClick"><slot /></div>
+        `),
+        )
+        .init(({ listener }) => {
+          const onClick = listener((e) => {
+            ops.push(1)
+          })
+
+          return {
+            onClick,
+          }
+        })
+        .registerComponent()
+
+      const Comp = componentSpace
+        .define()
+        .template(
+          tmpl(`
+          <div bind:click="onClick"><slot /></div>
+        `),
+        )
+        .init(({ listener }) => {
+          const onClick = listener((e) => {
+            ops.push(2)
+          })
+
+          return {
+            onClick,
+          }
+        })
+        .registerComponent()
+
+      const Root = componentSpace
+        .define()
+        .usingComponents({
+          native: Native,
+          comp: Comp,
+        })
+        .template(
+          tmpl(`
+          <comp bind:click="onClick">
+            <native id="native">
+              <button id="button">Click</button>
+            </native>
+          </comp>
+        `),
+        )
+        .init(({ listener }) => {
+          const onClick = listener((e) => {
+            ops.push(3)
+          })
+
+          return {
+            onClick,
+          }
+        })
+        .registerComponent()
+
+      const comp = glassEasel.Component.createWithContext('root', Root, domBackend)
+      const placeholder = document.createElement('span')
+      document.body.appendChild(placeholder)
+      glassEasel.Element.replaceDocumentElement(
+        comp,
+        document.body as any as glassEasel.GeneralBackendElement,
+        placeholder as any as glassEasel.GeneralBackendElement,
+      )
+
+      const button = (comp.$.button as glassEasel.Element).$$ as any as HTMLButtonElement
+      const native = (comp.$.native as glassEasel.GeneralComponent).$$ as any as HTMLElement
+      const nativeDiv = (comp.$.native as glassEasel.GeneralComponent).$.div as any as HTMLElement
+
+      const click = new MouseEvent('click', {
+        bubbles: true,
+        composed: true,
+      })
+      button.dispatchEvent(click)
+      expect(ops).toEqual([1, 2, 3])
+
+      ops = []
+      nativeDiv.dispatchEvent(click)
+      expect(ops).toEqual([1, 2, 3])
+
+      ops = []
+      native.dispatchEvent(click)
+      expect(ops).toEqual([2, 3])
     })
   })
 

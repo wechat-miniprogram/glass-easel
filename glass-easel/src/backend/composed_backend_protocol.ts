@@ -20,7 +20,8 @@ export interface Context extends Partial<suggestedBackend.Context<Context, Eleme
   createFragment(): Element
   onEvent(
     listener: (
-      target: GlassEaselElement,
+      element: GlassEaselElement,
+      target: Element,
       type: string,
       detail: unknown,
       options: EventOptions,

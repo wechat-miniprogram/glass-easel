@@ -133,9 +133,7 @@ export const createViewContext = (
 
 export const domBackend = new glassEasel.CurrentWindowBackendContext()
 
-domBackend.onEvent((target, type, detail, options) => {
-  glassEasel.triggerEvent(target, type, detail, options)
-})
+domBackend.onEvent(glassEasel.triggerExternalEvent)
 
 export const dataComponentSpace = glassEasel.getDefaultComponentSpace()
 

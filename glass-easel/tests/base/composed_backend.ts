@@ -31,7 +31,8 @@ export class Context implements glassEasel.composedBackend.Context {
   private _$eventEmitter:
     | null
     | ((
-        target: glassEasel.Element,
+        element: glassEasel.Element,
+        target: Element,
         type: string,
         detail: unknown,
         options: glassEasel.EventOptions,
@@ -133,7 +134,8 @@ export class Context implements glassEasel.composedBackend.Context {
 
   onEvent(
     _listener: (
-      target: glassEasel.Element,
+      element: glassEasel.Element,
+      target: Element,
       type: string,
       detail: unknown,
       options: glassEasel.EventOptions,

@@ -373,7 +373,8 @@ export class Event<TDetail> {
     this._$dispatched = true
     const crossShadow = this.composed
     const bubbles = this.bubbles
-    const inExternalOnly = externalTarget && !crossShadow
+    const isExternalAtTarget = externalTarget && isComponent(target) && target._$external
+    const inExternalOnly = !crossShadow && isExternalAtTarget
     const eventBubblingControl = this._$eventBubblingControl
 
     const forEachBubblePath = (
@@ -466,11 +467,11 @@ export class Event<TDetail> {
   }
 
   static dispatchExternalEvent<TDetail>(
-    component: GeneralComponent,
+    element: Element,
     target: GeneralBackendElement,
     event: Event<TDetail>,
   ) {
-    return event.dispatch(component, target)
+    return event.dispatch(element, target)
   }
 
   static triggerEvent<TDetail>(
@@ -486,13 +487,13 @@ export class Event<TDetail> {
 
   static triggerExternalEvent<TDetail>(
     this: void,
-    component: GeneralComponent,
+    element: Element,
     target: GeneralBackendElement,
     name: string,
     detail: TDetail,
     options?: EventOptions,
   ) {
     const ev = new Event(name, detail, options)
-    return Event.dispatchExternalEvent(component, target, ev)
+    return Event.dispatchExternalEvent(element, target, ev)
   }
 }
