@@ -86,7 +86,8 @@ export class EmptyComposedBackendContext implements Context {
 
   onEvent(
     _listener: (
-      target: GlassEaselElement,
+      element: GlassEaselElement,
+      target: EmptyComposedBackendElement,
       type: string,
       detail: unknown,
       options: EventOptions,

@@ -168,4 +168,123 @@ describe('native rendering mode', () => {
     )
     expect(ops).toStrictEqual([2, 1, 3])
   })
+
+  test('nesting event handling', () => {
+    let ops: number[] = []
+    const native = glassEasel.registerElement({
+      options: {
+        externalComponent: true,
+      },
+      template: tmpl(`
+        <div id="div" bind:touchstart="onStart">
+          <slot />
+        </div>
+      `),
+      methods: {
+        onStart() {
+          ops.push(1)
+        },
+      },
+    })
+    const normal = glassEasel.registerElement({
+      template: tmpl(`
+        <div id="div" capture-bind:touchstart="captureStart" bind:touchstart="onStart">
+          <slot />
+        </div>
+      `),
+      methods: {
+        captureStart() {
+          ops.push(2)
+        },
+        onStart() {
+          ops.push(3)
+        },
+      },
+    })
+    const comp = glassEasel.registerElement({
+      using: {
+        native,
+        normal,
+      },
+      template: tmpl(`
+        <native capture-bind:touchstart="captureStart" bind:touchstart="onStart">
+          <normal>
+            <native id="inner"/>
+          </normal>
+        </native>
+      `),
+      methods: {
+        captureStart() {
+          ops.push(4)
+        },
+        onStart() {
+          ops.push(5)
+        },
+      },
+    })
+    const elem = glassEasel.Component.createWithContext('root', comp.general(), domBackend)
+    expect(domHtml(elem)).toBe(
+      '<native><div><normal><div><native><div></div></native></div></normal></div></native>',
+    )
+    const inner = (elem.$.inner as glassEasel.Element).asInstanceOf(native)!
+
+    glassEasel.triggerExternalEvent(
+      inner,
+      inner.$.div as glassEasel.GeneralBackendElement,
+      'touchstart',
+      {},
+      { bubbles: true, capturePhase: true, composed: true },
+    )
+    expect(ops).toStrictEqual([4, 2, 1, 3, 1, 5])
+
+    ops = []
+    glassEasel.triggerExternalEvent(
+      inner,
+      inner.$.div as glassEasel.GeneralBackendElement,
+      'touchstart',
+      {},
+      { bubbles: false, capturePhase: true, composed: true },
+    )
+    expect(ops).toStrictEqual([4, 2, 1])
+
+    ops = []
+    glassEasel.triggerExternalEvent(
+      inner,
+      inner.$.div as glassEasel.GeneralBackendElement,
+      'touchstart',
+      {},
+      { bubbles: true, capturePhase: false, composed: true },
+    )
+    expect(ops).toStrictEqual([1, 3, 1, 5])
+
+    ops = []
+    glassEasel.triggerExternalEvent(
+      inner,
+      inner.$.div as glassEasel.GeneralBackendElement,
+      'touchstart',
+      {},
+      { bubbles: true, capturePhase: true, composed: false },
+    )
+    expect(ops).toStrictEqual([1])
+
+    ops = []
+    glassEasel.triggerExternalEvent(
+      inner,
+      inner.$$ as glassEasel.GeneralBackendElement,
+      'touchstart',
+      {},
+      { bubbles: true, capturePhase: true, composed: true },
+    )
+    expect(ops).toStrictEqual([4, 2, 3, 1, 5])
+
+    ops = []
+    glassEasel.triggerExternalEvent(
+      inner,
+      inner.$$ as glassEasel.GeneralBackendElement,
+      'touchstart',
+      {},
+      { bubbles: true, capturePhase: true, composed: false },
+    )
+    expect(ops).toStrictEqual([])
+  })
 })
