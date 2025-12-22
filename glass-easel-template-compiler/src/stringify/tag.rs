@@ -8,7 +8,7 @@ use compact_str::CompactString;
 
 use super::stringifier::*;
 use crate::{
-    escape::{camel_to_dash, escape_html_body, gen_lit_str},
+    escape::{camel_to_dash, escape_html_body, gen_lit_str_with_quotes},
     parse::{
         expr::Expression,
         tag::{
@@ -1167,7 +1167,7 @@ impl StringifyLine for Value {
                 location,
                 StringifierLineState::DoubleBraceStart,
             )?;
-            let quoted = gen_lit_str(x);
+            let quoted = gen_lit_str_with_quotes(x, stringifier.options().expression_string_single_quote);
             stringifier.write_token_state(
                 &format!(r#"{}"#, quoted),
                 None,

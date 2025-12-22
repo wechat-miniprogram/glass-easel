@@ -23,6 +23,9 @@ pub struct StringifyOptions {
     ///
     /// Note that lines may exceed this limit when it is not possible.
     pub line_width_limit: u32,
+
+    /// Prefer single quote for string literals in expressions.
+    pub expression_string_single_quote: bool,
 }
 
 impl Default for StringifyOptions {
@@ -34,6 +37,7 @@ impl Default for StringifyOptions {
             tab_size: 4,
             use_tab_character: false,
             line_width_limit: 100,
+            expression_string_single_quote: false,
         }
     }
 }
@@ -108,6 +112,24 @@ mod test {
         assert_eq!(
             output.as_str(),
             "<div\n    data:a=\"this is a long string\"\n/>\n<div data:a=\"but short\" />\n",
+        );
+    }
+
+    #[test]
+    fn expression_string_single_quote() {
+        let src = r#"<div data:a="{{ "abc" * 1 }}" />"#;
+        let (template, _) = crate::parse::parse("TEST", src);
+        let options = StringifyOptions {
+            expression_string_single_quote: true,
+            ..Default::default()
+        };
+        let mut stringifier =
+            crate::stringify::Stringifier::new(String::new(), "test", Some(src), options);
+        template.stringify_write(&mut stringifier).unwrap();
+        let (output, _) = stringifier.finish();
+        assert_eq!(
+            output.as_str(),
+            "<div data:a=\"{{ 'abc' * 1 }}\" />\n",
         );
     }
 

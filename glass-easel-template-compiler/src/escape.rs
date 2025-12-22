@@ -28,7 +28,43 @@ pub(crate) fn escape_html_quote(s: &str) -> Cow<'_, str> {
 }
 
 pub(crate) fn gen_lit_str(s: &str) -> String {
-    format!("{:?}", s)
+    gen_lit_str_with_quotes(s, false)
+}
+
+pub(crate) fn gen_lit_str_with_quotes(s: &str, use_single_quote: bool) -> String {
+    fn conv_ch_count(ch: u8, quote_ch: u8) -> usize {
+        match ch {
+            b'\\' | b'\n' | b'\r' | b'\t' | b'\0' => 2,
+            1..=31 => 4,
+            x if x == quote_ch => 2,
+            _ => 1,
+        }
+    }
+
+    fn conv_ch(w: &mut String, ch: char, quote_ch: char) {
+        match ch {
+            '\\' => w.push_str("\\\\"),
+            '\n' => w.push_str("\\n"),
+            '\r' => w.push_str("\\r"),
+            '\t' => w.push_str("\\t"),
+            '\0' => w.push_str("\\0"),
+            x if x as u8 <= 31 => {
+                w.push_str(&format!("\\x{:02X}", ch as u8));
+            }
+            x if x == quote_ch => w.push_str(&format!("\\{}", x)),
+            x => w.push(x),
+        }
+    }
+
+    let quote_ch = if use_single_quote { '\'' } else { '"' };
+    let cap = s.bytes().map(|ch| conv_ch_count(ch, quote_ch as u8)).sum::<usize>() + 2;
+    let mut ret = String::with_capacity(cap);
+    ret.push(quote_ch);
+    for ch in s.chars() {
+        conv_ch(&mut ret, ch, quote_ch);
+    }
+    ret.push(quote_ch);
+    ret
 }
 
 pub(crate) fn dash_to_camel(s: &str) -> CompactString {
@@ -58,4 +94,27 @@ pub(crate) fn camel_to_dash(s: &str) -> CompactString {
         }
     }
     dash_name
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gen_lit_str_double_quoted() {
+        assert_eq!(gen_lit_str_with_quotes("abc", false), r#""abc""#);
+        assert_eq!(gen_lit_str_with_quotes("\n\r\t\0", false), r#""\n\r\t\0""#);
+        assert_eq!(gen_lit_str_with_quotes("\u{1}", false), r#""\x01""#);
+        assert_eq!(gen_lit_str_with_quotes("\u{1F}", false), r#""\x1F""#);
+        assert_eq!(gen_lit_str_with_quotes("'", false), r#""'""#);
+        assert_eq!(gen_lit_str_with_quotes("\"", false), r#""\"""#);
+        assert_eq!(gen_lit_str_with_quotes("\\n\n", false), r#""\\n\n""#);
+    }
+
+    #[test]
+    fn gen_lit_str_single_quoted() {
+        assert_eq!(gen_lit_str_with_quotes("abc", true), r#"'abc'"#);
+        assert_eq!(gen_lit_str_with_quotes("'", true), r#"'\''"#);
+        assert_eq!(gen_lit_str_with_quotes("\"", true), r#"'"'"#);
+    }
 }

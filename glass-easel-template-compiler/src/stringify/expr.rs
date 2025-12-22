@@ -2,7 +2,7 @@ use std::fmt::{Result as FmtResult, Write as FmtWrite};
 
 use super::stringifier::*;
 use crate::{
-    escape::gen_lit_str,
+    escape::gen_lit_str_with_quotes,
     parse::expr::{ArrayFieldKind, Expression, ObjectFieldKind},
 };
 
@@ -124,7 +124,7 @@ pub(super) fn expression_strigify_write<W: FmtWrite>(
             stringifier.write_token_state("null", None, location, StringifierLineState::Normal)?;
         }
         Expression::LitStr { value, location } => {
-            let quoted = gen_lit_str(&value);
+            let quoted = gen_lit_str_with_quotes(&value, stringifier.options().expression_string_single_quote);
             stringifier.write_token_state(
                 &format!(r#"{}"#, quoted),
                 None,
@@ -661,17 +661,23 @@ impl Stringify for Expression {
 mod tests {
     use super::*;
 
-    fn case(src: &str) {
+    use crate::stringify::StringifyOptions;
+
+    fn case_with_options(src: &str, options: StringifyOptions) {
         let (template, _) = crate::parse::parse("TEST", src);
         let mut stringifier = crate::stringify::Stringifier::new(
             String::new(),
             "test",
             Some(src),
-            Default::default(),
+            options,
         );
         template.stringify_write(&mut stringifier).unwrap();
         let (stringify_result, _sourcemap) = stringifier.finish();
         assert_eq!(stringify_result.as_str(), &format!("{}\n", src));
+    }
+
+    fn case(src: &str) {
+        case_with_options(src, Default::default());
     }
 
     #[test]
@@ -682,6 +688,15 @@ mod tests {
     #[test]
     fn lit_str() {
         case(r#"{{ 1 + "foo" + 1 }}"#);
+    }
+
+    #[test]
+    fn lit_str_single_quoted() {
+        let options = StringifyOptions {
+            expression_string_single_quote: true,
+            ..Default::default()
+        };
+        case_with_options(r#"{{ 1 + 'foo' + 1 }}"#, options);
     }
 
     #[test]

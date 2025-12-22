@@ -222,6 +222,10 @@ pub struct StringifierLine<'s, 't, 'u, W: FmtWrite> {
 }
 
 impl<'s, 't, 'u, W: FmtWrite> StringifierLine<'s, 't, 'u, W> {
+    pub(super) fn options(&self) -> &StringifyOptions {
+        &self.block.top.options
+    }
+
     pub(super) fn block(&mut self) -> &mut StringifierBlock<'s, 't, W> {
         &mut self.block
     }
