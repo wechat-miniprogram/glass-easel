@@ -53,7 +53,8 @@ export class CurrentWindowBackendContext implements Context {
   private _$triggedEvents = new WeakSet<Event>()
   /* @internal */
   private _$eventListener?: (
-    target: any,
+    element: GlassEaselElement,
+    target: Element,
     type: string,
     detail: any,
     options: EventOptions,
@@ -122,7 +123,8 @@ export class CurrentWindowBackendContext implements Context {
 
   onEvent(
     listener: (
-      target: GlassEaselElement,
+      element: GlassEaselElement,
+      target: Element,
       type: string,
       detail: any,
       options: EventOptions,
@@ -154,11 +156,12 @@ export class CurrentWindowBackendContext implements Context {
   private _$trigger(ev: Event, type: string, detail: unknown, bubbles: boolean, composed: boolean) {
     if (!this._$eventListener || !ev.target) return
 
-    let t: Element | null = ev.target as any as Element
+    const target = ev.target as unknown as Element
+    let t: Element | null = target
     while (t && !t.__wxElement) t = t.parentNode
     if (!t) return
 
-    const bubbleStatus = this._$eventListener(t.__wxElement!, type, detail, {
+    const bubbleStatus = this._$eventListener(t.__wxElement!, target, type, detail, {
       originalEvent: ev,
       bubbles,
       composed,

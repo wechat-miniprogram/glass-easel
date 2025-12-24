@@ -597,7 +597,7 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
         `
         const entryFooter = `
           var registerGlobalEventListener = function (backend) {
-            backend.onEvent(glassEasel.triggerEvent)
+            backend.onEvent(glassEasel.triggerExternalEvent)
           }
           exports.registerGlobalEventListener = registerGlobalEventListener
         `

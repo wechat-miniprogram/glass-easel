@@ -4,7 +4,7 @@ import * as glassEasel from '../../src'
 
 const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
   beforeAll(() => {
-    domBackend.onEvent(glassEasel.Event.triggerEvent)
+    domBackend.onEvent(glassEasel.Event.triggerExternalEvent)
   })
 
   test('event listener filter', () => {
@@ -488,7 +488,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect(eventOrder).toStrictEqual([3, 4])
   })
 
-  test('event phrase', () => {
+  test('event phase', () => {
     const eventPhase: [string, glassEasel.EventPhase][] = []
     const def = glassEasel.registerElement({
       template: tmpl(`

@@ -23,7 +23,8 @@ export interface Context extends Partial<suggestedBackend.ContextForDomLike<Elem
   associateValue(element: Element, value: GlassEaselElement): void
   onEvent(
     listener: (
-      target: GlassEaselElement,
+      element: GlassEaselElement,
+      target: Element,
       type: string,
       detail: unknown,
       options: EventOptions,

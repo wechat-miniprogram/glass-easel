@@ -32,12 +32,8 @@ class MyCustomBackend implements glassEasel.composedBackend.Context {
 const myCustomBackend = new MyCustomBackend()
 
 // 连接事件系统
-backendContext.onEvent((target, type, detail, options) => {
-  const ev = new glassEasel.Event(type, detail, options)
-  glassEasel.Event.dispatchEvent(target, ev)
-  return ev.defaultPrevented()
-    ? glassEasel.EventBubbleStatus.NoDefault
-    : glassEasel.EventBubbleStatus.Normal
+backendContext.onEvent((element, target, type, detail, options) => {
+  return new glassEasel.Event(type, detail, options).dispatch(element, target)
 })
 
 // 创建根组件实例
