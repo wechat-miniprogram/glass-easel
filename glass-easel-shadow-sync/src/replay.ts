@@ -139,16 +139,19 @@ export function replayShadowBackend(
       const options = elem.getComponentOptions()
       be =
         handlers.createElement?.(ownerShadowRoot, elem) ||
-        ownerShadowRoot.createComponent(
-          elem.tagName,
-          elem.isExternal(),
-          elem.isVirtual(),
-          options.styleScope ?? glassEasel.StyleScopeManager.globalScope(),
-          options.extraStyleScope,
-          Object.keys(elem.getExternalClasses()),
-          elem.getShadowRoot()?.getSlotMode() ?? null,
-          options.writeIdToDOM,
-        )
+        (() => {
+          const [styleScope, extraStyleScope] = elem.getStyleScopes()
+          return ownerShadowRoot.createComponent(
+            elem.tagName,
+            elem.isExternal(),
+            elem.isVirtual(),
+            styleScope ?? glassEasel.StyleScopeManager.globalScope(),
+            extraStyleScope,
+            Object.keys(elem.getExternalClasses()),
+            elem.getShadowRoot()?.getSlotMode() ?? null,
+            options.writeIdToDOM,
+          )
+        })()
       be.__wxElement = elem
       be.associateValue(elem)
       setAttributes(elem, be)

@@ -415,7 +415,7 @@ abstract class Node implements glassEasel.backend.Element {
       const comp = this.__wxElement?.asGeneralComponent()
       if (comp) {
         const def = comp.getComponentDefinition()
-        const scope = def.getComponentOptions().styleScope
+        const [scope] = comp.getStyleScopes()
         if (scope && scope !== def.behavior.ownerSpace._$sharedStyleScope) {
           props['wx-host'] = def.behavior.ownerSpace.styleScopeManager.queryName(scope)!
         }

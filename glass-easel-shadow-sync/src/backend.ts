@@ -705,6 +705,7 @@ export class ShadowSyncBackendContext implements GlassEaselBackend.Context {
             )
           } else if (glassEasel.Component.isComponent(elem)) {
             const options = elem.getComponentOptions()
+            const [styleScope, extraStyleScope] = elem.getStyleScopes()
             be = ShadowSyncElement._prepareComponent(
               this,
               getShadowSyncElement(elem),
@@ -712,8 +713,8 @@ export class ShadowSyncBackendContext implements GlassEaselBackend.Context {
               elem.tagName,
               elem.isExternal(),
               elem.isVirtual(),
-              options.styleScope ?? glassEasel.StyleScopeManager.globalScope(),
-              options.extraStyleScope,
+              styleScope ?? glassEasel.StyleScopeManager.globalScope(),
+              extraStyleScope,
               Object.keys(elem.getExternalClasses()),
               elem.getShadowRoot()?.getSlotMode() ?? null,
               options.writeIdToDOM,
