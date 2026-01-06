@@ -21,10 +21,10 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       })
       const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
       const child = elem.getShadowRoot()!.getElementById('b')!
-      expect(domHtml(elem)).toBe('<div class="class-a abc"><span>abc</span></div>')
+      expect(domHtml(elem)).toBe('<div class="class-a abc"><span data-a="abc">abc</span></div>')
       expect(child.dataset.a).toBe('abc')
       elem.setData({ c: 'def' })
-      expect(domHtml(elem)).toBe('<div class="class-a def"><span>def</span></div>')
+      expect(domHtml(elem)).toBe('<div class="class-a def"><span data-a="def">def</span></div>')
       expect(child.dataset.a).toBe('def')
     })
 

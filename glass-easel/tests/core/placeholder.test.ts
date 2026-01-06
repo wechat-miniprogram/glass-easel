@@ -298,7 +298,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         },
         template: tmpl(`
           <child id="child" prop="{{ prop }}">A</child>
-          <c id="c-{{index}}" wx:for="{{arr}}" prop="{{item}}" data-index="{{index}}">{{index}}</c>
+          <c id="c-{{index}}" wx:for="{{arr}}" prop="{{item}}" data:index="{{index}}">{{index}}</c>
         `),
       })
       .registerComponent()

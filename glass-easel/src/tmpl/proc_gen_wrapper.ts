@@ -1128,11 +1128,16 @@ export class ProcGenWrapper {
           // leave for compatibilities
         } else {
           elem.setDataset(name, v)
+          elem.setAttribute(fullDashName, v)
         }
       }
       this.tryCallPropertyChangeListener(elem, name, v)
     } else {
       elem.setDataset(name, v)
+      if (fallbackDataHyphen) {
+        const fullDashName = `data-${camelToDashCase(name)}`
+        elem.setAttribute(fullDashName, v)
+      }
     }
   }
 
