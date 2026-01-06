@@ -334,7 +334,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
         },
         template: tmpl(`
         <block wx:for="{{list}}" wx:key="k">
-          <x-c data-i="{{index}}" s="{{item.k}}:{{item.v}}">{{item.v}}</x-c>
+          <x-c data:i="{{index}}" s="{{item.k}}:{{item.v}}">{{item.v}}</x-c>
         </block>
       `),
         data: {
@@ -592,7 +592,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       },
       template: tmpl(`
         <block wx:for="{{list}}" wx:key="k">
-          <x-c data-i="{{index}}" s="{{item.k}}:{{item.v}}">{{item.v}}</x-c>
+          <x-c data:i="{{index}}" s="{{item.k}}:{{item.v}}">{{item.v}}</x-c>
         </block>
       `),
       data: {
@@ -1480,7 +1480,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
-    expect(domHtml(elem)).toBe('<div></div>')
+    expect(domHtml(elem)).toBe('<div data-camelcase="123"></div>')
     matchElementWithDom(elem)
     expect(elem.getShadowRoot()!.childNodes[0]!.asElement()!.dataset.camelcase).toBe(123)
   })
@@ -1686,7 +1686,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
-    expect(domHtml(elem)).toBe('<sub-comp><div></div></sub-comp>')
+    expect(domHtml(elem)).toBe('<sub-comp data-a-b="456"><div data-a-b="123"></div></sub-comp>')
     matchElementWithDom(elem)
     expect(elem.getShadowRoot()!.getElementById('a')!.dataset.aB).toBe('123')
     const sub = elem.getShadowRoot()!.getElementById('sub')!.asGeneralComponent()!
@@ -1786,7 +1786,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
       .general()
     const elem = glassEasel.Component.createWithContext('root', def, testBackend)
     glassEasel.Element.pretendAttached(elem)
-    expect(domHtml(elem)).toBe('<div><span></span></div>')
+    expect(domHtml(elem)).toBe('<div><span data-d-c=""></span></div>')
     matchElementWithDom(elem)
     const child = elem.getShadowRoot()!.getElementById('child')!
     child.triggerEvent('customEv')
