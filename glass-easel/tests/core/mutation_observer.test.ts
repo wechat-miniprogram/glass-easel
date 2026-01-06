@@ -199,7 +199,7 @@ describe('MutationObserver', () => {
     })
     observer.observe(slot, { properties: 'all' })
     shadowRoot.setDynamicSlotHandler(
-      ['someValue'],
+      () => {},
       () => {},
       () => {},
       () => {},

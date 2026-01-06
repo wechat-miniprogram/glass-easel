@@ -25,10 +25,6 @@ export const enum SlotMode {
   Dynamic,
 }
 
-type AppliedSlotMeta = {
-  updatePathTree: { [key: string]: true } | undefined
-}
-
 export class ShadowRoot extends VirtualNode {
   /* @internal */
   [SHADOW_ROOT_SYMBOL]: true
@@ -51,10 +47,6 @@ export class ShadowRoot extends VirtualNode {
   /* @internal */
   private _$dynamicSlotsInserted?: boolean
   /* @internal */
-  private _$dynamicSlots?: Map<Element, AppliedSlotMeta>
-  /* @internal */
-  private _$requiredSlotValueNames?: string[]
-  /* @internal */
   private _$propertyPassingDeepCopy?: DeepCopyStrategy
   /* @internal */
   private _$insertDynamicSlotHandler?: (
@@ -70,8 +62,9 @@ export class ShadowRoot extends VirtualNode {
   private _$updateDynamicSlotHandler?: (
     slot: Element,
     slotValues: { [name: string]: unknown },
-    updatePathTree: { [name: string]: true },
   ) => void
+  /* @internal */
+  private _$updateDynamicSlotValueHandler?: (slot: Element, name: string) => void
 
   /* istanbul ignore next */
   constructor() {
@@ -104,14 +97,13 @@ export class ShadowRoot extends VirtualNode {
       node._$slotsList = Object.create(null) as Record<string, DoubleLinkedList<Element>>
     } else if (slotMode === SlotMode.Dynamic) {
       node._$dynamicSlotsInserted = false
-      node._$dynamicSlots = new Map()
-      node._$requiredSlotValueNames = []
       node._$propertyPassingDeepCopy = getDeepCopyStrategy(
         hostComponentOptions.propertyPassingDeepCopy,
       )
       node._$insertDynamicSlotHandler = undefined
       node._$removeDynamicSlotHandler = undefined
       node._$updateDynamicSlotHandler = undefined
+      node._$updateDynamicSlotValueHandler = undefined
     }
     node._$backendShadowRoot = be
     node._$initialize(true, be, node, host._$nodeTreeContext)
@@ -628,7 +620,6 @@ export class ShadowRoot extends VirtualNode {
       if (!this._$dynamicSlotsInserted) return
       const insertDynamicSlot = this._$insertDynamicSlotHandler
       const removeDynamicSlot = this._$removeDynamicSlotHandler
-      this._$dynamicSlots!.set(slot, { updatePathTree: undefined })
       removeDynamicSlot?.([slot])
       insertDynamicSlot?.([{ slot, name: newName, slotValues: slot._$slotValues! }])
     }
@@ -679,7 +670,6 @@ export class ShadowRoot extends VirtualNode {
       ) {
         const slot = it.value
         const slotName = slot._$slotName!
-        this._$dynamicSlots!.set(slot, { updatePathTree: undefined })
         slots.push({ slot, name: slotName, slotValues: slot._$slotValues! })
       }
       insertDynamicSlot?.(slots)
@@ -733,7 +723,6 @@ export class ShadowRoot extends VirtualNode {
         it = it.next
       ) {
         const slot = it.value
-        this._$dynamicSlots!.delete(slot)
         slots.push(slot)
       }
       removeDynamicSlot?.(slots)
@@ -748,7 +737,6 @@ export class ShadowRoot extends VirtualNode {
    * otherwise call `updateSlotHandler` for each slots.
    */
   setDynamicSlotHandler(
-    requiredSlotValueNames: string[],
     insertSlotHandler: (
       slots: {
         slot: Element
@@ -757,27 +745,15 @@ export class ShadowRoot extends VirtualNode {
       }[],
     ) => void,
     removeSlotHandler: (slots: Element[]) => void,
-    updateSlotHandler: (
-      slot: Element,
-      slotValues: { [name: string]: unknown },
-      updatePathTree: { [name: string]: true },
-    ) => void,
+    updateSlotHandler: (slot: Element, slotValues: { [name: string]: unknown }) => void,
+    updateSlotValueHandler: (slot: Element, name: string) => void,
   ) {
     if (this._$slotMode !== SlotMode.Dynamic) return
 
-    this._$requiredSlotValueNames = requiredSlotValueNames
     this._$insertDynamicSlotHandler = insertSlotHandler
     this._$removeDynamicSlotHandler = removeSlotHandler
     this._$updateDynamicSlotHandler = updateSlotHandler
-
-    if (this._$dynamicSlotsInserted) {
-      const iter = this._$dynamicSlots!.values()
-      for (let it = iter.next(); !it.done; it = iter.next()) {
-        const slotMeta = it.value
-        slotMeta.updatePathTree =
-          slotMeta.updatePathTree || (Object.create(null) as Record<string, true>)
-      }
-    }
+    this._$updateDynamicSlotValueHandler = updateSlotValueHandler
   }
 
   /**
@@ -786,10 +762,10 @@ export class ShadowRoot extends VirtualNode {
   useDynamicSlotHandlerFrom(source: ShadowRoot) {
     if (source._$insertDynamicSlotHandler) {
       this.setDynamicSlotHandler(
-        source._$requiredSlotValueNames!.slice(),
         source._$insertDynamicSlotHandler,
         source._$removeDynamicSlotHandler!,
         source._$updateDynamicSlotHandler!,
+        source._$updateDynamicSlotValueHandler!,
       )
     }
   }
@@ -821,24 +797,14 @@ export class ShadowRoot extends VirtualNode {
         propertyName: name,
       })
     }
-    if (this._$requiredSlotValueNames!.indexOf(name) < 0) return
-    const slotMeta = this._$dynamicSlots?.get(slot)
-    if (!slotMeta) return
-    if (!slotMeta.updatePathTree) {
-      slotMeta.updatePathTree = Object.create(null) as { [key: string]: true }
-    }
-    slotMeta.updatePathTree[name] = true
+    this._$updateDynamicSlotValueHandler?.(slot, name)
   }
 
   /**
    * Apply slot value updates
    */
   applySlotValueUpdates(slot: Element) {
-    const slotMeta = this._$dynamicSlots?.get(slot)
-    const slotValueUpdatePathTree = slotMeta?.updatePathTree
-    if (!slotValueUpdatePathTree) return
-    slotMeta.updatePathTree = undefined
-    this._$updateDynamicSlotHandler?.(slot, slot._$slotValues!, slotValueUpdatePathTree)
+    this._$updateDynamicSlotHandler?.(slot, slot._$slotValues!)
   }
 
   applySlotUpdates(): void {
@@ -849,19 +815,13 @@ export class ShadowRoot extends VirtualNode {
       for (let it = this._$subtreeSlotStart; it; it = it.next) {
         const slot = it.value
         const slotName = slot._$slotName!
-        this._$dynamicSlots!.set(slot, { updatePathTree: undefined })
         slots.push({ slot, name: slotName, slotValues: slot._$slotValues! })
       }
-      insertDynamicSlot?.(slots)
+      if (slots.length) insertDynamicSlot?.(slots)
     } else {
-      const iter = this._$dynamicSlots!.entries()
-      for (let it = iter.next(); !it.done; it = iter.next()) {
-        const [slot, slotMeta] = it.value
-        const slotValueUpdatePathTree = slotMeta.updatePathTree
-        if (slotValueUpdatePathTree) {
-          slotMeta.updatePathTree = undefined
-          this._$updateDynamicSlotHandler?.(slot, slot._$slotValues!, slotValueUpdatePathTree)
-        }
+      for (let it = this._$subtreeSlotStart; it; it = it.next) {
+        const slot = it.value
+        this._$updateDynamicSlotHandler?.(slot, slot._$slotValues!)
       }
     }
   }

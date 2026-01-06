@@ -90,6 +90,7 @@ const createDataContext = (dataComponentSpace: glassEasel.ComponentSpace) => {
   )
 
   const shadowSyncBackend = new ShadowSyncBackendContext(
+    glassEasel,
     messageChannelDataSide,
     dataComponentSpace.styleScopeManager,
     getLinearIdGenerator,

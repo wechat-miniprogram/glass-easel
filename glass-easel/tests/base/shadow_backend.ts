@@ -242,7 +242,6 @@ abstract class Node implements glassEasel.backend.Element {
   public _$nodeSlot: string = ''
   public _$slotName: string | null = null
   public _$slotElement: NativeNode | VirtualNode | null = null
-  public _$externalSlot: Element | null = null
   public _$inheritSlots: boolean = false
   public _$styleSegments: string[] = []
   public _$styleScope = 0
@@ -326,12 +325,6 @@ abstract class Node implements glassEasel.backend.Element {
       return recNonVirtual(this.shadowRoot as ShadowRoot)
     }
     const ownerHost = this._$ownerShadowRoot?.hostNode
-    if (ownerHost?.external && (ownerHost._$externalSlot as any) === this) {
-      for (let i = 0; i < ownerHost._$childNodes.length; i += 1) {
-        if (recNonVirtual(ownerHost._$childNodes[i]!) === false) return false
-      }
-      return true
-    }
     if (this._$slotName !== null) {
       if (!ownerHost) return true
       return ownerHost.forEachSlotContentInSpecifiedSlot(this as unknown as Element, recNonVirtual)
@@ -669,11 +662,6 @@ abstract class Node implements glassEasel.backend.Element {
   setSlotElement(slot: NativeNode | VirtualNode | null): void {
     assertTypes(slot, [NativeNode, VirtualNode, null])
     this._$slotElement = slot
-  }
-
-  setExternalSlot(slot: Element): void {
-    assertType(slot, Element)
-    this._$externalSlot = slot
   }
 
   setInheritSlots(): void {
@@ -1022,7 +1010,6 @@ export class Component extends Element {
   }
 
   calcContainingSlot(elem: Node | null): NativeNode | VirtualNode | null {
-    if (this.external) return this._$externalSlot
     if (this.slotMode === SlotMode.Single) {
       let singleSlot: NativeNode | VirtualNode | null = null
       this.forEachChildNodes((node) => {

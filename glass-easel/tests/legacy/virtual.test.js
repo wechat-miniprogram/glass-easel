@@ -117,7 +117,7 @@ const testCases = function (testBackend) {
       matchElementWithDom(e1)
     })
 
-    it('should work in a native-rendered root', function () {
+    if (testBackend !== shadowBackend) it('should work in a native-rendered root', function () {
       regElem({
         is: 'virtual-node-a',
         options: {
@@ -127,16 +127,8 @@ const testCases = function (testBackend) {
               ? undefined
               : getCustomExternalTemplateEngine((comp) => {
                   var root = comp.getBackendElement()
-                  var slot
-                  if (testBackend === shadowBackend) {
-                    var shadowRoot = root.getShadowRoot()
-                    slot = shadowRoot.createElement('div', 'div')
-                    slot.setSlotName('')
-                    shadowRoot.appendChild(slot)
-                  } else {
-                    slot = testBackend.createElement('div', 'div')
-                    root.appendChild(slot)
-                  }
+                  var slot = testBackend.createElement('div', 'div')
+                  root.appendChild(slot)
                   return {
                     root,
                     slot,

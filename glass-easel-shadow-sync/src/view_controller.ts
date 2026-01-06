@@ -31,6 +31,16 @@ type ParametersOrNever<T> = T extends CallbackFunction<infer Arg, infer Ret> ? A
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type DefaultReturn<T> = T extends CallbackFunction<infer Arg, infer Ret> ? Ret : never
 
+type TmplArgs = {
+  dynamicSlotValueChangedNames?: string[]
+}
+
+const getTmplArgs = (elem: Node): TmplArgs => {
+  const node = elem as { _$wxTmplArgs?: TmplArgs }
+  // eslint-disable-next-line no-return-assign
+  return (node._$wxTmplArgs = node._$wxTmplArgs || {})
+}
+
 export class Fragment {
   public childNodes: Node[] = []
 
@@ -59,6 +69,27 @@ export class ViewController {
   private _traceStartTimestampMapping = Object.create(null) as Record<number, number>
 
   private _customMethodHandler: ((element: Element | null, options: any) => void) | undefined
+
+  private _dynamicSlotHandler:
+    | {
+        insertSlotHandler: (
+          component: GeneralComponent,
+          slots: {
+            slot: Element
+            name: string
+            slotValues: {
+              [name: string]: unknown
+            }
+          }[],
+        ) => void
+        removeSlotHandler: (slots: Element[]) => void
+        updateSlotHandler: (
+          slot: Element,
+          slotValues: { [name: string]: unknown },
+          changedNames: string[],
+        ) => void
+      }
+    | undefined
 
   // eslint-disable-next-line no-useless-constructor
   constructor(
@@ -155,18 +186,41 @@ export class ViewController {
     stylingName: string,
     ownerShadowRoot: ShadowRoot | undefined,
   ): GeneralComponent | string | null {
-    const { _glassEasel, _componentSpace, _backendContext } = this
+    const { _glassEasel, _componentSpace, _backendContext, _dynamicSlotHandler } = this
 
     // find in the space otherwise
     const compDef = _componentSpace.getGlobalUsingComponent(logicalName)
     if (typeof compDef === 'string' || !compDef) {
       return compDef
     }
-    const node = ownerShadowRoot
+    const comp = ownerShadowRoot
       ? ownerShadowRoot.createComponentByDef(stylingName, compDef)
       : _glassEasel.Component.createWithContext(stylingName, compDef, _backendContext)
 
-    return node
+    const shadowRoot = comp.getShadowRoot()
+    if (_dynamicSlotHandler && shadowRoot?.getSlotMode() === _glassEasel.SlotMode.Dynamic) {
+      shadowRoot.setDynamicSlotHandler(
+        (slots) => _dynamicSlotHandler.insertSlotHandler(comp, slots),
+        (slots) => _dynamicSlotHandler.removeSlotHandler(slots),
+        (slot, slotValues) => {
+          const tmplArgs = getTmplArgs(slot)
+          _dynamicSlotHandler.updateSlotHandler(
+            slot,
+            slotValues,
+            tmplArgs.dynamicSlotValueChangedNames || [],
+          )
+          tmplArgs.dynamicSlotValueChangedNames = undefined
+        },
+        (slot, name) => {
+          const tmplArgs = getTmplArgs(slot)
+          tmplArgs.dynamicSlotValueChangedNames = tmplArgs.dynamicSlotValueChangedNames || []
+          tmplArgs.dynamicSlotValueChangedNames.push(name)
+        },
+      )
+      shadowRoot.applySlotUpdates()
+    }
+
+    return comp
   }
 
   private _$pendingCreateSimpleComponent: ((isReflectComponent: boolean) => void) | undefined
@@ -174,7 +228,6 @@ export class ViewController {
 
   createSimpleComponent(
     tagName: string,
-    external: boolean,
     ownerShadowRoot: ShadowRoot | undefined,
     virtualHost: boolean,
     styleScope: number,
@@ -192,7 +245,7 @@ export class ViewController {
     }
     this._$pendingCreateSimpleComponent = (isReflect) => {
       this._$pendingCreateSimpleComponent = undefined
-      if (isReflect || external) {
+      if (isReflect) {
         const comp = this.createExternalComponent(tagName, tagName, ownerShadowRoot)
         if (comp && typeof comp !== 'string') return this._$pendingAssignComponentId?.(comp)
       }
@@ -326,10 +379,6 @@ export class ViewController {
   setSlotElement(node: Node, slot: Element | null): void {
     const { _glassEasel } = this
     _glassEasel.Element.setSlotElement(node, slot)
-  }
-
-  setExternalSlot(_component: GeneralComponent, _slot: Element): void {
-    // TODO
   }
 
   setInheritSlots(element: Element): void {
@@ -667,6 +716,10 @@ export class ViewController {
 
   sendCustomMethod(element: Element | null, options: unknown): void {
     this._customMethodHandler?.(element, options)
+  }
+
+  setDynamicSlotHandler(handler: typeof this._dynamicSlotHandler): void {
+    this._dynamicSlotHandler = handler
   }
 }
 

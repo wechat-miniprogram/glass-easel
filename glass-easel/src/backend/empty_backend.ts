@@ -167,10 +167,6 @@ export class EmptyBackendElement implements Element {
     // empty
   }
 
-  setExternalSlot(_slot: EmptyBackendElement): void {
-    // empty
-  }
-
   setInheritSlots(): void {
     // empty
   }

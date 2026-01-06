@@ -1,9 +1,9 @@
 import * as glassEasel from 'glass-easel'
 import { virtual as matchElementWithDom } from '../../../glass-easel/tests/base/match'
 import {
-  ShadowSyncBackendContext,
   hookBuilderToSyncData,
   type ShadowSyncElement,
+  ReflectTemplateEngine,
 } from '../../src/backend'
 import {
   getViewNode,
@@ -202,7 +202,7 @@ describe('backend', () => {
         is: 'wx-textarea',
         options: {
           externalComponent: true,
-          templateEngine: ShadowSyncBackendContext.hookReflectTemplateEngine(),
+          templateEngine: ReflectTemplateEngine,
         },
         properties: {
           disabled: Boolean,
@@ -374,6 +374,7 @@ describe('backend', () => {
         data: {
           displayList: [] as number[],
         },
+        template: tmpl('<slot wx:for="{{displayList}}" item="{{list[item]}}" />'),
       }) as glassEasel.GeneralComponentDefinition,
     )
     componentSpace.setGlobalUsingComponent(
@@ -382,29 +383,12 @@ describe('backend', () => {
         is: 'list',
         options: {
           dynamicSlots: true,
-          templateEngine: ShadowSyncBackendContext.hookReflectTemplateEngine(
-            glassEasel.template.getDefaultTemplateEngine(),
-          ),
+          templateEngine: ReflectTemplateEngine,
         },
         properties: {
           list: {
             type: Array,
             value: [],
-          },
-        },
-        data: {
-          displayList: [] as number[],
-        },
-        template: tmpl('<slot wx:for="{{displayList}}" item="{{list[item]}}" />'),
-        listeners: {
-          setData(e: glassEasel.ShadowedEvent<number[]>) {
-            this.setData({
-              displayList: e.detail,
-            })
-          },
-          spliceUpdate(e: glassEasel.ShadowedEvent<[number, number, number[]]>) {
-            this.spliceArrayDataOnPath(['displayList'], ...e.detail)
-            this.applyDataUpdates()
           },
         },
       }) as glassEasel.GeneralComponentDefinition,
@@ -436,23 +420,24 @@ describe('backend', () => {
     expect(list.data.list).toEqual(listArray)
     expect(listOnView.data.list).toEqual(listArray)
 
-    listOnView.getShadowRoot()!.triggerEvent('setData', [0, 1, 2])
+    listOnView.setData({
+      displayList: [0, 1, 2]
+    })
     expect(listOnView.data.displayList).toEqual([0, 1, 2])
-    expect(list.data.displayList).toEqual([0, 1, 2])
     expect(domHtml(root)).toEqual('<list><li>0</li><li>1</li><li>2</li></list>')
     matchElementWithDom(root)
     matchElementWithDom(getViewNode(root))
 
-    listOnView.getShadowRoot()!.triggerEvent('spliceUpdate', [undefined, undefined, [3, 4]])
+    listOnView.spliceArrayDataOnPath(['displayList'], undefined, undefined, [3, 4])
+    listOnView.applyDataUpdates()
     expect(listOnView.data.displayList).toEqual([0, 1, 2, 3, 4])
-    expect(list.data.displayList).toEqual([0, 1, 2, 3, 4])
     expect(domHtml(root)).toEqual('<list><li>0</li><li>1</li><li>2</li><li>3</li><li>4</li></list>')
     matchElementWithDom(root)
     matchElementWithDom(getViewNode(root))
 
-    listOnView.getShadowRoot()!.triggerEvent('spliceUpdate', [0, 2, []])
+    listOnView.spliceArrayDataOnPath(['displayList'], 0, 2, [])
+    listOnView.applyDataUpdates()
     expect(listOnView.data.displayList).toEqual([2, 3, 4])
-    expect(list.data.displayList).toEqual([2, 3, 4])
     expect(domHtml(root)).toEqual('<list><li>2</li><li>3</li><li>4</li></list>')
     matchElementWithDom(root)
     matchElementWithDom(getViewNode(root))
