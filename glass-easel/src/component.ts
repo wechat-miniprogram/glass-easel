@@ -866,10 +866,6 @@ export class Component<
     // init data
     const shadowRoot = tmplInst.shadowRoot
     comp.shadowRoot = shadowRoot
-    if (external && (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext!.mode === BackendMode.Shadow))) {
-      const slot = (shadowRoot as ExternalShadowRoot).slot as backend.Element
-      ;(backendElement as backend.Element).setExternalSlot(slot)
-    }
     const dataGroup = new DataGroup(
       comp,
       data as DataWithPropertyValues<TData, TProperty>,

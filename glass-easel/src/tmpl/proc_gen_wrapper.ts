@@ -60,6 +60,8 @@ type TmplArgs = {
     [name: string]: EventListener<unknown> | null
   }
   dynamicSlotNameMatched?: boolean
+  dynamicSlotValueNames?: string[]
+  dynamicSlotValueUpdatePathTree?: { [key: string]: true }
   changeProp?: {
     [name: string]: {
       listener: ChangePropListener<unknown>
@@ -537,7 +539,14 @@ export class ProcGenWrapper {
             const nodeDataProxy = Component.getDataProxy(elem)
             nodeDataProxy.applyDataUpdates(true)
           }
-          sr?.applySlotUpdates()
+          if (sr) {
+            sr.forEachSlot((slot) => {
+              getTmplArgs(slot).dynamicSlotValueUpdatePathTree = Object.create(null) as {
+                [key: string]: true
+              }
+            })
+            sr.applySlotUpdates()
+          }
         }
         if (!slotElement) {
           if (slot !== undefined) elem.slot = slot
@@ -737,11 +746,13 @@ export class ProcGenWrapper {
     const sr = elem.getShadowRoot()
     if (sr?.getSlotMode() === SlotMode.Dynamic) {
       sr.setDynamicSlotHandler(
-        dynamicSlotValueNames || [],
         (slots) => {
           const childNodes: Node[] = []
           for (let i = 0; i < slots.length; i += 1) {
             const { slot, name: slotName, slotValues } = slots[i]!
+            const tmplArgs = getTmplArgs(slot)
+            tmplArgs.dynamicSlotValueNames = dynamicSlotValueNames
+            tmplArgs.dynamicSlotValueUpdatePathTree = undefined
             const slotChildNodes = this.handleChildrenCreation(
               (
                 isCreation,
@@ -801,7 +812,11 @@ export class ProcGenWrapper {
           }
           if (l !== r) elem.removeChildren(l, r - l)
         },
-        (slot, slotValues, slotValueUpdatePathTrees) => {
+        (slot, slotValues) => {
+          const tmplArgs = getTmplArgs(slot)
+          const slotValueUpdatePathTrees = tmplArgs.dynamicSlotValueUpdatePathTree
+          if (!slotValueUpdatePathTrees) return
+          tmplArgs.dynamicSlotValueUpdatePathTree = undefined
           const slotName = slot._$slotName || ''
           this.handleChildrenUpdate(
             (
@@ -829,6 +844,17 @@ export class ProcGenWrapper {
             slot,
             slotName,
           )
+        },
+        (slot, name) => {
+          const tmplArgs = getTmplArgs(slot)
+          if (tmplArgs.dynamicSlotValueNames?.includes(name)) {
+            const updatePathTree = (tmplArgs.dynamicSlotValueUpdatePathTree =
+              tmplArgs.dynamicSlotValueUpdatePathTree ||
+              (Object.create(null) as {
+                [key: string]: true
+              }))
+            updatePathTree[name] = true
+          }
         },
       )
       return sr

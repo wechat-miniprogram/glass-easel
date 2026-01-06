@@ -50,7 +50,6 @@ export const enum ChannelEventType {
   SET_SLOT,
   SET_SLOT_NAME,
   SET_SLOT_ELEMENT,
-  SET_EXTERNAL_SLOT,
   SET_INHERIT_SLOTS,
   REGISTER_STYLE_SCOPE,
   SET_STYLE,
@@ -109,6 +108,10 @@ export const enum ChannelEventType {
   PERFORMANCE_END_TRACE,
   PERFORMANCE_STATS_CALLBACK,
 
+  INSERT_DYNAMIC_SLOT,
+  UPDATE_DYNAMIC_SLOT,
+  REMOVE_DYNAMIC_SLOT,
+
   CUSTOM_METHOD,
 }
 
@@ -135,6 +138,9 @@ export type ChannelEventTypeViewSide =
   | ChannelEventType.ON_EVENT
   | ChannelEventType.ON_RELEASE_EVENT
   | ChannelEventType.PERFORMANCE_STATS_CALLBACK
+  | ChannelEventType.INSERT_DYNAMIC_SLOT
+  | ChannelEventType.UPDATE_DYNAMIC_SLOT
+  | ChannelEventType.REMOVE_DYNAMIC_SLOT
   | ChannelEventType.CUSTOM_METHOD
 
 export type ChannelEventTypeDataSide =
@@ -166,7 +172,6 @@ export type ChannelArgs = ExhaustiveChannelEvent<{
     number,
     string,
     boolean,
-    boolean,
     number,
     number | null,
     string[] | undefined,
@@ -191,7 +196,6 @@ export type ChannelArgs = ExhaustiveChannelEvent<{
   [ChannelEventType.SET_SLOT]: [number, string]
   [ChannelEventType.SET_SLOT_NAME]: [number, string]
   [ChannelEventType.SET_SLOT_ELEMENT]: [number, number | null]
-  [ChannelEventType.SET_EXTERNAL_SLOT]: [number, number]
   [ChannelEventType.SET_INHERIT_SLOTS]: [number]
   [ChannelEventType.REGISTER_STYLE_SCOPE]: [number, string | undefined]
   [ChannelEventType.SET_STYLE]: [number, string, number]
@@ -259,6 +263,10 @@ export type ChannelArgs = ExhaustiveChannelEvent<{
   [ChannelEventType.START_OVERLAY_INSPECT_CALLBACK]: [number, string, number | null]
   [ChannelEventType.STOP_OVERLAY_INSPECT]: []
 
+  [ChannelEventType.INSERT_DYNAMIC_SLOT]: [number, [number, string, string][]]
+  [ChannelEventType.UPDATE_DYNAMIC_SLOT]: [number, string, string[]]
+  [ChannelEventType.REMOVE_DYNAMIC_SLOT]: [number[]]
+
   [ChannelEventType.CUSTOM_METHOD]: [number | null, unknown]
 }>
 
@@ -274,40 +282,10 @@ function assertUnreachable(_x: never) {
   return new Error(`unexpected channel event ${_x as string}`)
 }
 
-export const MessageChannelDataSide = (
-  publish: <T extends ChannelEventTypeDataSide>(
-    arg: readonly [T, ...(T extends keyof ChannelArgs ? ChannelArgs[T] : never)],
-  ) => void,
-  subscribe: (
-    cb: (
-      arg: {
-        [T in ChannelEventTypeViewSide]: [
-          T,
-          ...(T extends keyof ChannelArgs ? ChannelArgs[T] : never),
-        ]
-      }[ChannelEventTypeViewSide],
-    ) => void,
-  ) => void,
-  idGenerator: () => IDGenerator,
-) => {
+const createCallbackManager = (idGenerator: () => IDGenerator) => {
   const callbackIdGen = idGenerator()
 
   const callbacks: ((...args: any[]) => void)[] = []
-  let createEvent:
-    | ((eventName: string, detail: any, options: EventOptions) => Event<unknown>)
-    | null = null
-  let triggerEvent:
-    | ((
-        event: Event<unknown>,
-        currentTargetId: number,
-        mark: Record<string, unknown> | null,
-        targetId: number,
-        isCapture: boolean,
-      ) => void)
-    | null = null
-
-  let handleCustomMethod: ((elementId: number | null, options: any) => void) | null = null
-  let overlayInspectCallbackId: number | null = null
 
   const callback2id = (cb: (...args: any[]) => void) => {
     const id = callbackIdGen.gen()
@@ -328,6 +306,61 @@ export const MessageChannelDataSide = (
     delete callbacks[id]
     callbackIdGen.release(id)
   }
+
+  return {
+    callback2id,
+    id2callback,
+    releaseCallbackId,
+  }
+}
+
+export const MessageChannelDataSide = (
+  publish: <T extends ChannelEventTypeDataSide>(
+    arg: readonly [T, ...(T extends keyof ChannelArgs ? ChannelArgs[T] : never)],
+  ) => void,
+  subscribe: (
+    cb: (
+      arg: {
+        [T in ChannelEventTypeViewSide]: [
+          T,
+          ...(T extends keyof ChannelArgs ? ChannelArgs[T] : never),
+        ]
+      }[ChannelEventTypeViewSide],
+    ) => void,
+  ) => void,
+  idGenerator: () => IDGenerator,
+) => {
+  let createEvent:
+    | ((eventName: string, detail: any, options: EventOptions) => Event<unknown>)
+    | null = null
+  let triggerEvent:
+    | ((
+        event: Event<unknown>,
+        currentTargetId: number,
+        mark: Record<string, unknown> | null,
+        targetId: number,
+        isCapture: boolean,
+      ) => void)
+    | null = null
+
+  let handleCustomMethod: ((elementId: number | null, options: any) => void) | null = null
+  let overlayInspectCallbackId: number | null = null
+  let insertSlotHandler:
+    | ((
+        elementId: number,
+        slots: {
+          slotId: number
+          name: string
+          slotValues: { [name: string]: unknown }
+        }[],
+      ) => void)
+    | null = null
+  let removeSlotHandler: ((slots: number[]) => void) | null = null
+  let updateSlotHandler:
+    | ((slot: number, slotValues: { [name: string]: unknown }, changedNames: string[]) => void)
+    | null = null
+
+  const { callback2id, id2callback, releaseCallbackId } = createCallbackManager(idGenerator)
 
   const eventIdMap = new Map<number, Event<unknown>>()
 
@@ -460,6 +493,28 @@ export const MessageChannelDataSide = (
         })
         break
       }
+      case ChannelEventType.INSERT_DYNAMIC_SLOT: {
+        const [, elementId, slots] = arg
+        insertSlotHandler?.(
+          elementId,
+          slots.map(([slotId, name, slotValues]) => ({
+            slotId,
+            name,
+            slotValues: JSON.parse(slotValues),
+          })),
+        )
+        break
+      }
+      case ChannelEventType.REMOVE_DYNAMIC_SLOT: {
+        const [, slotIds] = arg
+        removeSlotHandler?.(slotIds)
+        break
+      }
+      case ChannelEventType.UPDATE_DYNAMIC_SLOT: {
+        const [, slotId, slotValues, changedNames] = arg
+        updateSlotHandler?.(slotId, JSON.parse(slotValues), changedNames)
+        break
+      }
       case ChannelEventType.CUSTOM_METHOD: {
         const [, elementId, options] = arg
         handleCustomMethod?.(elementId, options)
@@ -520,7 +575,7 @@ export const MessageChannelDataSide = (
     },
 
     createElement: (id: number, logicalName: string, stylingName: string, ownerShadowRootId: number) => publish([ChannelEventType.CREATE_ELEMENT, id, logicalName, stylingName, ownerShadowRootId]),
-    createComponent: (id: number, shadowRootId: number, tagName: string, external: boolean, virtualHost: boolean, styleScope: number, extraStyleScope: number | null, externalClasses: string[] | undefined, slotMode: number | null, writeIdToDOM: boolean, ownerShadowRootId: number) => publish([ChannelEventType.CREATE_COMPONENT, id, shadowRootId, tagName, external, virtualHost, styleScope, extraStyleScope, externalClasses, slotMode, writeIdToDOM, ownerShadowRootId]),
+    createComponent: (id: number, shadowRootId: number, tagName: string, virtualHost: boolean, styleScope: number, extraStyleScope: number | null, externalClasses: string[] | undefined, slotMode: number | null, writeIdToDOM: boolean, ownerShadowRootId: number) => publish([ChannelEventType.CREATE_COMPONENT, id, shadowRootId, tagName, virtualHost, styleScope, extraStyleScope, externalClasses, slotMode, writeIdToDOM, ownerShadowRootId]),
     createTextNode: (id: number, textContent: string, ownerShadowRootId: number) => publish([ChannelEventType.CREATE_TEXT_NODE, id, textContent, ownerShadowRootId]),
     createVirtualNode: (id: number, virtualName: string, ownerShadowRootId: number) => publish([ChannelEventType.CREATE_VIRTUAL_NODE, id, virtualName, ownerShadowRootId]),
     createFragment: (id: number) => publish([ChannelEventType.CREATE_FRAGMENT, id]),
@@ -540,7 +595,6 @@ export const MessageChannelDataSide = (
     setSlot: (nodeId: number, name: string) => publish([ChannelEventType.SET_SLOT, nodeId, name]),
     setSlotName: (nodeId: number, name: string) => publish([ChannelEventType.SET_SLOT_NAME, nodeId, name]),
     setSlotElement: (nodeId: number, slot: number | null) => publish([ChannelEventType.SET_SLOT_ELEMENT, nodeId, slot]),
-    setExternalSlot: (nodeId: number, slot: number) => publish([ChannelEventType.SET_EXTERNAL_SLOT, nodeId, slot]),
     setInheritSlots: (nodeId: number) => publish([ChannelEventType.SET_INHERIT_SLOTS, nodeId]),
     registerStyleScope: (scopeId: number, stylePrefix: string | undefined) => publish([ChannelEventType.REGISTER_STYLE_SCOPE, scopeId, stylePrefix]),
     setStyle: (elementId: number, styleText: string, styleSegmentIndex: number) => publish([ChannelEventType.SET_STYLE, elementId, styleText, styleSegmentIndex]),
@@ -619,6 +673,27 @@ export const MessageChannelDataSide = (
     performanceStartTrace: (index: number) => publish([ChannelEventType.PERFORMANCE_START_TRACE, index]),
     performanceEndTrace: (id: number, cb: (stats: { startTimestamp: number; endTimestamp: number }) => void,) => publish([ChannelEventType.PERFORMANCE_END_TRACE, id, callback2id(cb)]),
 
+    setDynamicSlotHandler: (
+      _insertSlotHandler: (
+        elementId: number,
+        slots: {
+          slotId: number
+          name: string
+          slotValues: { [name: string]: unknown }
+        }[],
+      ) => void,
+      _removeSlotHandler: (slots: number[]) => void,
+      _updateSlotHandler: (
+        slot: number,
+        slotValues: { [name: string]: unknown },
+        changedNames: string[],
+      ) => void,
+    ) => {
+      insertSlotHandler = _insertSlotHandler
+      removeSlotHandler = _removeSlotHandler
+      updateSlotHandler = _updateSlotHandler
+    },
+
     callCustomMethod: (elementId: number | null, options: any) => publish([ChannelEventType.CUSTOM_METHOD, elementId, options]),
     onCustenMethod: (handler: (elementId: number | null, options: any) => void) => {
       handleCustomMethod = handler
@@ -658,6 +733,9 @@ export const MessageChannelViewSide = (
   const eventIdMap = new WeakMap<Event<unknown>, number>()
 
   const observersMap: Record<number, { disconnect(): void } | undefined> = []
+
+  const slotIdGen = idGenerator()
+  const slotMap: Record<number, Element> = []
 
   const eventHandler: EventListener<unknown> = (shadowedEvent) => {
     // ShadowedEvent is fresh created for each target
@@ -713,6 +791,41 @@ export const MessageChannelViewSide = (
   }
 
   controller.onCustomMethod(sendCustomMethodHandler)
+
+  controller.setDynamicSlotHandler({
+    insertSlotHandler: (component, slots) => {
+      const componentId = getNodeId(component)!
+      publish([
+        ChannelEventType.INSERT_DYNAMIC_SLOT,
+        componentId,
+        slots.map(({ slot, name, slotValues }) => {
+          const slotId = slotIdGen.gen()
+          slotMap[slotId] = slot
+          setNodeId(slot, slotId)
+          return [slotId, name, JSON.stringify(slotValues)] as [number, string, string]
+        }),
+      ])
+    },
+    removeSlotHandler: (slots) => {
+      publish([
+        ChannelEventType.REMOVE_DYNAMIC_SLOT,
+        slots.map((slot) => {
+          const slotId = getNodeId(slot)!
+          slotIdGen.release(slotId)
+          delete slotMap[slotId]
+          return slotId
+        }),
+      ])
+    },
+    updateSlotHandler: (slot, slotValue, changedNames) => {
+      publish([
+        ChannelEventType.UPDATE_DYNAMIC_SLOT,
+        getNodeId(slot)!,
+        JSON.stringify(slotValue),
+        changedNames,
+      ])
+    },
+  })
 
   // eslint-disable-next-line consistent-return
   subscribe((arg) => {
@@ -816,7 +929,6 @@ export const MessageChannelViewSide = (
           id,
           shadowRootId,
           tagName,
-          external,
           virtualHost,
           styleScope,
           extraStyleScope,
@@ -828,7 +940,6 @@ export const MessageChannelViewSide = (
         const ownerShadowRoot = nodeMap[ownerShadowRootId] as ShadowRoot | undefined
         controller.createSimpleComponent(
           tagName,
-          external,
           ownerShadowRoot,
           virtualHost,
           styleScope,
@@ -843,9 +954,6 @@ export const MessageChannelViewSide = (
             if (shadowRoot) {
               nodeMap[shadowRootId] = shadowRoot
               setNodeId(shadowRoot, shadowRootId)
-            } else {
-              // TODO external shadow root
-              // const externalShadowRoot = component.shadowRoot as ExternalShadowRoot
             }
             setNodeId(component, id)
           },
@@ -958,15 +1066,9 @@ export const MessageChannelViewSide = (
       case ChannelEventType.SET_SLOT_ELEMENT: {
         const [, nodeId, slotId] = arg
         const node = nodeMap[nodeId]! as Node
-        const slot = typeof slotId === 'number' ? (nodeMap[slotId]! as Element) : slotId
+        const slot =
+          typeof slotId === 'number' ? slotMap[slotId]! ?? (nodeMap[slotId]! as Element) : null
         controller.setSlotElement(node, slot)
-        break
-      }
-      case ChannelEventType.SET_EXTERNAL_SLOT: {
-        const [, nodeId, slotId] = arg
-        const comp = nodeMap[nodeId]! as GeneralComponent
-        const slot = nodeMap[slotId]! as Element
-        controller.setExternalSlot(comp, slot)
         break
       }
       case ChannelEventType.SET_INHERIT_SLOTS: {

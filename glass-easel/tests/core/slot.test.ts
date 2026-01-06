@@ -990,18 +990,18 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
           '<c1><child><x>C</x><x>B</x><x>C</x><x>B</x></child><a></a></c1><c2><child><x>C</x><x>B</x><x>C</x><x>B</x></child><a></a></c2><c3><child><x>C</x><x>B</x><x>C</x><x>B</x></child><a></a></c3>',
         )
         expect(ops).toEqual([
+          [-2, '3:C'],
+          [-2, '3:B'],
+          [-2, '3:C'],
+          [-2, '3:B'],
+          [-2, '3:C'],
+          [-2, '3:B'],
+          [-2, '3:C'],
+          [-2, '3:B'],
           [-1, '3:C'],
           [-1, '3:B'],
           [-1, '3:C'],
           [-1, '3:B'],
-          [-2, '3:C'],
-          [-2, '3:B'],
-          [-2, '3:C'],
-          [-2, '3:B'],
-          [-2, '3:C'],
-          [-2, '3:B'],
-          [-2, '3:C'],
-          [-2, '3:B'],
         ])
         matchElementWithDom(parentElem)
 

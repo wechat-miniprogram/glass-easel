@@ -19,7 +19,6 @@ import type {
 } from 'glass-easel'
 import { type Channel } from './message_channel'
 import { replayShadowBackend } from './replay'
-import { EmptyTemplateEngine } from './template_engine'
 import { type IDGenerator } from './utils'
 
 export const enum ShadowSyncElementType {
@@ -33,6 +32,7 @@ export const enum ShadowSyncElementType {
 
 export class ShadowSyncElement implements GlassEaselBackend.Element {
   public _id: number
+  public _slotId: number | undefined
 
   public __wxElement: Element | undefined
   public shadowRoot: ShadowSyncShadowRoot | undefined
@@ -70,7 +70,6 @@ export class ShadowSyncElement implements GlassEaselBackend.Element {
     componentElement: ShadowSyncElement,
     shadowRoot: ShadowSyncShadowRoot,
     tagName: string,
-    external: boolean,
     virtualHost: boolean,
     styleScope: number,
     extraStyleScope: number | null,
@@ -86,7 +85,6 @@ export class ShadowSyncElement implements GlassEaselBackend.Element {
       componentElement._id,
       shadowRoot._id,
       tagName,
-      external,
       virtualHost,
       styleScope,
       extraStyleScope,
@@ -101,7 +99,6 @@ export class ShadowSyncElement implements GlassEaselBackend.Element {
   static createComponent(
     context: ShadowSyncBackendContext,
     tagName: string,
-    external: boolean,
     virtualHost: boolean,
     styleScope: number,
     extraStyleScope: number | null,
@@ -115,7 +112,6 @@ export class ShadowSyncElement implements GlassEaselBackend.Element {
       new ShadowSyncElement(context, ShadowSyncElementType.Component, ownerShadowRoot),
       new ShadowSyncShadowRoot(context),
       tagName,
-      external,
       virtualHost,
       styleScope,
       extraStyleScope,
@@ -175,7 +171,11 @@ export class ShadowSyncElement implements GlassEaselBackend.Element {
   }
 
   static createFragment(context: ShadowSyncBackendContext): ShadowSyncElement {
-    const elem = new ShadowSyncElement(context, ShadowSyncElementType.Fragment, null)
+    const elem = new ShadowSyncElement(
+      context,
+      ShadowSyncElementType.Fragment,
+      context.getRootNode(),
+    )
     context.channel.createFragment(elem._id)
     return elem
   }
@@ -183,19 +183,23 @@ export class ShadowSyncElement implements GlassEaselBackend.Element {
   protected constructor(
     protected _context: ShadowSyncBackendContext,
     public type: ShadowSyncElementType,
-    public ownerShadowRoot: ShadowSyncShadowRoot | null,
+    public ownerShadowRoot: ShadowSyncShadowRoot,
   ) {
     const id = (this._id = _context._genElementId())
     _context._setElementId(id, this)
   }
 
+  public getChannel(): Channel {
+    return this.ownerShadowRoot.getChannel()
+  }
+
   release(): void {
     this._context._removeElementId(this._id)
-    this._context.channel.release(this._id)
+    this.getChannel().release(this._id)
   }
 
   associateValue(v: Element): void {
-    this._context.channel.associateValue(this._id, this._context.getAssociateValueInfo(v))
+    this.getChannel().associateValue(this._id, this._context.getAssociateValueInfo(v))
   }
 
   getShadowRoot(): ShadowSyncShadowRoot | undefined {
@@ -203,112 +207,108 @@ export class ShadowSyncElement implements GlassEaselBackend.Element {
   }
 
   appendChild(child: ShadowSyncElement): void {
-    this._context.channel.appendChild(this._id, child._id)
+    this.getChannel().appendChild(this._id, child._id)
   }
 
   removeChild(child: ShadowSyncElement): void {
-    this._context.channel.removeChild(this._id, child._id)
+    this.getChannel().removeChild(this._id, child._id)
   }
 
   insertBefore(child: ShadowSyncElement, before: ShadowSyncElement): void {
-    this._context.channel.insertBefore(this._id, child._id, before._id)
+    this.getChannel().insertBefore(this._id, child._id, before._id)
   }
 
   replaceChild(child: ShadowSyncElement, oldChild: ShadowSyncElement): void {
-    this._context.channel.replaceChild(this._id, child._id, oldChild._id)
+    this.getChannel().replaceChild(this._id, child._id, oldChild._id)
   }
 
   spliceBefore(before: ShadowSyncElement, deleteCount: number, list: ShadowSyncElement): void {
-    this._context.channel.spliceBefore(this._id, before._id, deleteCount, list._id)
+    this.getChannel().spliceBefore(this._id, before._id, deleteCount, list._id)
   }
 
   spliceAppend(list: ShadowSyncElement): void {
-    this._context.channel.spliceAppend(this._id, list._id)
+    this.getChannel().spliceAppend(this._id, list._id)
   }
 
   spliceRemove(start: ShadowSyncElement, deleteCount: number): void {
-    this._context.channel.spliceRemove(this._id, start._id, deleteCount)
+    this.getChannel().spliceRemove(this._id, start._id, deleteCount)
   }
 
   setId(id: string): void {
-    this._context.channel.setId(this._id, id)
+    this.getChannel().setId(this._id, id)
   }
 
   setSlot(name: string): void {
-    this._context.channel.setSlot(this._id, name)
+    this.getChannel().setSlot(this._id, name)
   }
 
   setSlotName(name: string): void {
-    this._context.channel.setSlotName(this._id, name)
+    this.getChannel().setSlotName(this._id, name)
   }
 
   setSlotElement(slot: ShadowSyncElement | null): void {
-    this._context.channel.setSlotElement(this._id, slot ? slot._id : slot)
-  }
-
-  setExternalSlot(slot: ShadowSyncElement): void {
-    this._context.channel.setExternalSlot(this._id, slot._id)
+    this.getChannel().setSlotElement(this._id, slot?._slotId ?? slot?._id ?? null)
   }
 
   setInheritSlots(): void {
-    this._context.channel.setInheritSlots(this._id)
+    this.getChannel().setInheritSlots(this._id)
   }
 
   setStyle(styleText: string, styleSegmentIndex: number): void {
-    this._context.channel.setStyle(this._id, styleText, styleSegmentIndex)
+    this.getChannel().setStyle(this._id, styleText, styleSegmentIndex)
   }
 
   addClass(className: string): void {
-    this._context.channel.addClass(this._id, className)
+    this.getChannel().addClass(this._id, className)
   }
 
   removeClass(className: string): void {
-    this._context.channel.removeClass(this._id, className)
+    this.getChannel().removeClass(this._id, className)
   }
 
   clearClasses(): void {
-    this._context.channel.clearClasses(this._id)
+    this.getChannel().clearClasses(this._id)
   }
 
   setClassAlias(className: string, target: string[]): void {
-    this._context.channel.setClassAlias(this._id, className, target)
+    this.getChannel().setClassAlias(this._id, className, target)
   }
 
   setAttribute(name: string, value: any): void {
-    this._context.channel.setAttribute(this._id, name, value)
+    this.getChannel().setAttribute(this._id, name, value)
   }
 
   removeAttribute(name: string): void {
-    this._context.channel.removeAttribute(this._id, name)
+    this.getChannel().removeAttribute(this._id, name)
   }
 
   setDataset(name: string, value: unknown): void {
-    this._context.channel.setDataset(this._id, name, value)
+    this.getChannel().setDataset(this._id, name, value)
   }
 
   setText(content: string): void {
-    this._context.channel.setText(this._id, content)
+    this.getChannel().setText(this._id, content)
   }
 
   getAllComputedStyles(cb: (res: GlassEaselBackend.GetAllComputedStylesResponses) => void): void {
-    this._context.channel.getAllComputedStyles(this._id, cb)
+    this.getChannel().getAllComputedStyles(this._id, cb)
   }
 
   getPseudoComputedStyles(
     pseudoType: string,
     cb: (res: GlassEaselBackend.GetAllComputedStylesResponses) => void,
   ): void {
-    this._context.channel.getPseudoComputedStyles(this._id, pseudoType, cb)
+    this.getChannel().getPseudoComputedStyles(this._id, pseudoType, cb)
   }
 
   getInheritedRules(cb: (res: GlassEaselBackend.GetInheritedRulesResponses) => void): void {
-    this._context.channel.getInheritedRules(this._id, cb)
+    this.getChannel().getInheritedRules(this._id, cb)
   }
 
   getBoundingClientRect(
     cb: (res: { left: number; top: number; width: number; height: number }) => void,
   ): void {
-    this._context.channel.getBoundingClientRect(this._id, cb)
+    this.getChannel().getBoundingClientRect(this._id, cb)
   }
 
   getBoxModel(
@@ -319,11 +319,11 @@ export class ShadowSyncElement implements GlassEaselBackend.Element {
       content: GlassEaselBackend.BoundingClientRect
     }) => void,
   ): void {
-    this._context.channel.getBoxModel(this._id, cb)
+    this.getChannel().getBoxModel(this._id, cb)
   }
 
   getMatchedRules(cb: (res: GlassEaselBackend.GetMatchedRulesResponses) => void): void {
-    this._context.channel.getMatchedRules(this._id, cb)
+    this.getChannel().getMatchedRules(this._id, cb)
   }
 
   getScrollOffset(
@@ -334,23 +334,23 @@ export class ShadowSyncElement implements GlassEaselBackend.Element {
       scrollHeight: number
     }) => void,
   ): void {
-    this._context.channel.getScrollOffset(this._id, cb)
+    this.getChannel().getScrollOffset(this._id, cb)
   }
 
   setScrollPosition(scrollLeft: number, scrollTop: number, duration: number): void {
-    this._context.channel.setScrollPosition(this._id, scrollLeft, scrollTop, duration)
+    this.getChannel().setScrollPosition(this._id, scrollLeft, scrollTop, duration)
   }
 
   getPseudoTypes(cb: (res: string[]) => void): void {
-    this._context.channel.getPseudoTypes(this._id, cb)
+    this.getChannel().getPseudoTypes(this._id, cb)
   }
 
   setModelBindingStat(attributeName: string, listener: ((newValue: unknown) => void) | null): void {
-    this._context.channel.setModelBindingStat(this._id, attributeName, listener)
+    this.getChannel().setModelBindingStat(this._id, attributeName, listener)
   }
 
   setListenerStats(type: string, capture: boolean, mutLevel: number): void {
-    this._context.channel.setListenerStats(this._id, type, capture, mutLevel)
+    this.getChannel().setListenerStats(this._id, type, capture, mutLevel)
   }
 
   createIntersectionObserver(
@@ -359,7 +359,7 @@ export class ShadowSyncElement implements GlassEaselBackend.Element {
     thresholds: number[],
     listener: (res: GlassEaselBackend.IntersectionStatus) => void,
   ): GlassEaselBackend.Observer {
-    const id = this._context.channel.createIntersectionObserver(
+    const id = this.getChannel().createIntersectionObserver(
       this._id,
       relativeElement ? relativeElement._id : null,
       relativeElementMargin,
@@ -368,17 +368,17 @@ export class ShadowSyncElement implements GlassEaselBackend.Element {
     )
     return {
       disconnect: () => {
-        this._context.channel.disconnectObserver(id)
+        this.getChannel().disconnectObserver(id)
       },
     }
   }
 
   getContext(cb: (res: any) => void): void {
-    this._context.channel.getContext(this._id, cb)
+    this.getChannel().getContext(this._id, cb)
   }
 
   sendCustomMethod(options: unknown) {
-    this._context.channel.callCustomMethod(this._id, options)
+    this.getChannel().callCustomMethod(this._id, options)
   }
 }
 
@@ -386,9 +386,29 @@ export class ShadowSyncShadowRoot
   extends ShadowSyncElement
   implements GlassEaselBackend.ShadowRootContext
 {
+  private channel = this._context.channel
+
+  override getChannel(): Channel {
+    return this.channel
+  }
+
+  disableAttachment(): void {
+    const noop = () => {}
+    this.channel = {
+      ...this.channel,
+      appendChild: noop,
+      removeChild: noop,
+      insertBefore: noop,
+      replaceChild: noop,
+      spliceBefore: noop,
+      spliceAppend: noop,
+      spliceRemove: noop,
+    }
+  }
+
   /** @internal */
   constructor(context: ShadowSyncBackendContext) {
-    super(context, ShadowSyncElementType.ShadowRoot, null)
+    super(context, ShadowSyncElementType.ShadowRoot, null as any)
     this.ownerShadowRoot = this
   }
 
@@ -411,7 +431,6 @@ export class ShadowSyncShadowRoot
     return ShadowSyncElement.createComponent(
       this._context,
       tagName,
-      external,
       virtualHost,
       styleScope,
       extraStyleScope,
@@ -431,6 +450,7 @@ export class ShadowSyncBackendContext implements GlassEaselBackend.Context {
 
   private _elementIdGen: IDGenerator
   private _elementIdMap: (ShadowSyncElement | undefined)[] = []
+  private _slotIdMap: (Element | undefined)[] = []
 
   private _shadowRoot: ShadowSyncShadowRoot
 
@@ -466,6 +486,7 @@ export class ShadowSyncBackendContext implements GlassEaselBackend.Context {
   private _traceIdGen: IDGenerator
 
   constructor(
+    public glassEasel: typeof import('glass-easel'),
     public channel: Channel,
     private styleScopeManager: StyleScopeManager,
     idGenerator: () => IDGenerator,
@@ -500,12 +521,59 @@ export class ShadowSyncBackendContext implements GlassEaselBackend.Context {
       this._themeInfo = themeInfo
       this._themeChangeListener?.(themeInfo)
     })
+    channel.setDynamicSlotHandler(
+      (elementId, slots) => {
+        const element = this._elementIdMap[elementId]?.__wxElement as Element
+        const comp = element.asGeneralComponent()
+        if (!comp || !ReflectTemplateEngine.isHookedReflectingComponent(comp)) return
+
+        const shadowRoot = comp.shadowRoot as ShadowRoot
+        if (shadowRoot.getSlotMode() !== this.glassEasel.SlotMode.Dynamic) return
+
+        const slotElements = [] as Element[]
+        slots.forEach(({ slotId, name, slotValues }) => {
+          const elem = shadowRoot.createVirtualNode('slot')
+          elem.destroyBackendElementOnRemoval()
+          this.glassEasel.Element.setSlotName(elem, name)
+          Object.keys(slotValues).forEach((key) => {
+            shadowRoot.replaceSlotValue(elem, key, slotValues[key])
+          })
+          shadowRoot.applySlotValueUpdates(elem)
+          slotElements.push(elem)
+          this._slotIdMap[slotId] = elem
+          ;(elem.$$ as ShadowSyncElement)._slotId = slotId
+        })
+
+        shadowRoot.insertChildren(slotElements, -1)
+      },
+      (slotIds) => {
+        slotIds.forEach((slotId) => {
+          const elem = this._slotIdMap[slotId]
+          if (elem) {
+            const shadowRoot = elem.parentNode as ShadowRoot
+            shadowRoot.removeChild(elem)
+            this._slotIdMap[slotId] = undefined
+          }
+        })
+      },
+      (slotId, slotValues, changedNames) => {
+        const elem = this._slotIdMap[slotId]
+        if (elem) {
+          const shadowRoot = elem.parentNode as ShadowRoot
+          changedNames.forEach((key) => {
+            shadowRoot.replaceSlotValue(elem, key, slotValues[key])
+          })
+          shadowRoot.applySlotValueUpdates(elem)
+        }
+      },
+    )
   }
 
   getAssociateValueInfo(node: Node): Record<string, unknown> {
-    const behavior = node.asGeneralComponent()?.getComponentDefinition().behavior
     return {
-      isReflect: behavior && ShadowSyncBackendContext._reflectingComponentBehaviors.has(behavior),
+      isReflect:
+        node.asGeneralComponent() &&
+        ReflectTemplateEngine.isHookedReflectingComponent(node.asGeneralComponent()!),
     }
   }
 
@@ -710,7 +778,6 @@ export class ShadowSyncBackendContext implements GlassEaselBackend.Context {
               getShadowSyncElement(elem),
               getShadowSyncElement(elem.getShadowRoot()!) as ShadowSyncShadowRoot,
               elem.tagName,
-              elem.isExternal(),
               elem.isVirtual(),
               options.styleScope ?? glassEasel.StyleScopeManager.globalScope(),
               options.extraStyleScope,
@@ -741,57 +808,44 @@ export class ShadowSyncBackendContext implements GlassEaselBackend.Context {
       handler(element, options)
     })
   }
+}
 
-  private static _reflectingComponentBehaviors = new Set<GeneralBehavior>()
+export class ReflectTemplateEngine implements templateEngine.Template {
+  static isHookedReflectingComponent(component: GeneralComponent): boolean {
+    return component.getComponentOptions().templateEngine === ReflectTemplateEngine
+  }
 
-  static hookReflectTemplateEngine(
-    TemplateEngine: templateEngine.TemplateEngine = EmptyTemplateEngine,
-  ) {
-    return class SyncTemplateEngine implements templateEngine.Template {
-      static create(behavior: GeneralBehavior, componentOptions: NormalizedComponentOptions) {
-        ShadowSyncBackendContext._reflectingComponentBehaviors.add(behavior)
-        return new SyncTemplateEngine(TemplateEngine.create(behavior, componentOptions))
-      }
+  static create(behavior: GeneralBehavior, componentOptions: NormalizedComponentOptions) {
+    return new ReflectTemplateEngine()
+  }
 
-      // eslint-disable-next-line no-useless-constructor
-      constructor(public template: templateEngine.Template) {
-        //
-      }
-
-      updateTemplate(behavior: GeneralBehavior): void {
-        this.template.updateTemplate?.(behavior)
-      }
-
-      createInstance(
-        elem: GeneralComponent,
-        createShadowRoot: (component: GeneralComponent) => ShadowRoot,
-      ): templateEngine.TemplateInstance {
-        const context = elem.getBackendContext()
-        if (!(context instanceof ShadowSyncBackendContext)) {
-          throw new Error('')
-        }
-        const { channel } = context
-        const backendElement = elem.getBackendElement() as ShadowSyncElement
-        const actualInstance = this.template.createInstance(elem, createShadowRoot)
-
-        const instance: templateEngine.TemplateInstance = {
-          shadowRoot: actualInstance.shadowRoot,
-          initValues: (data) => {
-            channel.initValues(backendElement._id, data)
-            actualInstance.initValues(data)
-          },
-          updateValues: (data, changes) => {
-            channel.updateValues(backendElement._id, changes)
-            actualInstance.updateValues(data, changes)
-          },
-          updateTemplate: (template, data) => {
-            actualInstance.updateTemplate?.(template, data)
-          },
-        }
-
-        return instance
-      }
+  createInstance(
+    elem: GeneralComponent,
+    createShadowRoot: (component: GeneralComponent) => ShadowRoot,
+  ): templateEngine.TemplateInstance {
+    const context = elem.getBackendContext()
+    if (!(context instanceof ShadowSyncBackendContext)) {
+      throw new Error('backendContext is not ShadowSyncBackendContext')
     }
+    const { channel } = context
+    const backendElement = elem.getBackendElement() as ShadowSyncElement
+    const shadowRoot = createShadowRoot(elem)
+
+    const backendShadowRoot = shadowRoot.$$ as ShadowSyncShadowRoot
+    // prevent childNodes from attaching to shadowRoot
+    backendShadowRoot.disableAttachment()
+
+    const instance: templateEngine.TemplateInstance = {
+      shadowRoot,
+      initValues: (data) => {
+        channel.initValues(backendElement._id, data)
+      },
+      updateValues: (data, changes) => {
+        channel.updateValues(backendElement._id, changes)
+      },
+    }
+
+    return instance
   }
 }
 
