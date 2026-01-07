@@ -48,7 +48,7 @@ pub(crate) fn gen_lit_str_with_quotes(s: &str, use_single_quote: bool) -> String
             '\r' => w.push_str("\\r"),
             '\t' => w.push_str("\\t"),
             '\0' => w.push_str("\\0"),
-            x if x as u8 <= 31 => {
+            x if x as u32 <= 31u32 => {
                 w.push_str(&format!("\\x{:02X}", ch as u8));
             }
             x if x == quote_ch => w.push_str(&format!("\\{}", x)),
@@ -103,6 +103,7 @@ mod tests {
     #[test]
     fn gen_lit_str_double_quoted() {
         assert_eq!(gen_lit_str_with_quotes("abc", false), r#""abc""#);
+        assert_eq!(gen_lit_str_with_quotes("上下左右", false), r#""上下左右""#);
         assert_eq!(gen_lit_str_with_quotes("\n\r\t\0", false), r#""\n\r\t\0""#);
         assert_eq!(gen_lit_str_with_quotes("\u{1}", false), r#""\x01""#);
         assert_eq!(gen_lit_str_with_quotes("\u{1F}", false), r#""\x1F""#);
