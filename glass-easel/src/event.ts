@@ -1,5 +1,4 @@
 import { type GeneralBackendElement } from './backend'
-import { type GeneralComponent } from './component'
 import { addTimelineEvent, performanceMeasureEnd, performanceMeasureStart } from './dev_tools'
 import { type Element } from './element'
 import { type ExternalShadowRoot } from './external_shadow_tree'
@@ -495,5 +494,18 @@ export class Event<TDetail> {
   ) {
     const ev = new Event(name, detail, options)
     return Event.dispatchExternalEvent(element, target, ev)
+  }
+
+  static triggerBackendEvent<TDetail>(
+    this: void,
+    element: Element,
+    name: string,
+    detail: TDetail,
+    options: EventOptions,
+    target?: GeneralBackendElement,
+  ) {
+    return target
+      ? Event.triggerExternalEvent(element, target, name, detail, options)
+      : Event.triggerEvent(element, name, detail, options)
   }
 }

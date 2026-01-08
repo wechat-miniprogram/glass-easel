@@ -21,10 +21,10 @@ export interface Context extends Partial<suggestedBackend.Context<Context, Eleme
   onEvent(
     listener: (
       element: GlassEaselElement,
-      target: Element,
       type: string,
       detail: unknown,
       options: EventOptions,
+      target?: Element,
     ) => EventBubbleStatus | void,
   ): void
 }

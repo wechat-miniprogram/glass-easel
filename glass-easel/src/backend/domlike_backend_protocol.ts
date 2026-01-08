@@ -24,10 +24,10 @@ export interface Context extends Partial<suggestedBackend.ContextForDomLike<Elem
   onEvent(
     listener: (
       element: GlassEaselElement,
-      target: Element,
       type: string,
       detail: unknown,
       options: EventOptions,
+      target?: Element,
     ) => EventBubbleStatus | void,
   ): void
   setListenerStats(element: Element, type: string, capture: boolean, mutLevel: MutLevel): void

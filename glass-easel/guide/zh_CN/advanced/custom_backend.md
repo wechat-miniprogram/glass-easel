@@ -32,9 +32,7 @@ class MyCustomBackend implements glassEasel.composedBackend.Context {
 const myCustomBackend = new MyCustomBackend()
 
 // 连接事件系统
-backendContext.onEvent((element, target, type, detail, options) => {
-  return new glassEasel.Event(type, detail, options).dispatch(element, target)
-})
+backendContext.onEvent(glassEasel.Event.triggerBackendEvent)
 
 // 创建根组件实例
 const rootComponent = glassEasel.Component.createWithContext('body', helloWorld, myCustomBackend)
