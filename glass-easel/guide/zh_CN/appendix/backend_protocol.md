@@ -126,7 +126,7 @@ glass-easel 并不会自行调用这个接口。应由其他模块调用这个�
 
 创建一个片段节点。它用于表示节点数组，方便批量插入和移除节点。
 
-### `Context#onEvent(listener: (element: Node, target: Element, type: string, detail: any, options: EventOptions) => EventBubbleStatus | void): void`
+### `Context#onEvent(listener: (element: Node, type: string, detail: any, options: EventOptions, target?: Element) => EventBubbleStatus | void): void`
 
 设置全局事件回调函数。这个回调函数只有一个。
 

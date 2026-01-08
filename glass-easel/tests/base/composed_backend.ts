@@ -32,10 +32,10 @@ export class Context implements glassEasel.composedBackend.Context {
     | null
     | ((
         element: glassEasel.Element,
-        target: Element,
         type: string,
         detail: unknown,
         options: glassEasel.EventOptions,
+        target: Element,
       ) => glassEasel.EventBubbleStatus) = null
 
   public shouldThrows(when: ThrowOption) {
@@ -135,10 +135,10 @@ export class Context implements glassEasel.composedBackend.Context {
   onEvent(
     _listener: (
       element: glassEasel.Element,
-      target: Element,
       type: string,
       detail: unknown,
       options: glassEasel.EventOptions,
+      target: Element,
     ) => glassEasel.EventBubbleStatus,
   ): void {
     this._$eventEmitter = _listener

@@ -14,7 +14,7 @@ componentSpace.defineComponent({
 
 describe('domlike backend', () => {
   beforeAll(() => {
-    domBackend.onEvent(glassEasel.Event.triggerExternalEvent)
+    domBackend.onEvent(glassEasel.Event.triggerBackendEvent)
   })
 
   describe('events', () => {
@@ -252,7 +252,7 @@ describe('domlike backend', () => {
         `),
         )
         .init(({ listener }) => {
-          const onClick = listener((e) => {
+          const onClick = listener(() => {
             ops.push(1)
           })
 
@@ -270,7 +270,7 @@ describe('domlike backend', () => {
         `),
         )
         .init(({ listener }) => {
-          const onClick = listener((e) => {
+          const onClick = listener(() => {
             ops.push(2)
           })
 
@@ -296,7 +296,7 @@ describe('domlike backend', () => {
         `),
         )
         .init(({ listener }) => {
-          const onClick = listener((e) => {
+          const onClick = listener(() => {
             ops.push(3)
           })
 

@@ -54,10 +54,10 @@ export class CurrentWindowBackendContext implements Context {
   /* @internal */
   private _$eventListener?: (
     element: GlassEaselElement,
-    target: Element,
     type: string,
     detail: any,
     options: EventOptions,
+    target: Element,
   ) => EventBubbleStatus | void
 
   destroy() {
@@ -124,10 +124,10 @@ export class CurrentWindowBackendContext implements Context {
   onEvent(
     listener: (
       element: GlassEaselElement,
-      target: Element,
       type: string,
       detail: any,
       options: EventOptions,
+      target: Element,
     ) => EventBubbleStatus | void,
   ) {
     if (!this._$eventListener) {
@@ -161,12 +161,18 @@ export class CurrentWindowBackendContext implements Context {
     while (t && !t.__wxElement) t = t.parentNode
     if (!t) return
 
-    const bubbleStatus = this._$eventListener(t.__wxElement!, target, type, detail, {
-      originalEvent: ev,
-      bubbles,
-      composed,
-      capturePhase: true,
-    })
+    const bubbleStatus = this._$eventListener(
+      t.__wxElement!,
+      type,
+      detail,
+      {
+        originalEvent: ev,
+        bubbles,
+        composed,
+        capturePhase: true,
+      },
+      target,
+    )
     if (bubbleStatus === EventBubbleStatus.NoDefault) {
       ev.preventDefault()
     }

@@ -4,7 +4,7 @@ import * as glassEasel from '../../src'
 
 const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
   beforeAll(() => {
-    domBackend.onEvent(glassEasel.Event.triggerExternalEvent)
+    domBackend.onEvent(glassEasel.Event.triggerBackendEvent)
   })
 
   test('event listener filter', () => {

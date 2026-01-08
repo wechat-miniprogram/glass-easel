@@ -87,10 +87,10 @@ export class EmptyComposedBackendContext implements Context {
   onEvent(
     _listener: (
       element: GlassEaselElement,
-      target: EmptyComposedBackendElement,
       type: string,
       detail: unknown,
       options: EventOptions,
+      target: EmptyComposedBackendElement,
     ) => EventBubbleStatus,
   ): void {
     // empty
