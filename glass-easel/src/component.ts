@@ -551,11 +551,14 @@ export class Component<
     comp._$external = external
     comp.tagName = tagName
     comp._$methodCaller = comp
+    comp.ownerShadowRoot = owner
 
     // check shared style scope
     const ownerSpace = behavior.ownerSpace
     const sharedStyleScope = ownerSpace._$sharedStyleScope
-    const isDedicatedStyleScope = options.styleScope && options.styleScope !== sharedStyleScope
+
+    const [styleScope, extraStyleScope] = comp.getStyleScopes()
+    const isDedicatedStyleScope = styleScope && styleScope !== sharedStyleScope
 
     // create backend element
     let backendElement: GeneralBackendElement | null = null
@@ -567,7 +570,7 @@ export class Component<
             tagName,
           )
           if (isDedicatedStyleScope) {
-            const styleScopePrefix = ownerSpace.styleScopeManager.queryName(options.styleScope!)
+            const styleScopePrefix = ownerSpace.styleScopeManager.queryName(styleScope)
             if (styleScopePrefix) {
               backendElement.setAttribute('wx-host', styleScopePrefix)
             }
@@ -592,8 +595,8 @@ export class Component<
           tagName,
           external,
           virtualHost,
-          options.styleScope ?? StyleScopeManager.globalScope(),
-          options.extraStyleScope,
+          styleScope ?? StyleScopeManager.globalScope(),
+          extraStyleScope,
           behavior._$externalClasses,
           // eslint-disable-next-line no-nested-ternary
           external
@@ -619,31 +622,26 @@ export class Component<
     comp._$placeholderHandlerRemover = placeholderHandlerRemover
 
     const ownerHost = owner ? owner.getHostNode() : undefined
-    const ownerComponentOptions = ownerHost?.getComponentOptions()
 
     // init class list
-    const styleScope = ownerComponentOptions?.styleScope ?? StyleScopeManager.globalScope()
-    const extraStyleScope = ownerComponentOptions?.extraStyleScope ?? undefined
+    const [ownerStyleScope, ownerExtraStyleScope, styleScopeManager] =
+      ownerHost?.getStyleScopes() ?? [null, null, comp.getOwnerSpace().styleScopeManager]
 
-    const styleScopeManager = ownerHost?._$behavior.ownerSpace.styleScopeManager
     comp.classList = new ClassList(
       comp,
       behavior._$externalClasses,
       ownerHost ? ownerHost.classList : null,
-      styleScope,
-      extraStyleScope,
+      ownerStyleScope ?? StyleScopeManager.globalScope(),
+      ownerExtraStyleScope ?? undefined,
       styleScopeManager,
     )
     if (backendElement) {
-      const ownerStyleScope = ownerComponentOptions?.styleScope ?? options.styleScope
       if (ownerStyleScope) {
         if (BM.COMPOSED || (BM.DYNAMIC && nodeTreeContext!.mode === BackendMode.Composed)) {
           ;(backendElement as composedBackend.Element).setStyleScope(
             ownerStyleScope,
-            extraStyleScope,
-            isDedicatedStyleScope
-              ? options.styleScope ?? StyleScopeManager.globalScope()
-              : undefined,
+            ownerExtraStyleScope ?? undefined,
+            isDedicatedStyleScope ? styleScope ?? StyleScopeManager.globalScope() : undefined,
           )
         }
       }
@@ -663,7 +661,9 @@ export class Component<
       }
       if (ENV.DEV) performanceMeasureEnd()
       if (styleScopeManager && writeExtraInfoToAttr) {
-        const prefix = styleScopeManager.queryName(styleScope)
+        const prefix = styleScopeManager.queryName(
+          ownerStyleScope ?? StyleScopeManager.globalScope(),
+        )
         if (prefix) {
           backendElement.setAttribute('exparser:info-class-prefix', `${prefix}--`)
         }
@@ -1188,6 +1188,18 @@ export class Component<
    */
   getComponentOptions(): NormalizedComponentOptions {
     return this._$definition._$options
+  }
+
+  /**
+   * Get the style scopes of the component
+   */
+  getStyleScopes(): [number | null, number | null, StyleScopeManager] {
+    const options = this.getComponentOptions()
+    if (options.inheritStyleScope)
+      return this.ownerShadowRoot
+        ? this.ownerShadowRoot.getHostNode().getStyleScopes()
+        : [null, null, this.getOwnerSpace().styleScopeManager]
+    return [options.styleScope, options.extraStyleScope, this.getOwnerSpace().styleScopeManager]
   }
 
   /**

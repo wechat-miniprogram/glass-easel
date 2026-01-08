@@ -58,26 +58,26 @@ export class NativeNode extends Element {
     node._$initialize(false, backendElement, owner, owner._$nodeTreeContext)
     node._$placeholderHandlerRemover = placeholderHandlerRemover
     const ownerHost = owner.getHostNode()
-    const ownerComponentOptions = ownerHost.getComponentOptions()
-    const styleScope = ownerComponentOptions.styleScope ?? StyleScopeManager.globalScope()
-    const extraStyleScope = ownerComponentOptions.extraStyleScope ?? undefined
-    const styleScopeManager = ownerHost._$behavior.ownerSpace.styleScopeManager
+    const [styleScope, extraStyleScope, styleScopeManager] = ownerHost.getStyleScopes()
     node.classList = new ClassList(
       node,
       undefined,
       ownerHost.classList,
-      styleScope,
-      extraStyleScope,
+      styleScope ?? StyleScopeManager.globalScope(),
+      extraStyleScope ?? undefined,
       styleScopeManager,
     )
     if (backendElement) {
       if (BM.COMPOSED || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Composed)) {
         if (ENV.DEV) performanceMeasureStart('backend.setStyleScope')
-        ;(backendElement as composedBackend.Element).setStyleScope(styleScope, extraStyleScope)
+        ;(backendElement as composedBackend.Element).setStyleScope(
+          styleScope ?? StyleScopeManager.globalScope(),
+          extraStyleScope ?? undefined,
+        )
         if (ENV.DEV) performanceMeasureEnd()
       }
       if (globalOptions.writeExtraInfoToAttr) {
-        const prefix = styleScopeManager.queryName(styleScope)
+        const prefix = styleScopeManager.queryName(styleScope ?? StyleScopeManager.globalScope())
         if (prefix) {
           backendElement.setAttribute('exparser:info-class-prefix', `${prefix}--`)
         }

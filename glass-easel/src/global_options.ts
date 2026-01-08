@@ -55,6 +55,8 @@ export type ComponentOptions = {
   styleScope?: StyleScopeId
   /** An extra style scope assigned to the component */
   extraStyleScope?: StyleScopeId | null
+  /** Inherit style scope from parent component or not */
+  inheritStyleScope?: boolean
   /** Enable multiple slots or not */
   multipleSlots?: boolean
   /** Enable dynamic slots or not */
@@ -95,6 +97,7 @@ export type NormalizedComponentOptions = {
   templateEngine: TemplateEngine | null
   styleScope: StyleScopeId | null
   extraStyleScope: StyleScopeId | null
+  inheritStyleScope: boolean
   multipleSlots: boolean
   dynamicSlots: boolean
   reflectToAttributes: boolean
@@ -139,6 +142,7 @@ export const globalOptions: NormalizedComponentOptions & EnvironmentOptions = {
   templateEngine: null,
   styleScope: null,
   extraStyleScope: null,
+  inheritStyleScope: false,
   hostNodeTagName: 'wx-x',
   multipleSlots: false,
   dynamicSlots: false,
@@ -177,6 +181,8 @@ export const normalizeComponentOptions = (
     styleScope: p.styleScope !== undefined ? p.styleScope : b.styleScope,
     hostNodeTagName: p.hostNodeTagName !== undefined ? p.hostNodeTagName : b.hostNodeTagName,
     extraStyleScope: p.extraStyleScope !== undefined ? p.extraStyleScope : b.extraStyleScope,
+    inheritStyleScope:
+      p.inheritStyleScope !== undefined ? p.inheritStyleScope : b.inheritStyleScope,
     multipleSlots: p.multipleSlots !== undefined ? p.multipleSlots : b.multipleSlots,
     dynamicSlots: p.dynamicSlots !== undefined ? p.dynamicSlots : b.dynamicSlots,
     reflectToAttributes:
