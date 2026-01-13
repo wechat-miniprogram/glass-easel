@@ -1167,7 +1167,8 @@ impl StringifyLine for Value {
                 location,
                 StringifierLineState::DoubleBraceStart,
             )?;
-            let quoted = gen_lit_str_with_quotes(x, stringifier.options().expression_string_single_quote);
+            let quoted =
+                gen_lit_str_with_quotes(x, stringifier.options().expression_string_single_quote);
             stringifier.write_token_state(
                 &format!(r#"{}"#, quoted),
                 None,

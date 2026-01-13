@@ -596,7 +596,8 @@ impl ConvertedExprWriteBlock for Element {
                                 &(key.0.start..key.0.start),
                                 w,
                             )?;
-                            let name_str = crate::escape::gen_lit_str_with_quotes(&key.1.name, false);
+                            let name_str =
+                                crate::escape::gen_lit_str_with_quotes(&key.1.name, false);
                             w.write_token_state(
                                 &name_str,
                                 Some(&key.1.name),

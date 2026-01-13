@@ -124,7 +124,10 @@ pub(super) fn expression_strigify_write<W: FmtWrite>(
             stringifier.write_token_state("null", None, location, StringifierLineState::Normal)?;
         }
         Expression::LitStr { value, location } => {
-            let quoted = gen_lit_str_with_quotes(&value, stringifier.options().expression_string_single_quote);
+            let quoted = gen_lit_str_with_quotes(
+                &value,
+                stringifier.options().expression_string_single_quote,
+            );
             stringifier.write_token_state(
                 &format!(r#"{}"#, quoted),
                 None,
@@ -665,12 +668,8 @@ mod tests {
 
     fn case_with_options(src: &str, options: StringifyOptions) {
         let (template, _) = crate::parse::parse("TEST", src);
-        let mut stringifier = crate::stringify::Stringifier::new(
-            String::new(),
-            "test",
-            Some(src),
-            options,
-        );
+        let mut stringifier =
+            crate::stringify::Stringifier::new(String::new(), "test", Some(src), options);
         template.stringify_write(&mut stringifier).unwrap();
         let (stringify_result, _sourcemap) = stringifier.finish();
         assert_eq!(stringify_result.as_str(), &format!("{}\n", src));

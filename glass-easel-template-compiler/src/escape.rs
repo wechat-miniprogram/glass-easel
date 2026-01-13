@@ -57,7 +57,11 @@ pub(crate) fn gen_lit_str_with_quotes(s: &str, use_single_quote: bool) -> String
     }
 
     let quote_ch = if use_single_quote { '\'' } else { '"' };
-    let cap = s.bytes().map(|ch| conv_ch_count(ch, quote_ch as u8)).sum::<usize>() + 2;
+    let cap = s
+        .bytes()
+        .map(|ch| conv_ch_count(ch, quote_ch as u8))
+        .sum::<usize>()
+        + 2;
     let mut ret = String::with_capacity(cap);
     ret.push(quote_ch);
     for ch in s.chars() {

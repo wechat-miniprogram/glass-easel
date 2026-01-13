@@ -127,10 +127,7 @@ mod test {
             crate::stringify::Stringifier::new(String::new(), "test", Some(src), options);
         template.stringify_write(&mut stringifier).unwrap();
         let (output, _) = stringifier.finish();
-        assert_eq!(
-            output.as_str(),
-            "<div data:a=\"{{ 'abc' * 1 }}\" />\n",
-        );
+        assert_eq!(output.as_str(), "<div data:a=\"{{ 'abc' * 1 }}\" />\n",);
     }
 
     #[test]
