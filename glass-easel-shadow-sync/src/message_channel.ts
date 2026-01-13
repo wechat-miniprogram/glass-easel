@@ -296,8 +296,8 @@ const createCallbackManager = (idGenerator: () => IDGenerator) => {
   const id2callback = <F extends (...args: any[]) => void>(
     id: number,
     release = true,
-  ): ((...args: GetCallback<Parameters<F>>) => void) => {
-    const cb = callbacks[id]!
+  ): ((...args: GetCallback<Parameters<F>>) => void) | undefined => {
+    const cb = callbacks[id]
     if (release) releaseCallbackId(id)
     return cb
   }
@@ -367,7 +367,7 @@ export const MessageChannelDataSide = (
   subscribe((arg) => {
     switch (arg[0]) {
       case ChannelEventType.CREATE_CALLBACK:
-        id2callback<Channel['create']>(arg[1])({
+        id2callback<Channel['create']>(arg[1])!({
           windowInfo: {
             width: arg[2],
             height: arg[3],
@@ -379,37 +379,31 @@ export const MessageChannelDataSide = (
         })
         break
       case ChannelEventType.ON_WINDOW_RESIZE_CALLBACK:
-        id2callback<Channel['onWindowResize']>(
-          arg[1],
-          false,
-        )({
+        id2callback<Channel['onWindowResize']>(arg[1], false)!({
           width: arg[2],
           height: arg[3],
           devicePixelRatio: arg[4],
         })
         break
       case ChannelEventType.ON_THEME_CHANGE_CALLBACK:
-        id2callback<Channel['onThemeChange']>(
-          arg[1],
-          false,
-        )({
+        id2callback<Channel['onThemeChange']>(arg[1], false)!({
           theme: arg[2],
         })
         break
       case ChannelEventType.RENDER_CALLBACK:
-        id2callback<Channel['render']>(arg[1])(arg[2] !== null ? new Error(arg[2]) : null)
+        id2callback<Channel['render']>(arg[1])!(arg[2] !== null ? new Error(arg[2]) : null)
         break
       case ChannelEventType.MEDIA_QUERY_OBSERVER_CALLBACK:
-        id2callback<Channel['createMediaQueryObserver']>(arg[1], false)(JSON.parse(arg[2]))
+        id2callback<Channel['createMediaQueryObserver']>(arg[1], false)?.(JSON.parse(arg[2]))
         break
       case ChannelEventType.INTERSECTION_OBSERVER_CALLBACK:
-        id2callback<Channel['createMediaQueryObserver']>(arg[1], false)(JSON.parse(arg[2]))
+        id2callback<Channel['createMediaQueryObserver']>(arg[1], false)?.(JSON.parse(arg[2]))
         break
       case ChannelEventType.SET_MODEL_BINDING_STAT_CALLBACK:
-        id2callback<Channel['setModelBindingStat']>(arg[1])(JSON.parse(arg[2]))
+        id2callback<Channel['setModelBindingStat']>(arg[1])!(JSON.parse(arg[2]))
         break
       case ChannelEventType.GET_CONTEXT_CALLBACK:
-        id2callback<Channel['getContext']>(arg[1])(JSON.parse(arg[2]))
+        id2callback<Channel['getContext']>(arg[1])!(JSON.parse(arg[2]))
         break
       case ChannelEventType.ON_CREATE_EVENT: {
         const [, eventId, eventName, detail, options, currentTargetId, mark, targetId, capture] =
@@ -446,19 +440,19 @@ export const MessageChannelDataSide = (
         break
       }
       case ChannelEventType.GET_ALL_COMPUTED_STYLES_CALLBACK:
-        id2callback<Channel['getAllComputedStyles']>(arg[1])(JSON.parse(arg[2]))
+        id2callback<Channel['getAllComputedStyles']>(arg[1])!(JSON.parse(arg[2]))
         break
       case ChannelEventType.GET_PSEUDO_COMPUTED_STYLES_CALLBACK:
-        id2callback<Channel['getPseudoComputedStyles']>(arg[1])(JSON.parse(arg[2]))
+        id2callback<Channel['getPseudoComputedStyles']>(arg[1])!(JSON.parse(arg[2]))
         break
       case ChannelEventType.GET_INHERITED_RULES_CALLBACK:
-        id2callback<Channel['getInheritedRules']>(arg[1])(JSON.parse(arg[2]))
+        id2callback<Channel['getInheritedRules']>(arg[1])!(JSON.parse(arg[2]))
         break
       case ChannelEventType.REPLACE_STYLE_SHEET_ALL_PROPERTIES_CALLBACK:
-        id2callback<Channel['replaceStyleSheetAllProperties']>(arg[1])(arg[2])
+        id2callback<Channel['replaceStyleSheetAllProperties']>(arg[1])!(arg[2])
         break
       case ChannelEventType.GET_BOUNDING_CLIENT_RECT_CALLBACK:
-        id2callback<Channel['getBoundingClientRect']>(arg[1])({
+        id2callback<Channel['getBoundingClientRect']>(arg[1])!({
           left: arg[2],
           top: arg[3],
           width: arg[4],
@@ -466,13 +460,13 @@ export const MessageChannelDataSide = (
         })
         break
       case ChannelEventType.GET_BOX_MODEL_CALLBACK:
-        id2callback<Channel['getBoxModel']>(arg[1])(JSON.parse(arg[2]))
+        id2callback<Channel['getBoxModel']>(arg[1])!(JSON.parse(arg[2]))
         break
       case ChannelEventType.GET_MATCHED_RULES_CALLBACK:
-        id2callback<Channel['getMatchedRules']>(arg[1])(JSON.parse(arg[2]))
+        id2callback<Channel['getMatchedRules']>(arg[1])!(JSON.parse(arg[2]))
         break
       case ChannelEventType.GET_SCROLL_OFFSET_CALLBACK:
-        id2callback<Channel['getScrollOffset']>(arg[1])({
+        id2callback<Channel['getScrollOffset']>(arg[1])!({
           scrollLeft: arg[2],
           scrollTop: arg[3],
           scrollWidth: arg[4],
@@ -480,14 +474,14 @@ export const MessageChannelDataSide = (
         })
         break
       case ChannelEventType.GET_PSEUDO_TYPES_CALLBACK:
-        id2callback<Channel['getPseudoTypes']>(arg[1])(arg[2])
+        id2callback<Channel['getPseudoTypes']>(arg[1])!(arg[2])
         break
       case ChannelEventType.START_OVERLAY_INSPECT_CALLBACK: {
-        id2callback<Channel['startOverlayInspect']>(arg[1], false)(arg[2], arg[3])
+        id2callback<Channel['startOverlayInspect']>(arg[1], false)?.(arg[2], arg[3])
         break
       }
       case ChannelEventType.PERFORMANCE_STATS_CALLBACK: {
-        id2callback<Channel['performanceEndTrace']>(arg[1])({
+        id2callback<Channel['performanceEndTrace']>(arg[1])!({
           startTimestamp: arg[2],
           endTimestamp: arg[3],
         })
@@ -571,7 +565,7 @@ export const MessageChannelDataSide = (
     },
     disconnectObserver: (id: number) => {
       publish([ChannelEventType.DISCONNECT_OBSERVER, id])
-      id2callback(id) // release callback
+      releaseCallbackId(id)
     },
 
     createElement: (id: number, logicalName: string, stylingName: string, ownerShadowRootId: number) => publish([ChannelEventType.CREATE_ELEMENT, id, logicalName, stylingName, ownerShadowRootId]),
