@@ -816,7 +816,7 @@ export class ReflectTemplateEngine implements templateEngine.Template {
     return component.getComponentOptions().templateEngine === ReflectTemplateEngine
   }
 
-  static create(behavior: GeneralBehavior, componentOptions: NormalizedComponentOptions) {
+  static create(_behavior: GeneralBehavior, _componentOptions: NormalizedComponentOptions) {
     return new ReflectTemplateEngine()
   }
 

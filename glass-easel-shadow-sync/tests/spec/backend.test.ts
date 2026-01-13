@@ -421,7 +421,7 @@ describe('backend', () => {
     expect(listOnView.data.list).toEqual(listArray)
 
     listOnView.setData({
-      displayList: [0, 1, 2]
+      displayList: [0, 1, 2],
     })
     expect(listOnView.data.displayList).toEqual([0, 1, 2])
     expect(domHtml(root)).toEqual('<list><li>0</li><li>1</li><li>2</li></list>')

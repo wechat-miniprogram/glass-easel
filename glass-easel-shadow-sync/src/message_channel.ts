@@ -500,7 +500,7 @@ export const MessageChannelDataSide = (
           slots.map(([slotId, name, slotValues]) => ({
             slotId,
             name,
-            slotValues: JSON.parse(slotValues),
+            slotValues: JSON.parse(slotValues) as Record<string, unknown>,
           })),
         )
         break

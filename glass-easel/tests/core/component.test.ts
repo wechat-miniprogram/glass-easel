@@ -188,24 +188,38 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     const extraStyleScope = glassEasel.StyleScopeManager.globalScope()
     const Root = componentSpace.defineComponent({
       options: {
-        styleScope: styleScope,
-        extraStyleScope: extraStyleScope,
+        styleScope,
+        extraStyleScope,
       },
     })
     const root = glassEasel.Component.createWithContext('root', Root, testBackend)
     const a0 = glassEasel.Component.createWithContext('a', A, testBackend)
     const a1 = root.getShadowRoot()!.createComponentByDef('a', A)
     root.getShadowRoot()!.appendChild(a1)
-    expect(root.getStyleScopes()).toEqual([styleScope, extraStyleScope, componentSpace.styleScopeManager])
+    expect(root.getStyleScopes()).toEqual([
+      styleScope,
+      extraStyleScope,
+      componentSpace.styleScopeManager,
+    ])
     expect(a0.getStyleScopes()).toEqual([null, null, componentSpace.styleScopeManager])
-    expect(a1.getStyleScopes()).toEqual([styleScope, extraStyleScope, componentSpace.styleScopeManager])
+    expect(a1.getStyleScopes()).toEqual([
+      styleScope,
+      extraStyleScope,
+      componentSpace.styleScopeManager,
+    ])
     expect(domHtml(root)).toBe('<a wx-host="root"><div class="a root--a"></div></a>')
     expect(domHtml(a0)).toBe('<div class="a"></div>')
 
     const a2 = a1.getShadowRoot()!.createComponentByDef('a', A)
     a1.getShadowRoot()!.appendChild(a2)
-    expect(a2.getStyleScopes()).toEqual([styleScope, extraStyleScope, componentSpace.styleScopeManager])
-    expect(domHtml(root)).toBe('<a wx-host="root"><div class="a root--a"></div><a wx-host="root"><div class="a root--a"></div></a></a>')
+    expect(a2.getStyleScopes()).toEqual([
+      styleScope,
+      extraStyleScope,
+      componentSpace.styleScopeManager,
+    ])
+    expect(domHtml(root)).toBe(
+      '<a wx-host="root"><div class="a root--a"></div><a wx-host="root"><div class="a root--a"></div></a></a>',
+    )
   })
 }
 
