@@ -74,7 +74,9 @@ describe('selector query', () => {
     const ab = env.associateBackend()
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
-    expect(domHtml(root.getComponent())).toBe('<div><child>456</child><child data-a="A">789</child></div>')
+    expect(domHtml(root.getComponent())).toBe(
+      '<div><child>456</child><child data-a="A">789</child></div>',
+    )
   })
 
   test('select single component (with custom export)', () => {
