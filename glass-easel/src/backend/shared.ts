@@ -75,8 +75,9 @@ export type IntersectionStatus = {
   intersectionRatio: number
   boundingClientRect: BoundingClientRect
   intersectionRect: BoundingClientRect
-  relativeRect: BoundingClientRect
+  rootBounds: BoundingClientRect | null
   time: number
+  isIntersecting: boolean
 }
 
 export const enum ResizeObserverMode {
