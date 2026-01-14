@@ -443,8 +443,9 @@ export class CurrentWindowBackendContext implements Context {
             intersectionRatio: entry.intersectionRatio,
             boundingClientRect: entry.boundingClientRect,
             intersectionRect: entry.intersectionRect,
-            relativeRect: entry.rootBounds!,
+            rootBounds: entry.rootBounds,
             time: entry.time,
+            isIntersecting: entry.isIntersecting,
           })
         })
       },
