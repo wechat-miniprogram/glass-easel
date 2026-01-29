@@ -58,9 +58,10 @@ export class ViewController {
   private _listenerMap = new WeakMap<
     Element,
     {
-      normal: Map<string, EventListener<unknown>>
-      capture: Map<string, EventListener<unknown>>
-    }
+      name: string
+      listener: EventListener<unknown>
+      isCapture: boolean
+    }[]
   >()
 
   private _styleSheetIdMapping = Object.create(null) as Record<number, number>
@@ -649,21 +650,22 @@ export class ViewController {
   ): void {
     const { _glassEasel, _listenerMap } = this
     const elemListenerMap = _listenerMap
-    if (!elemListenerMap.has(element)) {
-      elemListenerMap.set(element, {
-        normal: new Map(),
-        capture: new Map(),
-      })
+    if (!elemListenerMap.has(element)) elemListenerMap.set(element, [])
+    const listeners = elemListenerMap.get(element)!
+    const oldIndex = listeners.findIndex(
+      ({ name, isCapture }) => name === type && isCapture === capture,
+    )
+    if (oldIndex !== -1) {
+      const { listener: oldListener, isCapture: oldIsCapture } = listeners[oldIndex]!
+      listeners.splice(oldIndex, 1)
+      element.removeListener(type, oldListener, { capture: oldIsCapture })
     }
-    const listenerMap = elemListenerMap.get(element)!
-    const listeners = capture ? listenerMap.capture : listenerMap.normal
-    if (listeners.has(type)) element.removeListener(type, listeners.get(type)!)
     element.addListener(type, listener, {
       mutated: mutLevel === _glassEasel.EventMutLevel.Mut,
       final: mutLevel === _glassEasel.EventMutLevel.Final,
       capture,
     })
-    listeners.set(type, listener)
+    listeners.push({ name: type, listener, isCapture: capture })
   }
 
   initValues(element: Element, values: Record<string, unknown>): void {
