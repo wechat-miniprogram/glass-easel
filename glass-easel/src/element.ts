@@ -133,8 +133,6 @@ export class Element implements NodeCast {
   /** @internal */
   _$inheritSlots: boolean
   /** @internal */
-  _$placeholderHandlerRemover: (() => void) | undefined
-  /** @internal */
   _$virtual: boolean
   dataset: { [name: string]: unknown }
   /** @internal */
@@ -188,7 +186,6 @@ export class Element implements NodeCast {
     this._$subtreeSlotStart = null
     this._$subtreeSlotEnd = null
     this._$inheritSlots = false
-    this._$placeholderHandlerRemover = undefined
     this._$virtual = virtual
     this.dataset = {}
     this._$marks = null
@@ -676,8 +673,6 @@ export class Element implements NodeCast {
           elem._$destroyOnRemoval = AutoDestroyState.Destroyed
           elem.destroyBackendElement()
         }
-        const f = elem._$placeholderHandlerRemover
-        if (typeof f === 'function') f()
       }
       rec(node)
     } else if (node._$destroyOnRemoval === AutoDestroyState.Enabled) {

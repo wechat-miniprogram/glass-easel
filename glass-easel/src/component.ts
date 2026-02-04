@@ -524,7 +524,6 @@ export class Component<
     owner: ShadowRoot | null,
     backendContext: GeneralBackendContext | null,
     genericImpls: { [name: string]: ComponentDefinitionWithPlaceholder } | null,
-    placeholderHandlerRemover: (() => void) | undefined,
     initPropValues?: (comp: ComponentInstance<TData, TProperty, TMethod>) => void,
   ): ComponentInstance<TData, TProperty, TMethod> {
     if (!def._$detail) {
@@ -619,7 +618,6 @@ export class Component<
       owner,
       owner?._$nodeTreeContext ?? nodeTreeContext!,
     )
-    comp._$placeholderHandlerRemover = placeholderHandlerRemover
 
     const ownerHost = owner ? owner.getHostNode() : undefined
 
@@ -964,7 +962,6 @@ export class Component<
         null,
         backendContext,
         collectGenericImpls(componentDefinition as unknown as GeneralComponentDefinition),
-        undefined,
         initPropValues,
       )
     }

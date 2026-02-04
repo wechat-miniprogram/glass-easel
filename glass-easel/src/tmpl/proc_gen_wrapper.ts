@@ -6,6 +6,7 @@ import { type DataValue } from '../data_proxy'
 import { Element, StyleSegmentIndex } from '../element'
 import { type EventListener } from '../event'
 import { safeCallback } from '../func_arr'
+import { MutationObserver } from '../mutation_observer'
 import { type NativeNode } from '../native_node'
 import { type Node } from '../node'
 import { SlotMode, type ShadowRoot } from '../shadow_root'
@@ -72,6 +73,7 @@ type TmplArgs = {
   staticClassesDirty?: boolean
   styleNameValues?: string[] // [name1, value1, name2, value2, ...]
   styleNameValuesDirty?: boolean
+  placeholderCallback?: () => void
 }
 export type TmplDevArgs = {
   A?: string[] // active attributes
@@ -505,8 +507,8 @@ export class ProcGenWrapper {
         const elem = childNodes[index] as Element
         index += 1
         if (!elem) return
+        const tmplArgs = getTmplArgs(elem)
         if (slotElement) {
-          const tmplArgs = getTmplArgs(elem)
           if (dynamicSlotName! === (slot || '')) {
             if (!tmplArgs.dynamicSlotNameMatched) {
               const newElem = this.createCommonElement(
@@ -553,6 +555,16 @@ export class ProcGenWrapper {
         }
         if (!dynSlot) {
           this.handleChildrenUpdate(children, elem, undefined, undefined)
+        }
+        if (tmplArgs.placeholderCallback) {
+          tmplArgs.placeholderCallback = this.getPlaceholderCallback(
+            elem,
+            tagName,
+            genericImpls,
+            propertyInit,
+            children,
+            dynamicSlotValueNames,
+          )
         }
       },
 
@@ -938,6 +950,57 @@ export class ProcGenWrapper {
     return true
   }
 
+  private getPlaceholderCallback(
+    elem: Element,
+    tagName: string,
+    genericImpls: { [key: string]: string },
+    propertyInit: (elem: Element, isCreation: boolean) => void,
+    children: DefineChildren,
+    dynamicSlotValueNames: string[] | undefined,
+  ): () => void {
+    return () => {
+      const { using } = this.shadowRoot.resolveComponent(tagName, tagName)
+      const replacer = this.shadowRoot.createComponentByDef(
+        tagName,
+        using,
+        genericImpls,
+        (elem: GeneralComponent | NativeNode) => {
+          const sr = isComponent(elem)
+            ? this.dynamicSlotUpdate(elem, dynamicSlotValueNames, children)
+            : null
+          propertyInit(elem, true)
+          if (isComponent(elem)) {
+            if (elem.hasPendingChanges()) {
+              const nodeDataProxy = Component.getDataProxy(elem)
+              nodeDataProxy.applyDataUpdates(true)
+            }
+            sr?.applySlotUpdates()
+          }
+        },
+      )
+      replacer.destroyBackendElementOnRemoval()
+      const replacerShadowRoot = (replacer as GeneralComponent).getShadowRoot()
+      const elemShadowRoot = isComponent(elem) ? elem.getShadowRoot() : null
+      const isElemDynamicSlots = elemShadowRoot?.getSlotMode() === SlotMode.Dynamic
+      const isReplacerDynamicSlots = replacerShadowRoot?.getSlotMode() === SlotMode.Dynamic
+      if (isReplacerDynamicSlots !== isElemDynamicSlots) {
+        dispatchError(
+          new Error(
+            `The "dynamicSlots" option of component <${replacer.is}> and its placeholder <${
+              (elem as GeneralComponent).is
+            }> should be the same.`,
+          ),
+          '[render]',
+          isComponent(replacer) ? replacer : replacer.is,
+        )
+      } else if (isReplacerDynamicSlots) {
+        elem.parentNode?.replaceChild(replacer, elem)
+      } else {
+        elem.selfReplaceWith(replacer)
+      }
+    }
+  }
+
   private createCommonElement(
     tagName: string,
     genericImpls: { [key: string]: string },
@@ -960,40 +1023,30 @@ export class ProcGenWrapper {
         sr?.applySlotUpdates()
       }
     }
-    const placeholderCallback = () => {
-      const replacer = this.shadowRoot.createComponent(
-        tagName,
+    const { waiting, using } = this.shadowRoot.resolveComponent(tagName, tagName)
+    const elem = this.shadowRoot.createComponentByDef(tagName, using, genericImpls, initPropValues)
+    if (waiting) {
+      const tmplArgs = getTmplArgs(elem)
+      tmplArgs.placeholderCallback = this.getPlaceholderCallback(
+        elem,
         tagName,
         genericImpls,
-        undefined,
-        initPropValues,
+        propertyInit,
+        children,
+        dynamicSlotValueNames,
       )
-      replacer.destroyBackendElementOnRemoval()
-      const replacerShadowRoot = (replacer as GeneralComponent).getShadowRoot()
-      const elemShadowRoot = isComponent(elem) ? elem.getShadowRoot() : null
-      const isElemDynamicSlots = elemShadowRoot?.getSlotMode() === SlotMode.Dynamic
-      const isReplacerDynamicSlots = replacerShadowRoot?.getSlotMode() === SlotMode.Dynamic
-      if (isReplacerDynamicSlots !== isElemDynamicSlots) {
-        dispatchError(
-          new Error(
-            `The "dynamicSlots" option of component <${replacer.is}> and its placeholder <${elem.is}> should be the same.`,
-          ),
-          '[render]',
-          isComponent(replacer) ? replacer : replacer.is,
-        )
-      } else if (isReplacerDynamicSlots) {
-        elem.parentNode?.replaceChild(replacer, elem)
-      } else {
-        elem.selfReplaceWith(replacer)
+      const mockedCallback = () => {
+        tmplArgs.placeholderCallback?.()
+        tmplArgs.placeholderCallback = undefined
       }
+      waiting.add(mockedCallback)
+      waiting.hintUsed(this.shadowRoot.getHostNode())
+      new MutationObserver((e) => {
+        if (e.type === 'attachStatus' && e.status === 'detached') {
+          waiting.remove(mockedCallback)
+        }
+      }).observe(elem, { attachStatus: true })
     }
-    const elem = this.shadowRoot.createComponent(
-      tagName,
-      tagName,
-      genericImpls,
-      placeholderCallback,
-      initPropValues,
-    )
     elem.destroyBackendElementOnRemoval()
     if (dynSlot) {
       this.bindingMapDisabled = true // IDEA better binding map disable detection

@@ -32,12 +32,7 @@ export class NativeNode extends Element {
   static isNativeNode = isNativeNode
 
   /* @internal */
-  static create(
-    tagName: string,
-    owner: ShadowRoot,
-    stylingName?: string,
-    placeholderHandlerRemover?: () => void,
-  ): NativeNode {
+  static create(tagName: string, owner: ShadowRoot, stylingName?: string): NativeNode {
     const node = Object.create(NativeNode.prototype) as NativeNode
     node.is = tagName
     node.stylingName = stylingName ?? tagName
@@ -56,7 +51,6 @@ export class NativeNode extends Element {
       if (ENV.DEV) performanceMeasureEnd()
     }
     node._$initialize(false, backendElement, owner, owner._$nodeTreeContext)
-    node._$placeholderHandlerRemover = placeholderHandlerRemover
     const ownerHost = owner.getHostNode()
     const [styleScope, extraStyleScope, styleScopeManager] = ownerHost.getStyleScopes()
     node.classList = new ClassList(

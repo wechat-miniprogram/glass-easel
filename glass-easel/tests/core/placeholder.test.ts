@@ -472,6 +472,52 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     })
     matchElementWithDom(elem)
   })
+
+  test('replacing after data changed', () => {
+    const cs = new glassEasel.ComponentSpace()
+    const Root = cs.defineComponent({
+      using: {
+        child: 'child',
+      },
+      placeholders: {
+        child: 'div',
+      },
+      template: tmpl(`
+        <block
+          wx:for="{{list}}"
+        >
+          <child item="{{item}}"></child>
+        </block>
+      `),
+      data: {
+        list: [] as number[],
+      },
+    })
+    const elem = glassEasel.Component.createWithContext('root', Root, testBackend)
+    glassEasel.Element.pretendAttached(elem)
+    elem.setData({ list: [0, 0] })
+    expect(domHtml(elem)).toBe('<div item="0"></div><div item="0"></div>')
+    matchElementWithDom(elem)
+    elem.setData({ list: [1, 2, 3, 4] })
+    expect(domHtml(elem)).toBe(
+      '<div item="1"></div><div item="2"></div><div item="3"></div><div item="4"></div>',
+    )
+    matchElementWithDom(elem)
+    cs.defineComponent({
+      is: 'child',
+      options: {
+        virtualHost: true,
+      },
+      template: tmpl(`
+        <div>{{item}}</div>
+      `),
+      properties: {
+        item: Number,
+      },
+    })
+    expect(domHtml(elem)).toBe('<div>1</div><div>2</div><div>3</div><div>4</div>')
+    matchElementWithDom(elem)
+  })
 }
 
 describe('placeholder (DOM backend)', () => testCases(domBackend))

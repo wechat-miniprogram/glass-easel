@@ -1,5 +1,4 @@
 import { BM, BackendMode, type backend } from './backend'
-import { type ComponentDefinitionWithPlaceholder } from './behavior'
 import {
   Component,
   convertGenerics,
@@ -7,7 +6,7 @@ import {
   type GeneralComponent,
   type GeneralComponentDefinition,
 } from './component'
-import { type ComponentSpaceHooks } from './component_space'
+import { type ComponentWaitingList, type ComponentSpaceHooks } from './component_space'
 import { DeepCopyStrategy, getDeepCopyStrategy } from './data_proxy'
 import { deepCopy, simpleDeepCopy } from './data_utils'
 import { Element, type DoubleLinkedList } from './element'
@@ -140,12 +139,10 @@ export class ShadowRoot extends VirtualNode {
   createNativeNodeWithInit(
     tagName: string,
     stylingName: string,
-    placeholderHandlerRemover: (() => void) | undefined,
     initPropValues?: (comp: NativeNode) => void,
   ): NativeNode {
     const ret = this._$hooks.createNativeNode(
-      (tagName, stylingName) =>
-        NativeNode.create(tagName, this, stylingName, placeholderHandlerRemover),
+      (tagName, stylingName) => NativeNode.create(tagName, this, stylingName),
       tagName,
       stylingName,
     )
@@ -153,19 +150,10 @@ export class ShadowRoot extends VirtualNode {
     return ret
   }
 
-  /**
-   * Create a component if possible
-   *
-   * Placeholding status should be checked with `checkComponentPlaceholder` .
-   * This function may create a native node if the using target is native node.
-   */
-  createComponent(
+  resolveComponent(
     tagName: string,
     usingKey?: string,
-    genericTargets?: { [key: string]: string },
-    placeholderCallback?: (c: GeneralComponentDefinition) => void,
-    initPropValues?: (comp: GeneralComponent | NativeNode) => void,
-  ): GeneralComponent | NativeNode {
+  ): { waiting?: ComponentWaitingList; using: GeneralComponentDefinition | string } {
     const host = this._$host
     const beh = host._$behavior
     const hostGenericImpls = host._$genericImpls
@@ -182,47 +170,12 @@ export class ShadowRoot extends VirtualNode {
     for (let i = 0; i < possibleComponentDefinitions.length; i += 1) {
       const cwp = possibleComponentDefinitions[i]
       if (cwp === null || cwp === undefined) continue
-      if (typeof cwp === 'string') {
-        return this.createNativeNodeWithInit(cwp, tagName, undefined, initPropValues)
-      }
-      let usingTarget: GeneralComponentDefinition | string | undefined
-      let placeholderHandlerRemover: (() => void) | undefined
-      if (cwp.final) {
-        usingTarget = cwp.final
-      } else if (cwp.placeholder !== null) {
-        usingTarget = resolvePlaceholder(cwp.placeholder, space, cwp.source, hostGenericImpls)
-        const waiting = cwp.waiting
-        if (placeholderCallback && waiting) {
-          waiting.add(placeholderCallback)
-          waiting.hintUsed(host)
-          placeholderHandlerRemover = () => {
-            waiting.remove(placeholderCallback)
-          }
-        }
-      }
-      if (typeof usingTarget === 'string') {
-        return this.createNativeNodeWithInit(
-          usingTarget,
-          tagName,
-          placeholderHandlerRemover,
-          initPropValues,
-        )
-      }
-      if (usingTarget) {
-        return this._$hooks.createComponent(
-          (tagName, usingTarget) =>
-            Component._$advancedCreate(
-              tagName,
-              usingTarget,
-              this,
-              null,
-              convertGenerics(usingTarget, beh, host, genericTargets),
-              placeholderHandlerRemover,
-              initPropValues,
-            ),
-          tagName,
-          usingTarget,
-        )
+      if (typeof cwp === 'string') return { using: cwp }
+      if (cwp.final) return { using: cwp.final }
+      if (cwp.placeholder !== null) {
+        const placeholder = resolvePlaceholder(cwp.placeholder, space, cwp.source, hostGenericImpls)
+        const waiting = cwp.waiting || undefined
+        return { waiting, using: placeholder }
       }
     }
 
@@ -239,110 +192,86 @@ export class ShadowRoot extends VirtualNode {
       }
       triggerWarning(`Cannot find component "${compName}", using default component.`, this._$host)
     }
-    if (typeof comp === 'string') {
-      return this.createNativeNodeWithInit(comp, tagName, undefined, initPropValues)
-    }
-    return this._$hooks.createComponent(
-      (tagName, comp) =>
-        Component._$advancedCreate(
-          tagName,
-          comp,
-          this,
-          null,
-          convertGenerics(comp, beh, host, genericTargets),
-          undefined,
-          initPropValues,
-        ),
-      tagName,
-      comp,
-    )
-  }
-
-  createComponentByDef(
-    tagName: string,
-    componentDef: GeneralComponentDefinition,
-  ): GeneralComponent {
-    return this._$hooks.createComponent(
-      (tagName, compDef) =>
-        Component._$advancedCreate(tagName, compDef, this, null, null, undefined),
-      tagName,
-      componentDef,
-    )
+    return { using: comp }
   }
 
   /**
-   * Create a component if the given tag name is a component in the space, or a native node if not
+   * Create a component if possible
    *
-   * The component `using` map is not used.
-   * Consider using `checkComponentPlaceholder` to check if the tag name is in the `using` map.
-   * The global using registered with `ComponentSpace.prototype.getGlobalUsingComponent` is still used.
+   * Placeholding status should be checked with `checkComponentPlaceholder` .
+   * This function may create a native node if the using target is native node.
    */
-  createComponentOrNativeNode(
+  createComponent(
     tagName: string,
+    usingKey?: string,
     genericTargets?: { [key: string]: string },
     initPropValues?: (comp: GeneralComponent | NativeNode) => void,
   ): GeneralComponent | NativeNode {
     const host = this._$host
     const beh = host._$behavior
-    const space = beh.ownerSpace
+    const { using } = this.resolveComponent(tagName, usingKey)
 
-    // find in the space otherwise
-    const comp = space.getGlobalUsingComponent(tagName)
-    if (typeof comp === 'string') {
-      return this.createNativeNodeWithInit(comp, tagName, undefined, initPropValues)
-    }
-    if (comp) {
-      return this._$hooks.createComponent(
-        (tagName, comp) =>
-          Component._$advancedCreate(
+    const node =
+      typeof using === 'string'
+        ? this.createNativeNodeWithInit(using, tagName, initPropValues)
+        : this._$hooks.createComponent(
+            (tagName, compDef) =>
+              Component._$advancedCreate(
+                tagName,
+                compDef,
+                this,
+                null,
+                convertGenerics(compDef, beh, host, genericTargets),
+                initPropValues,
+              ),
             tagName,
-            comp,
-            this,
-            null,
-            convertGenerics(comp, beh, host, genericTargets),
-            undefined,
-            initPropValues,
-          ),
-        tagName,
-        comp,
-      )
-    }
+            using,
+          )
 
-    if (space._$allowUnusedNativeNode) {
-      // use native node otherwise
-      const node = this._$hooks.createNativeNode(
-        (tagName) => NativeNode.create(tagName, this),
-        tagName,
-        tagName,
-      )
-      initPropValues?.(node)
-      return node
-    }
-    throw new ThirdError(`Unknown tag name ${tagName}`, '[render]', host)
+    return node
   }
 
-  /**
-   * Find whether this component is placeholding or not
-   *
-   * This method will only find in the component `using` list and `generics` list.
-   * If not found, returns `undefined` .
-   * If the placeholder will be used, returns `true` ; `false` otherwise.
-   */
-  checkComponentPlaceholder(usingKey: string): boolean | undefined {
-    const beh = this._$host._$behavior
-    let compDef: ComponentDefinitionWithPlaceholder
-    const using = beh._$using[usingKey]
-    if (using !== undefined) {
-      compDef = using
-    } else {
-      const g = this._$host._$genericImpls?.[usingKey]
-      if (g) compDef = g
-      else return undefined
-    }
-    if (typeof compDef === 'string') return false
-    if (compDef.final) return false
-    if (compDef.placeholder !== null) return true
-    return false
+  createComponentByDef(
+    tagName: string,
+    componentDef: GeneralComponentDefinition,
+    genericTargets?: { [key: string]: string },
+    initPropValues?: (comp: GeneralComponent | NativeNode) => void,
+  ): GeneralComponent
+  createComponentByDef(
+    tagName: string,
+    componentDef: string,
+    genericTargets?: { [key: string]: string },
+    initPropValues?: (comp: GeneralComponent | NativeNode) => void,
+  ): NativeNode
+  createComponentByDef(
+    tagName: string,
+    componentDef: GeneralComponentDefinition | string,
+    genericTargets?: { [key: string]: string },
+    initPropValues?: (comp: GeneralComponent | NativeNode) => void,
+  ): GeneralComponent | NativeNode
+  createComponentByDef(
+    tagName: string,
+    componentDef: GeneralComponentDefinition | string,
+    genericTargets?: { [key: string]: string },
+    initPropValues?: (comp: GeneralComponent | NativeNode) => void,
+  ): GeneralComponent | NativeNode {
+    const host = this._$host
+    const beh = host._$behavior
+    return typeof componentDef === 'string'
+      ? this.createNativeNodeWithInit(componentDef, tagName, initPropValues)
+      : this._$hooks.createComponent(
+          (tagName, compDef) =>
+            Component._$advancedCreate(
+              tagName,
+              compDef,
+              this,
+              null,
+              convertGenerics(compDef, beh, host, genericTargets),
+              initPropValues,
+            ),
+          tagName,
+          componentDef,
+        )
   }
 
   getElementById(id: string): Element | undefined {
