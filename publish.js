@@ -139,7 +139,10 @@ writeFileAndGitAdd(
 // run build
 console.info('Run build')
 if (
-  childProcess.spawnSync('npm', ['run', 'build'], { stdio: 'inherit' }).status !== 0
+  childProcess.spawnSync('npm', ['run', 'build'], {
+    env: { GLASS_EASEL_ARGS: '', ...process.env },
+    stdio: 'inherit',
+  }).status !== 0
 ) {
   throw new Error('failed to execute npm build')
 }
