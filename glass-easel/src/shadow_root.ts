@@ -6,7 +6,7 @@ import {
   type GeneralComponent,
   type GeneralComponentDefinition,
 } from './component'
-import { type ComponentWaitingList, type ComponentSpaceHooks } from './component_space'
+import { type ComponentSpaceHooks } from './component_space'
 import { DeepCopyStrategy, getDeepCopyStrategy } from './data_proxy'
 import { deepCopy, simpleDeepCopy } from './data_utils'
 import { Element, type DoubleLinkedList } from './element'
@@ -153,7 +153,10 @@ export class ShadowRoot extends VirtualNode {
   resolveComponent(
     tagName: string,
     usingKey?: string,
-  ): { waiting?: ComponentWaitingList; using: GeneralComponentDefinition | string } {
+  ): {
+    using: GeneralComponentDefinition | string
+    placeholderHandler: { onReplace(callback: () => void): void; destroy: () => void } | undefined
+  } {
     const host = this._$host
     const beh = host._$behavior
     const hostGenericImpls = host._$genericImpls
@@ -170,12 +173,32 @@ export class ShadowRoot extends VirtualNode {
     for (let i = 0; i < possibleComponentDefinitions.length; i += 1) {
       const cwp = possibleComponentDefinitions[i]
       if (cwp === null || cwp === undefined) continue
-      if (typeof cwp === 'string') return { using: cwp }
-      if (cwp.final) return { using: cwp.final }
+      if (typeof cwp === 'string') return { using: cwp, placeholderHandler: undefined }
+      if (cwp.final) return { using: cwp.final, placeholderHandler: undefined }
       if (cwp.placeholder !== null) {
         const placeholder = resolvePlaceholder(cwp.placeholder, space, cwp.source, hostGenericImpls)
         const waiting = cwp.waiting || undefined
-        return { waiting, using: placeholder }
+        if (waiting) {
+          let placeholderCallback: (() => void) | undefined
+          const actualPlaceholderCallback = () => {
+            placeholderCallback?.()
+            placeholderCallback = undefined
+          }
+          waiting.add(actualPlaceholderCallback)
+          waiting.hintUsed(host)
+          return {
+            using: placeholder,
+            placeholderHandler: {
+              onReplace(callback: () => void) {
+                placeholderCallback = callback
+              },
+              destroy() {
+                waiting.remove(actualPlaceholderCallback)
+              },
+            },
+          }
+        }
+        return { using: placeholder, placeholderHandler: undefined }
       }
     }
 
@@ -192,7 +215,7 @@ export class ShadowRoot extends VirtualNode {
       }
       triggerWarning(`Cannot find component "${compName}", using default component.`, this._$host)
     }
-    return { using: comp }
+    return { using: comp, placeholderHandler: undefined }
   }
 
   /**

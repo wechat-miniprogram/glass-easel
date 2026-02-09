@@ -518,6 +518,67 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect(domHtml(elem)).toBe('<div>1</div><div>2</div><div>3</div><div>4</div>')
     matchElementWithDom(elem)
   })
+
+  test('replacing dynamic slotting component after data changed', () => {
+    const cs = new glassEasel.ComponentSpace()
+    const Tmp = cs.defineComponent({
+      options: {
+        virtualHost: true,
+        dynamicSlots: true,
+      },
+      properties: {
+        item: Number,
+      },
+      template: tmpl(`
+        <div item="{{item}}">{{item}}</div>
+      `),
+    })
+
+    const Root = cs.defineComponent({
+      using: {
+        child: 'child',
+        tmp: Tmp,
+      },
+      placeholders: {
+        child: 'tmp',
+      },
+      template: tmpl(`
+        <block
+          wx:for="{{list}}"
+        >
+          <child item="{{item}}"><block slot:i>{{item}}-{{i}}</block></child>
+        </block>
+      `),
+      data: {
+        list: [] as number[],
+      },
+    })
+    const elem = glassEasel.Component.createWithContext('root', Root, testBackend)
+    glassEasel.Element.pretendAttached(elem)
+    elem.setData({ list: [0, 0] })
+    expect(domHtml(elem)).toBe('<div item="0">0</div><div item="0">0</div>')
+    matchElementWithDom(elem)
+    elem.setData({ list: [1, 2, 3, 4] })
+    expect(domHtml(elem)).toBe(
+      '<div item="1">1</div><div item="2">2</div><div item="3">3</div><div item="4">4</div>',
+    )
+    matchElementWithDom(elem)
+    cs.defineComponent({
+      is: 'child',
+      options: {
+        virtualHost: true,
+        dynamicSlots: true,
+      },
+      template: tmpl(`
+        <div>{{item}}-<slot i="{{item}}" /></div>
+      `),
+      properties: {
+        item: Number,
+      },
+    })
+    expect(domHtml(elem)).toBe('<div>1-1-1</div><div>2-2-2</div><div>3-3-3</div><div>4-4-4</div>')
+    matchElementWithDom(elem)
+  })
 }
 
 describe('placeholder (DOM backend)', () => testCases(domBackend))

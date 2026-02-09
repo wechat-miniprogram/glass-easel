@@ -73,7 +73,7 @@ type TmplArgs = {
   staticClassesDirty?: boolean
   styleNameValues?: string[] // [name1, value1, name2, value2, ...]
   styleNameValuesDirty?: boolean
-  placeholderCallback?: () => void
+  placeholderHandler?: { onReplace(callback: () => void): void; destroy: () => void }
 }
 export type TmplDevArgs = {
   A?: string[] // active attributes
@@ -556,14 +556,16 @@ export class ProcGenWrapper {
         if (!dynSlot) {
           this.handleChildrenUpdate(children, elem, undefined, undefined)
         }
-        if (tmplArgs.placeholderCallback) {
-          tmplArgs.placeholderCallback = this.getPlaceholderCallback(
-            elem,
-            tagName,
-            genericImpls,
-            propertyInit,
-            children,
-            dynamicSlotValueNames,
+        if (tmplArgs.placeholderHandler) {
+          tmplArgs.placeholderHandler.onReplace(
+            this.getPlaceholderCallback(
+              elem,
+              tagName,
+              genericImpls,
+              propertyInit,
+              children,
+              dynamicSlotValueNames,
+            ),
           )
         }
       },
@@ -1023,27 +1025,24 @@ export class ProcGenWrapper {
         sr?.applySlotUpdates()
       }
     }
-    const { waiting, using } = this.shadowRoot.resolveComponent(tagName, tagName)
+    const { placeholderHandler, using } = this.shadowRoot.resolveComponent(tagName, tagName)
     const elem = this.shadowRoot.createComponentByDef(tagName, using, genericImpls, initPropValues)
-    if (waiting) {
+    if (placeholderHandler) {
       const tmplArgs = getTmplArgs(elem)
-      tmplArgs.placeholderCallback = this.getPlaceholderCallback(
-        elem,
-        tagName,
-        genericImpls,
-        propertyInit,
-        children,
-        dynamicSlotValueNames,
+      tmplArgs.placeholderHandler = placeholderHandler
+      placeholderHandler.onReplace(
+        this.getPlaceholderCallback(
+          elem,
+          tagName,
+          genericImpls,
+          propertyInit,
+          children,
+          dynamicSlotValueNames,
+        ),
       )
-      const mockedCallback = () => {
-        tmplArgs.placeholderCallback?.()
-        tmplArgs.placeholderCallback = undefined
-      }
-      waiting.add(mockedCallback)
-      waiting.hintUsed(this.shadowRoot.getHostNode())
       new MutationObserver((e) => {
         if (e.type === 'attachStatus' && e.status === 'detached') {
-          waiting.remove(mockedCallback)
+          placeholderHandler.destroy()
         }
       }).observe(elem, { attachStatus: true })
     }
