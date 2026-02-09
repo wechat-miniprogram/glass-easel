@@ -136,100 +136,15 @@ writeFileAndGitAdd(
   cbindgenRes.stdout,
 )
 
-// execute wasm-pack
-console.info('Run wasm-pack')
-;['glass-easel-template-compiler', 'glass-easel-stylesheet-compiler'].forEach((p) => {
-  if (
-    childProcess.spawnSync(
-      'wasm-pack',
-      ['build', p, '--target', 'nodejs', '--out-dir', 'pkg-nodejs'],
-      { stdio: 'inherit' },
-    ).status !== 0
-  ) {
-    throw new Error('failed to execute wasm-pack on the template compiler')
-  }
-})
-
-// compile glass-easel
-console.info('Compile glass-easel')
-if (childProcess.spawnSync('rm', ['-rf', 'dist'], { cwd: 'glass-easel' }).status !== 0) {
-  throw new Error('failed to clean glass-easel dist')
-}
+// run build
+console.info('Run build')
 if (
   childProcess.spawnSync('npm', ['run', 'build'], {
-    cwd: 'glass-easel',
     env: { GLASS_EASEL_ARGS: '', ...process.env },
     stdio: 'inherit',
   }).status !== 0
 ) {
-  throw new Error('failed to compile glass-easel')
-}
-
-// compile glass-easel-miniprogram-adapter
-console.info('Compile glass-easel-miniprogram-adapter')
-if (
-  childProcess.spawnSync('rm', ['-rf', 'dist'], { cwd: 'glass-easel-miniprogram-adapter' })
-    .status !== 0
-) {
-  throw new Error('failed to clean glass-easel dist')
-}
-if (
-  childProcess.spawnSync('npm', ['run', 'build'], {
-    cwd: 'glass-easel-miniprogram-adapter',
-    stdio: 'inherit',
-  }).status !== 0
-) {
-  throw new Error('failed to compile glass-easel-miniprogram-adapter')
-}
-
-// compile glass-easel-miniprogram-typescript
-console.info('Compile glass-easel-miniprogram-typescript')
-if (
-  childProcess.spawnSync('npm', ['run', 'build'], {
-    cwd: 'glass-easel-miniprogram-typescript',
-    stdio: 'inherit',
-  }).status !== 0
-) {
-  throw new Error('failed to compile glass-easel-miniprogram-typescript')
-}
-
-// compile glass-easel-miniprogram-webpack-plugin
-console.info('Compile glass-easel-miniprogram-webpack-plugin')
-if (
-  childProcess.spawnSync('npm', ['run', 'build'], {
-    cwd: 'glass-easel-miniprogram-webpack-plugin',
-    stdio: 'inherit',
-  }).status !== 0
-) {
-  throw new Error('failed to compile glass-easel-miniprogram-webpack-plugin')
-}
-
-// compile glass-easel-miniprogram-template
-console.info('Compile glass-easel-miniprogram-template')
-if (
-  childProcess.spawnSync('rm', ['-rf', 'dist'], { cwd: 'glass-easel-miniprogram-template' })
-    .status !== 0
-) {
-  throw new Error('failed to clean glass-easel dist')
-}
-if (
-  childProcess.spawnSync('npm', ['run', 'build'], {
-    cwd: 'glass-easel-miniprogram-template',
-    stdio: 'inherit',
-  }).status !== 0
-) {
-  throw new Error('failed to compile glass-easel-miniprogram-template')
-}
-
-// compile glass-easel-shadow-sync
-console.info('Compile glass-easel-shadow-sync')
-if (
-  childProcess.spawnSync('npm', ['run', 'build'], {
-    cwd: 'glass-easel-shadow-sync',
-    stdio: 'inherit',
-  }).status !== 0
-) {
-  throw new Error('failed to compile glass-easel-shadow-sync')
+  throw new Error('failed to execute npm build')
 }
 
 // cargo test
@@ -268,19 +183,6 @@ if (
   }
 })
 
-// publish wasm-pack modules
-;['glass-easel-template-compiler', 'glass-easel-stylesheet-compiler'].forEach((p) => {
-  console.info(`Publish wasm-pack generated ${p} to npmjs`)
-  if (
-    childProcess.spawnSync('pnpm', ['publish', '--registry', 'https://registry.npmjs.org'], {
-      cwd: `${p}/pkg-nodejs`,
-      stdio: 'inherit',
-    }).status !== 0
-  ) {
-    throw new Error('failed to execute wasm-pack on the template compiler')
-  }
-})
-
 // publish js modules
 ;[
   'glass-easel',
@@ -289,6 +191,8 @@ if (
   'glass-easel-miniprogram-webpack-plugin',
   'glass-easel-miniprogram-template',
   'glass-easel-shadow-sync',
+  'glass-easel-template-compiler',
+  'glass-easel-stylesheet-compiler',
 ].forEach((p) => {
   console.info(`Publish ${p} to npmjs`)
   if (
