@@ -886,7 +886,7 @@ export class Component<
     } else {
       tmplInst.initValues(dataGroup.innerData || dataGroup.data)
     }
-    dataGroup.setUpdateListener((data, combinedChanges) => {
+    dataGroup.updateListener = (data, combinedChanges) => {
       if (ENV.DEV) {
         performanceMeasureRenderWaterfall('component.render', 'backend.render', comp, () => {
           tmplInst.updateValues(data, combinedChanges)
@@ -894,7 +894,7 @@ export class Component<
       } else {
         tmplInst.updateValues(data, combinedChanges)
       }
-    })
+    }
 
     // bind behavior listeners
     const listeners = behavior._$listeners

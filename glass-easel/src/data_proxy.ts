@@ -494,6 +494,7 @@ export class DataGroup<
 > {
   data: DataWithPropertyValues<TData, TProperty>
   innerData: { [key: string]: DataValue } | null
+  updateListener?: DataUpdateCallback
   /* @internal */
   private _$comp: ComponentInstance<TData, TProperty, TMethod> | null
   /* @internal */
@@ -512,8 +513,6 @@ export class DataGroup<
   private _$observerStatus: boolean[]
   /* @internal */
   private _$modelBindingListener: { [name: string]: ModelBindingListener } | null = null
-  /* @internal */
-  private _$updateListener?: DataUpdateCallback
   /* @internal */
   private _$pendingChanges: DataChange[] = []
   /* @internal */
@@ -595,11 +594,6 @@ export class DataGroup<
       null,
       null,
     )
-  }
-
-  /** Set a callback for every grouped update */
-  setUpdateListener(updateListener: DataUpdateCallback) {
-    this._$updateListener = updateListener
   }
 
   /** Replace the underlying data */
@@ -1013,7 +1007,7 @@ export class DataGroup<
       )
     }
     this._$recUpdateLevel += 1
-    this._$updateListener?.(this.innerData || this.data, combinedChanges)
+    this.updateListener?.(this.innerData || this.data, combinedChanges)
     this._$recUpdateLevel -= 1
 
     // trigger prop observers (to simulating legacy behaviors)
