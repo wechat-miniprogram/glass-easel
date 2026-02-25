@@ -391,6 +391,15 @@ impl<'s, 't, 'u, W: FmtWrite> StringifierLine<'s, 't, 'u, W> {
     pub(super) fn sub_block(&mut self, t: &impl StringifyBlock) -> FmtResult {
         self.write_sub_block(|stringifier| t.stringify_write(stringifier))
     }
+
+    pub(super) fn write_line_break(&mut self) -> FmtResult {
+        if !self.block.top.options.minimize {
+            self.write_str("\n")?;
+            self.block.write_indent()?;
+            self.state = StringifierLineState::LineStart;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

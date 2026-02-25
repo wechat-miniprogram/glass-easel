@@ -668,6 +668,7 @@ impl<'a> StringifyLine for ElementWithWx<'a> {
                     is_first = false;
                     "wx:if"
                 } else {
+                    stringifier.write_line_break()?;
                     "wx:elif"
                 };
                 let list = [WriteAttrItem::NamedAttr {
@@ -716,6 +717,7 @@ impl<'a> StringifyLine for ElementWithWx<'a> {
                 }
             }
             if let Some((loc, children)) = else_branch.as_ref() {
+                stringifier.write_line_break()?;
                 let list = [WriteAttrItem::NameOnly {
                     name: "wx:else",
                     location: loc.clone(),
@@ -1335,6 +1337,42 @@ mod test {
         assert_eq!(
             output.as_str(),
             "<div a=\"{{ 123 }}\" />\n<div\n    data:a=\"123\"\n    data:b=\"456\"\n/>\n",
+        );
+    }
+
+    #[test]
+    fn if_tag() {
+        let src = r#"<block wx:if={{ cond }}>123</block><block wx:elif={{ cond2 }}>456</block><block wx:else>789</block>"#;
+        let (template, _) = crate::parse::parse("TEST", src);
+        let options = StringifyOptions {
+            line_width_limit: 30,
+            ..Default::default()
+        };
+        let mut stringifier =
+            crate::stringify::Stringifier::new(String::new(), "test", Some(src), options);
+        template.stringify_write(&mut stringifier).unwrap();
+        let (output, _) = stringifier.finish();
+        assert_eq!(
+            output.as_str(),
+            "<block wx:if=\"{{ cond }}\">123</block>\n<block wx:elif=\"{{ cond2 }}\">456</block>\n<block wx:else>789</block>\n",
+        );
+    }
+
+    #[test]
+    fn if_tag_short() {
+        let src = r#"<block wx:if={{ cond }}><div /></block><block wx:elif={{ cond2 }}><div /></block><block wx:else><div /></block>"#;
+        let (template, _) = crate::parse::parse("TEST", src);
+        let options = StringifyOptions {
+            line_width_limit: 30,
+            ..Default::default()
+        };
+        let mut stringifier =
+            crate::stringify::Stringifier::new(String::new(), "test", Some(src), options);
+        template.stringify_write(&mut stringifier).unwrap();
+        let (output, _) = stringifier.finish();
+        assert_eq!(
+            output.as_str(),
+            "<div wx:if=\"{{ cond }}\" />\n<div wx:elif=\"{{ cond2 }}\" />\n<div wx:else />\n",
         );
     }
 
