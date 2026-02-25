@@ -51,6 +51,10 @@ glassEasel.registerElement({
 
     propAnySf: glassEasel.NormalizedPropertyType.Any,
     propNull: null,
+    propNullWithValue: {
+      type: null,
+      value: 'foo',
+    },
   },
   created() {
     expectType<string>(this.data.propStr)
@@ -73,6 +77,7 @@ glassEasel.registerElement({
     expectType<{ name: string }[]>(this.data.propArrBooks)
     expectType<any>(this.data.propAnySf)
     expectType<any>(this.data.propNull)
+    expectType<string>(this.data.propNullWithValue)
 
     expectType<string | number | boolean>(this.data.propOptional)
     expectType<string | number | boolean>(this.data.propOptionalFoo)
