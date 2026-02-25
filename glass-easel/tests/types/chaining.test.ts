@@ -47,6 +47,11 @@ componentSpace
   })
 
   .property('propNull', null)
+  .property('propNullWithValue', {
+    type: null,
+    value: 'foo',
+  })
+
   .init(({ data }) => {
     expectType<string>(data.propStr)
     expectType<number>(data.propNum)
@@ -65,6 +70,7 @@ componentSpace
     expectType<number | boolean | 'foo'>(data.propOptionalFoo)
 
     expectType<any>(data.propNull)
+    expectType<string>(data.propNullWithValue)
 
     // @ts-expect-error
     expectType<any>(data.nonExists)

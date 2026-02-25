@@ -294,9 +294,12 @@ type Satisfy<T, V> = V extends T ? V : T
  * PropertyTypeToSimpleValueType<typeof String, 'foo'> = 'foo'
  * PropertyTypeToSimpleValueType<typeof String, 123> = string
  */
-type PropertyTypeToSimpleValueType<T extends PropertyType, V> = T extends
-  | StringConstructor
-  | NormalizedPropertyType.String
+type PropertyTypeToSimpleValueType<
+  T extends PropertyType,
+  V,
+> = T extends null | NormalizedPropertyType.Any
+  ? V
+  : T extends StringConstructor | NormalizedPropertyType.String
   ? Satisfy<string, V>
   : T extends NumberConstructor | NormalizedPropertyType.Number
   ? Satisfy<number, V>
