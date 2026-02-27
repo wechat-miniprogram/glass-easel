@@ -44,6 +44,7 @@ type PluginConfig = {
   defaultEntry: string
   customBootstrap: boolean
   disableClassPrefix: boolean
+  disableHostConversion: boolean
 }
 
 type GlobalStaticConfig = {
@@ -91,16 +92,19 @@ class StyleSheetManager {
   enableStyleScope = Object.create(null) as { [path: string]: boolean }
   scopeNameInc = 0
   disableClassPrefix: boolean
+  disableHostConversion: boolean
   codeRoot: string
   virtualModules: VirtualModulePluginType
   hostStylesReady = false
 
   constructor(
     disableClassPrefix: boolean,
+    disableHostConversion: boolean,
     codeRoot: string,
     virtualModules: VirtualModulePluginType,
   ) {
     this.disableClassPrefix = disableClassPrefix
+    this.disableHostConversion = disableHostConversion
     this.codeRoot = codeRoot
     this.virtualModules = virtualModules
   }
@@ -182,6 +186,7 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
   defaultEntry: string
   customBootstrap: boolean
   disableClassPrefix: boolean
+  disableHostConversion: boolean
   // eslint-disable-next-line @typescript-eslint/no-unsafe-call
   virtualModules = new VirtualModulesPlugin() as VirtualModulePluginType
 
@@ -192,6 +197,7 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
     this.defaultEntry = options.defaultEntry || 'pages/index/index'
     this.customBootstrap = options.customBootstrap || false
     this.disableClassPrefix = options.disableClassPrefix || false
+    this.disableHostConversion = options.disableHostConversion || false
   }
 
   apply(compiler: Compiler) {
@@ -214,6 +220,7 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
     virtualModules.apply(compiler)
     const styleSheetManager = new StyleSheetManager(
       this.disableClassPrefix,
+      this.disableHostConversion,
       codeRoot,
       this.virtualModules,
     )
@@ -425,6 +432,7 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
                   } else {
                     x.options = {
                       classPrefix: styleSheetManager.getScopeName(compPath),
+                      disableHostConversion: styleSheetManager.disableHostConversion,
                       setLowPriorityStyles: (s: string, map: string) => {
                         styleSheetManager.setLowPriorityStyles(compPath, s, map)
                       },
