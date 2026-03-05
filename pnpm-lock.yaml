@@ -68,6 +68,9 @@ importers:
       rollup:
         specifier: ^3.29.1
         version: 3.29.1
+      rollup-plugin-base64:
+        specifier: ^1.0.1
+        version: 1.0.1(rollup@3.29.1)
       rollup-plugin-dts:
         specifier: ^6.0.2
         version: 6.0.2(rollup@3.29.1)(typescript@5.2.2)
@@ -1098,6 +1101,18 @@ packages:
       typescript: 5.2.2
     dev: true
 
+  /@rollup/pluginutils@3.1.0(rollup@3.29.1):
+    resolution: {integrity: sha512-GksZ6pr6TpIjHm8h9lSQ8pi8BE9VeubNT0OMJ3B5uZJ8pz73NPiqOtCog/x2/QzM1ENChPKxMDhiQuRHsqc+lg==}
+    engines: {node: '>= 8.0.0'}
+    peerDependencies:
+      rollup: ^1.20.0||^2.0.0
+    dependencies:
+      '@types/estree': 0.0.39
+      estree-walker: 1.0.1
+      picomatch: 2.3.1
+      rollup: 3.29.1
+    dev: true
+
   /@rollup/pluginutils@5.0.4(rollup@3.29.1):
     resolution: {integrity: sha512-0KJnIoRI8A+a1dqOYLxH8vBf8bphDmty5QvIm2hqm7oFCFYKCAZWWd2hXgMibaPsNDhI0AtpYfQZJG47pt/k4g==}
     engines: {node: '>=14.0.0'}
@@ -1183,6 +1198,10 @@ packages:
     dependencies:
       '@types/estree': 1.0.8
       '@types/json-schema': 7.0.15
+
+  /@types/estree@0.0.39:
+    resolution: {integrity: sha512-EYNwp3bU+98cpU4lAWYYL7Zz+2gryWH1qbdDTidVd6hkiR6weksdbMadyXKXNPEkQFhXM+hVO9ZygomHXp+AIw==}
+    dev: true
 
   /@types/estree@1.0.0:
     resolution: {integrity: sha512-WulqXMDUTYAXCjZnk6JtIHPigp55cVtDgDrO2gHRwhyJto21+1zbVCtOYB2L1F9w4qCQ0rOGWBnBe0FNTiEJIQ==}
@@ -2646,6 +2665,10 @@ packages:
   /estraverse@5.3.0:
     resolution: {integrity: sha512-MMdARuVEQziNTeJD8DgMqmhwR11BRQ/cBP+pLtYdSTnf3MIO8fFeiINEbX36ZdNlfU/7A9f3gUw49B3oQsvwBA==}
     engines: {node: '>=4.0'}
+
+  /estree-walker@1.0.1:
+    resolution: {integrity: sha512-1fMXF3YP4pZZVozF8j/ZLfvnR8NSIljt56UhbZ5PeeDmmGHpgpdwQt7ITlGvYaQukCvuBRMLEiKiYC+oeIg4cg==}
+    dev: true
 
   /estree-walker@2.0.2:
     resolution: {integrity: sha512-Rfkk/Mp/DL7JVje3u18FxFujQlTNR2q6QfMSMB7AvCBx91NGj/ba3kCfza0f6dVDbw7YlRf/nDrn7pQrCCyQ/w==}
@@ -4598,6 +4621,14 @@ packages:
     hasBin: true
     dependencies:
       glob: 7.2.3
+    dev: true
+
+  /rollup-plugin-base64@1.0.1(rollup@3.29.1):
+    resolution: {integrity: sha512-IbdX8fjuXO/Op3hYmRPjVo0VwcSenwsQDaDTFdoe+70B5ZGoLMtr96L2yhHXCfxv7HwZVvxZqLsuWj6VwzRt3g==}
+    dependencies:
+      '@rollup/pluginutils': 3.1.0(rollup@3.29.1)
+    transitivePeerDependencies:
+      - rollup
     dev: true
 
   /rollup-plugin-dts@6.0.2(rollup@3.29.1)(typescript@5.2.2):
