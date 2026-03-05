@@ -218,3 +218,15 @@ impl TmplGroup {
 pub fn enable_console_log() {
     console_log::init_with_level(log::Level::Debug).unwrap();
 }
+
+#[wasm_bindgen]
+pub fn wxml(wxml: &str) -> Result<JsValue, JsValue> {
+    let mut tmpl_group = TmplGroup::new();
+    tmpl_group.add_tmpl("", wxml);
+    let groups_code = tmpl_group.get_tmpl_gen_object_groups()?;
+    let code = format!("return {}['']", groups_code.as_str());
+    let content = js_sys::Function::new_no_args(code.as_str()).call0(&JsValue::null())?;
+    let obj = js_sys::Object::new();
+    js_sys::Reflect::set(&obj, &JsValue::from_str("content"), &content)?;
+    Ok(obj.into())
+}
