@@ -24,7 +24,8 @@ const childComponent = componentSpace.define()
       return a - b
     },
   })
-  .defineComponent()
+.registerComponent()
+
 // 或在 init 中实现 trait behavior
 const childComponent = componentSpace.define()
   .init(function ({ implement }) {
@@ -37,7 +38,7 @@ const childComponent = componentSpace.define()
       },
     })
   })
-  .defineComponent()
+.registerComponent()
 ```
 
 在从组件外访问这个组件时，可以使用 trait behavior ：
@@ -47,7 +48,7 @@ const myComponent = componentSpace.define()
   .usingComponents({
     child: childComponent,
   })
-  .template(compileTemplate(`
+  .template(wxml(`
     <child id="c" />
   `))
   .lifetime('attached', function () {
@@ -98,13 +99,13 @@ const childComponent = componentSpace.define()
       return a + b
     }
   })
-  .defineComponent()
+.registerComponent()
 
 const myComponent = componentSpace.define()
   .usingComponents({
     child: childComponent,
   })
-  .template(compileTemplate(`
+  .template(wxml(`
     <child id="c" />
   `))
   .lifetime('attached', function () {
