@@ -10,22 +10,18 @@
 glass-easel 目前以前者为默认的初始化方式，通过设置 `propertyEarlyInit` 选项可以改为后者：
 
 ```js
-export const childComponent = componentSpace.defineComponent({
-  options: {
+export const childComponent = componentSpace.define()
+  .options({
     propertyEarlyInit: true,
-  },
-  data: {
+  })
+  .data(() => ({
     a: 1,
-  },
-  observers: {
-    a() {
-      // 可能早于 created 生命周期触发
-    }
-  },
-  lifetimes: {
-    created() {
-      // 可能晚于 observers 触发
-    },
-  },
-})
+  }))
+  .observer('a', function () {
+    // 可能早于 created 生命周期触发
+  })
+  .lifetime('created', function () {
+    // 可能晚于 observers 触发
+  })
+  .registerComponent()
 ```

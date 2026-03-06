@@ -1,5 +1,7 @@
 # 组件空间
 
+> 📖 关于 `ComponentSpace` 的完整 API 列表请参阅 [其他常用 API — ComponentSpace](../api/other.md#componentspace) 。
+
 ## 定义组件空间
 
 组件空间是一组组件的集合。定义组件时，需要将它定义在某个组件空间里。
@@ -9,20 +11,19 @@
 const componentSpace = new glassEasel.ComponentSpace()
 
 // 在这个组件空间中添加一个 hello-world 组件
-export const helloWorld = componentSpace.defineComponent({
-  is: 'hello-world',
-})
+export const helloWorld = componentSpace.define('hello-world')
+  .registerComponent()
 ```
 
 在使用组件名字来指定组件时，只会在当前组件空间中查找组件，例如：
 
 ```js
-componentSpace.defineComponent({
-  using: {
+componentSpace.define()
+  .usingComponents({
     // 在同一个组件空间下查找名为 hello-world 的组件
     hello: 'hello-world',
-  },
-})
+  })
+  .registerComponent()
 ```
 
 ## 默认组件选项
@@ -37,6 +38,8 @@ componentSpace.updateComponentOptions({
 
 这个组件空间中接下来定义的组件将统一具有这些选项。
 
+> 📖 关于组件选项以及所有可用选项的完整列表和说明，请参阅 [组件配置](../advanced/component_options.md) 文档。
+
 ## 默认组件
 
 在组件空间中可以定义一个默认组件，当组件定义未找到时，会使用默认组件来代替。
@@ -44,9 +47,8 @@ componentSpace.updateComponentOptions({
 通常，默认组件的名字是空字符串 `''` ，定义一个该名字的组件就可以将它作为默认组件：
 
 ```js
-export const helloWorld = componentSpace.defineComponent({
-  is: '',
-})
+export const helloWorld = componentSpace.define('')
+  .registerComponent()
 ```
 
 ## 全局引用
@@ -54,9 +56,8 @@ export const helloWorld = componentSpace.defineComponent({
 在实践中，可能有一些很常用的组件，在其他每个组件中都 using 引用会很繁琐。此时可以使用组件空间全局引用。例如：
 
 ```js
-const hotComponent = componentSpace.defineComponent({})
-
-componentSpace.setGlobalUsingComponent('hot', hotComponent)
+const hotComponent = componentSpace.define()
+  .registerComponent()
 ```
 
 这样相当于在所有组件中都引用了这个这个组件。
@@ -70,25 +71,24 @@ componentSpace.setGlobalUsingComponent('hot', 'div')
 在组件的 `usingComponents` 中也可以重新 using 全局引用、赋予另一个名字。例如：
 
 ```js
-const myComponent = componentSpace.defineComponent({
-  using: {
+const myComponent = componentSpace.define()
+  .usingComponents({
     'another-hot': 'hot',
-  },
-})
+  })
+  .registerComponent()
 ```
 
 ## 基组件空间
 
-组件空间在创建时，可以导入另一个组件空间中的 **公开组件** 。例如：
+组件空间在创建时，可以导入另一个组件空间中的**公开组件**。例如：
 
 ```js
 // 创建一个基组件空间
 const baseComponentSpace = new glassEasel.ComponentSpace()
 
 // 在基组件空间中定义一个组件
-baseComponentSpace.defineComponent({
-  is: 'base-component',
-})
+baseComponentSpace.define('base-component')
+  .registerComponent()
 
 // 导出这个组件为公开组件
 baseComponentSpace.exportComponent('base-component', 'base-component')
@@ -97,11 +97,11 @@ baseComponentSpace.exportComponent('base-component', 'base-component')
 const componentSpace = new glassEasel.ComponentSpace('', baseComponentSpace)
 
 // 可以使用基组件空间中导出的组件
-componentSpace.defineComponent({
-  using: {
+componentSpace.define()
+  .usingComponents({
     base: 'base-component',
-  },
-})
+  })
+  .registerComponent()
 ```
 
 ## 导入组件空间
@@ -113,9 +113,8 @@ componentSpace.defineComponent({
 const componentSpaceA = new glassEasel.ComponentSpace()
 
 // 在基组件空间中定义一个组件
-componentSpaceA.defineComponent({
-  is: 'a-component',
-})
+componentSpaceA.define('a-component')
+  .registerComponent()
 
 // 导出这个组件，并为它命一个公开的名字
 componentSpaceA.exportComponent('public-name', 'a-component')
@@ -127,11 +126,11 @@ const componentSpaceB = new glassEasel.ComponentSpace()
 componentSpaceB.importSpace('space://space-a', componentSpaceA, false)
 
 // 可以使用导入的组件空间中定义的组件
-componentSpaceB.defineComponent({
-  using: {
+componentSpaceB.define()
+  .usingComponents({
     base: 'space://space-a/public-name',
-  },
-})
+  })
+  .registerComponent()
 ```
 
 在导入组件空间时，也可以导入它的所有组件（不只是公开组件），例如：
@@ -144,9 +143,9 @@ const componentSpaceC = new glassEasel.ComponentSpace()
 componentSpaceC.importSpace('space-private://space-a', componentSpaceA, true)
 
 // 可以使用导入的组件空间中定义的组件
-componentSpaceC.defineComponent({
-  using: {
+componentSpaceC.define()
+  .usingComponents({
     base: 'space-private://space-a/a-component',
-  },
-})
+  })
+  .registerComponent()
 ```
