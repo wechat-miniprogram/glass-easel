@@ -10,11 +10,19 @@ Definition API 类似于微信小程序的传统接口风格，例如：
 
 ```js
 export const helloWorld = componentSpace.defineComponent({
-  template: compileTemplate(template),
+  template: wxml(template),
   data: {
     hello: 'Hello world!',
   },
-  methods: {},
+  methods: {
+    hello() {
+      console.log('hello')
+      this.world()
+    },
+    world() {
+      console.log('world')
+    },
+  },
 })
 ```
 
@@ -26,10 +34,24 @@ Chaining API 采用连缀的形式串联各个字段，例如：
 
 ```js
 export const helloWorld = componentSpace.define()
-  .template(compileTemplate(template))
+  .template(wxml(template))
   .data(() => ({
     hello: 'Hello world!',
   }))
+  .init(({ method }) => {
+    const hello = method(() => {
+      console.log('hello')
+      world()
+    })
+    const world = method(() => {
+      console.log('world')
+    })
+
+    return {
+      hello,
+      world,
+    }
+  })
   .registerComponent()
 ```
 
@@ -44,7 +66,7 @@ export const helloWorld = componentSpace.define()
 ```js
 export const helloWorld = componentSpace.define()
   .definition({
-    template: compileTemplate(template),
+    template: wxml(template),
     data: {
       hello: 'Hello world!',
     },
@@ -58,7 +80,7 @@ export const helloWorld = componentSpace.define()
 
 ```js
 export const myComponent = componentSpace.defineComponent({
-  template: compileTemplate(`
+  template: wxml(`
     <div> Some text in myComponent </div>
   `),
 })
@@ -72,7 +94,7 @@ export const helloWorld = componentSpace.defineComponent({
   using: {
     'my-component': myComponent,
   },
-  template: compileTemplate(`
+  template: wxml(`
     <my-component />
   `),
 })
@@ -81,7 +103,7 @@ export const helloWorld = componentSpace.define()
   .usingComponents({
     'my-component': myComponent,
   })
-  .template(compileTemplate(`
+  .template(wxml(`
     <my-component />
   `))
   .registerComponent()
@@ -96,7 +118,7 @@ export const helloWorld = componentSpace.define()
 ```js
 // 使用 Definition API 定义属性
 export const addComponent = componentSpace.defineComponent({
-  template: compileTemplate(`
+  template: wxml(`
     <div>{{a}} + {{b}} = {{ a + b }}</div>
   `),
   properties: {
@@ -109,7 +131,7 @@ export const addComponent = componentSpace.defineComponent({
 })
 // 或使用 Chaining API 定义属性
 export const addComponent = componentSpace.define()
-  .template(compileTemplate(`
+  .template(wxml(`
     <div>{{a}} + {{b}} = {{ a + b }}</div>
   `)
   .property('a', Number)
@@ -127,7 +149,7 @@ export const helloWorld = componentSpace.defineComponent({
   using: {
     'my-component': myComponent,
   },
-  template: compileTemplate(`
+  template: wxml(`
     <my-component a="1" b="2" />
   `),
 })
@@ -156,7 +178,7 @@ init 函数是可以使用 Chaining API 定义的函数，每次创建实例时�
 
 ```js
 export const helloWorld = componentSpace.define()
-  .template(compileTemplate(`
+  .template(wxml(`
     <div>{{ hello }}</div>
   `))
   .data(() => ({

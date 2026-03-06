@@ -6,7 +6,9 @@
 
 ### 基础特性
 
-[入门](basic/beginning.md)
+[快速入门](basic/quick_start.md)
+
+[框架思维](basic/thinking.md)
 
 [模板](basic/template.md)
 
@@ -78,7 +80,7 @@
 
 [自定义后端](advanced/custom_backend.md)
 
-[自定义模板引擎](advanced/template_engine.md) 
+[自定义模板引擎](advanced/template_engine.md)
 
 [外部组件](advanced/external_component.md)
 

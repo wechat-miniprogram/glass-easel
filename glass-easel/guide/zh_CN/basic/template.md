@@ -9,36 +9,34 @@ glass-easel 模板遵循 WXML 语法。
 在模板中，可以用 `{{ ... }}` 的形式嵌入表达式，表达式中的数据来源于组件的 `data` ，例如：
 
 ```js
-export const addComponent = componentSpace.defineComponent({
-  template: compileTemplate(`
+export const addComponent = componentSpace.define()
+  .template(wxml(`
     <div>{{ a }} + {{ b }} = {{ a + b }}</div>
-  `),
-  data: {
+  `))
+  .data(() => ({
     a: 1,
     b: 2,
-  },
-})
+  }))
+  .registerComponent()
 ```
 
 使用组件实例的 `setData` 方法可以更新数据绑定，例如：
 
 ```js
-export const addComponent = componentSpace.defineComponent({
-  template: compileTemplate(`
+export const addComponent = componentSpace.define()
+  .template(wxml(`
     <div>{{ a }} + {{ b }} = {{ a + b }}</div>
-  `),
-  data: {
+  `))
+  .data(() => ({
     a: 1,
     b: 2,
-  },
-  lifetimes: {
-    attached() {
-      this.setData({
-        a: 3,
-      })
-    },
-  },
-})
+  }))
+  .init(({ setData, lifetime }) => {
+    lifetime('attached', () => {
+      setData({ a: 3 })
+    })
+  })
+  .registerComponent()
 ```
 
 ## 条件分支
