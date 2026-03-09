@@ -634,10 +634,11 @@ export class Component<
       styleScopeManager,
     )
     if (backendElement) {
-      if (ownerStyleScope) {
+      const elementStyleScope = ownerStyleScope ?? styleScope
+      if (elementStyleScope) {
         if (BM.COMPOSED || (BM.DYNAMIC && nodeTreeContext!.mode === BackendMode.Composed)) {
           ;(backendElement as composedBackend.Element).setStyleScope(
-            ownerStyleScope,
+            elementStyleScope,
             ownerExtraStyleScope ?? undefined,
             isDedicatedStyleScope ? styleScope ?? StyleScopeManager.globalScope() : undefined,
           )
