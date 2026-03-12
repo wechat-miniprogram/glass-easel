@@ -6,11 +6,15 @@
 
 ### 基础特性
 
-[入门](basic/beginning.md)
+[快速入门](basic/quick_start.md)
+
+[框架思维](basic/thinking.md)
 
 [模板](basic/template.md)
 
 [组件](basic/component.md)
+
+[组件定义风格](basic/definition_style.md)
 
 [生命周期](basic/lifetime.md)
 
@@ -72,19 +76,33 @@
 
 [组件空间](advanced/component_space.md)
 
+[组件配置](advanced/component_options.md)
+
 [组件构造器中间件](advanced/component_filter.md)
 
 [绑定映射表更新](advanced/binding_map_update.md)
 
 [自定义后端](advanced/custom_backend.md)
 
-[自定义模板引擎](advanced/template_engine.md) 
+[自定义模板引擎](advanced/template_engine.md)
 
 [外部组件](advanced/external_component.md)
 
 [警告与错误](advanced/error_listener.md)
 
 [构建参数](advanced/build_args.md)
+
+### API 参考
+
+[节点类型](api/node.md)
+
+[Element 常用 API](api/element.md)
+
+[Component 常用 API](api/component.md)
+
+[ShadowRoot 常用 API](api/shadow_root.md)
+
+[其他常用 API](api/other.md)
 
 ### 附录
 

@@ -8,56 +8,48 @@
 
 ```js
 // form 组件，需要关联到子孙节点中的 input 组件
-export const formComponent = componentSpace.defineComponent({
-  is: 'component/form',
-  relations: {
-    // 需要关联到 input 组件
-    './input': {
-      // 关联范围是子孙节点
-      type: 'descendant',
-      linked(target) {
-        // 每当有 input 组件插入时，这个函数会执行一次
-        // 参数中的 target 是 input 组件实例
-        // 使用 getRelationNodes 可以获取当前关联到的所有 input 组件
-        this.getRelationNodes('./input')
-      },
-      unlinked(target) {
-        // 每当有 input 组件移除时，这个函数会执行一次
-      },
-    }
-  },
-})
+export const formComponent = componentSpace.define('component/form')
+  .relation('./input', {
+    // 关联范围是子孙节点
+    type: 'descendant',
+    linked(target) {
+      // 每当有 input 组件插入时，这个函数会执行一次
+      // 参数中的 target 是 input 组件实例
+      // 使用 getRelationNodes 可以获取当前关联到的所有 input 组件
+      this.getRelationNodes('./input')
+    },
+    unlinked(target) {
+      // 每当有 input 组件移除时，这个函数会执行一次
+    },
+  })
+  .registerComponent()
 
 // input 组件，需要关联到祖先节点中的 form 组件
-export const myComponent = componentSpace.defineComponent({
-  is: 'component/input',
-  relations: {
-    // 需要关联到 form 组件
-    './form': {
-      // 关联范围是祖先节点
-      type: 'ancestor',
-      linked(target) {
-        // 关联到 form 组件时，这个函数会执行一次
-      },
-      linkFailed() {
-        // 没有关联到 form 组件时，这个函数会执行一次
-      },
-    }
-  },
-})
+export const inputComponent = componentSpace.define('component/input')
+  .relation('./form', {
+    // 关联范围是祖先节点
+    type: 'ancestor',
+    linked(target) {
+      // 关联到 form 组件时，这个函数会执行一次
+    },
+    linkFailed() {
+      // 没有关联到 form 组件时，这个函数会执行一次
+    },
+  })
+  .registerComponent()
 
 // 同时使用这两个组件
-export const myComponent = componentSpace.defineComponent({
-  using: {
+export const myComponent = componentSpace.define()
+  .usingComponents({
     form: formComponent,
     input: inputComponent,
-  },
-  template: compileTemplate(`
+  })
+  .template(wxml(`
     <form>
       <input />
     </form>
-  `),
-})
+  `))
+  .registerComponent()
 ```
 
 这样， `<form>` 和 `<input>` 可以实现更复杂的关联逻辑。

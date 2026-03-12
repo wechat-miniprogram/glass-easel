@@ -7,11 +7,11 @@
 在组件中添加 `externalComponent` 选项，就可以使它成为一个外部组件，例如：
 
 ```js
-componentSpace.defineComponent({
-  options: {
+componentSpace.define()
+  .options({
     externalComponent: true,
-  },
-})
+  })
+  .registerComponent()
 ```
 
 这种模式下的组件通常具有很好的性能，但部分特性不可用：
