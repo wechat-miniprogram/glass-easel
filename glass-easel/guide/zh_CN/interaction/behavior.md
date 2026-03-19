@@ -64,44 +64,52 @@ export const myComponent = componentSpace.define()
 
 当多个 behavior 之间存在共同的祖先 behavior 时，会出现菱形继承的情况。例如：
 
+```
+       base
+      /    \
+  behaviorB  behaviorC
+      \    /
+    myComponent
+```
+
+glass-easel 在合并 behaviors 时，对**生命周期**、**页面生命周期**、**数据监听器**和 **init 函数**的去重行为取决于 `once` 参数：
+
+* 当 `once` 为 `true` 时，如果同一个回调函数实例已经被合并过，就不会重复添加。
+* 当 `once` 为 `false`（默认）时，即使是同一个回调函数实例在菱形继承中被多个 behavior 引入，也会被重复添加。
+
+通过 `.lifetime()` 、 `.pageLifetime()` 、 `.observer()` 和 `.init()` 注册的回调都支持传入 `once` 参数（默认为 `false`）；而通过 `.definition()` 经典 API 注册的回调则默认 `once` 为 `true` 。
+
 ```js
 // 公共祖先 behavior
 const base = componentSpace.define()
-  .property('x', Number)
+  // once 为 true ，菱形继承时只会执行一次
   .lifetime('attached', function () {
-    console.log('base attached')
+    console.log('base attached (once)')
+  }, true)
+  // once 为 false （默认），菱形继承时会执行多次
+  .lifetime('attached', function () {
+    console.log('base attached (not once)')
   })
   .registerBehavior()
 
-// behaviorB 和 behaviorC 都引入了 base
 const behaviorB = componentSpace.define()
   .behavior(base)
-  .property('b', String)
   .registerBehavior()
 
 const behaviorC = componentSpace.define()
   .behavior(base)
-  .property('c', Boolean)
   .registerBehavior()
 
-// myComponent 同时引入 behaviorB 和 behaviorC ，形成菱形继承
-//
-//       base
-//      /    \
-//  behaviorB  behaviorC
-//      \    /
-//    myComponent
-//
 const myComponent = componentSpace.define()
   .behavior(behaviorB)
   .behavior(behaviorC)
-  .template(wxml(`
-    <div>{{x}} {{b}} {{c}}</div>
-  `))
+  .template(wxml(`<div />`)
   .registerComponent()
+// 'base attached (once)' 只输出一次（被自动去重）
+// 'base attached (not once)' 输出两次（分别从 behaviorB 和 behaviorC 引入）
 ```
 
-glass-easel 在合并 behaviors 时，会对**生命周期**、**页面生命周期**、**数据监听器**和 **init 函数**进行自动去重：如果同一个回调函数实例已经被合并过，就不会重复添加。因此在上面的例子中， `base` 中的 `attached` 回调只会执行一次，而不会因为被 `behaviorB` 和 `behaviorC` 各引入一次而执行两次。
+在上面的菱形继承例子中， `base` 中标记了 `once` 为 `true` 的 `attached` 回调只会执行一次；而默认 `once` 为 `false` 的回调则会因为被 `behaviorB` 和 `behaviorC` 各引入一次而执行两次。
 
 ## 字段冲突时的覆盖规则
 

@@ -1,12 +1,12 @@
 # 组件定义 API 参考
 
-本文档是组件定义各项连缀方法和配置的完整 API 参考。关于组件定义的入门用法，请参阅 [组件定义](../basic/component.md) 。关于两种 API 风格的选择，请参阅 [组件定义风格](../basic/definition_style.md) 。
+本文档是组件定义各项 Chaining 方法和配置的完整 API 参考。关于组件定义的入门用法，请参阅 [组件定义](../basic/component.md) 。关于两种 API 风格的选择，请参阅 [组件定义风格](../basic/definition_style.md) 。
 
-## 连缀方法总览
+## Chaining 方法总览
 
-以下是 Chaining API 提供的所有连缀方法：
+以下是 Chaining API 提供的所有 Chaining 方法：
 
-| 连缀方法 | 类型 | 说明 |
+| Chaining 方法 | 类型 | 说明 |
 |---|---|---|
 | `.template(template)` | `template: { [key: string]: unknown }` | 设置编译后的模板对象 |
 | `.data(gen)` | `gen: () => TData` | 添加模板数据字段（接受返回数据对象的函数） |
@@ -24,10 +24,9 @@
 | `.generics(list)` | `list: Record<string, { default?: string \| ComponentDefinition } \| true>` | 设置泛型组件（抽象节点） |
 | `.externalClasses(list)` | `list: string[]` | 设置外部样式类 |
 | `.relation(name, rel)` | `name: string, rel: RelationParams` | 添加组件间关系 |
-| `.listeners(list)` | `list: Record<string, Function \| string>` | 设置事件监听器 |
 | `.definition(def)` | `def: ComponentParams` | 混入 Definition API 风格的配置对象 |
 | `.options(options)` | `options: ComponentOptions` | 设置组件选项 |
-| `.chainingFilter(func)` | `func: ChainingFilterFunc` | 设置连缀过滤器 |
+| `.chainingFilter(func)` | `func: ChainingFilterFunc` | 设置 Chaining 过滤器 |
 | `.methodCallerInit(func)` | `func: (this: ComponentInstance) => any` | 设置方法调用者初始化函数 |
 | `.extraThisFieldsType<T>()` | — | 声明附加的 `this` 字段类型（仅 TypeScript） |
 | `.registerComponent()` | — | 完成构建并注册为组件 |
@@ -174,7 +173,7 @@ export const add = componentSpace
 | 声明类型           | 转换行为                                                                                      |
 | ------------------ | --------------------------------------------------------------------------------------------- |
 | `String`           | 会被 `String()` 强制转换；`null` / `undefined` 回退为默认值 `''`                              |
-| `Number`           | 仅接受 `typeof value === 'number'` 的值（包括 `NaN` 和 `Infinity`）; 非数字值回退为默认值 `0` |
+| `Number`           | 仅接受能通过 `isFinite()` 检查的值（即可转换为有限数字的值）；`NaN`、`Infinity` 及其他非数字值回退为默认值 `0` |
 | `Boolean`          | 任何值都会被 `!!` 强制转换为布尔值                                                            |
 | `Array`            | 仅接受能通过 `Array.isArray` 检查的数组，非数组值回退为默认值 `[]`                            |
 | `Object`           | 仅接受 `typeof value === 'object'` 的值（包括 `null`），非对象值回退为默认值 `null`           |
@@ -366,34 +365,6 @@ export const myComponent = componentSpace
 
 ---
 
-## listeners 事件监听器
-
-```ts
-.listeners(list: { [bindingKey: string]: ((...args: any[]) => any) | string })
-```
-
-在组件定义中声明式地绑定事件监听器。键名的格式为 `<节点id>.<事件名>` ，值可以是函数或方法名字符串。
-
-```js
-export const myComponent = componentSpace
-  .define()
-  .template(
-    wxml(`
-      <div id="btn">Click me</div>
-    `),
-  )
-  .listeners({
-    'btn.tap': function () {
-      console.log('button tapped')
-    },
-  })
-  .registerComponent()
-```
-
-> 📖 具体用法请参考 [通过 listeners 监听事件](../basic/event.md#通过-listeners-监听事件) 文档。
-
----
-
 ## init 函数
 
 ```ts
@@ -469,7 +440,7 @@ init(({ setData, lifetime }) => {
 
 ### implement 方法 {#init-implement}
 
-`implement` 与连缀方法 [`.implement()`](#implement-实现-trait-behavior) 类似，用于为当前组件实例实现一个 Trait Behavior。与连缀方法不同的是，`init` 中的 `implement` 在实例创建时动态执行，可以利用闭包中的变量。
+`implement` 与 Chaining 方法 [`.implement()`](#implement-实现-trait-behavior) 类似，用于为当前组件实例实现一个 Trait Behavior。与 Chaining 方法不同的是，`init` 中的 `implement` 在实例创建时动态执行，可以利用闭包中的变量。
 
 ```js
 const myTrait = componentSpace.defineTraitBehavior()
@@ -489,7 +460,7 @@ init(({ implement }) => {
 
 ### relation 方法 {#init-relation}
 
-`relation` 与连缀方法 [`.relation()`](#relation-组件间关系) 类似，用于在 `init` 函数中动态声明组件间关系。它返回一个关系句柄对象，可以调用 `.list()` 获取已关联的目标组件实例列表。
+`relation` 与 Chaining 方法 [`.relation()`](#relation-组件间关系) 类似，用于在 `init` 函数中动态声明组件间关系。它返回一个关系句柄对象，可以调用 `.list()` 获取已关联的目标组件实例列表。
 
 ```js
 init(({ relation, lifetime }) => {
@@ -515,7 +486,7 @@ init(({ relation, lifetime }) => {
 
 ### observer 方法 {#init-observer}
 
-`observer` 与连缀方法 [`.observer()`](#observer-数据监听器) 类似，用于在 `init` 函数中注册组件数据变化回调：
+`observer` 与 Chaining 方法 [`.observer()`](#observer-数据监听器) 类似，用于在 `init` 函数中注册组件数据变化回调：
 
 ```js
 .init(({ observer, setData }) => {
@@ -535,7 +506,7 @@ init(({ relation, lifetime }) => {
 
 ### lifetime 方法 {#init-lifetime}
 
-`lifetime` 与连缀方法 [`.lifetime()`](#lifetime-生命周期) 类似，用于在 `init` 函数中注册组件生命周期回调：
+`lifetime` 与 Chaining 方法 [`.lifetime()`](#lifetime-生命周期) 类似，用于在 `init` 函数中注册组件生命周期回调：
 
 ```js
 .init(({ lifetime }) => {
@@ -553,7 +524,7 @@ init(({ relation, lifetime }) => {
 
 ### pageLifetime 方法 {#init-pageLifetime}
 
-`pageLifetime` 与连缀方法 [`.pageLifetime()`](#pagelifetime-页面生命周期) 类似，用于在 `init` 函数中注册页面生命周期回调：
+`pageLifetime` 与 Chaining 方法 [`.pageLifetime()`](#pagelifetime-页面生命周期) 类似，用于在 `init` 函数中注册页面生命周期回调：
 
 ```js
 .init(({ pageLifetime }) => {
@@ -780,7 +751,7 @@ export const myComponent = componentSpace
   .registerComponent()
 ```
 
-也可以在 [`init` 函数中通过 `implement`](#init-implement) 动态实现 Trait Behavior 。两者的区别在于：连缀方法 `implement` 在组件定义阶段静态声明，而 `init` 中的 `implement` 在实例创建时动态执行，后者可以利用闭包中的变量。
+也可以在 [`init` 函数中通过 `implement`](#init-implement) 动态实现 Trait Behavior 。两者的区别在于：Chaining 方法 `implement` 在组件定义阶段静态声明，而 `init` 中的 `implement` 在实例创建时动态执行，后者可以利用闭包中的变量。
 
 > 📖 更多关于 Trait Behavior 的详细说明请参阅 [Trait Behaviors](../interaction/trait_behavior.md) 文档。
 
@@ -993,7 +964,7 @@ export const myComponent = componentSpace
   .registerComponent()
 ```
 
-可以将 `definition` 与其他连缀方法自由混用。例如，将适合集中声明的部分（如 `data` 、 `methods` ）放在 `definition` 中，将需要精细控制的逻辑（如 `init` ）通过连缀调用来定义：
+可以将 `definition` 与其他 Chaining 方法自由混用。例如，将适合集中声明的部分（如 `data` 、 `methods` ）放在 `definition` 中，将需要精细控制的逻辑（如 `init` ）通过 Chaining 调用来定义：
 
 ```js
 export const myComponent = componentSpace
@@ -1016,15 +987,15 @@ export const myComponent = componentSpace
 
 ---
 
-## chainingFilter 连缀过滤器
+## chainingFilter Chaining 过滤器
 
 ```ts
 .chainingFilter(func: ChainingFilterFunc)
 ```
 
-定义一个 Chaining API 层面的中间件（连缀过滤器）。它允许你拦截并修改链式调用中的方法行为，常用于创建自定义的校验、转换或增强逻辑。
+定义一个 Chaining API 层面的中间件（Chaining 过滤器）。它允许你拦截并修改链式调用中的方法行为，常用于创建自定义的校验、转换或增强逻辑。
 
-连缀过滤器通常定义在 behavior 中。当其他组件引入含有 `chainingFilter` 的 behavior 时，后续的连缀调用会经过过滤器处理。
+Chaining 过滤器通常定义在 behavior 中。当其他组件引入含有 `chainingFilter` 的 behavior 时，后续的 Chaining 调用会经过过滤器处理。
 
 ```js
 export const propCheck = componentSpace
@@ -1044,7 +1015,7 @@ export const propCheck = componentSpace
   .registerBehavior()
 ```
 
-使用时在连缀调用靠前的位置引入这个 behavior：
+使用时在 Chaining 调用靠前的位置引入这个 behavior：
 
 ```js
 export const myComponent = componentSpace
@@ -1056,7 +1027,7 @@ export const myComponent = componentSpace
   .registerComponent()
 ```
 
-> 📖 关于连缀过滤器的详细说明和示例请参阅 [组件构造器中间件](../advanced/component_filter.md) 文档。
+> 📖 关于 Chaining 过滤器的详细说明和示例请参阅 [组件构造器中间件](../advanced/component_filter.md) 文档。
 
 ---
 
@@ -1118,7 +1089,7 @@ export const myComponent = componentSpace
 .registerComponent()
 ```
 
-完成组件构建并注册为组件。这是连缀调用的最后一步，调用后会返回组件定义对象，可以被其他组件通过 `usingComponents` 引用。
+完成组件构建并注册为组件。这是 Chaining 调用的最后一步，调用后会返回组件定义对象，可以被其他组件通过 `usingComponents` 引用。
 
 ```js
 export const myComponent = componentSpace

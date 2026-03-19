@@ -5,7 +5,7 @@
 组件可以定义一些生命周期回调函数。最常见的是 `attached` 生命周期，它在组件被添加到页面内后立刻触发，例如：
 
 ```js
-// 使用连缀方法添加生命周期回调函数
+// 使用 Chaining 方法添加生命周期回调函数
 export const myComponent = componentSpace.define()
   .lifetime('attached', function () {
     // 组件被添加到页面后触发
@@ -64,7 +64,7 @@ stateDiagram-v2
 触发时，页面生命周期会自动递归到所有子孙组件上。因而它主要用于广播一些全局事件。
 
 ```js
-// 使用连缀方法添加页面生命周期回调函数
+// 使用 Chaining 方法添加页面生命周期回调函数
 export const myComponent = componentSpace.define()
   .pageLifetime('someLifetime', function () { /* ... */ })
   .registerComponent()

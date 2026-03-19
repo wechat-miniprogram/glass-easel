@@ -44,6 +44,8 @@ export const myComponent = componentSpace.define()
 
 可以看到，子组件模板中声明的 `my-class` 已被替换为父组件传入的 `some-class`，使得父组件中定义的 `.some-class` 样式规则能够正确地应用到子组件内部的 `<div>` 元素上。
 
+> 样式的优先级取决于样式表本身，比如 CSS 中后声明的样式会优先于先声明的。external-class 并不改变优先级，即 external-class 并不优先于普通 class，或反之。
+
 ## 多层嵌套传递
 
 外部样式类支持跨多层组件嵌套传递。中间层组件可以将自己声明的外部样式类继续传递给更内层的子组件，从而实现样式从最外层一直穿透到最内层。

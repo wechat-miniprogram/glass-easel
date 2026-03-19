@@ -1,6 +1,6 @@
 ---
 name: glass-easel
-description: Provides fundamental knowledge for glass-easel component development, useful as a reference when creating, editing, or reviewing glass-easel components.
+description: Provides fundamental knowledge and best practices for glass-easel component development, useful as a reference when creating, editing, reviewing, or optimizing glass-easel components.
 ---
 
 # glass-easel Component Development Knowledge
@@ -380,7 +380,15 @@ export const App = componentSpace.define()
   .registerComponent()
 ```
 
-## 10. Notes
+## 10. Performance Best Practices
+
+See [Best Practices Reference](./references/best-practices.md) for details.
+
+## 11. Error Handling and Robustness
+
+See [Best Practices Reference](./references/best-practices.md) for details.
+
+## 14. Notes
 
 1. **API Style**: Prefer the Chaining API
 2. **Synchronous Updates**: `setData` is immediately synchronous; consecutive calls each trigger independent renders; use `groupUpdates` for batch updates

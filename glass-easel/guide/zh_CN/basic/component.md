@@ -187,28 +187,6 @@ export const myComponent = componentSpace
 
 > 📖 更多关于方法定义的详细用法请参阅 [方法](./method.md) 文档。
 
-## listeners 事件监听器
-
-`listeners` 用于在组件定义中声明式地绑定事件监听器，将模板中的节点事件绑定到方法。
-
-```js
-export const myComponent = componentSpace
-  .define()
-  .template(
-    wxml(`
-      <div id="btn">Click me</div>
-    `),
-  )
-  .listeners({
-    'btn.tap': function () {
-      console.log('button tapped')
-    },
-  })
-  .registerComponent()
-```
-
-> 📖 具体用法请参考 [通过 listeners 监听事件](./event.md#通过-listeners-监听事件) 文档。
-
 ## using 引用其他组件
 
 组件可以引用其他组件，在模板中使用它们。例如有另一个组件：
@@ -333,7 +311,7 @@ export const myComponent = componentSpace
 
 ## implement 实现 Trait Behavior
 
-`implement` 连缀方法用于在组件定义时静态地实现一个 [Trait Behavior](../interaction/trait_behavior.md) 。Trait Behavior 类似于 TypeScript 中的接口，它要求实现者提供一组方法：
+`implement` Chaining 方法用于在组件定义时静态地实现一个 [Trait Behavior](../interaction/trait_behavior.md) 。Trait Behavior 类似于 TypeScript 中的接口，它要求实现者提供一组方法：
 
 ```js
 // 定义一个 trait behavior
@@ -485,6 +463,6 @@ export const myComponent = componentSpace
 以下是一些不太常用的高级组件定义配置，详细说明请参阅 [组件定义 API 参考](../api/definition.md) ：
 
 - **[`definition`](../api/definition.md#definition-混入经典风格定义)** — 在 Chaining API 中混入 Definition API 风格的配置对象
-- **[`chainingFilter`](../api/definition.md#chainingfilter-连缀过滤器)** — 定义 Chaining API 层面的中间件
+- **[`chainingFilter`](../api/definition.md#chainingfilter-chaining-过滤器)** — 定义 Chaining API 层面的中间件
 - **[`methodCallerInit`](../api/definition.md#methodcallerinit-方法调用者初始化)** — 自定义方法调用者的 `this` 对象
 - **[`extraThisFieldsType`](../api/definition.md#extrathistfieldstype-额外-this-字段类型)** — TypeScript 类型辅助，为 `this` 添加额外字段类型

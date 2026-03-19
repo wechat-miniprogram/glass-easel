@@ -5,10 +5,10 @@
 | | Definition API | Chaining API（推荐） |
 |---|---|---|
 | 入口方法 | `componentSpace.defineComponent({...})` | `componentSpace.define().xxx().registerComponent()` |
-| 代码风格 | 传递单个配置对象 | 链式连缀调用 |
+| 代码风格 | 传递单个配置对象 | 链式调用（Chaining） |
 | TypeScript 支持 | 有一定限制 | 完整的类型推导 |
-| 逻辑拆分 | 所有配置集中在一个对象中 | 连缀函数可多次调用，方便拆分 |
-| 学习成本 | 较低，与小程序传统风格一致 | 略高，需要了解连缀模式 |
+| 逻辑拆分 | 所有配置集中在一个对象中 | Chaining 方法可多次调用，方便拆分 |
+| 学习成本 | 较低，与小程序传统风格一致 | 略高，需要了解 Chaining 模式 |
 
 ## Definition API
 
@@ -51,14 +51,14 @@ export const helloWorld = componentSpace.defineComponent({
 | `lifetimes` | `{ [name: string]: ComponentMethod }` | 生命周期回调 |
 | `created` / `attached` / `ready` / `moved` / `detached` | `ComponentMethod` | 生命周期回调的简写形式 |
 | `pageLifetimes` | `{ [name: string]: ComponentMethod }` | 页面生命周期回调 |
-| `observers` | `{ [fields: string]: ComponentMethod }` | 数据监听器 |
+| `observers` | `{ [fields: string]: ComponentMethod \| string }` | 数据监听器 |
 | `options` | `ComponentOptions` | 组件选项 |
 
 这种风格的代码比较符合传统习惯，但对 TypeScript 的支持有一定限制：由于所有配置在一个对象字面量中声明， TypeScript 难以在 `methods` 之间进行完整的类型推导。
 
 ## Chaining API（推荐）
 
-Chaining API 通过 `componentSpace.define()` 开始，以连缀调用的形式串联各个字段，最后调用 `registerComponent()` 完成注册：
+Chaining API 通过 `componentSpace.define()` 开始，以链式调用的形式串联各个字段，最后调用 `registerComponent()` 完成注册：
 
 ```js
 export const helloWorld = componentSpace.define()
@@ -85,12 +85,12 @@ export const helloWorld = componentSpace.define()
 
 Chaining API 有以下几个值得关注的特点：
 
-- **完整的 TypeScript 类型推导**：每一步连缀调用都能正确推导出当前已声明的数据、属性和方法类型，在 `init` 函数中可获得完整的类型提示。
+- **完整的 TypeScript 类型推导**：每一步 Chaining 调用都能正确推导出当前已声明的数据、属性和方法类型，在 `init` 函数中可获得完整的类型提示。
 - **`init` 函数**：交互逻辑集中在 `init` 方法中定义。方法之间可以直接以函数变量的形式互相调用，无需通过 `this` 。
 
-Chaining API 提供的连缀方法包括：
+Chaining API 提供的方法包括：
 
-| 连缀方法 | 类型 | 说明 |
+| Chaining 方法 | 类型 | 说明 |
 |---|---|---|
 | `.template(template)` | `template: { [key: string]: unknown }` | 设置编译后的模板对象 |
 | `.data(gen)` | `gen: () => TData` | 添加模板数据字段（接受返回数据对象的函数） |
@@ -110,7 +110,7 @@ Chaining API 提供的连缀方法包括：
 | `.relation(name, rel)` | `name: string, rel: RelationParams` | 添加组件间关系 |
 | `.definition(def)` | `def: ComponentParams` | 混入 Definition API 风格的配置对象 |
 | `.options(options)` | `options: ComponentOptions` | 设置组件选项 |
-| `.chainingFilter(func)` | `func: ChainingFilterFunc` | 设置连缀过滤器（用于自定义 behavior 的连缀扩展） |
+| `.chainingFilter(func)` | `func: ChainingFilterFunc` | 设置 Chaining 过滤器（用于自定义 behavior 的 Chaining 扩展） |
 | `.methodCallerInit(func)` | `func: (this: ComponentInstance) => any` | 设置方法调用者初始化函数（自定义 `this` 值） |
 | `.extraThisFieldsType<T>()` | — | 声明附加的 `this` 字段类型（仅用于 TypeScript 类型辅助） |
 | `.registerComponent()` | — | 完成构建并注册为组件 |
@@ -140,7 +140,7 @@ export const helloWorld = componentSpace.define()
   .registerComponent()
 ```
 
-这种混用方式让你可以灵活选择：将适合集中声明的部分（如 `template` 、 `data` ）放在 `definition` 中，将需要精细控制的逻辑（如方法、生命周期）通过连缀调用来定义。
+这种混用方式让你可以灵活选择：将适合集中声明的部分（如 `template` 、 `data` ）放在 `definition` 中，将需要精细控制的逻辑（如方法、生命周期）通过 Chaining 调用来定义。
 
 ## 如何选择
 

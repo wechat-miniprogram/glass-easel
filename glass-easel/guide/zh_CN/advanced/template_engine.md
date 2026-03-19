@@ -4,7 +4,7 @@
 
 模板引擎是负责处理模板内容、并在模板上执行数据绑定更新的模块。
 
-glass-easel 的默认模板引擎是 `glassEasel.glassEaselTemplate` ，但也可以通过在组件 options 中指定 `templateEngine` 来使用自定义的模板引擎。
+glass-easel 的默认模板引擎是 `glassEasel.template.GlassEaselTemplateEngine` ，但也可以通过在组件 options 中指定 `templateEngine` 来使用自定义的模板引擎。
 
 自定义模板引擎必须实现 TypeScript 接口 `glassEasel.templateEngine.TemplateEngine` 。
 
@@ -45,15 +45,18 @@ import type {
   templateEngine,
 } from 'glass-easel'
 
-class MyTemplateEngine implements templateEngine.TemplateEngine {
-  static create(rootBehavior: GeneralBehavior, options: NormalizedComponentOptions) {
+class MyTemplateEngine implements templateEngine.Template {
+  static create(
+    behavior: GeneralBehavior,
+    componentOptions: NormalizedComponentOptions,
+  ): MyTemplateEngine {
     behavior.getTemplate() // 组件的 template 字段内容
     return new MyTemplateEngine()
   }
 
   createInstance(
     component: GeneralComponent,
-    createShadowRoot: (component: GeneralComponent) => ShadowRoot
+    createShadowRoot: (component: GeneralComponent) => ShadowRoot,
   ): templateEngine.TemplateInstance {
     const instance: templateEngine.TemplateInstance = {
       shadowRoot: createShadowRoot(component),
@@ -64,10 +67,12 @@ class MyTemplateEngine implements templateEngine.TemplateEngine {
         // 组件更新，新的数据是 data ，变更内容描述在 changes 中
       },
     }
+    return instance
   }
 }
 
-export const myComponent = componentSpace.define()
+export const myComponent = componentSpace
+  .define()
   .options({
     templateEngine: MyTemplateEngine,
   })
@@ -91,35 +96,57 @@ import {
   type NormalizedComponentOptions,
   type ShadowRoot,
   type templateEngine,
+  type ExternalShadowRoot,
 } from 'glass-easel'
 
 // The template config specifying the target container for the portal
 type PortalTemplateDef = {
-  targetContainer: Element
+  targetContainer: HTMLElement
 }
 
-class PortalTemplate implements templateEngine.Template {
-  private targetContainer: Element
+class PortalTemplateEngine implements templateEngine.Template {
+  private targetContainer: HTMLElement
 
-  constructor(targetContainer: Element) {
+  constructor(targetContainer: HTMLElement) {
     this.targetContainer = targetContainer
+  }
+
+  static create(
+    behavior: GeneralBehavior,
+    options: NormalizedComponentOptions,
+  ): PortalTemplateEngine {
+    if (!options.externalComponent) {
+      throw new Error('This template engine can only be used with external components')
+    }
+    const templateDef = behavior.getTemplate() as PortalTemplateDef
+    return new PortalTemplateEngine(templateDef.targetContainer)
   }
 
   createInstance(
     component: GeneralComponent,
     createShadowRoot: (component: GeneralComponent) => ShadowRoot,
   ): templateEngine.TemplateInstance {
-    const shadowRoot = createShadowRoot(component)
-    const targetContainer = this.targetContainer
+    const root = component.getBackendElement()!
+    const slot = this.targetContainer as unknown as GeneralBackendElement
 
-    // Create a slot in the shadow root to receive child nodes
-    const slot = shadowRoot.createVirtualNode('slot')
-    Element.setSlotName(slot)
-    slot.destroyBackendElementOnRemoval()
-
-    // Create a wrapper node in the shadow root that will be mounted to the target container
-    const wrapper = shadowRoot.createNativeNode('div')
-    wrapper.destroyBackendElementOnRemoval()
+    const shadowRoot: ExternalShadowRoot = {
+      root,
+      slot,
+      getIdMap(): { [id: string]: GeneralBackendElement } {
+        // Return a mapping from node IDs to backend elements
+        return {}
+      },
+      handleEvent(target: GeneralBackendElement, event: Event<unknown>): void {
+        // Trigger an event on the target element
+      },
+      setListener<T>(
+        elem: GeneralBackendElement,
+        ev: string,
+        listener: (event: ShadowedEvent<T>) => unknown,
+      ): void {
+        // Add an event listener to the element
+      },
+    }
 
     return {
       shadowRoot,
@@ -136,21 +163,12 @@ class PortalTemplate implements templateEngine.Template {
   }
 }
 
-class PortalTemplateEngine implements templateEngine.TemplateEngine {
-  create(
-    behavior: GeneralBehavior,
-    _options: NormalizedComponentOptions,
-  ): templateEngine.Template {
-    const templateDef = behavior.getTemplate() as PortalTemplateDef
-    return new PortalTemplate(templateDef.targetContainer)
-  }
-}
-
 // Usage:
 // Assume `rootContainer` is a node at the root level of the page.
-export const myPortal = componentSpace.define()
+export const myPortal = componentSpace
+  .define()
   .options({
-    templateEngine: new PortalTemplateEngine(),
+    templateEngine: PortalTemplateEngine,
   })
   .template({
     targetContainer: rootContainer, // the portal target
@@ -186,11 +204,19 @@ type VNode =
 // A JSX-like render function that receives data and returns a VNode tree
 type RenderFn = (data: Record<string, unknown>) => VNode
 
-class JsxTemplate implements templateEngine.Template {
+class JsxTemplateEngine implements templateEngine.Template {
   private renderFn: RenderFn
 
   constructor(renderFn: RenderFn) {
     this.renderFn = renderFn
+  }
+
+  static create(
+    behavior: GeneralBehavior,
+    _options: NormalizedComponentOptions,
+  ): JsxTemplateEngine {
+    const renderFn = behavior.getTemplate() as RenderFn
+    return new JsxTemplateEngine(renderFn)
   }
 
   createInstance(
@@ -263,20 +289,11 @@ class JsxTemplate implements templateEngine.Template {
   }
 }
 
-class JsxTemplateEngine implements templateEngine.TemplateEngine {
-  create(
-    behavior: GeneralBehavior,
-    _options: NormalizedComponentOptions,
-  ): templateEngine.Template {
-    const renderFn = behavior.getTemplate() as RenderFn
-    return new JsxTemplate(renderFn)
-  }
-}
-
 // Usage:
-export const myComponent = componentSpace.define()
+export const myComponent = componentSpace
+  .define()
   .options({
-    templateEngine: new JsxTemplateEngine(),
+    templateEngine: JsxTemplateEngine,
   })
   .template(
     // A JSX-like render function as the template

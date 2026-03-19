@@ -11,14 +11,14 @@
 例如，可以在 `a` 和 `b` 两个字段中任何一个被设置时，触发一个响应函数：
 
 ```js
-// 使用连缀方法添加数据监听器
+// 使用 Chaining 方法添加数据监听器
 export const addComponent = componentSpace.define()
   .data(() => ({
     a: 1,
     b: 2,
     sum: 3,
   }))
-  // 在连缀方法中，应传入数组来监听多个数据字段
+// 在 Chaining 方法中，应传入数组来监听多个数据字段
   .observer(['a', 'b'], function () {
     this.updateData({
       sum: this.data.a + this.data.b,

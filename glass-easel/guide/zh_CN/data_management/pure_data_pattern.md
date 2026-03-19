@@ -1,6 +1,6 @@
 # 纯数据字段
 
-通过组件选项 `pureDataPattern` 可以使得一些数据字段不能用于模板上。这个选项接受一个正则表达式，符合这个正则表达式的字段名不能用于模板。
+通过组件选项 `pureDataPattern` 可以将部分数据字段排除在模板渲染之外。该选项接受一个正则表达式，匹配该正则表达式的字段名将不会参与模板渲染。
 
 ```js
 export const myComponent = componentSpace.define()
@@ -8,7 +8,7 @@ export const myComponent = componentSpace.define()
     // 所有以 _ 开头的字段都不能用于模板
     pureDataPattern: /^_/,
   })
-  // 模板上的纯数据字段将视为 undefined
+  // 纯数据字段在模板中将被视为 undefined
   .template(wxml(`
     <div>{{ _a }}</div>
   `))
@@ -18,4 +18,4 @@ export const myComponent = componentSpace.define()
   .registerComponent()
 ```
 
-使用 `pureDataPattern` 通常不会带来性能方面的影响。但如果通过 `dataDeepCopy` 禁用数据拷贝， `pureDataPattern` 可能仍然会带来部分数据拷贝开销。
+使用 `pureDataPattern` 通常不会带来性能影响。但如果通过 `dataDeepCopy` 禁用了数据深拷贝，`pureDataPattern` 仍可能引入部分数据拷贝开销。

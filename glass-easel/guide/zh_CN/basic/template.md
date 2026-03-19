@@ -319,9 +319,9 @@ data: {
 <child id="myChild" />
 ```
 
-在组件代码中，可以通过 `self.$` 快速访问，或通过 `getShadowRoot().getElementById()` 查找带有 `id` 的节点。 `id` 也用于 `listeners` 声明中指定事件目标。
+在组件代码中，可以通过 `this.$` 快速访问，或通过 `getShadowRoot().getElementById()` 查找带有 `id` 的节点。
 
-> 📖 详细用法请参阅 [组件](./component.md) 和 [事件](./event.md#通过-listeners-监听事件) 文档。
+> 📖 详细用法请参阅 [`Component.prototype.$`](../api/component.md#基本属性) 文档。
 
 ## 临时变量
 

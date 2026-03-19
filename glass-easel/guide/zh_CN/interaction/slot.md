@@ -44,12 +44,12 @@ export const myComponent = componentSpace.define()
 ```html
 <!-- myComponent 的 Composed Tree -->
 <myComponent>
-  <shadowRoot>
+  <:shadowRoot>
     <div>
       <child>
-        <shadowRoot>
+        <:shadowRoot>
           <div>
-            <slot>
+            <:slot>
               <!-- slot 内容被插入到此处 -->
               <div class="a">
 ```

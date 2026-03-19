@@ -10,6 +10,8 @@
 
 [框架思维](basic/thinking.md)
 
+[启动与预编译](basic/bootstrap.md)
+
 [模板](basic/template.md)
 
 [组件](basic/component.md)

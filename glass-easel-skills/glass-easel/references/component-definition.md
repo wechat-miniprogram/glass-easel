@@ -200,6 +200,8 @@ Use `.methods()` to batch define methods mounted on `this`. It is recommended to
 
 ## listeners
 
+> ⚠️ **Deprecated**: `listeners` declarative event listening is deprecated. Use `addListener` imperatively to add event listeners instead.
+
 Declaratively bind events on nodes in the Shadow Tree:
 
 ```js
@@ -214,6 +216,28 @@ Declaratively bind events on nodes in the Shadow Tree:
 ```
 
 Key format `{id}.{event}`; omitting the id binds to Shadow Root; id `this` binds to the component itself.
+
+The recommended replacement is to use `addListener` in the `init` function or lifecycle callbacks:
+
+```js
+export const myComponent = componentSpace.define()
+  .template(wxml(`
+    <div id="myDiv">
+      <child id="myChild" />
+    </div>
+  `))
+  .init(function ({ self, lifetime }) {
+    lifetime('attached', function () {
+      this.$.myDiv.addListener('tap', (e) => { /* ... */ })
+      this.$.myChild.addListener('customEvent', (e) => { /* ... */ })
+      this.$.shadowRoot.addListener('someEvent', (e) => { /* Bound to Shadow Root */ })
+      this.addListener('customEvent', (e) => { /* Bound to the component itself */ })
+    })
+  })
+  .registerComponent()
+```
+
+> ⚠️ The `id` in `listeners` keys only matches statically present nodes in the template. For dynamic nodes (e.g., nodes controlled by `wx:if`), the `id` may not be correctly located. It is recommended to use `addListener` or bind events directly in the template with `bind:xxx`.
 
 ## behaviors
 

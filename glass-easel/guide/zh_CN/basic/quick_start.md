@@ -29,7 +29,7 @@ const HelloWorld = componentSpace
 2. 调用 `define()` 开始定义一个组件
 3. 设置模板内容，并调用 `registerComponent()` 完成注册
 
-> 💡 glass-easel 提供了 **Chaining API** 和 **Definition API** 两种组件定义风格。本文使用 Chaining API，它以连缀调用的形式串联各个字段，对 TypeScript 有更好的类型支持。更多详情请参阅 [组件](./component.md) 文档。
+> 💡 glass-easel 提供了 **Chaining API** 和 **Definition API** 两种组件定义风格。本文使用 Chaining API，它以链式调用的形式串联各个字段，对 TypeScript 有更好的类型支持。更多详情请参阅 [组件](./component.md) 文档。
 
 ## 模板和数据渲染
 
@@ -164,7 +164,7 @@ const HelloWorld = componentSpace
   .registerComponent()
 ```
 
-通过 `usingComponent({ Btn })` 引入 `Btn` 组件后，就可以在模板中像使用普通标签一样使用它。`bind:hit` 监听了 `Btn` 组件派发的 `hit` 自定义事件。
+通过 `usingComponents({ Btn })` 引入 `Btn` 组件后，就可以在模板中像使用普通标签一样使用它。`bind:hit` 监听了 `Btn` 组件派发的 `hit` 自定义事件。
 
 注意第一个 `<Btn disable ...>` 传递了 `disable` 属性（等价于 `disable="{{true}}"`），因此减号按钮是禁用状态。
 
@@ -176,8 +176,9 @@ const HelloWorld = componentSpace
 接下来可以根据需要深入学习：
 
 - [框架思维](./thinking.md) —— 深入理解 glass-easel 的声明式、组件隔离和多后端设计理念
+- [启动与预编译](./bootstrap.md) —— 了解如何启动 glass-easel 的渲染流程以及预编译流程
 - [模板](./template.md) —— 了解条件渲染、列表渲染、class/style 绑定等完整模板语法
 - [组件](./component.md) —— 了解两种 API 风格、属性定义、init 函数等组件详细用法
-- [事件](./event.md) —— 了解事件冒泡、捕获、互斥事件等完整的事件处理机制
 - [生命周期](./lifetime.md) —— 了解组件从创建到销毁的完整生命周期
+- [事件](./event.md) —— 了解事件冒泡、捕获、互斥事件等完整的事件处理机制
 - [Slot 插槽](../interaction/slot.md) —— 了解更灵活的内容分发方式

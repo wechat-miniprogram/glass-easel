@@ -99,7 +99,9 @@ export const myComponent = componentSpace.define()
 
 > 📖 `bind:` 和其他前缀的具体区别请参考 [事件绑定](../basic/template.md#事件绑定) 文档。
 
-### 通过 listeners 监听事件
+### 通过 listeners 监听事件（已废弃）
+
+> ⚠️ **已废弃**：`listeners` 声明式事件监听已废弃，建议使用 [`addListener`](#通过-addlistener-监听事件) 命令式地添加事件监听。
 
 `listeners` 提供了一种声明式的方式来监听 Shadow Tree 中节点的事件，无需在模板中使用 `bind:` 绑定。
 
@@ -138,7 +140,43 @@ export const myComponent = componentSpace.define()
 
 设置 `listeners` 与在模板中写 `bind:xxx` 的监听效果相同，但 `listeners` 额外支持监听 `this` （组件自身）上的事件，这在模板中无法直接实现。
 
-> ⚠️ `listeners` 的键中的 `id` 仅匹配模板中静态存在的节点。对于动态节点（例如 `wx:if` 控制的节点），其 `id` 可能无法被正确定位，因此不推荐对动态节点使用 `listeners` 。推荐直接在模板中使用 `bind:xxx` 来绑定事件监听。
+> ⚠️ `listeners` 的键中的 `id` 仅匹配模板中静态存在的节点。对于动态节点（例如 `wx:if` 控制的节点），其 `id` 可能无法被正确定位。推荐使用 `addListener` 或直接在模板中使用 `bind:xxx` 来绑定事件监听。
+
+以下是将上面的 `listeners` 示例改为使用 `addListener` 的等价写法：
+
+```js
+export const myComponent = componentSpace.define()
+  .template(wxml(`
+    <div id="myDiv">
+      <child id="myChild" />
+    </div>
+  `))
+  .init(function ({ self, lifetime }) {
+    const onTap = (e) => {
+      console.log('myDiv tapped', e.detail)
+    }
+
+    const onMyChildCustomEvent = (e) => {
+      console.log('child event', e.detail)
+    }
+
+    const onSomeEvent = (e) => {
+      console.log('shadow root event', e.detail)
+    }
+
+    const onCustomEvent = (e) => {
+      console.log('self event', e.detail)
+    }
+
+    lifetime('attached', function () {
+      this.$.myDiv.addListener('tap', onTap)
+      this.$.myChild.addListener('customEvent', onMyChildCustomEvent)
+      this.$.shadowRoot.addListener('someEvent', onSomeEvent)
+      this.addListener('customEvent', onCustomEvent)
+    })
+  })
+  .registerComponent()
+```
 
 ### 通过 addListener 监听事件
 
@@ -191,10 +229,10 @@ self.removeListener('customEvent', handler)
 
 冒泡事件支持类似于 DOM 事件的捕获阶段。捕获阶段位于普通的冒泡阶段之前，且与冒泡经过的节点顺序正好相反。
 
-事件需要具有捕获阶段时，需要指定 `capture` 选项，例如：
+事件需要具有捕获阶段时，需要指定 `capturePhase` 选项，例如：
 
 ```js
-triggerEvent('customEvent', detail, { bubbles: true, capture: true })
+triggerEvent('customEvent', detail, { bubbles: true, capturePhase: true })
 ```
 
 在捕获阶段绑定响应函数时，可以使用 `capture-bind:` 、 `capture-catch:` 或 `capture-mut-bind:` ，例如：

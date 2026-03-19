@@ -43,7 +43,7 @@ console.log(node.attributes) // [{ name: 'src', value: '...' }, ...]
 console.log(node.classList)
 ```
 
-## Shadow 树结构
+## Shadow Tree 结构
 
 以下属性描述了节点在 [Shadow Tree](../tree/node_tree.md#shadow-tree) 中的位置关系。这些属性都是只读的，不应直接修改。如需变更节点树结构，请参考 [节点树变更](../tree/node_tree_modification.md) 文档。
 
@@ -428,7 +428,7 @@ const intersectionObs = node.createIntersectionObserver(
 
 // 创建尺寸变化观察器
 const resizeObs = node.createResizeObserver(
-  'border-box',  // 观察模式：'border-box' 或 'content-box'
+  glassEasel.ResizeObserverMode.BorderBox,  // 观察模式：ResizeObserverMode.BorderBox 或 ResizeObserverMode.ContentBox
   (status) => {
     console.log('New size:', status.width, status.height)
   },

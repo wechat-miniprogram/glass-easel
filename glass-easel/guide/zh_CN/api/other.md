@@ -175,7 +175,7 @@ observer.disconnect()
 
 | 选项 | 类型 | 说明 |
 | --- | --- | --- |
-| `properties` | `boolean \| 'all'` | 观察属性/property 变更。 `true` 只观察基本属性（ `id` / `class` / `style` / `slot` ）和组件 property ； `'all'` 还包括 dataset 、 mark 、外部样式类和 slot value |
+| `properties` | `boolean \| 'all'` | 观察属性/property 变更。 `true` 只观察基本属性（ `id` / `class` / `style` / `slot` ）、通过 `setAttribute` 设置的普通属性和组件 property ； `'all'` 还包括 dataset 、 mark 、外部样式类和 slot value |
 | `childList` | `boolean` | 观察子节点的添加和移除 |
 | `characterData` | `boolean` | 观察文本节点内容变更 |
 | `subtree` | `boolean` | 是否递归观察子树中的变更（对 `attachStatus` 无效） |
