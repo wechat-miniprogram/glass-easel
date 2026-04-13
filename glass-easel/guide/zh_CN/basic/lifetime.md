@@ -22,13 +22,14 @@ export const myComponent = componentSpace.define()
   .registerComponent()
 ```
 
-glass-easel 会自动触发的生命周期列表如下。
+glass-easel 会自动触发的生命周期列表如下（使用默认模板引擎时）。
 
 | 生命周期 | 触发时机 | 触发次数 | 注意事项 |
 | -------- | -------- | ------ | -------- |
 | `created` | 组件实例刚刚被创建完时触发 | 每个实例触发一次 | 组件还未添加到页面节点树中，不能通过组件节点向上查找父节点或其他兄弟节点。|
 | `attached` | 组件实例被添加到页面后触发 | 每个实例最多触发一次 | |
-| `moved` | 组件实例在节点树中位置被移动后触发 | 只有 `wx:for` 内项目可能触发，次数不定 | |
+| `moved` | 组件实例在节点树中位置被移动后触发 | 次数不定 | 只有 `wx:for` 内项目可能触发。 |
+| `beforeDetach` | 组件实例将被从页面内移除前触发 | 每个实例最多触发一次 | 组件将被移除，不再位于节点树中，不应再操作节点或更新数据。|
 | `detached` | 组件实例被从页面内移除后触发 | 每个实例最多触发一次 | 组件已被移除，不再位于节点树中，不应再操作节点或更新数据。|
 
 ### 生命周期状态轮转示意图
@@ -42,7 +43,8 @@ stateDiagram-v2
   created --> attached: 挂载到页面
   attached --> moved: 在节点树中移动
   moved --> attached: 移动完成
-  attached --> detached: 从页面中移除
+  attached --> beforeDetach: 即将从页面中移除
+  beforeDetach --> detached: 移除完成
   detached --> [*]
 ```
 
