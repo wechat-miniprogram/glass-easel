@@ -507,6 +507,8 @@ export class DataGroup<
   private _$reflectToAttributes: boolean
   /* @internal */
   private _$propFields: { [name: string]: PropertyDefinition }
+  /* @internal */
+  _$propDirty: { [name: string]: boolean }
   /** @internal */
   _$observerTree: DataGroupObserverTree
   /* @internal */
@@ -574,6 +576,7 @@ export class DataGroup<
     this._$propertyPassingDeepCopy = propertyPassingDeepCopy
     this._$reflectToAttributes = reflectToAttributes && !!associatedComponent
     this._$propFields = observerTree.propFields
+    this._$propDirty = Object.create(null) as { [name: string]: boolean }
     this._$observerTree = observerTree
     this._$observerStatus = new Array(observerTree.observers.length) as boolean[]
     this._$propertyComparer = propertyComparer
@@ -1027,6 +1030,7 @@ export class DataGroup<
             comp,
           )
         }
+        this._$propDirty[propName] = true
         if (comp._$mutationObserverTarget) {
           MutationObserverTarget.callAttrObservers(comp, {
             type: 'properties',
