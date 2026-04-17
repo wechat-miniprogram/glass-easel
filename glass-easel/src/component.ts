@@ -1125,6 +1125,21 @@ export class Component<
     return !!comp._$behavior._$propertyMap[propName]
   }
 
+  /**
+   * Check whether a property has been explicitly set since the component was created.
+   *
+   * A property is considered "dirty" once it receives a value through an update
+   * (e.g. `setData`, or parent component passing a prop).
+   * A property that still holds its initial default value is not dirty.
+   */
+  static isDirtyProperty<
+    TData extends DataList,
+    TProperty extends PropertyList,
+    TMethod extends MethodList,
+  >(comp: Component<TData, TProperty, TMethod>, propName: string): boolean {
+    return !!comp._$dataGroup._$propDirty[propName]
+  }
+
   /** List methods by the component definition (backward compatibility) */
   static getMethodsFromDef<
     TData extends DataList,
