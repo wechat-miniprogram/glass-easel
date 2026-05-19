@@ -20,7 +20,7 @@
     "doc": "typedoc src/index.ts --excludePrivate --excludeProtected --excludeInternal",
     "build": "rollup --config rollup.config.ts --configPlugin @rollup/plugin-typescript",
     "dev": "GLASS_EASEL_ARGS=--dev npm run build",
-    "lint": "eslint --ext .js,.ts src",
+    "lint": "eslint src",
     "test": "jest -c jest.config.js",
     "coverage": "jest -c jest.config.js --collect-coverage"
   },

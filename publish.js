@@ -50,7 +50,7 @@ if (
 ].forEach((p) => {
   console.info(`Run eslint on ${p}`)
   if (
-    childProcess.spawnSync('npx', ['eslint', '-c', '../.eslintrc.js', '.'], {
+      childProcess.spawnSync('npx', ['eslint', '-c', '../eslint.config.mjs', '.'], {
       cwd: p,
       stdio: 'inherit',
     }).status !== 0
@@ -60,7 +60,7 @@ if (
 })
 console.info('Run eslint on glass-easel-miniprogram-template')
 if (
-  childProcess.spawnSync('npx', ['eslint', '-c', '.eslintrc.js', '.'], {
+      childProcess.spawnSync('npx', ['eslint', '-c', 'eslint.config.mjs', '.'], {
     cwd: 'glass-easel-miniprogram-template',
     stdio: 'inherit',
   }).status !== 0
