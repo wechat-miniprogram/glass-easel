@@ -28,9 +28,14 @@ import {
 import { TraitBehavior } from './trait_behaviors'
 import { safeCallback } from './func_arr'
 import { type NativeNode } from './native_node'
+import { type ShadowRoot } from './shadow_root'
 import { type TextNode } from './text_node'
 
-export type MiddlewareHook<R, T extends any[]> = (next: (...metadata: T) => R, ...metadata: T) => R
+export type MiddlewareHook<R, T extends any[]> = (
+  this: ShadowRoot,
+  next: (...metadata: T) => R,
+  ...metadata: T
+) => R
 
 export type ComponentSpaceHooks = {
   createTextNode: MiddlewareHook<TextNode, [string]>
@@ -188,9 +193,15 @@ export class ComponentSpace {
   _$sharedStyleScope = 0
   /** The hooks used to alter some workflow within this component space. */
   readonly hooks: ComponentSpaceHooks = {
-    createTextNode: (next, text) => next(text),
-    createNativeNode: (next, tagName, stylingName) => next(tagName, stylingName),
-    createComponent: (next, tagName, definition) => next(tagName, definition),
+    createTextNode(next, text) {
+      return next(text)
+    },
+    createNativeNode(next, tagName, stylingName) {
+      return next(tagName, stylingName)
+    },
+    createComponent(next, tagName, definition) {
+      return next(tagName, definition)
+    },
   }
 
   /**

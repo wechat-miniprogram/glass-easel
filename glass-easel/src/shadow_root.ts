@@ -120,11 +120,12 @@ export class ShadowRoot extends VirtualNode {
   }
 
   createTextNode(text = ''): TextNode {
-    return this._$hooks.createTextNode((text) => new TextNode(text, this), text)
+    return this._$hooks.createTextNode.call(this, (text) => new TextNode(text, this), text)
   }
 
   createNativeNode(tagName: string): NativeNode {
-    return this._$hooks.createNativeNode(
+    return this._$hooks.createNativeNode.call(
+      this,
       (tagName, stylingName) => NativeNode.create(tagName, this, stylingName),
       tagName,
       tagName,
@@ -140,7 +141,8 @@ export class ShadowRoot extends VirtualNode {
     stylingName: string,
     initPropValues?: (comp: NativeNode) => void,
   ): NativeNode {
-    const ret = this._$hooks.createNativeNode(
+    const ret = this._$hooks.createNativeNode.call(
+      this,
       (tagName, stylingName) => NativeNode.create(tagName, this, stylingName),
       tagName,
       stylingName,
@@ -236,7 +238,8 @@ export class ShadowRoot extends VirtualNode {
     const node =
       typeof using === 'string'
         ? this.createNativeNodeWithInit(using, tagName, initPropValues)
-        : this._$hooks.createComponent(
+        : this._$hooks.createComponent.call(
+            this,
             (tagName, compDef) =>
               Component._$advancedCreate(
                 tagName,
@@ -281,7 +284,8 @@ export class ShadowRoot extends VirtualNode {
     const beh = host._$behavior
     return typeof componentDef === 'string'
       ? this.createNativeNodeWithInit(componentDef, tagName, initPropValues)
-      : this._$hooks.createComponent(
+      : this._$hooks.createComponent.call(
+          this,
           (tagName, compDef) =>
             Component._$advancedCreate(
               tagName,
