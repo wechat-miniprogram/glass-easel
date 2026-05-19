@@ -373,6 +373,26 @@ export class ShadowSyncElement implements GlassEaselBackend.Element {
     }
   }
 
+  createResizeObserver(
+    mode: GlassEaselBackend.ResizeObserverMode,
+    listener: (res: GlassEaselBackend.ResizeStatus) => void,
+  ): GlassEaselBackend.Observer {
+    const id = this.getChannel().createResizeObserver(this._id, mode, listener)
+    return {
+      disconnect: () => {
+        this.getChannel().disconnectObserver(id)
+      },
+    }
+  }
+
+  triggerNativeEvent(type: string, detail: unknown): void {
+    this.getChannel().triggerNativeEvent(this._id, type, detail)
+  }
+
+  manipulateNativeNode(action: string, args: unknown, cb: (res: unknown) => void): void {
+    this.getChannel().manipulateNativeNode(this._id, action, args, cb)
+  }
+
   getContext(cb: (res: any) => void): void {
     this.getChannel().getContext(this._id, cb)
   }

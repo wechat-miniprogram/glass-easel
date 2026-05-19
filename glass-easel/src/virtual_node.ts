@@ -7,7 +7,6 @@ import { VIRTUAL_NODE_SYMBOL, isVirtualNode } from './type_symbol'
 
 export class VirtualNode extends Element {
   [VIRTUAL_NODE_SYMBOL]: true
-  is: string
 
   /* @internal */
   /* istanbul ignore next */
@@ -23,7 +22,7 @@ export class VirtualNode extends Element {
     owner: ShadowRoot,
     nodeTreeContext: GeneralBackendContext | null,
   ) {
-    this.is = String(virtualName)
+    const is = String(virtualName)
     if (
       nodeTreeContext &&
       (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Shadow))
@@ -32,13 +31,13 @@ export class VirtualNode extends Element {
       if (ENV.DEV) performanceMeasureStart('backend.createVirtualNode')
       const be = shadowRoot.createVirtualNode(virtualName)
       if (ENV.DEV) performanceMeasureEnd()
-      this._$initialize(true, be, owner, nodeTreeContext)
+      this._$initialize(is, true, be, owner, nodeTreeContext)
       if (ENV.DEV) performanceMeasureStart('backend.associateValue')
       be.__wxElement = this
       be.associateValue(this)
       if (ENV.DEV) performanceMeasureEnd()
     } else {
-      this._$initialize(true, null, owner, owner._$nodeTreeContext)
+      this._$initialize(is, true, null, owner, owner._$nodeTreeContext)
     }
   }
 

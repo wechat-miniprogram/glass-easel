@@ -613,6 +613,7 @@ export class Component<
       }
     }
     comp._$initialize(
+      def.is,
       virtualHost,
       backendElement,
       owner,
@@ -1037,10 +1038,6 @@ export class Component<
       null,
       initPropValues,
     )
-  }
-
-  get is(): string {
-    return this._$definition.is
   }
 
   get properties(): Merge<DataWithPropertyValues<TData, TProperty>> {

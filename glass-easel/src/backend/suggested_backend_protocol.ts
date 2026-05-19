@@ -26,12 +26,14 @@ export type Element<E> = {
   ): void
   getBoundingClientRect(cb: (res: BoundingClientRect) => void): void
   getBoxModel(
-    cb: (res: {
-      margin: BoundingClientRect
-      border: BoundingClientRect
-      padding: BoundingClientRect
-      content: BoundingClientRect
-    }) => void,
+    cb: (
+      res: {
+        margin: BoundingClientRect
+        border: BoundingClientRect
+        padding: BoundingClientRect
+        content: BoundingClientRect
+      } | null,
+    ) => void,
   ): void
   createIntersectionObserver(
     relativeElement: E | null,
@@ -47,6 +49,8 @@ export type Element<E> = {
   setScrollPosition(scrollLeft: number, scrollTop: number, duration: number): void
   getContext(cb: (res: unknown) => void): void
   getPseudoTypes(cb: (res: string[]) => void): void
+  triggerNativeEvent(type: string, detail: unknown): void
+  manipulateNativeNode(action: string, args: unknown, cb: (res: unknown) => void): void
 }
 
 export type ElementForDomLike = {

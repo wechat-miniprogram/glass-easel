@@ -82,7 +82,6 @@ export class ShadowRoot extends VirtualNode {
       be = (host._$backendElement as backend.Element).getShadowRoot()!
     }
 
-    node.is = 'shadow'
     node._$idMap = null
     let slotMode = SlotMode.Single
     const hostComponentOptions = host.getComponentOptions()
@@ -105,7 +104,7 @@ export class ShadowRoot extends VirtualNode {
       node._$updateDynamicSlotValueHandler = undefined
     }
     node._$backendShadowRoot = be
-    node._$initialize(true, be, node, host._$nodeTreeContext)
+    node._$initialize('shadow', true, be, node, host._$nodeTreeContext)
     node._$host = host
     node._$hooks = host.getOwnerSpace().hooks
     host.shadowRoot = node

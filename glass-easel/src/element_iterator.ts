@@ -93,11 +93,6 @@ export class ElementIterator<T extends Node = Element> {
   static create(
     node: Node,
     type: ElementIteratorType,
-    nodeTypeLimit?: typeof Element,
-  ): ElementIterator<Element>
-  static create(
-    node: Node,
-    type: ElementIteratorType,
     nodeTypeLimit: typeof Component,
   ): ElementIterator<GeneralComponent>
   static create(
@@ -115,6 +110,11 @@ export class ElementIterator<T extends Node = Element> {
     type: ElementIteratorType,
     nodeTypeLimit: typeof VirtualNode,
   ): ElementIterator<VirtualNode>
+  static create(
+    node: Node,
+    type: ElementIteratorType,
+    nodeTypeLimit?: typeof Element,
+  ): ElementIterator<Element>
   static create(
     node: Node,
     type: ElementIteratorType,

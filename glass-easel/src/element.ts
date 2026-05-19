@@ -108,6 +108,7 @@ export type DoubleLinkedList<T> = {
  */
 export class Element implements NodeCast {
   [ELEMENT_SYMBOL]: true
+  public is: string
   /** @internal */
   _$backendElement: GeneralBackendElement | null
   /** @internal */
@@ -169,11 +170,13 @@ export class Element implements NodeCast {
 
   /* @internal */
   protected _$initialize(
+    is: string,
     virtual: boolean,
     backendElement: GeneralBackendElement | null,
     owner: ShadowRoot | null,
     nodeTreeContext: GeneralBackendContext | DestroyedBackendContext,
   ) {
+    this.is = is
     this._$backendElement = backendElement
     this._$destroyOnRemoval = AutoDestroyState.Disabled
     this._$nodeTreeContext = nodeTreeContext
