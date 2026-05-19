@@ -389,5 +389,49 @@ describe('Component Space', () => {
       glassEasel.Component.createWithContext('root', compDef, domBackend)
       expect(callCount).toBe(1)
     })
+
+    test('hooks receive the calling shadow root as this', () => {
+      const cs = new glassEasel.ComponentSpace()
+      const childCompDef = cs.defineComponent({
+        is: 'comp/child',
+      })
+      const compDef = cs.defineComponent({
+        is: 'comp/parent',
+        using: {
+          c: 'child',
+        },
+        template: tmpl(`
+          <div>ABC</div>
+          <native-node />
+          <c id="child" />
+        `),
+      })
+      cs.setGlobalUsingComponent('native-node', 'span')
+      const textHookThisList: glassEasel.ShadowRoot[] = []
+      const nativeHookThisList: glassEasel.ShadowRoot[] = []
+      const componentHookThisList: glassEasel.ShadowRoot[] = []
+      cs.hooks.createTextNode = function (next, text) {
+        textHookThisList.push(this)
+        return next(text)
+      }
+      cs.hooks.createNativeNode = function (next, tagName, stylingName) {
+        nativeHookThisList.push(this)
+        return next(tagName, stylingName)
+      }
+      cs.hooks.createComponent = function (next, tagName, def) {
+        componentHookThisList.push(this)
+        return next(tagName, def)
+      }
+
+      const root = glassEasel.Component.createWithContext('root', compDef, domBackend)
+
+      expect(textHookThisList).toStrictEqual([root.shadowRoot])
+      expect(nativeHookThisList).toStrictEqual([root.shadowRoot, root.shadowRoot])
+      expect(componentHookThisList).toStrictEqual([root.shadowRoot])
+      expect(root.$.child).toBeInstanceOf(glassEasel.Component)
+      expect((root.$.child as glassEasel.GeneralComponent).asInstanceOf(childCompDef)).toBe(
+        root.$.child,
+      )
+    })
   })
 })
