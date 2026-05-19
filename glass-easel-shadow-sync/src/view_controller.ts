@@ -25,9 +25,16 @@ import { dashToCamelCase, initValues, updateValues } from './utils'
 // eslint-disable-next-line @typescript-eslint/ban-types
 type OptionalKeys<T> = { [P in keyof T]-?: {} extends Pick<T, P> ? P : never }[keyof T]
 
+type NormalFunction<Args extends any[], Ret> = (...args: Args) => Ret
 type CallbackFunction<Args extends any[], Ret> = (...args: [...Args, (ret: Ret) => void]) => void
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-type ParametersOrNever<T> = T extends CallbackFunction<infer Arg, infer Ret> ? Arg : never
+type CallbackParametersOrNever<T> = T extends CallbackFunction<infer Arg, infer Ret>
+  ? Arg
+  : T extends NormalFunction<infer Arg, infer Ret>
+  ? Arg
+  : never
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type ParametersOrNever<T> = T extends NormalFunction<infer Arg, infer Ret> ? Arg : never
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type DefaultReturn<T> = T extends CallbackFunction<infer Arg, infer Ret> ? Ret : never
 
@@ -165,6 +172,14 @@ export class ViewController {
         listener,
       ) ?? undefined
     )
+  }
+
+  createResizeObserver(
+    target: Element,
+    mode: GlassEaselBackend.ResizeObserverMode,
+    listener: (res: GlassEaselBackend.ResizeStatus) => void,
+  ): GlassEaselBackend.Observer | undefined {
+    return target.createResizeObserver(mode, listener) ?? undefined
   }
 
   createElement(logicalName: string, stylingName: string, ownerShadowRoot: ShadowRoot): Element {
@@ -476,6 +491,31 @@ export class ViewController {
     element: Element,
     method: M,
     args: ParametersOrNever<GlassEaselBackend.Element[M]>,
+  ): void {
+    const { _glassEasel } = this
+    const backendContext = element.getBackendContext()
+    const backendElement = element.getBackendElement()
+    if (!backendContext || !backendElement) {
+      return
+    }
+    if (backendContext.mode === _glassEasel.BackendMode.Domlike) {
+      if (!(backendContext as any)[method]) {
+        return
+      }
+      ;(backendContext as any)[method](backendElement as domlikeBackend.Element, ...args)
+    } else {
+      const be = backendElement as composedBackend.Element | shadowBackend.Element
+      if (!be[method]) {
+        return
+      }
+      ;(be as any)[method](...args)
+    }
+  }
+
+  private callSuggestedBackendCbMethod<M extends OptionalKeys<GlassEaselBackend.Element>>(
+    element: Element,
+    method: M,
+    args: CallbackParametersOrNever<GlassEaselBackend.Element[M]>,
     defaultReturn: DefaultReturn<GlassEaselBackend.Element[M]>,
     cb: (res: DefaultReturn<GlassEaselBackend.Element[M]>) => void,
   ): void {
@@ -503,7 +543,7 @@ export class ViewController {
     element: Element,
     cb: (res: GlassEaselBackend.GetAllComputedStylesResponses) => void,
   ): void {
-    this.callSuggestedBackendMethod(element, 'getAllComputedStyles', [], { properties: [] }, cb)
+    this.callSuggestedBackendCbMethod(element, 'getAllComputedStyles', [], { properties: [] }, cb)
   }
 
   getPseudoComputedStyles(
@@ -511,7 +551,7 @@ export class ViewController {
     pseudoType: string,
     cb: (res: GlassEaselBackend.GetAllComputedStylesResponses) => void,
   ): void {
-    this.callSuggestedBackendMethod(
+    this.callSuggestedBackendCbMethod(
       element,
       'getPseudoComputedStyles',
       [pseudoType],
@@ -524,7 +564,7 @@ export class ViewController {
     element: Element,
     cb: (res: GlassEaselBackend.GetInheritedRulesResponses) => void,
   ): void {
-    this.callSuggestedBackendMethod(element, 'getInheritedRules', [], { rules: [] }, cb)
+    this.callSuggestedBackendCbMethod(element, 'getInheritedRules', [], { rules: [] }, cb)
   }
 
   replaceStyleSheetAllProperties(
@@ -550,12 +590,14 @@ export class ViewController {
 
   getBoxModel(
     element: Element,
-    cb: (res: {
-      margin: GlassEaselBackend.BoundingClientRect
-      border: GlassEaselBackend.BoundingClientRect
-      padding: GlassEaselBackend.BoundingClientRect
-      content: GlassEaselBackend.BoundingClientRect
-    }) => void,
+    cb: (
+      res: {
+        margin: GlassEaselBackend.BoundingClientRect
+        border: GlassEaselBackend.BoundingClientRect
+        padding: GlassEaselBackend.BoundingClientRect
+        content: GlassEaselBackend.BoundingClientRect
+      } | null,
+    ) => void,
   ): void {
     const mockRect = { left: 0, top: 0, width: 0, height: 0 }
     const mockBoxModel = {
@@ -564,14 +606,14 @@ export class ViewController {
       padding: mockRect,
       content: mockRect,
     }
-    this.callSuggestedBackendMethod(element, 'getBoxModel', [], mockBoxModel, cb)
+    this.callSuggestedBackendCbMethod(element, 'getBoxModel', [], mockBoxModel, cb)
   }
 
   getMatchedRules(
     element: Element,
     cb: (res: GlassEaselBackend.GetMatchedRulesResponses) => void,
   ): void {
-    this.callSuggestedBackendMethod(element, 'getMatchedRules', [], { inline: [], rules: [] }, cb)
+    this.callSuggestedBackendCbMethod(element, 'getMatchedRules', [], { inline: [], rules: [] }, cb)
   }
 
   getScrollOffset(
@@ -618,11 +660,11 @@ export class ViewController {
   }
 
   getContext(element: Element, cb: (res: any) => void): void {
-    this.callSuggestedBackendMethod(element, 'getContext', [], null, cb)
+    this.callSuggestedBackendCbMethod(element, 'getContext', [], null, cb)
   }
 
   getPseudoTypes(element: Element, cb: (res: string[]) => void): void {
-    this.callSuggestedBackendMethod(element, 'getPseudoTypes', [], [], cb)
+    this.callSuggestedBackendCbMethod(element, 'getPseudoTypes', [], [], cb)
   }
 
   startOverlayInspect(callback: (event: string, node: Element | null) => void): void {
@@ -639,6 +681,25 @@ export class ViewController {
       return
     }
     _backendContext.stopOverlayInspect()
+  }
+
+  triggerNativeEvent(element: Element, type: string, detail: unknown): void {
+    this.callSuggestedBackendMethod(element, 'triggerNativeEvent', [type, detail])
+  }
+
+  manipulateNativeNode(
+    element: Element,
+    action: string,
+    args: unknown,
+    callback: (res: unknown) => void,
+  ): void {
+    this.callSuggestedBackendCbMethod(
+      element,
+      'manipulateNativeNode',
+      [action, args],
+      null,
+      callback,
+    )
   }
 
   setListenerStats(

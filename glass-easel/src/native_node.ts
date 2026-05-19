@@ -16,7 +16,6 @@ import { NATIVE_NODE_SYMBOL, isNativeNode } from './type_symbol'
 
 export class NativeNode extends Element {
   [NATIVE_NODE_SYMBOL]: true
-  is: string
   public stylingName: string
   /* @internal */
   private _$modelBindingListeners?: { [name: string]: ModelBindingListener }
@@ -34,7 +33,6 @@ export class NativeNode extends Element {
   /* @internal */
   static create(tagName: string, owner: ShadowRoot, stylingName?: string): NativeNode {
     const node = Object.create(NativeNode.prototype) as NativeNode
-    node.is = tagName
     node.stylingName = stylingName ?? tagName
     const nodeTreeContext = owner.getBackendContext()
     let backendElement: GeneralBackendElement | null = null
@@ -50,7 +48,7 @@ export class NativeNode extends Element {
       }
       if (ENV.DEV) performanceMeasureEnd()
     }
-    node._$initialize(false, backendElement, owner, owner._$nodeTreeContext)
+    node._$initialize(tagName, false, backendElement, owner, owner._$nodeTreeContext)
     const ownerHost = owner.getHostNode()
     const [styleScope, extraStyleScope, styleScopeManager] = ownerHost.getStyleScopes()
     node.classList = new ClassList(
