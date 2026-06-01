@@ -918,6 +918,14 @@ export class CurrentWindowBackendContext implements Context {
     this._stopOverlayInspectHandler()
     this._stopOverlayInspectHandler = null
   }
+
+  getActiveElement(cb: (node: GlassEaselElement | null) => void): void {
+    let node = document.activeElement as Element | null
+    while (node !== null && !node.__wxElement) {
+      node = node?.parentNode || null
+    }
+    cb(node?.__wxElement ?? null)
+  }
 }
 
 const debounce = <Func extends (...args: any[]) => void>(func: Func, wait: number): Func => {

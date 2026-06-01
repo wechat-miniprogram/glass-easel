@@ -158,6 +158,7 @@ export interface Context<Ctx, Elem> {
   ): void
   startOverlayInspect(cb: (event: string, node: GlassEaselElement | null) => void): void
   stopOverlayInspect(): void
+  getActiveElement(cb: (node: GlassEaselElement | null) => void): void
 }
 
 type UnshiftTarget<Fn, T> = Fn extends (...args: infer Args) => infer Ret
