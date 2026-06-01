@@ -710,6 +710,18 @@ export class ShadowSyncBackendContext implements GlassEaselBackend.Context {
     }
   }
 
+  getActiveElement(cb: (node: Element | null) => void): void {
+    this.channel.getActiveElement((elementId) => {
+      cb(elementId ? (this._elementIdMap[elementId]!.__wxElement as Element) : null)
+    })
+  }
+
+  elementFromPoint(left: number, top: number, cb: (node: Element | null) => void): void {
+    this.channel.elementFromPoint(left, top, (elementId) => {
+      cb(elementId ? (this._elementIdMap[elementId]!.__wxElement as Element) : null)
+    })
+  }
+
   _genElementId() {
     return this._elementIdGen.gen()
   }

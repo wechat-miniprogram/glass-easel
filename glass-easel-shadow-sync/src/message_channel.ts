@@ -32,6 +32,8 @@ export const enum ChannelEventType {
   CREATE_RESIZE_OBSERVER,
   RESIZE_OBSERVER_CALLBACK,
   DISCONNECT_OBSERVER,
+  ELEMENT_FROM_POINT,
+  ELEMENT_FROM_POINT_CALLBACK,
 
   CREATE_ELEMENT,
   CREATE_COMPONENT,
@@ -108,6 +110,8 @@ export const enum ChannelEventType {
   TRIGGER_NATIVE_EVENT,
   MANIPULATE_NATIVE_NODE,
   MANIPULATE_NATIVE_NODE_CALLBACK,
+  GET_ACTIVE_ELEMENT,
+  GET_ACTIVE_ELEMENT_CALLBACK,
 
   PERFORMANCE_START_TRACE,
   PERFORMANCE_END_TRACE,
@@ -128,6 +132,7 @@ export type ChannelEventTypeViewSide =
   | ChannelEventType.MEDIA_QUERY_OBSERVER_CALLBACK
   | ChannelEventType.INTERSECTION_OBSERVER_CALLBACK
   | ChannelEventType.RESIZE_OBSERVER_CALLBACK
+  | ChannelEventType.ELEMENT_FROM_POINT_CALLBACK
   | ChannelEventType.SET_MODEL_BINDING_STAT_CALLBACK
   | ChannelEventType.GET_ALL_COMPUTED_STYLES_CALLBACK
   | ChannelEventType.GET_PSEUDO_COMPUTED_STYLES_CALLBACK
@@ -140,6 +145,7 @@ export type ChannelEventTypeViewSide =
   | ChannelEventType.GET_PSEUDO_TYPES_CALLBACK
   | ChannelEventType.START_OVERLAY_INSPECT_CALLBACK
   | ChannelEventType.MANIPULATE_NATIVE_NODE_CALLBACK
+  | ChannelEventType.GET_ACTIVE_ELEMENT_CALLBACK
   | ChannelEventType.GET_CONTEXT_CALLBACK
   | ChannelEventType.ON_CREATE_EVENT
   | ChannelEventType.ON_EVENT
@@ -174,6 +180,8 @@ export type ChannelArgs = ExhaustiveChannelEvent<{
   [ChannelEventType.CREATE_RESIZE_OBSERVER]: [number, number, number]
   [ChannelEventType.RESIZE_OBSERVER_CALLBACK]: [number, string]
   [ChannelEventType.DISCONNECT_OBSERVER]: [number]
+  [ChannelEventType.ELEMENT_FROM_POINT]: [number, number, number]
+  [ChannelEventType.ELEMENT_FROM_POINT_CALLBACK]: [number, number | null]
 
   [ChannelEventType.CREATE_ELEMENT]: [number, string, string, number]
   [ChannelEventType.CREATE_COMPONENT]: [
@@ -274,6 +282,8 @@ export type ChannelArgs = ExhaustiveChannelEvent<{
   [ChannelEventType.TRIGGER_NATIVE_EVENT]: [number, string, string]
   [ChannelEventType.MANIPULATE_NATIVE_NODE]: [number, string, string, number]
   [ChannelEventType.MANIPULATE_NATIVE_NODE_CALLBACK]: [number, string]
+  [ChannelEventType.GET_ACTIVE_ELEMENT]: [number]
+  [ChannelEventType.GET_ACTIVE_ELEMENT_CALLBACK]: [number, number | null]
 
   [ChannelEventType.INSERT_DYNAMIC_SLOT]: [number, [number, string, string][]]
   [ChannelEventType.UPDATE_DYNAMIC_SLOT]: [number, string, string[]]
@@ -414,6 +424,9 @@ export const MessageChannelDataSide = (
       case ChannelEventType.RESIZE_OBSERVER_CALLBACK:
         id2callback<Channel['createResizeObserver']>(arg[1], false)?.(JSON.parse(arg[2]))
         break
+      case ChannelEventType.ELEMENT_FROM_POINT_CALLBACK:
+        id2callback<Channel['elementFromPoint']>(arg[1])!(arg[2])
+        break
       case ChannelEventType.SET_MODEL_BINDING_STAT_CALLBACK:
         id2callback<Channel['setModelBindingStat']>(arg[1])!(JSON.parse(arg[2]))
         break
@@ -491,12 +504,14 @@ export const MessageChannelDataSide = (
       case ChannelEventType.GET_PSEUDO_TYPES_CALLBACK:
         id2callback<Channel['getPseudoTypes']>(arg[1])!(arg[2])
         break
-      case ChannelEventType.START_OVERLAY_INSPECT_CALLBACK: {
+      case ChannelEventType.START_OVERLAY_INSPECT_CALLBACK:
         id2callback<Channel['startOverlayInspect']>(arg[1], false)?.(arg[2], arg[3])
         break
-      }
       case ChannelEventType.MANIPULATE_NATIVE_NODE_CALLBACK:
         id2callback<Channel['manipulateNativeNode']>(arg[1])!(JSON.parse(arg[2]))
+        break
+      case ChannelEventType.GET_ACTIVE_ELEMENT_CALLBACK:
+        id2callback<Channel['getActiveElement']>(arg[1])!(arg[2])
         break
       case ChannelEventType.PERFORMANCE_STATS_CALLBACK: {
         id2callback<Channel['performanceEndTrace']>(arg[1])!({
@@ -594,6 +609,7 @@ export const MessageChannelDataSide = (
       publish([ChannelEventType.DISCONNECT_OBSERVER, id])
       releaseCallbackId(id)
     },
+    elementFromPoint: (x: number, y: number, cb: (res: number | null) => void) => publish([ChannelEventType.ELEMENT_FROM_POINT, x, y, callback2id(cb)]),
 
     createElement: (id: number, logicalName: string, stylingName: string, ownerShadowRootId: number) => publish([ChannelEventType.CREATE_ELEMENT, id, logicalName, stylingName, ownerShadowRootId]),
     createComponent: (id: number, shadowRootId: number, tagName: string, virtualHost: boolean, styleScope: number, extraStyleScope: number | null, externalClasses: string[] | undefined, slotMode: number | null, writeIdToDOM: boolean, ownerShadowRootId: number) => publish([ChannelEventType.CREATE_COMPONENT, id, shadowRootId, tagName, virtualHost, styleScope, extraStyleScope, externalClasses, slotMode, writeIdToDOM, ownerShadowRootId]),
@@ -701,6 +717,7 @@ export const MessageChannelDataSide = (
       args: unknown,
       cb: (res: unknown) => void,
     ) => publish([ChannelEventType.MANIPULATE_NATIVE_NODE, elementId, action, JSON.stringify(args), callback2id(cb)]),
+    getActiveElement: (cb: (elementId: number | null) => void) => publish([ChannelEventType.GET_ACTIVE_ELEMENT, callback2id(cb)]),
 
     performanceStartTrace: (index: number) => publish([ChannelEventType.PERFORMANCE_START_TRACE, index]),
     performanceEndTrace: (id: number, cb: (stats: { startTimestamp: number; endTimestamp: number }) => void,) => publish([ChannelEventType.PERFORMANCE_END_TRACE, id, callback2id(cb)]),
@@ -951,6 +968,14 @@ export const MessageChannelViewSide = (
           observer.disconnect()
           observersMap[callbackId] = undefined
         }
+        break
+      }
+      case ChannelEventType.ELEMENT_FROM_POINT: {
+        const [, x, y, callbackId] = arg
+        controller.elementFromPoint(x, y, (res) => {
+          const nodeId = res ? getNodeId(res)! : null
+          publish([ChannelEventType.ELEMENT_FROM_POINT_CALLBACK, callbackId, nodeId])
+        })
         break
       }
       case ChannelEventType.CREATE_ELEMENT: {
@@ -1368,6 +1393,14 @@ export const MessageChannelViewSide = (
             callbackId,
             JSON.stringify(res),
           ])
+        })
+        break
+      }
+      case ChannelEventType.GET_ACTIVE_ELEMENT: {
+        const [, callbackId] = arg
+        controller.getActiveElement((element) => {
+          const elementId = element ? getNodeId(element)! : null
+          publish([ChannelEventType.GET_ACTIVE_ELEMENT_CALLBACK, callbackId, elementId])
         })
         break
       }

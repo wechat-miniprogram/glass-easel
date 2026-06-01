@@ -182,6 +182,15 @@ export class ViewController {
     return target.createResizeObserver(mode, listener) ?? undefined
   }
 
+  elementFromPoint(x: number, y: number, cb: (element: Element | null) => void): void {
+    const { _backendContext } = this
+    if (!_backendContext.elementFromPoint) {
+      cb(null)
+      return
+    }
+    _backendContext.elementFromPoint(x, y, cb)
+  }
+
   createElement(logicalName: string, stylingName: string, ownerShadowRoot: ShadowRoot): Element {
     return ownerShadowRoot.createNativeNodeWithInit(logicalName, stylingName, undefined)
   }
@@ -700,6 +709,14 @@ export class ViewController {
       null,
       callback,
     )
+  }
+
+  getActiveElement(cb: (node: Element | null) => void): void {
+    const { _backendContext } = this
+    if (!_backendContext.getActiveElement) {
+      return cb(null)
+    }
+    _backendContext.getActiveElement(cb)
   }
 
   setListenerStats(
