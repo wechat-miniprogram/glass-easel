@@ -172,7 +172,7 @@ export class EventTarget<TEvents extends { [type: string]: unknown }> {
   getListeners() {
     const finalListeners = Object.create(null) as Record<
       string,
-      (EventListenerOptions & { listener: EventListener<unknown> })[]
+      (Required<EventListenerOptions> & { listener: EventListener<unknown> })[]
     >
     const resolveListeners = (
       listeners: { [T in keyof TEvents]: EventFuncArr<TEvents[T]> },

@@ -119,7 +119,8 @@ export interface ProcGen {
     isCreation: false,
     data: DataValue,
     dataUpdatePathTree: UpdatePathTreeNode,
-  ): { C: DefineChildren }
+    bindingMapGenList: { [field: string]: BindingMapGen[] } | undefined,
+  ): { C: DefineChildren; B?: { [field: string]: BindingMapGen[] } }
 }
 
 export type ProcGenEnv = {
@@ -208,10 +209,15 @@ export class ProcGenWrapper {
     return children.B
   }
 
-  update(data: DataValue, dataUpdatePathTree: UpdatePathTreeNode): void {
+  update(
+    data: DataValue,
+    dataUpdatePathTree: UpdatePathTreeNode,
+    bindingMapGen: { [field: string]: BindingMapGen[] } | undefined,
+  ): { [field: string]: BindingMapGen[] } | undefined {
     const { shadowRoot, procGen } = this
-    const children = procGen(this, false, data, dataUpdatePathTree)
+    const children = procGen(this, false, data, dataUpdatePathTree, bindingMapGen)
     this.handleChildrenUpdate(children.C, shadowRoot, undefined, undefined)
+    return children.B
   }
 
   private endBindingMapUpdateForElement(elem: Element) {

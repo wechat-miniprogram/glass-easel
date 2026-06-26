@@ -2488,7 +2488,10 @@ export class Element implements NodeCast {
     }
   }
 
-  getListeners(): Record<string, (EventListenerOptions & { listener: EventListener<unknown> })[]> {
+  getListeners(): Record<
+    string,
+    (Required<EventListenerOptions> & { listener: EventListener<unknown> })[]
+  > {
     return this._$eventTarget.getListeners()
   }
 

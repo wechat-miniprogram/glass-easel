@@ -61,7 +61,7 @@ impl Template {
                      has_scripts: bool| {
                         w.expr_stmt(|w| {
                             write!(w, "H[{key}]=", key = gen_lit_str(key))?;
-                            w.function_args("R,C,D,U", |w| {
+                            w.function_args("R,C,D,U,A", |w| {
                                 if has_scripts {
                                     w.expr_stmt(|w| {
                                         write!(w, "R.setFnFilter(Q.A,Q.B)")?;
@@ -86,8 +86,8 @@ impl Template {
                                     declare_shortcut!("L", "R.c");
                                     declare_shortcut!("M", "R.m");
                                     declare_shortcut!("O", "R.r");
-                                    w.set_var_on_top_scope_init("A", |w| {
-                                        write!(w, "{{")?;
+                                    w.expr_stmt(|w| {
+                                        write!(w, "A=A||{{")?;
                                         for (index, (key, size)) in bmc.list_fields().enumerate() {
                                             if index > 0 {
                                                 write!(w, ",")?;
