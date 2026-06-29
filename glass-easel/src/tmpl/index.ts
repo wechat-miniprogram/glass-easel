@@ -23,11 +23,11 @@ export {
   type ChangePropFilter,
 } from './proc_gen_wrapper'
 
-const DEFAULT_PROC_GEN: ProcGen = () => ({
+const DEFAULT_PROC_GEN: ProcGen = (R, C, D, U?, A?) => ({
   C: (isCreation, defineTextNode, defineElement, defineIfGroup, defineForLoop, defineSlot) => {
     defineSlot('')
   },
-  B: Object.create(null) as { [field: string]: BindingMapGen[] },
+  B: (A || Object.create(null)) as { [field: string]: BindingMapGen[] },
 })
 export const DEFAULT_PROC_GEN_GROUP: (name: string) => ProcGen = () => DEFAULT_PROC_GEN
 
@@ -230,7 +230,22 @@ export class GlassEaselTemplateInstance implements TemplateInstance {
         }
       }
     }
-    this.procGenWrapper.update(data, dataUpdatePathTree)
+    const oldBindingMapGen = this.bindingMapGen
+    const bindingMapGen = (this.bindingMapGen =
+      this.procGenWrapper.update(data, dataUpdatePathTree, oldBindingMapGen) || oldBindingMapGen)
+    // FIXME: this is a temporary solution for older version of template compiler
+    // procGen will return fresh new bindingMapGen each time
+    // we need to use the new one but it may contain undefined items
+    if (oldBindingMapGen && bindingMapGen && oldBindingMapGen !== bindingMapGen) {
+      const keys = Object.keys(bindingMapGen)
+      for (let i = 0; i < keys.length; i += 1) {
+        const key = keys[i]!
+        const updators = bindingMapGen[key]!
+        for (let j = 0; j < updators.length; j += 1) {
+          if (!updators[j]) updators[j] = oldBindingMapGen[key]![j]!
+        }
+      }
+    }
   }
 
   tryBindingMapUpdate(data: DataValue, change?: DataChange): boolean {

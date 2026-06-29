@@ -579,6 +579,59 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect(domHtml(elem)).toBe('<div>1-1-1</div><div>2-2-2</div><div>3-3-3</div><div>4-4-4</div>')
     matchElementWithDom(elem)
   })
+
+  test('binding map update after replacing', () => {
+    const cs = new glassEasel.ComponentSpace()
+
+    const Root = cs.defineComponent({
+      using: {
+        child: 'child',
+      },
+      placeholders: {
+        child: 'div',
+      },
+      template: tmpl(`
+        <child visible="{{visible}}"></child>
+      `),
+      data: {
+        visible: false,
+      },
+    })
+    const elem = glassEasel.Component.createWithContext('root', Root, testBackend)
+    glassEasel.Element.pretendAttached(elem)
+
+    expect(domHtml(elem)).toBe('<div></div>')
+    matchElementWithDom(elem)
+
+    // update something
+    elem.setData({ a: 1, b: 2 } as any)
+
+    const callOrder: boolean[] = []
+
+    cs.defineComponent({
+      is: 'child',
+      template: tmpl(`
+        <div>{{visible}}</div>
+      `),
+      properties: {
+        visible: {
+          type: Boolean,
+          observer: (val: boolean) => {
+            callOrder.push(val)
+          },
+        },
+      },
+    })
+
+    expect(callOrder).toStrictEqual([])
+    expect(domHtml(elem)).toBe('<child><div>false</div></child>')
+    matchElementWithDom(elem)
+
+    elem.setData({ visible: true })
+    expect(callOrder).toStrictEqual([true])
+    expect(domHtml(elem)).toBe('<child><div>true</div></child>')
+    matchElementWithDom(elem)
+  })
 }
 
 describe('placeholder (DOM backend)', () => testCases(domBackend))
