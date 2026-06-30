@@ -1,0 +1,168 @@
+name: publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Publish Packages'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate version format
+        run: |
+          VERSION="${{ inputs.version }}"
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Error: version must match X.Y.Z format, got: $VERSION"
+            exit 1
+          fi
+          echo "Releasing version: $VERSION"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+
+      - name: Setup wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: 'v0.13.1'
+
+      - name: Install cbindgen
+        run: cargo install cbindgen
+
+      - name: Install dependencies
+        run: pnpm install --recursive --frozen-lockfile --strict-peer-dependencies
+
+      - name: Cargo check (deny warnings)
+        run: cargo check
+        env:
+          RUSTFLAGS: '-D warnings'
+
+      - name: Cargo fmt check
+        run: cargo fmt --check
+
+      - name: ESLint checks
+        run: |
+          for pkg in glass-easel \
+                     glass-easel-miniprogram-adapter \
+                     glass-easel-miniprogram-typescript \
+                     glass-easel-miniprogram-webpack-plugin \
+                     glass-easel-shadow-sync; do
+            echo "Linting $pkg..."
+            cd "$pkg"
+            npx eslint -c ../.eslintrc.js .
+            cd ..
+          done
+          echo "Linting glass-easel-miniprogram-template..."
+          cd glass-easel-miniprogram-template
+          npx eslint -c .eslintrc.js .
+          cd ..
+
+      - name: Update npm package versions
+        run: |
+          VERSION="${{ inputs.version }}"
+          for pkg in glass-easel/package.json \
+                     glass-easel-miniprogram-adapter/package.json \
+                     glass-easel-miniprogram-typescript/package.json \
+                     glass-easel-miniprogram-webpack-plugin/package.json \
+                     glass-easel-miniprogram-template/package.json \
+                     glass-easel-shadow-sync/package.json \
+                     glass-easel-template-compiler/package.json \
+                     glass-easel-stylesheet-compiler/package.json; do
+            echo "Updating $pkg to $VERSION"
+            sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" "$pkg"
+          done
+
+      - name: Update Cargo.toml versions
+        run: |
+          VERSION="${{ inputs.version }}"
+          for toml in glass-easel-template-compiler/Cargo.toml \
+                      glass-easel-stylesheet-compiler/Cargo.toml; do
+            echo "Updating $toml to $VERSION"
+            sed -i "s/^version = \"[^\"]*\"/version = \"$VERSION\"/" "$toml"
+          done
+
+      - name: Run pnpm install (update lockfile)
+        run: pnpm install --recursive
+
+      - name: Generate cbindgen header
+        working-directory: glass-easel-template-compiler
+        run: cbindgen > glass_easel_template_compiler.h
+
+      - name: Build all packages
+        run: pnpm -r run build
+        env:
+          GLASS_EASEL_ARGS: ''
+
+      - name: Cargo test
+        run: cargo test
+
+      - name: pnpm test
+        run: pnpm test -r
+
+      - name: Commit version bump
+        run: |
+          git add -A
+          git commit --message "version: ${{ inputs.version }}"
+
+      - name: Create git tag
+        run: git tag "v${{ inputs.version }}"
+
+      - name: Push commit and tags
+        run: |
+          git push
+          git push --tags
+
+      - name: Get crates.io OIDC token
+        id: crates-auth
+        uses: rust-lang/crates-io-auth-action@v1
+
+      - name: Publish Rust crates to crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-auth.outputs.token }}
+        run: |
+          cargo publish -p glass-easel-template-compiler
+          cargo publish -p glass-easel-stylesheet-compiler
+
+      - name: Publish npm packages 
+        run: |
+          for pkg in glass-easel \
+                     glass-easel-miniprogram-adapter \
+                     glass-easel-miniprogram-typescript \
+                     glass-easel-miniprogram-webpack-plugin \
+                     glass-easel-miniprogram-template \
+                     glass-easel-shadow-sync \
+                     glass-easel-template-compiler \
+                     glass-easel-stylesheet-compiler; do
+            echo "Publishing $pkg to npm..."
+            cd "$pkg"
+            pnpm publish --provenance
+            cd ..
+          done
