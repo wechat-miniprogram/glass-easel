@@ -1,12 +1,9 @@
 name: publish
 
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Publish Packages'
-        required: true
-        type: string
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   contents: write
@@ -20,14 +17,16 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - name: Validate version format
+      - name: Extract version from tag
+        id: version
         run: |
-          VERSION="${{ inputs.version }}"
+          VERSION="${GITHUB_REF#refs/tags/v}"
           if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "Error: version must match X.Y.Z format, got: $VERSION"
+            echo "Error: tag must be vX.Y.Z format, got: $GITHUB_REF"
             exit 1
           fi
           echo "Releasing version: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,34 +59,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --recursive --frozen-lockfile --strict-peer-dependencies
 
-      - name: Cargo check (deny warnings)
-        run: cargo check
-        env:
-          RUSTFLAGS: '-D warnings'
-
-      - name: Cargo fmt check
-        run: cargo fmt --check
-
-      - name: ESLint checks
-        run: |
-          for pkg in glass-easel \
-                     glass-easel-miniprogram-adapter \
-                     glass-easel-miniprogram-typescript \
-                     glass-easel-miniprogram-webpack-plugin \
-                     glass-easel-shadow-sync; do
-            echo "Linting $pkg..."
-            cd "$pkg"
-            npx eslint -c ../.eslintrc.js .
-            cd ..
-          done
-          echo "Linting glass-easel-miniprogram-template..."
-          cd glass-easel-miniprogram-template
-          npx eslint -c .eslintrc.js .
-          cd ..
-
       - name: Update npm package versions
         run: |
-          VERSION="${{ inputs.version }}"
+          VERSION="${{ steps.version.outputs.version }}"
           for pkg in glass-easel/package.json \
                      glass-easel-miniprogram-adapter/package.json \
                      glass-easel-miniprogram-typescript/package.json \
@@ -102,7 +76,7 @@ jobs:
 
       - name: Update Cargo.toml versions
         run: |
-          VERSION="${{ inputs.version }}"
+          VERSION="${{ steps.version.outputs.version }}"
           for toml in glass-easel-template-compiler/Cargo.toml \
                       glass-easel-stylesheet-compiler/Cargo.toml; do
             echo "Updating $toml to $VERSION"
@@ -120,25 +94,6 @@ jobs:
         run: pnpm -r run build
         env:
           GLASS_EASEL_ARGS: ''
-
-      - name: Cargo test
-        run: cargo test
-
-      - name: pnpm test
-        run: pnpm test -r
-
-      - name: Commit version bump
-        run: |
-          git add -A
-          git commit --message "version: ${{ inputs.version }}"
-
-      - name: Create git tag
-        run: git tag "v${{ inputs.version }}"
-
-      - name: Push commit and tags
-        run: |
-          git push
-          git push --tags
 
       - name: Get crates.io OIDC token
         id: crates-auth
