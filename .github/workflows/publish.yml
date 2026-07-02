@@ -1,0 +1,117 @@
+name: publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Error: tag must be vX.Y.Z format, got: $GITHUB_REF"
+            exit 1
+          fi
+          echo "Releasing version: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check version
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          for pkg in glass-easel/package.json \
+                     glass-easel-miniprogram-adapter/package.json \
+                     glass-easel-miniprogram-typescript/package.json \
+                     glass-easel-miniprogram-webpack-plugin/package.json \
+                     glass-easel-miniprogram-template/package.json \
+                     glass-easel-shadow-sync/package.json \
+                     glass-easel-template-compiler/package.json \
+                     glass-easel-stylesheet-compiler/package.json; do
+            ACTUAL=$(grep -m1 '"version"' "$pkg" | sed -E 's/.*"version": "([^"]*)".*/\1/')
+            if [ "$ACTUAL" != "$VERSION" ]; then
+              echo "Error: $pkg has version $ACTUAL but tag is v$VERSION"
+              exit 1
+            fi
+            echo "OK: $pkg = $ACTUAL"
+          done
+          for toml in glass-easel-template-compiler/Cargo.toml \
+                      glass-easel-stylesheet-compiler/Cargo.toml; do
+            ACTUAL=$(grep -m1 '^version = ' "$toml" | sed -E 's/^version = "([^"]*)".*/\1/')
+            if [ "$ACTUAL" != "$VERSION" ]; then
+              echo "Error: $toml has version $ACTUAL but tag is v$VERSION"
+              exit 1
+            fi
+            echo "OK: $toml = $ACTUAL"
+          done
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+
+      - name: Setup wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: 'v0.13.1'
+
+      - name: Install dependencies
+        run: pnpm install --recursive --frozen-lockfile --strict-peer-dependencies
+
+      - name: Build all packages
+        run: pnpm -r run build
+        env:
+          GLASS_EASEL_ARGS: ''
+
+      - name: Get crates.io OIDC token
+        id: crates-auth
+        uses: rust-lang/crates-io-auth-action@v1
+
+      - name: Publish Rust crates to crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-auth.outputs.token }}
+        run: |
+          cargo publish -p glass-easel-template-compiler
+          cargo publish -p glass-easel-stylesheet-compiler
+
+      - name: Publish npm packages
+        run: |
+          for pkg in glass-easel \
+                     glass-easel-miniprogram-adapter \
+                     glass-easel-miniprogram-typescript \
+                     glass-easel-miniprogram-webpack-plugin \
+                     glass-easel-miniprogram-template \
+                     glass-easel-shadow-sync \
+                     glass-easel-template-compiler \
+                     glass-easel-stylesheet-compiler; do
+            echo "Publishing $pkg to npm..."
+            cd "$pkg"
+            pnpm publish --provenance
+            cd ..
+          done
