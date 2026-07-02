@@ -1,6 +1,10 @@
 {
   "name": "glass-easel-miniprogram-template",
   "version": "0.21.3",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wechat-miniprogram/glass-easel.git"
+  },
   "main": "src/index.ts",
   "scripts": {
     "build": "webpack --config webpack.config.js",

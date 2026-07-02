@@ -1,6 +1,10 @@
 {
   "name": "glass-easel-shadow-sync",
   "version": "0.21.3",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wechat-miniprogram/glass-easel.git"
+  },
   "main": "dist/glass-easel-shadow-sync.js",
   "scripts": {
     "build": "rollup -c rollup.config.mjs",
