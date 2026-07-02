@@ -54,8 +54,8 @@ export class TextNode implements NodeCast {
       if (BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike)) {
         backendElement = (context as domlikeBackend.Context).document.createTextNode(text)
       } else if (BM.SHADOW || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Shadow)) {
-        const backend = owner._$backendShadowRoot!
-        backendElement = backend.createTextNode(text)
+        const backend = owner._$backendShadowRoot
+        backendElement = backend?.createTextNode(text) ?? null
       } else {
         const backend = context as composedBackend.Context
         backendElement = backend.createTextNode(text)

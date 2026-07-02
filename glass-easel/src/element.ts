@@ -241,7 +241,7 @@ export class Element implements NodeCast {
     }
     if (BM.SHADOW || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Shadow)) {
       if (ENV.DEV) performanceMeasureStart('backend.setId')
-      ;(be as backend.Element).setId(newId)
+      ;(be as backend.Element | null)?.setId(newId)
       if (ENV.DEV) performanceMeasureEnd()
     }
     if (globalOptions.writeExtraInfoToAttr) {
@@ -271,7 +271,7 @@ export class Element implements NodeCast {
     }
     this._$nodeSlot = newSlot
     if (BM.SHADOW || (BM.DYNAMIC && this.getBackendMode() === BackendMode.Shadow)) {
-      ;(this._$backendElement as backend.Element).setSlot(newSlot)
+      ;(this._$backendElement as backend.Element | null)?.setSlot(newSlot)
     }
     const slotParentShadowRoot = Element._$getParentHostShadowRoot(this.parentNode)
     if (slotParentShadowRoot) {
@@ -2231,14 +2231,14 @@ export class Element implements NodeCast {
         // do nothing
       } else if (BM.SHADOW || (BM.DYNAMIC && parent.getBackendMode() === BackendMode.Shadow)) {
         if (!frag) {
-          const backendContext = parent.getBackendContext() as backend.Context
+          const backendContext = parent.getBackendContext() as backend.Context | null
           if (ENV.DEV) performanceMeasureStart('backend.createFragment')
-          frag = backendContext.createFragment()
+          frag = backendContext?.createFragment() ?? null
           if (ENV.DEV) performanceMeasureEnd()
         }
         const be = child._$backendElement as backend.Element
         if (ENV.DEV) performanceMeasureStart('backend.appendChild')
-        frag.appendChild(be)
+        frag?.appendChild(be)
         if (ENV.DEV) performanceMeasureEnd()
       } else {
         Element.insertChildComposed(placeholder, null, child, true, i)

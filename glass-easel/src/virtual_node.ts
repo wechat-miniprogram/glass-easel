@@ -27,14 +27,16 @@ export class VirtualNode extends Element {
       nodeTreeContext &&
       (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Shadow))
     ) {
-      const shadowRoot = owner._$backendShadowRoot!
+      const shadowRoot = owner._$backendShadowRoot
       if (ENV.DEV) performanceMeasureStart('backend.createVirtualNode')
-      const be = shadowRoot.createVirtualNode(virtualName)
+      const be = shadowRoot?.createVirtualNode(virtualName) ?? null
       if (ENV.DEV) performanceMeasureEnd()
       this._$initialize(is, true, be, owner, nodeTreeContext)
       if (ENV.DEV) performanceMeasureStart('backend.associateValue')
-      be.__wxElement = this
-      be.associateValue(this)
+      if (be) {
+        be.__wxElement = this
+        be.associateValue(this)
+      }
       if (ENV.DEV) performanceMeasureEnd()
     } else {
       this._$initialize(is, true, null, owner, owner._$nodeTreeContext)

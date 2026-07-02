@@ -588,26 +588,27 @@ export class Component<
       } else if (BM.SHADOW || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Shadow)) {
         if (ENV.DEV) performanceMeasureStart('component.createComponent')
         const sr = owner
-          ? owner._$backendShadowRoot!
+          ? owner._$backendShadowRoot
           : (nodeTreeContext as backend.Context).getRootNode()
-        const be = sr.createComponent(
-          tagName,
-          external,
-          virtualHost,
-          styleScope ?? StyleScopeManager.globalScope(),
-          extraStyleScope,
-          behavior._$externalClasses,
-          // eslint-disable-next-line no-nested-ternary
-          external
-            ? null
-            : // eslint-disable-next-line no-nested-ternary
-            options.dynamicSlots
-            ? SlotMode.Dynamic
-            : options.multipleSlots
-            ? SlotMode.Multiple
-            : SlotMode.Single,
-          options.writeIdToDOM,
-        )
+        const be =
+          sr?.createComponent(
+            tagName,
+            external,
+            virtualHost,
+            styleScope ?? StyleScopeManager.globalScope(),
+            extraStyleScope,
+            behavior._$externalClasses,
+            // eslint-disable-next-line no-nested-ternary
+            external
+              ? null
+              : // eslint-disable-next-line no-nested-ternary
+              options.dynamicSlots
+              ? SlotMode.Dynamic
+              : options.multipleSlots
+              ? SlotMode.Multiple
+              : SlotMode.Single,
+            options.writeIdToDOM,
+          ) ?? null
         backendElement = be
         if (ENV.DEV) performanceMeasureEnd()
       }

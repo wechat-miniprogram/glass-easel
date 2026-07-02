@@ -218,7 +218,7 @@ export class ClassList {
         const name = dirtyExternalNames[i]!
         const externalIndex = this._$externalNames!.indexOf(name)
         const targets = this._$externalRawAlias![externalIndex] || []
-        ;(this._$element._$backendElement as backend.Element).setClassAlias(name, targets)
+        ;(this._$element._$backendElement as backend.Element | null)?.setClassAlias(name, targets)
       }
       this._$dirtyExternalNames = null
       return false
