@@ -112,6 +112,6 @@ jobs:
                      glass-easel-stylesheet-compiler; do
             echo "Publishing $pkg to npm..."
             cd "$pkg"
-            pnpm publish --provenance
+            pnpm publish --provenance --no-git-checks
             cd ..
           done
