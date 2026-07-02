@@ -31,31 +31,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          registry-url: 'https://registry.npmjs.org'
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
-          targets: wasm32-unknown-unknown
-
-      - name: Setup wasm-pack
-        uses: jetli/wasm-pack-action@v0.4.0
-        with:
-          version: 'v0.13.1'
-
-      - name: Install dependencies
-        run: pnpm install --recursive --frozen-lockfile --strict-peer-dependencies
-
       - name: Check version
         run: |
           VERSION="${{ steps.version.outputs.version }}"
@@ -84,6 +59,31 @@ jobs:
             echo "OK: $toml = $ACTUAL"
           done
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+
+      - name: Setup wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: 'v0.13.1'
+
+      - name: Install dependencies
+        run: pnpm install --recursive --frozen-lockfile --strict-peer-dependencies
+
       - name: Build all packages
         run: pnpm -r run build
         env:
@@ -100,7 +100,7 @@ jobs:
           cargo publish -p glass-easel-template-compiler
           cargo publish -p glass-easel-stylesheet-compiler
 
-      - name: Publish npm packages 
+      - name: Publish npm packages
         run: |
           for pkg in glass-easel \
                      glass-easel-miniprogram-adapter \
