@@ -632,6 +632,71 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect(domHtml(elem)).toBe('<child><div>true</div></child>')
     matchElementWithDom(elem)
   })
+
+  test('replacing after detached', () => {
+    const cs = new glassEasel.ComponentSpace()
+
+    const Child = cs.defineComponent({
+      using: {
+        comp: 'comp',
+      },
+      placeholders: {
+        comp: 'div',
+      },
+      template: tmpl(`<comp wx:if="{{visible}}"></comp>`),
+      data: {
+        visible: true,
+      },
+    })
+
+    const Root = cs.defineComponent({
+      using: {
+        child: Child,
+      },
+      template: tmpl(`
+        <child id="child" wx:if="{{visible}}"></child>
+      `),
+      data: {
+        visible: true,
+      },
+    })
+    const elem = glassEasel.Component.createWithContext('root', Root, testBackend)
+    glassEasel.Element.pretendAttached(elem)
+
+    const child = (elem.$.child as glassEasel.Element).asInstanceOf(Child)!
+
+    expect(domHtml(elem)).toBe('<child><div></div></child>')
+    matchElementWithDom(elem)
+
+    child.setData({ visible: false})
+
+    expect(domHtml(elem)).toBe('<child></child>')
+    matchElementWithDom(elem)
+
+    elem.setData({ visible: false })
+
+    expect(domHtml(elem)).toBe('')
+    matchElementWithDom(elem)
+
+    child.setData({ visible: true })
+    expect(domHtml(elem)).toBe('')
+    matchElementWithDom(elem)
+
+    cs.defineComponent({
+      is: 'comp',
+      template: tmpl(`
+        <div>{{visible}}</div>
+      `),
+      properties: {
+        visible: {
+          type: Boolean,
+        },
+      },
+    })
+
+    expect(domHtml(elem)).toBe('')
+    matchElementWithDom(elem)
+  })
 }
 
 describe('placeholder (DOM backend)', () => testCases(domBackend))

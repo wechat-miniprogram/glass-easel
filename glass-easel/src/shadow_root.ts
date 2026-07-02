@@ -79,7 +79,9 @@ export class ShadowRoot extends VirtualNode {
 
     let be: backend.ShadowRootContext | null = null
     if (BM.SHADOW || (BM.DYNAMIC && host.getBackendMode() === BackendMode.Shadow)) {
-      be = (host._$backendElement as backend.Element).getShadowRoot()!
+      if (host._$backendElement) {
+        be = (host._$backendElement as backend.Element).getShadowRoot()!
+      }
     }
 
     node._$idMap = null

@@ -41,7 +41,7 @@ export class NativeNode extends Element {
       if (BM.DOMLIKE || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Domlike)) {
         backendElement = (nodeTreeContext as domlikeBackend.Context).document.createElement(tagName)
       } else if (BM.SHADOW || (BM.DYNAMIC && owner.getBackendMode() === BackendMode.Shadow)) {
-        backendElement = owner._$backendShadowRoot!.createElement(tagName, node.stylingName)
+        backendElement = owner._$backendShadowRoot?.createElement(tagName, node.stylingName) ?? null
       } else {
         const backend = nodeTreeContext as composedBackend.Context
         backendElement = backend.createElement(tagName, node.stylingName)

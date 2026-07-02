@@ -468,6 +468,8 @@ export class ShadowSyncShadowRoot
 export class ShadowSyncBackendContext implements GlassEaselBackend.Context {
   mode: BackendMode.Shadow = 1
 
+  public dropBackendAfterRelease = true
+
   private _elementIdGen: IDGenerator
   private _elementIdMap: (ShadowSyncElement | undefined)[] = []
   private _slotIdMap: (Element | undefined)[] = []
