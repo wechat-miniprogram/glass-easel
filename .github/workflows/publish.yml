@@ -6,7 +6,7 @@ on:
       - 'v*'
 
 permissions:
-  contents: write
+  contents: read
   id-token: write
 
 concurrency:
@@ -53,13 +53,10 @@ jobs:
         with:
           version: 'v0.13.1'
 
-      - name: Install cbindgen
-        run: cargo install cbindgen
-
       - name: Install dependencies
         run: pnpm install --recursive --frozen-lockfile --strict-peer-dependencies
 
-      - name: Update npm package versions
+      - name: Check version
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           for pkg in glass-easel/package.json \
@@ -70,25 +67,22 @@ jobs:
                      glass-easel-shadow-sync/package.json \
                      glass-easel-template-compiler/package.json \
                      glass-easel-stylesheet-compiler/package.json; do
-            echo "Updating $pkg to $VERSION"
-            sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" "$pkg"
+            ACTUAL=$(grep -m1 '"version"' "$pkg" | sed -E 's/.*"version": "([^"]*)".*/\1/')
+            if [ "$ACTUAL" != "$VERSION" ]; then
+              echo "Error: $pkg has version $ACTUAL but tag is v$VERSION"
+              exit 1
+            fi
+            echo "OK: $pkg = $ACTUAL"
           done
-
-      - name: Update Cargo.toml versions
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
           for toml in glass-easel-template-compiler/Cargo.toml \
                       glass-easel-stylesheet-compiler/Cargo.toml; do
-            echo "Updating $toml to $VERSION"
-            sed -i "s/^version = \"[^\"]*\"/version = \"$VERSION\"/" "$toml"
+            ACTUAL=$(grep -m1 '^version = ' "$toml" | sed -E 's/^version = "([^"]*)".*/\1/')
+            if [ "$ACTUAL" != "$VERSION" ]; then
+              echo "Error: $toml has version $ACTUAL but tag is v$VERSION"
+              exit 1
+            fi
+            echo "OK: $toml = $ACTUAL"
           done
-
-      - name: Run pnpm install (update lockfile)
-        run: pnpm install --recursive
-
-      - name: Generate cbindgen header
-        working-directory: glass-easel-template-compiler
-        run: cbindgen > glass_easel_template_compiler.h
 
       - name: Build all packages
         run: pnpm -r run build
