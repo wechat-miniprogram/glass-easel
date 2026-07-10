@@ -10,8 +10,8 @@ import { type GeneralBackendElement } from './backend'
  * However, the subtree must be created in the same backend context.
  */
 export interface ExternalShadowRoot {
-  root: GeneralBackendElement
-  slot: GeneralBackendElement
+  root: GeneralBackendElement | null
+  slot: GeneralBackendElement | null
   getIdMap(): { [id: string]: GeneralBackendElement }
   handleEvent<T>(target: GeneralBackendElement, event: Event<T>): void
   setListener<T>(

@@ -6,7 +6,6 @@ import { type DataValue } from '../data_proxy'
 import { Element, StyleSegmentIndex } from '../element'
 import { type EventListener } from '../event'
 import { safeCallback } from '../func_arr'
-import { MutationObserver } from '../mutation_observer'
 import { type NativeNode } from '../native_node'
 import { type Node } from '../node'
 import { SlotMode, type ShadowRoot } from '../shadow_root'
@@ -14,7 +13,7 @@ import { type TextNode } from '../text_node'
 import { type ProcGenGroupList } from '../tmpl'
 import { isComponent, isNativeNode } from '../type_symbol'
 import { type VirtualNode } from '../virtual_node'
-import { dispatchError, triggerWarning } from '../warning'
+import { triggerWarning } from '../warning'
 import { RangeListManager } from './range_list_diff'
 
 export type UpdatePathTreeNode = true | { [key: string]: UpdatePathTreeNode } | UpdatePathTreeNode[]
@@ -73,7 +72,9 @@ type TmplArgs = {
   staticClassesDirty?: boolean
   styleNameValues?: string[] // [name1, value1, name2, value2, ...]
   styleNameValuesDirty?: boolean
-  placeholderHandler?: { onReplace(callback: () => void): void; destroy: () => void }
+  // Set on placeholder elements; used to swap in the latest init-prop-values
+  // callback so that the replacer component is created with up-to-date data.
+  updateInitPropValues?: (cb: (elem: GeneralComponent | NativeNode) => void) => void
 }
 export type TmplDevArgs = {
   A?: string[] // active attributes
@@ -562,16 +563,12 @@ export class ProcGenWrapper {
         if (!dynSlot) {
           this.handleChildrenUpdate(children, elem, undefined, undefined)
         }
-        if (tmplArgs.placeholderHandler) {
-          tmplArgs.placeholderHandler.onReplace(
-            this.getPlaceholderCallback(
-              elem,
-              tagName,
-              genericImpls,
-              propertyInit,
-              children,
-              dynamicSlotValueNames,
-            ),
+        // If the element is still a placeholder, refresh the callback that
+        // initializes props on the future replacer component with the latest
+        // `propertyInit` / children / dynamic slot values captured in this pass.
+        if (tmplArgs.updateInitPropValues) {
+          tmplArgs.updateInitPropValues(
+            this.getInitPropValuesCallback(propertyInit, children, dynamicSlotValueNames),
           )
         }
       },
@@ -958,53 +955,22 @@ export class ProcGenWrapper {
     return true
   }
 
-  private getPlaceholderCallback(
-    elem: Element,
-    tagName: string,
-    genericImpls: { [key: string]: string },
+  private getInitPropValuesCallback(
     propertyInit: (elem: Element, isCreation: boolean) => void,
     children: DefineChildren,
     dynamicSlotValueNames: string[] | undefined,
-  ): () => void {
-    return () => {
-      const { using } = this.shadowRoot.resolveComponent(tagName, tagName)
-      const replacer = this.shadowRoot.createComponentByDef(
-        tagName,
-        using,
-        genericImpls,
-        (elem: GeneralComponent | NativeNode) => {
-          const sr = isComponent(elem)
-            ? this.dynamicSlotUpdate(elem, dynamicSlotValueNames, children)
-            : null
-          propertyInit(elem, true)
-          if (isComponent(elem)) {
-            if (elem.hasPendingChanges()) {
-              const nodeDataProxy = Component.getDataProxy(elem)
-              nodeDataProxy.applyDataUpdates(true)
-            }
-            sr?.applySlotUpdates()
-          }
-        },
-      )
-      replacer.destroyBackendElementOnRemoval()
-      const replacerShadowRoot = (replacer as GeneralComponent).getShadowRoot()
-      const elemShadowRoot = isComponent(elem) ? elem.getShadowRoot() : null
-      const isElemDynamicSlots = elemShadowRoot?.getSlotMode() === SlotMode.Dynamic
-      const isReplacerDynamicSlots = replacerShadowRoot?.getSlotMode() === SlotMode.Dynamic
-      if (isReplacerDynamicSlots !== isElemDynamicSlots) {
-        dispatchError(
-          new Error(
-            `The "dynamicSlots" option of component <${replacer.is}> and its placeholder <${
-              (elem as GeneralComponent).is
-            }> should be the same.`,
-          ),
-          '[render]',
-          isComponent(replacer) ? replacer : replacer.is,
-        )
-      } else if (isReplacerDynamicSlots) {
-        elem.parentNode?.replaceChild(replacer, elem)
-      } else {
-        elem.selfReplaceWith(replacer)
+  ): (elem: GeneralComponent | NativeNode) => void {
+    return (elem: GeneralComponent | NativeNode) => {
+      const sr = isComponent(elem)
+        ? this.dynamicSlotUpdate(elem, dynamicSlotValueNames, children)
+        : null
+      propertyInit(elem, true)
+      if (isComponent(elem)) {
+        if (elem.hasPendingChanges()) {
+          const nodeDataProxy = Component.getDataProxy(elem)
+          nodeDataProxy.applyDataUpdates(true)
+        }
+        sr?.applySlotUpdates()
       }
     }
   }
@@ -1016,42 +982,32 @@ export class ProcGenWrapper {
     children: DefineChildren,
     dynamicSlotValueNames: string[] | undefined,
   ): Element {
-    let dynSlot = false
-    const initPropValues = (elem: GeneralComponent | NativeNode) => {
-      const sr = isComponent(elem)
-        ? this.dynamicSlotUpdate(elem, dynamicSlotValueNames, children)
-        : null
-      if (sr) dynSlot = true
-      propertyInit(elem, true)
-      if (isComponent(elem)) {
-        if (elem.hasPendingChanges()) {
-          const nodeDataProxy = Component.getDataProxy(elem)
-          nodeDataProxy.applyDataUpdates(true)
-        }
-        sr?.applySlotUpdates()
+    // `initPropValues` is stored in a mutable binding so that it can be
+    // replaced from the update pass (see `tmplArgs.updateInitPropValues`
+    // below). This keeps the placeholder → real-component transition using
+    // the freshest data instead of the values captured at creation time.
+    let initPropValues = this.getInitPropValuesCallback(
+      propertyInit,
+      children,
+      dynamicSlotValueNames,
+    )
+    const elem = this.shadowRoot.createComponent(
+      tagName,
+      tagName,
+      genericImpls,
+      undefined,
+      (elem) => initPropValues(elem),
+    )
+    const placeholding = this.shadowRoot.checkComponentPlaceholder(tagName)
+    if (placeholding) {
+      // Expose a setter so that later template update passes can swap in a
+      // new `initPropValues`. The real-component replacement (registered
+      // inside `shadowRoot.createComponent`) will then use it.
+      getTmplArgs(elem).updateInitPropValues = (cb) => {
+        initPropValues = cb
       }
     }
-    const { placeholderHandler, using } = this.shadowRoot.resolveComponent(tagName, tagName)
-    const elem = this.shadowRoot.createComponentByDef(tagName, using, genericImpls, initPropValues)
-    if (placeholderHandler) {
-      const tmplArgs = getTmplArgs(elem)
-      tmplArgs.placeholderHandler = placeholderHandler
-      placeholderHandler.onReplace(
-        this.getPlaceholderCallback(
-          elem,
-          tagName,
-          genericImpls,
-          propertyInit,
-          children,
-          dynamicSlotValueNames,
-        ),
-      )
-      new MutationObserver((e) => {
-        if (e.type === 'attachStatus' && e.status === 'detached') {
-          placeholderHandler.destroy()
-        }
-      }).observe(elem, { attachStatus: true })
-    }
+    const dynSlot = isComponent(elem) && elem.getShadowRoot()?.getSlotMode() === SlotMode.Dynamic
     elem.destroyBackendElementOnRemoval()
     if (dynSlot) {
       this.bindingMapDisabled = true // IDEA better binding map disable detection

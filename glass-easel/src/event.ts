@@ -443,7 +443,7 @@ export class Event<TDetail> {
       forEachBubblePath(target, (currentTarget, target, mark) => {
         if (!atTarget && isComponent(currentTarget) && currentTarget._$external) {
           const sr = currentTarget.shadowRoot as ExternalShadowRoot
-          sr.handleEvent(sr.slot, this)
+          if (sr.slot) sr.handleEvent(sr.slot, this)
         }
         atTarget = false
 
