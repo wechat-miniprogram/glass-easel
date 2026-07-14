@@ -668,7 +668,7 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect(domHtml(elem)).toBe('<child><div></div></child>')
     matchElementWithDom(elem)
 
-    child.setData({ visible: false})
+    child.setData({ visible: false })
 
     expect(domHtml(elem)).toBe('<child></child>')
     matchElementWithDom(elem)
@@ -695,6 +695,69 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     })
 
     expect(domHtml(elem)).toBe('')
+    matchElementWithDom(elem)
+  })
+
+  test('replacing placeholder whose owner was detached before attached', () => {
+    const cs = new glassEasel.ComponentSpace()
+
+    const Child = cs.defineComponent({
+      using: {
+        comp: 'comp',
+      },
+      placeholders: {
+        comp: 'div',
+      },
+      template: tmpl(`<comp><span /></comp>`),
+      created() {
+        const sr = this.getShadowRoot()
+        if (sr) sr.cancelDestroyBackendElementOnRemoval()
+      },
+    })
+
+    const Parent = cs.defineComponent({
+      using: {
+        child: Child,
+      },
+      template: tmpl(`<child wx:if="{{visible}}"></child>`),
+      data: {
+        visible: true,
+      },
+      created() {
+        this.setData({ visible: false })
+      },
+    })
+
+    const Root = cs.defineComponent({
+      using: {
+        parent: Parent,
+      },
+      template: tmpl(`
+        <parent id="parent" wx:if="{{visible}}"></parent>
+      `),
+      data: {
+        visible: false,
+      },
+    })
+    const elem = glassEasel.Component.createWithContext('root', Root, testBackend)
+    glassEasel.Element.pretendAttached(elem)
+
+    expect(domHtml(elem)).toBe('')
+    matchElementWithDom(elem)
+
+    elem.setData({ visible: true })
+
+    expect(domHtml(elem)).toBe('<parent></parent>')
+    matchElementWithDom(elem)
+
+    cs.defineComponent({
+      is: 'comp',
+      template: tmpl(`
+        <div>comp<slot /></div>
+      `),
+    })
+
+    expect(domHtml(elem)).toBe('<parent></parent>')
     matchElementWithDom(elem)
   })
 }

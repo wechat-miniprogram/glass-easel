@@ -217,8 +217,6 @@ export class ShadowRoot extends VirtualNode {
     placeholderCallback?: ((c: GeneralComponentDefinition) => void) | undefined,
     initPropValues?: (comp: GeneralComponent | NativeNode) => void,
   ): GeneralComponent | NativeNode {
-    const host = this._$host
-    const beh = host._$behavior
     const { using, waiting } = this.resolveComponent(tagName, usingKey)
 
     let placeholderHandlerRemover: (() => void) | undefined
