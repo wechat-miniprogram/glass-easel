@@ -10,6 +10,12 @@ glass-easel 是小程序组件框架的核心实现。它实质上是一个 Java
 
 glass-easel 是对旧版小程序组件框架的重写，保持对旧版小程序组件框架特性的兼容，并添加了一些新特性。它运行时并不依赖于小程序环境，可以独立运行在 web 或其他 JavaScript 环境下。
 
+相关项目：
+
+* [glass-easel-analyzer](https://github.com/wechat-miniprogram/glass-easel-analyzer) VSCode 扩展，用于 glass-easel 应用开发
+* [glass-easel-devtools](https://github.com/wechat-miniprogram/glass-easel-devtools) Devtools 插件，用于 glass-easel 应用开发
+* [glass-easel-i18n](https://github.com/wechat-miniprogram/glass-easel-i18n) 国际化支持
+
 ## 主要特点
 
 glass-easel 可以让同样的组件代码运行在 web 、小程序等不同环境下。

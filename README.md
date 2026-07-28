@@ -18,6 +18,12 @@ It keeps the feature-level compatibilities, while some new features are added.
 The framework runtime does not require specific MiniProgram environment,
 which means it can be executed in web or other JavaScript environments.
 
+Related projects:
+
+* [glass-easel-analyzer](https://github.com/wechat-miniprogram/glass-easel-analyzer) VSCode extension for glass-easel application development
+* [glass-easel-devtools](https://github.com/wechat-miniprogram/glass-easel-devtools) DevTools plugin for glass-easel application development
+* [glass-easel-i18n](https://github.com/wechat-miniprogram/glass-easel-i18n) I18N support for glass-easel application
+
 ## Major Features
 
 _glass-easel_ allows the same component code executed in different environments, i.e. in both web and MiniProgram environments.
