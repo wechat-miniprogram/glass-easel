@@ -13,6 +13,7 @@ glass-easel 是对旧版小程序组件框架的重写，保持对旧版小程�
 相关项目：
 
 * [glass-easel-analyzer](https://github.com/wechat-miniprogram/glass-easel-analyzer) VSCode 扩展，用于 glass-easel 应用开发
+* [glass-easel-analyzer-miniprogram](https://github.com/wechat-miniprogram/glass-easel-analyzer-miniprogram) 用于 glass-easel-analyzer 的小程序开发配置
 * [glass-easel-devtools](https://github.com/wechat-miniprogram/glass-easel-devtools) Devtools 插件，用于 glass-easel 应用开发
 * [glass-easel-i18n](https://github.com/wechat-miniprogram/glass-easel-i18n) 国际化支持
 

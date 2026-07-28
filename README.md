@@ -21,6 +21,7 @@ which means it can be executed in web or other JavaScript environments.
 Related projects:
 
 * [glass-easel-analyzer](https://github.com/wechat-miniprogram/glass-easel-analyzer) VSCode extension for glass-easel application development
+* [glass-easel-analyzer-miniprogram](https://github.com/wechat-miniprogram/glass-easel-analyzer-miniprogram) WeChat MiniProgram configuration for glass-easel-analyzer
 * [glass-easel-devtools](https://github.com/wechat-miniprogram/glass-easel-devtools) DevTools plugin for glass-easel application development
 * [glass-easel-i18n](https://github.com/wechat-miniprogram/glass-easel-i18n) I18N support for glass-easel application
 
