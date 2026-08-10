@@ -220,9 +220,6 @@ export interface Element extends Partial<suggestedBackend.Element<Element>> {
    */
   removeClass(elementClass: string, styleScope?: number): void
 
-  /** Remove all classes. Not called on text nodes. */
-  clearClasses(): void
-
   /** Set an attribute on this node. `value` can be any type. Not called on text nodes. */
   setAttribute(name: string, value: unknown): void
 

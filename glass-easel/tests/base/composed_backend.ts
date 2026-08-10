@@ -475,11 +475,6 @@ abstract class Node implements glassEasel.composedBackend.Element {
     if (index !== -1) this._$classes.splice(index, 1)
   }
 
-  clearClasses(): void {
-    if (!this._$classes) return
-    this._$classes = []
-  }
-
   setAttribute(name: string, value: unknown): void {
     // eslint-disable-next-line no-param-reassign
     name = name.toLowerCase()

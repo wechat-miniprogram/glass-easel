@@ -430,10 +430,6 @@ export class ViewController {
     element.classList!.toggle(className, false)
   }
 
-  clearClasses(element: Element): void {
-    element.classList!.setClassNames('')
-  }
-
   setClassAlias(element: GeneralComponent, className: string, target: string[]): void {
     element.setExternalClass(className, target)
   }

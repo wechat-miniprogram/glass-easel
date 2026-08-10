@@ -59,7 +59,6 @@ export const enum ChannelEventType {
   SET_STYLE,
   ADD_CLASS,
   REMOVE_CLASS,
-  CLEAR_CLASSES,
   SET_CLASS_ALIAS,
   SET_ATTRIBUTE,
   REMOVE_ATTRIBUTE,
@@ -218,7 +217,6 @@ export type ChannelArgs = ExhaustiveChannelEvent<{
   [ChannelEventType.SET_STYLE]: [number, string, number]
   [ChannelEventType.ADD_CLASS]: [number, string]
   [ChannelEventType.REMOVE_CLASS]: [number, string]
-  [ChannelEventType.CLEAR_CLASSES]: [number]
   [ChannelEventType.SET_CLASS_ALIAS]: [number, string, string[]]
   [ChannelEventType.SET_ATTRIBUTE]: [number, string, unknown]
   [ChannelEventType.REMOVE_ATTRIBUTE]: [number, string]
@@ -637,7 +635,6 @@ export const MessageChannelDataSide = (
     setStyle: (elementId: number, styleText: string, styleSegmentIndex: number) => publish([ChannelEventType.SET_STYLE, elementId, styleText, styleSegmentIndex]),
     addClass: (elementId: number, className: string) => publish([ChannelEventType.ADD_CLASS, elementId, className]),
     removeClass: (elementId: number, className: string) => publish([ChannelEventType.REMOVE_CLASS, elementId, className]),
-    clearClasses: (elementId: number) => publish([ChannelEventType.CLEAR_CLASSES, elementId]),
     setClassAlias: (elementId: number, className: string, target: string[]) => publish([ChannelEventType.SET_CLASS_ALIAS, elementId, className, target]),
     setAttribute: (elementId: number, name: string, value: unknown) => publish([ChannelEventType.SET_ATTRIBUTE, elementId, name, value]),
     removeAttribute: (elementId: number, name: string) => publish([ChannelEventType.REMOVE_ATTRIBUTE, elementId, name]),
@@ -1164,12 +1161,6 @@ export const MessageChannelViewSide = (
         const [, elementId, className] = arg
         const element = nodeMap[elementId]! as Element
         controller.removeClass(element, className)
-        break
-      }
-      case ChannelEventType.CLEAR_CLASSES: {
-        const [, elementId] = arg
-        const element = nodeMap[elementId]! as Element
-        controller.clearClasses(element)
         break
       }
       case ChannelEventType.SET_CLASS_ALIAS: {
