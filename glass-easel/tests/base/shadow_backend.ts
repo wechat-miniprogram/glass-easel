@@ -691,12 +691,6 @@ abstract class Node implements glassEasel.backend.Element {
     }
   }
 
-  clearClasses(): void {
-    assertType(this, Element)
-    this._$rawClasses = []
-    this._$updateResolvedClassNames()
-  }
-
   setClassAlias(this: Component, className: string, targets: string[]): void {
     assertType(this, Component)
     this._$classAlias[className] = targets

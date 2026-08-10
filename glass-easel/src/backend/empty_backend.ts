@@ -183,10 +183,6 @@ export class EmptyBackendElement implements Element {
     // empty
   }
 
-  clearClasses(): void {
-    // empty
-  }
-
   setClassAlias(_className: string, _target: string[]): void {
     // empty
   }

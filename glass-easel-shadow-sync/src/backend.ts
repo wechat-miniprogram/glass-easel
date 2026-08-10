@@ -266,10 +266,6 @@ export class ShadowSyncElement implements GlassEaselBackend.Element {
     this.getChannel().removeClass(this._id, className)
   }
 
-  clearClasses(): void {
-    this.getChannel().clearClasses(this._id)
-  }
-
   setClassAlias(className: string, target: string[]): void {
     this.getChannel().setClassAlias(this._id, className, target)
   }

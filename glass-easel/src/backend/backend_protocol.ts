@@ -249,9 +249,6 @@ export interface Element extends Partial<suggestedBackend.Element<Element>> {
    */
   removeClass(className: string): void
 
-  /** Remove all classes. Not called on text nodes. */
-  clearClasses(): void
-
   /**
    * Update a class alias of this node.
    * Not called on text nodes.

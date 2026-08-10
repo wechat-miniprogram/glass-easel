@@ -178,10 +178,6 @@ export class EmptyComposedBackendElement implements Element {
     // empty
   }
 
-  clearClasses(): void {
-    // empty
-  }
-
   setAttribute(_name: string, _value: unknown): void {
     // empty
   }
