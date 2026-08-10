@@ -30,7 +30,7 @@ type CallbackFunction<Args extends any[], Ret> = (...args: [...Args, (ret: Ret) 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type CallbackParametersOrNever<T> = T extends CallbackFunction<infer Arg, infer Ret>
   ? Arg
-  : T extends NormalFunction<infer Arg, infer Ret>
+  : T extends NormalFunction<infer Arg, unknown>
   ? Arg
   : never
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
