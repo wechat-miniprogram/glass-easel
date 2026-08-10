@@ -722,7 +722,19 @@ impl ConvertedExprWriteInline for Expression {
             expr: &Expression,
             w: &mut StringifierLine<'s, 't, 'u, W>,
             accept_level: ExpressionLevel,
+            dry_run: bool,
         ) -> Result<bool, std::fmt::Error> {
+            if dry_run {
+                let ret = match expr {
+                    Expression::ScopeRef { .. } => false,
+                    Expression::DataField { .. } => true,
+                    Expression::StaticMember { .. } => true,
+                    Expression::DynamicMember { .. } => true,
+                    Expression::FuncCall { .. } => true,
+                    _ => false,
+                };
+                return Ok(ret);
+            }
             match expr {
                 Expression::ScopeRef { location, index } => {
                     w.write_scope_name("", *index, location)?;
@@ -1017,6 +1029,20 @@ mod test {
         assert_eq!(find_token(&sm, 0, 6), Some((0, 9)));
         assert_eq!(find_token(&sm, 0, 8), Some((0, 12)));
         assert_eq!(find_token(&sm, 0, 10), Some((0, 14)));
+    }
+
+    #[test]
+    fn expr_object_key_shortcut() {
+        let src = r#"{{ { a } }}"#;
+        let expect = r#"({a:data.a});"#;
+        let (out, sm) = convert(src);
+        assert_eq!(out, expect);
+        assert_eq!(find_token(&sm, 0, 1), Some((0, 3)));
+        assert_eq!(find_token(&sm, 0, 2), Some((0, 5)));
+        assert_eq!(find_token(&sm, 0, 4), Some((0, 5)));
+        assert_eq!(find_token(&sm, 0, 8), Some((0, 5)));
+        assert_eq!(find_token(&sm, 0, 9), Some((0, 5)));
+        assert_eq!(find_token(&sm, 0, 10), Some((0, 7)));
     }
 
     #[test]

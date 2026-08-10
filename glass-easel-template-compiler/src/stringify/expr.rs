@@ -84,9 +84,10 @@ pub(super) fn expression_strigify_write<W: FmtWrite>(
         &Expression,
         &mut StringifierLine<W>,
         ExpressionLevel,
+        bool,
     ) -> Result<bool, std::fmt::Error>,
 ) -> FmtResult {
-    if !filter(expression, stringifier, accept_level)? {
+    if !filter(expression, stringifier, accept_level, false)? {
         return Ok(());
     }
     let cur_level = ExpressionLevel::from_expression(expression);
@@ -170,9 +171,19 @@ pub(super) fn expression_strigify_write<W: FmtWrite>(
                     } => {
                         let is_shortcut = match value {
                             Expression::ScopeRef { index, .. } => {
-                                stringifier.block().get_scope_name(*index) == name.as_str()
+                                if filter(expression, stringifier, ExpressionLevel::Cond, true)? {
+                                    stringifier.block().get_scope_name(*index) == name.as_str()
+                                } else {
+                                    false
+                                }
                             }
-                            Expression::DataField { name: x, .. } => x == name,
+                            Expression::DataField { name: x, .. } => {
+                                if filter(expression, stringifier, ExpressionLevel::Cond, true)? {
+                                    x == name
+                                } else {
+                                    false
+                                }
+                            }
                             _ => false,
                         };
                         stringifier.write_token_state(
@@ -647,7 +658,7 @@ impl StringifyLine for Expression {
         &self,
         stringifier: &mut StringifierLine<'s, 't, 'u, W>,
     ) -> FmtResult {
-        expression_strigify_write(self, stringifier, ExpressionLevel::Cond, &|_, _, _| {
+        expression_strigify_write(self, stringifier, ExpressionLevel::Cond, &|_, _, _, _| {
             Ok(true)
         })
     }
