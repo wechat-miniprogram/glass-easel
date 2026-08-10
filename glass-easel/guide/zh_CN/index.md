@@ -110,6 +110,4 @@
 
 ### 附录
 
-[自定义后端协议](appendix/backend_protocol.md)
-
 [list-diff 算法介绍](appendix/list_diff_algorithm.md)
