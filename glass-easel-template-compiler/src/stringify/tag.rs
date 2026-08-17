@@ -220,7 +220,7 @@ fn children_stringify_write<'s, 't, W: FmtWrite>(
 
                         // for comments in the same line, write it
                         if let Node::Comment(comment) = peek {
-                            if comment.location.start.line == item.location_end().line {
+                            if comment.location.start.line == end_item.location_end().line {
                                 if let Node::Text(_) = end_item {
                                     // empty
                                 } else {
@@ -1271,53 +1271,48 @@ impl StringifyLine for Value {
 mod test {
     use crate::stringify::{Stringify, StringifyOptions};
 
+    fn stringify_with_options(src: &str, options: StringifyOptions) -> String {
+        let (template, _) = crate::parse::parse("TEST", src);
+        let mut stringifier =
+            crate::stringify::Stringifier::new(String::new(), "test", Some(src), options);
+        template.stringify_write(&mut stringifier).unwrap();
+        stringifier.finish().0
+    }
+
+    fn stringify(src: &str) -> String {
+        stringify_with_options(src, Default::default())
+    }
+
     #[test]
     fn text_node() {
         let src = r#" text <div> text <span/> </div>"#;
-        let (template, _) = crate::parse::parse("TEST", src);
-        let mut stringifier = crate::stringify::Stringifier::new(
-            String::new(),
-            "test",
-            Some(src),
-            Default::default(),
-        );
-        template.stringify_write(&mut stringifier).unwrap();
-        let (output, _) = stringifier.finish();
         assert_eq!(
-            output.as_str(),
+            stringify(src),
             "<!----> text <!---->\n<div>\n    <!----> text <!---->\n    <span />\n</div>\n",
         );
     }
 
     #[test]
+    fn text_node_then_element_stable() {
+        let src = "<view>\n  hello\n  <text>world</text>\n</view>";
+        assert_eq!(stringify(&stringify(src)), stringify(src));
+    }
+
+    #[test]
     fn comment_around_text_node() {
         let src = r#"<!----> text <!---->"#;
-        let (template, _) = crate::parse::parse("TEST", src);
-        let mut stringifier = crate::stringify::Stringifier::new(
-            String::new(),
-            "test",
-            Some(src),
-            Default::default(),
-        );
-        template.stringify_write(&mut stringifier).unwrap();
-        let (output, _) = stringifier.finish();
-        assert_eq!(output.as_str(), "<!----> text <!---->\n",);
+        assert_eq!(stringify(src), "<!----> text <!---->\n",);
     }
 
     #[test]
     fn meta_tag() {
         let src = r#"<!META a={{123}}> <!META data:a="123" data:b="456">"#;
-        let (template, _) = crate::parse::parse("TEST", src);
         let options = StringifyOptions {
             line_width_limit: 30,
             ..Default::default()
         };
-        let mut stringifier =
-            crate::stringify::Stringifier::new(String::new(), "test", Some(src), options);
-        template.stringify_write(&mut stringifier).unwrap();
-        let (output, _) = stringifier.finish();
         assert_eq!(
-            output.as_str(),
+            stringify_with_options(src, options),
             "<!META a=\"{{ 123 }}\">\n<!META\n    data:a=\"123\"\n    data:b=\"456\"\n>\n",
         );
     }
@@ -1325,17 +1320,12 @@ mod test {
     #[test]
     fn normal_tag() {
         let src = r#"<div a={{123}} /> <div data:a="123" data:b="456" />"#;
-        let (template, _) = crate::parse::parse("TEST", src);
         let options = StringifyOptions {
             line_width_limit: 30,
             ..Default::default()
         };
-        let mut stringifier =
-            crate::stringify::Stringifier::new(String::new(), "test", Some(src), options);
-        template.stringify_write(&mut stringifier).unwrap();
-        let (output, _) = stringifier.finish();
         assert_eq!(
-            output.as_str(),
+            stringify_with_options(src, options),
             "<div a=\"{{ 123 }}\" />\n<div\n    data:a=\"123\"\n    data:b=\"456\"\n/>\n",
         );
     }
@@ -1343,17 +1333,12 @@ mod test {
     #[test]
     fn if_tag() {
         let src = r#"<block wx:if={{ cond }}>123</block><block wx:elif={{ cond2 }}>456</block><block wx:else>789</block>"#;
-        let (template, _) = crate::parse::parse("TEST", src);
         let options = StringifyOptions {
             line_width_limit: 30,
             ..Default::default()
         };
-        let mut stringifier =
-            crate::stringify::Stringifier::new(String::new(), "test", Some(src), options);
-        template.stringify_write(&mut stringifier).unwrap();
-        let (output, _) = stringifier.finish();
         assert_eq!(
-            output.as_str(),
+            stringify_with_options(src, options),
             "<block wx:if=\"{{ cond }}\">123</block>\n<block wx:elif=\"{{ cond2 }}\">456</block>\n<block wx:else>789</block>\n",
         );
     }
@@ -1361,17 +1346,12 @@ mod test {
     #[test]
     fn if_tag_short() {
         let src = r#"<block wx:if={{ cond }}><div /></block><block wx:elif={{ cond2 }}><div /></block><block wx:else><div /></block>"#;
-        let (template, _) = crate::parse::parse("TEST", src);
         let options = StringifyOptions {
             line_width_limit: 30,
             ..Default::default()
         };
-        let mut stringifier =
-            crate::stringify::Stringifier::new(String::new(), "test", Some(src), options);
-        template.stringify_write(&mut stringifier).unwrap();
-        let (output, _) = stringifier.finish();
         assert_eq!(
-            output.as_str(),
+            stringify_with_options(src, options),
             "<div wx:if=\"{{ cond }}\" />\n<div wx:elif=\"{{ cond2 }}\" />\n<div wx:else />\n",
         );
     }
@@ -1379,17 +1359,8 @@ mod test {
     #[test]
     fn comment() {
         let src = r#"<div> <!--TEST--> abc </div>"#;
-        let (template, _) = crate::parse::parse("TEST", src);
-        let mut stringifier = crate::stringify::Stringifier::new(
-            String::new(),
-            "test",
-            Some(src),
-            Default::default(),
-        );
-        template.stringify_write(&mut stringifier).unwrap();
-        let (output, _) = stringifier.finish();
         assert_eq!(
-            output.as_str(),
+            stringify(src),
             "<div>\n    <!--TEST--> abc <!---->\n</div>\n",
         );
     }
@@ -1397,32 +1368,18 @@ mod test {
     #[test]
     fn comment_minimized() {
         let src = r#"<div> <!--TEST--> <span /> </div>"#;
-        let (template, _) = crate::parse::parse("TEST", src);
         let options = StringifyOptions {
             minimize: true,
             ..Default::default()
         };
-        let mut stringifier =
-            crate::stringify::Stringifier::new(String::new(), "test", Some(src), options);
-        template.stringify_write(&mut stringifier).unwrap();
-        let (output, _) = stringifier.finish();
-        assert_eq!(output.as_str(), "<div><span/></div>",);
+        assert_eq!(stringify_with_options(src, options), "<div><span/></div>",);
     }
 
     #[test]
     fn line_end_comments() {
         let src = r#"<div> abc <!-- 1 --> <span /> <!-- 2 --> <span> <!-- 3 --> </span> </div>"#;
-        let (template, _) = crate::parse::parse("TEST", src);
-        let mut stringifier = crate::stringify::Stringifier::new(
-            String::new(),
-            "test",
-            Some(src),
-            Default::default(),
-        );
-        template.stringify_write(&mut stringifier).unwrap();
-        let (output, _) = stringifier.finish();
         assert_eq!(
-            output.as_str(),
+            stringify(src),
             "<div>\n    <!----> abc <!-- 1 -->\n    <span /> <!-- 2 -->\n    <span>\n        <!-- 3 -->\n    </span>\n</div>\n",
         );
     }
@@ -1430,17 +1387,8 @@ mod test {
     #[test]
     fn preserve_empty_lines_between_tags() {
         let src = "<div> \n\n <span /> \n\n <span /> \n\n </div>";
-        let (template, _) = crate::parse::parse("TEST", src);
-        let mut stringifier = crate::stringify::Stringifier::new(
-            String::new(),
-            "test",
-            Some(src),
-            Default::default(),
-        );
-        template.stringify_write(&mut stringifier).unwrap();
-        let (output, _) = stringifier.finish();
         assert_eq!(
-            output.as_str(),
+            stringify(src),
             "<div>\n\n    <span />\n\n    <span />\n\n</div>\n",
         );
     }
