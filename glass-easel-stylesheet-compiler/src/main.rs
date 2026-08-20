@@ -30,6 +30,10 @@ struct CmdArgs {
     #[arg(long)]
     low_priority_sourcemap_output: Option<PathBuf>,
 
+    /// The tag name prefix that should be added to tag names
+    #[arg(short, long)]
+    tag_name_prefix: Option<String>,
+
     /// The class prefix that should be added to class names (`--` not included)
     #[arg(short, long)]
     class_prefix: Option<String>,
@@ -65,6 +69,7 @@ fn main() {
         import_sign: args.import_sign.clone(),
         convert_host: args.convert_host,
         host_is: args.host_is.clone(),
+        tag_name_prefix: args.tag_name_prefix.clone(),
     };
 
     let sst = if args.interactive {

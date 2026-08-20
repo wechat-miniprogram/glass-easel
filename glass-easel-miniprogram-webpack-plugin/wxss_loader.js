@@ -6,8 +6,8 @@ const { StyleSheetTransformer } = require('glass-easel-stylesheet-compiler')
 
 module.exports = function (src, prevMap, meta) {
   const callback = this.async()
-  const { classPrefix, disableHostConversion, setLowPriorityStyles } = this.query
-  const sst = new StyleSheetTransformer(this.resourcePath, src, classPrefix, 750, !disableHostConversion)
+  const { tagNamePrefix, classPrefix, disableHostConversion, setLowPriorityStyles } = this.query
+  const sst = new StyleSheetTransformer(this.resourcePath, src, classPrefix, 750, !disableHostConversion, tagNamePrefix)
   setLowPriorityStyles(sst.getLowPriorityContent(), sst.getLowPrioritySourceMap())
   const warnings = sst.extractWarnings()
   if (warnings && warnings.length > 0) {

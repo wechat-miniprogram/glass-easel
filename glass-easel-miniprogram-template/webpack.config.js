@@ -65,6 +65,8 @@ module.exports = [
         resourceFilePattern: /\.(jpg|jpeg|png|gif|html)$/,
         // the default entry
         defaultEntry: 'pages/index/index',
+        // add a tag name prefix to components nodes to avoid conflict with DOM elements
+        tagNamePrefix: 'wx-',
         // compile with more debug information (unset to follow the webpack mode)
         // dev: false,
       }),

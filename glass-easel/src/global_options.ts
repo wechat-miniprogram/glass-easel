@@ -47,7 +47,13 @@ export enum DeepCopyKind {
 export type ComponentOptions = {
   /** Is external component or not */
   externalComponent?: boolean
-  /** The host node tag name (only valid in external components) */
+  /**
+   * The logical tag name of the host node
+   *
+   * For a domlike backend (which does not support logical/styling tag names),
+   * this can be set to `wx-*` (or similar),
+   * means that using `wx-${tagName}` as the tag name of the host node.
+   */
   hostNodeTagName?: string
   /** The template engine */
   templateEngine?: TemplateEngine

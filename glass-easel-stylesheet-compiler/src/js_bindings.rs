@@ -56,6 +56,7 @@ impl StyleSheetTransformer {
         class_prefix: Option<String>,
         rpx_ratio: f32,
         convert_host: bool,
+        tag_name_prefix: Option<String>,
     ) -> Self {
         let mut sst = crate::StyleSheetTransformer::from_css(
             name,
@@ -64,6 +65,7 @@ impl StyleSheetTransformer {
                 class_prefix,
                 rpx_ratio,
                 convert_host,
+                tag_name_prefix,
                 ..Default::default()
             },
         );
