@@ -43,6 +43,7 @@ type PluginConfig = {
   resourceFilePattern: RegExp
   defaultEntry: string
   customBootstrap: boolean
+  tagNamePrefix: string
   disableClassPrefix: boolean
   disableHostConversion: boolean
 }
@@ -185,6 +186,7 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
   resourceFilePattern: RegExp
   defaultEntry: string
   customBootstrap: boolean
+  tagNamePrefix: string
   disableClassPrefix: boolean
   disableHostConversion: boolean
   // eslint-disable-next-line @typescript-eslint/no-unsafe-call
@@ -196,6 +198,7 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
     this.resourceFilePattern = options.resourceFilePattern || /\.(jpg|jpeg|png|gif)$/
     this.defaultEntry = options.defaultEntry || 'pages/index/index'
     this.customBootstrap = options.customBootstrap || false
+    this.tagNamePrefix = options.tagNamePrefix || ''
     this.disableClassPrefix = options.disableClassPrefix || false
     this.disableHostConversion = options.disableHostConversion || false
   }
@@ -431,6 +434,7 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
                     loaders.splice(i, loaders.length - i)
                   } else {
                     x.options = {
+                      tagNamePrefix: this.tagNamePrefix,
                       classPrefix: styleSheetManager.getScopeName(compPath),
                       disableHostConversion: styleSheetManager.disableHostConversion,
                       setLowPriorityStyles: (s: string, map: string) => {
@@ -584,6 +588,9 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
           var env = new adapter.MiniProgramEnv()
           exports.env = env
           var codeSpace = env.createCodeSpace('', true)
+          codeSpace.getComponentSpace().updateComponentOptions({ hostNodeTagName: '${
+            this.tagNamePrefix
+          }*' })
           codeSpace.addStyleSheet('app', 'app')
           exports.codeSpace = codeSpace
           exports.genObjectGroups = ${tmplGroup ? tmplGroup.getTmplGenObjectGroups() : '{}'}

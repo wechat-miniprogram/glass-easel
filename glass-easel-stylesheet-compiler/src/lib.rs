@@ -12,6 +12,7 @@ use step::{StepParser, StepToken};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StyleSheetOptions {
+    pub tag_name_prefix: Option<String>,
     pub class_prefix: Option<String>,
     pub class_prefix_sign: Option<String>,
     pub rpx_ratio: f32,
@@ -23,6 +24,7 @@ pub struct StyleSheetOptions {
 impl Default for StyleSheetOptions {
     fn default() -> Self {
         Self {
+            tag_name_prefix: None,
             class_prefix: None,
             class_prefix_sign: None,
             rpx_ratio: 750.,
@@ -180,21 +182,32 @@ impl StyleSheetTransformer {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SelectorPos {
+    None,
+    TagName,
+    Class,
+}
+
 fn write_maybe_class_name(
     input: &mut StepParser,
     ss: &mut StyleSheetTransformer,
     next: &StepToken,
     src: &CowRcStr,
-    in_class: bool,
+    sel_pos: SelectorPos,
 ) {
-    if in_class {
+    if sel_pos == SelectorPos::Class {
         if let Some(content) = ss.options.class_prefix_sign.clone() {
             let st = StepToken::wrap(Token::Comment(&content), next.position);
             ss.append_token(st, input, None);
         }
     }
-    if in_class && ss.options.class_prefix.is_some() {
+    if sel_pos == SelectorPos::Class && ss.options.class_prefix.is_some() {
         let s = format!("{}--{}", ss.options.class_prefix.as_ref().unwrap(), src);
+        let st = StepToken::wrap(Token::Ident(s.as_str().into()), next.position);
+        ss.append_token_space_preserved(st, input, Some(Token::Ident(src.clone())));
+    } else if sel_pos == SelectorPos::TagName && ss.options.tag_name_prefix.is_some() {
+        let s = format!("{}{}", ss.options.tag_name_prefix.as_ref().unwrap(), src);
         let st = StepToken::wrap(Token::Ident(s.as_str().into()), next.position);
         ss.append_token_space_preserved(st, input, Some(Token::Ident(src.clone())));
     } else {
@@ -443,9 +456,10 @@ fn parse_at_rule(
 }
 
 fn parse_qualified_rule(input: &mut StepParser, ss: &mut StyleSheetTransformer) {
-    let mut in_class = false;
     let mut has_whitespace = false;
     input.skip_whitespace();
+
+    // test `:host` selector
     if ss.options.convert_host {
         let r = input.try_parse::<_, _, ParseError<()>>(|input| {
             input.expect_colon()?;
@@ -518,6 +532,9 @@ fn parse_qualified_rule(input: &mut StepParser, ss: &mut StyleSheetTransformer) 
             return;
         }
     }
+
+    // convert selectors
+    let mut sel_pos = SelectorPos::TagName;
     loop {
         let r = input.try_parse::<_, _, ParseError<()>>(|input| {
             let next = input.next_including_whitespace()?;
@@ -542,23 +559,27 @@ fn parse_qualified_rule(input: &mut StepParser, ss: &mut StyleSheetTransformer) 
                     let close = ss.append_nested_block(next, input);
                     convert_class_names_and_rpx_in_block(input, ss);
                     ss.append_nested_block_close(close, input);
-                    in_class = false;
+                    sel_pos = SelectorPos::None;
                 }
                 Token::Delim('.') => {
                     ss.append_token_space_preserved(next, input, None);
-                    in_class = true;
+                    sel_pos = SelectorPos::Class;
                 }
                 Token::Ident(src) => {
-                    write_maybe_class_name(input, ss, &next, src, in_class);
-                    in_class = false;
+                    write_maybe_class_name(input, ss, &next, src, sel_pos);
+                    sel_pos = SelectorPos::None;
                 }
                 Token::WhiteSpace(_) => {
                     has_whitespace = true;
-                    in_class = false;
+                    sel_pos = SelectorPos::None;
+                }
+                Token::Comma => {
+                    ss.append_token_space_preserved(next.clone(), input, None);
+                    sel_pos = SelectorPos::TagName;
                 }
                 _ => {
                     ss.append_token_space_preserved(next.clone(), input, None);
-                    in_class = false;
+                    sel_pos = SelectorPos::None;
                 }
             }
             Ok(true)
@@ -578,7 +599,7 @@ fn convert_class_names_and_rpx_in_block(input: &mut StepParser, ss: &mut StyleSh
     input
         .parse_nested_block::<_, (), ()>(|nested_input| {
             let input = &mut StepParser::wrap(nested_input);
-            let mut in_class = false;
+            let mut sel_pos = SelectorPos::TagName;
             let mut has_whitespace = false;
             input.skip_whitespace();
             loop {
@@ -600,7 +621,7 @@ fn convert_class_names_and_rpx_in_block(input: &mut StepParser, ss: &mut StyleSh
                         let close = ss.append_nested_block(next, input);
                         convert_class_names_and_rpx_in_block(input, ss);
                         ss.append_nested_block_close(close, input);
-                        in_class = false;
+                        sel_pos = SelectorPos::None;
                     }
                     Token::Function(func) => {
                         let func: &str = func;
@@ -612,15 +633,15 @@ fn convert_class_names_and_rpx_in_block(input: &mut StepParser, ss: &mut StyleSh
                         let close = ss.append_nested_block(next.clone(), input);
                         convert_rpx_in_block(input, ss, config);
                         ss.append_nested_block_close(close, input);
-                        in_class = false;
+                        sel_pos = SelectorPos::None;
                     }
                     Token::Delim('.') => {
                         ss.append_token(next, input, None);
-                        in_class = true;
+                        sel_pos = SelectorPos::Class;
                     }
                     Token::Ident(src) => {
-                        write_maybe_class_name(input, ss, &next, src, in_class);
-                        in_class = false;
+                        write_maybe_class_name(input, ss, &next, src, sel_pos);
+                        sel_pos = SelectorPos::None; 
                     }
                     Token::Dimension {
                         has_sign,
@@ -631,15 +652,19 @@ fn convert_class_names_and_rpx_in_block(input: &mut StepParser, ss: &mut StyleSh
                         write_maybe_rpx_dimension(
                             input, ss, &next, *has_sign, *value, *int_value, unit,
                         );
-                        in_class = false;
+                        sel_pos = SelectorPos::None;
                     }
                     Token::WhiteSpace(_) => {
                         has_whitespace = true;
-                        in_class = false;
+                        sel_pos = SelectorPos::None;
+                    }
+                    Token::Comma => {
+                        ss.append_token(next, input, None);
+                        sel_pos = SelectorPos::TagName;
                     }
                     _ => {
                         ss.append_token(next, input, None);
-                        in_class = false;
+                        sel_pos = SelectorPos::None;
                     }
                 }
             }

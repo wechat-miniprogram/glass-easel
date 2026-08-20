@@ -566,8 +566,11 @@ export class Component<
       if (BM.DOMLIKE || (BM.DYNAMIC && nodeTreeContext.mode === BackendMode.Domlike)) {
         if (!virtualHost) {
           if (ENV.DEV) performanceMeasureStart('backend.createElement')
+          const tagNamePrefix = options.hostNodeTagName.endsWith('*')
+            ? options.hostNodeTagName.slice(0, -1)
+            : ''
           backendElement = (nodeTreeContext as domlikeBackend.Context).document.createElement(
-            tagName,
+            tagNamePrefix + tagName,
           )
           if (isDedicatedStyleScope) {
             const styleScopePrefix = ownerSpace.styleScopeManager.queryName(styleScope)
