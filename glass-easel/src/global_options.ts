@@ -47,7 +47,7 @@ export enum DeepCopyKind {
 export type ComponentOptions = {
   /** Is external component or not */
   externalComponent?: boolean
-  /** The host node tag name (only valid in external components) */
+  /** The logical tag name of the host node */
   hostNodeTagName?: string
   /** The template engine */
   templateEngine?: TemplateEngine
