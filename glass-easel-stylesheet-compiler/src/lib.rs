@@ -599,7 +599,7 @@ fn convert_class_names_and_rpx_in_block(input: &mut StepParser, ss: &mut StyleSh
     input
         .parse_nested_block::<_, (), ()>(|nested_input| {
             let input = &mut StepParser::wrap(nested_input);
-            let mut sel_pos = SelectorPos::TagName;
+            let mut sel_pos = SelectorPos::None;
             let mut has_whitespace = false;
             input.skip_whitespace();
             loop {
@@ -657,10 +657,6 @@ fn convert_class_names_and_rpx_in_block(input: &mut StepParser, ss: &mut StyleSh
                     Token::WhiteSpace(_) => {
                         has_whitespace = true;
                         sel_pos = SelectorPos::None;
-                    }
-                    Token::Comma => {
-                        ss.append_token(next, input, None);
-                        sel_pos = SelectorPos::TagName;
                     }
                     _ => {
                         ss.append_token(next, input, None);
