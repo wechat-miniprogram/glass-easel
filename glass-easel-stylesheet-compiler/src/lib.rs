@@ -571,7 +571,7 @@ fn parse_qualified_rule(input: &mut StepParser, ss: &mut StyleSheetTransformer) 
                 }
                 Token::WhiteSpace(_) => {
                     has_whitespace = true;
-                    sel_pos = SelectorPos::None;
+                    if sel_pos != SelectorPos::TagName { sel_pos = SelectorPos::None; }
                 }
                 Token::Comma => {
                     ss.append_token_space_preserved(next.clone(), input, None);
@@ -786,6 +786,31 @@ mod test {
         let mut sm = Vec::new();
         output.write_source_map(&mut sm).unwrap();
         assert_eq!(std::str::from_utf8(&s).unwrap(), ".a{}");
+    }
+
+    #[test]
+    fn add_tag_name_prefix() {
+        let trans = StyleSheetTransformer::from_css(
+            "",
+            r#"
+                a[t], b,c {
+                    key: v;
+                }
+            "#,
+            StyleSheetOptions {
+                tag_name_prefix: Some("wx-".into()),
+                ..Default::default()
+            },
+        );
+        let mut s = Vec::new();
+        let output = trans.output();
+        output.write(&mut s).unwrap();
+        let mut sm = Vec::new();
+        output.write_source_map(&mut sm).unwrap();
+        assert_eq!(
+            std::str::from_utf8(&s).unwrap(),
+            "wx-a[t], wx-b,wx-c{key:v;}"
+        );
     }
 
     #[test]
