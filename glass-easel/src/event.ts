@@ -4,7 +4,7 @@ import { type Element } from './element'
 import { type ExternalShadowRoot } from './external_shadow_tree'
 import { FuncArrWithMeta } from './func_arr'
 import { ENV } from './global_options'
-import { isComponent, isShadowRoot } from './type_symbol'
+import { isComponent, isElement, isShadowRoot } from './type_symbol'
 
 /**
  * Options for an event
@@ -467,10 +467,14 @@ export class Event<TDetail> {
 
   static dispatchExternalEvent<TDetail>(
     element: Element,
-    target: GeneralBackendElement,
+    externalTarget: GeneralBackendElement,
     event: Event<TDetail>,
   ) {
-    return event.dispatch(element, target)
+    let target = element
+    if (isComponent(element) && isElement(element.shadowRoot)) {
+      target = element.shadowRoot
+    }
+    return event.dispatch(target, externalTarget)
   }
 
   static triggerEvent<TDetail>(
