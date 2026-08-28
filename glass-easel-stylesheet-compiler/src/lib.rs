@@ -571,7 +571,9 @@ fn parse_qualified_rule(input: &mut StepParser, ss: &mut StyleSheetTransformer) 
                 }
                 Token::WhiteSpace(_) => {
                     has_whitespace = true;
-                    if sel_pos != SelectorPos::TagName { sel_pos = SelectorPos::None; }
+                    if sel_pos != SelectorPos::TagName {
+                        sel_pos = SelectorPos::None;
+                    }
                 }
                 Token::Comma => {
                     ss.append_token_space_preserved(next.clone(), input, None);
@@ -641,7 +643,7 @@ fn convert_class_names_and_rpx_in_block(input: &mut StepParser, ss: &mut StyleSh
                     }
                     Token::Ident(src) => {
                         write_maybe_class_name(input, ss, &next, src, sel_pos);
-                        sel_pos = SelectorPos::None; 
+                        sel_pos = SelectorPos::None;
                     }
                     Token::Dimension {
                         has_sign,
