@@ -290,11 +290,26 @@ export class ShadowSyncElement implements GlassEaselBackend.Element {
     this.getChannel().getAllComputedStyles(this._id, cb)
   }
 
+  getPartialComputedStyles(
+    properties: string[],
+    cb: (res: GlassEaselBackend.GetAllComputedStylesResponses) => void,
+  ): void {
+    this.getChannel().getPartialComputedStyles(this._id, properties, cb)
+  }
+
   getPseudoComputedStyles(
     pseudoType: string,
     cb: (res: GlassEaselBackend.GetAllComputedStylesResponses) => void,
   ): void {
     this.getChannel().getPseudoComputedStyles(this._id, pseudoType, cb)
+  }
+
+  getPartialPseudoComputedStyles(
+    pseudoType: string,
+    properties: string[],
+    cb: (res: GlassEaselBackend.GetAllComputedStylesResponses) => void,
+  ): void {
+    this.getChannel().getPartialPseudoComputedStyles(this._id, pseudoType, properties, cb)
   }
 
   getInheritedRules(cb: (res: GlassEaselBackend.GetInheritedRulesResponses) => void): void {

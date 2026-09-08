@@ -581,11 +581,21 @@ export class CurrentWindowBackendContext implements Context {
 
   getAllComputedStyles(
     target: Element,
-    cb: (computedStyle: { properties: { name: string; value: string }[] }) => void,
+    cb: (res: shared.GetAllComputedStylesResponses) => void,
   ): void {
     const style = window.getComputedStyle(target as unknown as HTMLElement)
-    const properties = collectStyleSheetProperties(style)
-    cb({ properties })
+    const result = collectStyleSheetProperties(style)
+    cb({ properties: result })
+  }
+
+  getPartialComputedStyles(
+    target: Element,
+    properties: string[],
+    cb: (res: shared.GetAllComputedStylesResponses) => void,
+  ): void {
+    const style = window.getComputedStyle(target as unknown as HTMLElement)
+    const result = collectStyleSheetProperties(style, properties)
+    cb({ properties: result })
   }
 
   getPseudoComputedStyles(
@@ -594,8 +604,19 @@ export class CurrentWindowBackendContext implements Context {
     cb: (res: shared.GetAllComputedStylesResponses) => void,
   ): void {
     const style = window.getComputedStyle(target as unknown as HTMLElement, `::${pseudoType}`)
-    const properties = collectStyleSheetProperties(style)
-    cb({ properties })
+    const result = collectStyleSheetProperties(style)
+    cb({ properties: result })
+  }
+
+  getPartialPseudoComputedStyles(
+    target: Element,
+    pseudoType: string,
+    properties: string[],
+    cb: (res: shared.GetAllComputedStylesResponses) => void,
+  ): void {
+    const style = window.getComputedStyle(target as unknown as HTMLElement, `::${pseudoType}`)
+    const result = collectStyleSheetProperties(style, properties)
+    cb({ properties: result })
   }
 
   getBoxModel(
@@ -941,15 +962,16 @@ const debounce = <Func extends (...args: any[]) => void>(func: Func, wait: numbe
   }) as Func
 }
 
-const collectStyleSheetProperties = (style: CSSStyleDeclaration) => {
-  const properties: shared.CSSProperty[] = []
-  for (let i = 0; i < style.length; i += 1) {
-    const name = style[i]!
+const collectStyleSheetProperties = (style: CSSStyleDeclaration, properties?: string[]) => {
+  const result: shared.CSSProperty[] = []
+  const propertiesNames = properties || style
+  for (let i = 0; i < propertiesNames.length; i += 1) {
+    const name = propertiesNames[i]!
     const important = style.getPropertyPriority(name) === 'important'
     const value = style.getPropertyValue(name)
-    properties.push({ name, value, important })
+    result.push({ name, value, important })
   }
-  return properties
+  return result
 }
 
 const forEachStyleSheetRule = (

@@ -64,7 +64,7 @@ export type GetInheritedRulesResponses = {
 }
 
 export type GetAllComputedStylesResponses = {
-  properties: { name: string; value: string }[]
+  properties: CSSProperty[]
 }
 
 export interface Observer {

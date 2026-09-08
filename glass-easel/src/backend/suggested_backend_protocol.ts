@@ -20,8 +20,17 @@ interface GetWrapper<T> {
 
 export type Element<E> = {
   getAllComputedStyles(cb: (res: GetAllComputedStylesResponses) => void): void
+  getPartialComputedStyles(
+    properties: string[],
+    cb: (res: GetAllComputedStylesResponses) => void,
+  ): void
   getPseudoComputedStyles(
     pseudoType: string,
+    cb: (res: GetAllComputedStylesResponses) => void,
+  ): void
+  getPartialPseudoComputedStyles(
+    pseudoType: string,
+    properties: string[],
     cb: (res: GetAllComputedStylesResponses) => void,
   ): void
   getBoundingClientRect(cb: (res: BoundingClientRect) => void): void
