@@ -54,9 +54,7 @@ const markElement = (elem: Node) => {
   ;(elem as any)[markSymbol] = true
 }
 
-const isElementMarked = (elem: Node) => {
-  return (elem as any)[markSymbol] === true
-}
+const isElementMarked = (elem: Node) => (elem as any)[markSymbol] === true
 
 function findMarkedElementParent(elem: Element): Element | null
 function findMarkedElementParent(elem: Node): Node | null
@@ -676,7 +674,7 @@ export class ViewController {
       if (!be.getBoundingClientRect) {
         return cb(defaultRect)
       }
-      be.getBoundingClientRect!(cb)
+      be.getBoundingClientRect(cb)
     }
   }
 
@@ -737,7 +735,7 @@ export class ViewController {
       if (!be.getScrollOffset) {
         return cb(defaultOffset)
       }
-      be.getScrollOffset!(cb)
+      be.getScrollOffset(cb)
     }
   }
 
