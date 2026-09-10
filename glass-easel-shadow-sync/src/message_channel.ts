@@ -85,9 +85,10 @@ export const enum ChannelEventType {
   DISABLE_STYLE_SHEET,
 
   GET_ALL_COMPUTED_STYLES,
-  GET_ALL_COMPUTED_STYLES_CALLBACK,
+  GET_PARTIAL_COMPUTED_STYLES,
   GET_PSEUDO_COMPUTED_STYLES,
-  GET_PSEUDO_COMPUTED_STYLES_CALLBACK,
+  GET_PARTIAL_PSEUDO_COMPUTED_STYLES,
+  GET_COMPUTED_STYLES_CALLBACK,
   GET_INHERITED_RULES,
   GET_INHERITED_RULES_CALLBACK,
   GET_MATCHED_RULES,
@@ -133,8 +134,7 @@ export type ChannelEventTypeViewSide =
   | ChannelEventType.RESIZE_OBSERVER_CALLBACK
   | ChannelEventType.ELEMENT_FROM_POINT_CALLBACK
   | ChannelEventType.SET_MODEL_BINDING_STAT_CALLBACK
-  | ChannelEventType.GET_ALL_COMPUTED_STYLES_CALLBACK
-  | ChannelEventType.GET_PSEUDO_COMPUTED_STYLES_CALLBACK
+  | ChannelEventType.GET_COMPUTED_STYLES_CALLBACK
   | ChannelEventType.GET_INHERITED_RULES_CALLBACK
   | ChannelEventType.GET_MATCHED_RULES_CALLBACK
   | ChannelEventType.REPLACE_STYLE_SHEET_ALL_PROPERTIES_CALLBACK
@@ -256,9 +256,10 @@ export type ChannelArgs = ExhaustiveChannelEvent<{
   [ChannelEventType.PERFORMANCE_STATS_CALLBACK]: [number, number, number]
 
   [ChannelEventType.GET_ALL_COMPUTED_STYLES]: [number, number]
-  [ChannelEventType.GET_ALL_COMPUTED_STYLES_CALLBACK]: [number, string]
+  [ChannelEventType.GET_PARTIAL_COMPUTED_STYLES]: [number, string[], number]
   [ChannelEventType.GET_PSEUDO_COMPUTED_STYLES]: [number, string, number]
-  [ChannelEventType.GET_PSEUDO_COMPUTED_STYLES_CALLBACK]: [number, string]
+  [ChannelEventType.GET_PARTIAL_PSEUDO_COMPUTED_STYLES]: [number, string, string[], number]
+  [ChannelEventType.GET_COMPUTED_STYLES_CALLBACK]: [number, string]
   [ChannelEventType.GET_INHERITED_RULES]: [number, number]
   [ChannelEventType.GET_INHERITED_RULES_CALLBACK]: [number, string]
   [ChannelEventType.GET_MATCHED_RULES]: [number, number]
@@ -465,11 +466,8 @@ export const MessageChannelDataSide = (
         eventIdMap.delete(eventId)
         break
       }
-      case ChannelEventType.GET_ALL_COMPUTED_STYLES_CALLBACK:
+      case ChannelEventType.GET_COMPUTED_STYLES_CALLBACK:
         id2callback<Channel['getAllComputedStyles']>(arg[1])!(JSON.parse(arg[2]))
-        break
-      case ChannelEventType.GET_PSEUDO_COMPUTED_STYLES_CALLBACK:
-        id2callback<Channel['getPseudoComputedStyles']>(arg[1])!(JSON.parse(arg[2]))
         break
       case ChannelEventType.GET_INHERITED_RULES_CALLBACK:
         id2callback<Channel['getInheritedRules']>(arg[1])!(JSON.parse(arg[2]))
@@ -659,12 +657,26 @@ export const MessageChannelDataSide = (
     appendStyleSheetPath: (index: number, path: string, styleScope?: number) => publish([ChannelEventType.APPEND_STYLE_SHEET_PATH, index, path, styleScope]),
     disableStyleSheet: (index: number) => publish([ChannelEventType.DISABLE_STYLE_SHEET, index]),
 
-    getAllComputedStyles: (elementId: number, cb: (res: GlassEaselBackend.GetAllComputedStylesResponses) => void) => publish([ChannelEventType.GET_ALL_COMPUTED_STYLES, elementId, callback2id(cb)]),
+    getAllComputedStyles: (
+      elementId: number,
+      cb: (res: GlassEaselBackend.GetAllComputedStylesResponses) => void
+    ) => publish([ChannelEventType.GET_ALL_COMPUTED_STYLES, elementId, callback2id(cb)]),
+    getPartialComputedStyles: (
+      elementId: number,
+      properties: string[],
+      cb: (res: GlassEaselBackend.GetAllComputedStylesResponses) => void
+    ) => publish([ChannelEventType.GET_PARTIAL_COMPUTED_STYLES, elementId, properties, callback2id(cb)]),
     getPseudoComputedStyles: (
       elementId: number,
       pseudoType: string,
       cb: (res: GlassEaselBackend.GetAllComputedStylesResponses) => void,
     ) => publish([ChannelEventType.GET_PSEUDO_COMPUTED_STYLES, elementId, pseudoType, callback2id(cb)]),
+    getPartialPseudoComputedStyles: (
+      elementId: number,
+      pseudoType: string,
+      properties: string[],
+      cb: (res: GlassEaselBackend.GetAllComputedStylesResponses) => void,
+    ) => publish([ChannelEventType.GET_PARTIAL_PSEUDO_COMPUTED_STYLES, elementId, pseudoType, properties, callback2id(cb)]),
     getInheritedRules: (elementId: number, cb: (res: GlassEaselBackend.GetInheritedRulesResponses) => void) => publish([ChannelEventType.GET_INHERITED_RULES, elementId, callback2id(cb)]),
     replaceStyleSheetAllProperties: (sheetIndex: number, ruleIndex: number, inlineStyle: string, cb: (propertyIndex: number | null) => void) => publish([ChannelEventType.REPLACE_STYLE_SHEET_ALL_PROPERTIES, sheetIndex, ruleIndex, inlineStyle, callback2id(cb)]),
     getBoundingClientRect: (parent: number, cb: (res: GlassEaselBackend.BoundingClientRect) => void) => publish([ChannelEventType.GET_BOUNDING_CLIENT_RECT, parent, callback2id(cb)]),
@@ -1253,11 +1265,15 @@ export const MessageChannelViewSide = (
         const [, elementId, callbackId] = arg
         const element = nodeMap[elementId]! as Element
         controller.getAllComputedStyles(element, (res) => {
-          publish([
-            ChannelEventType.GET_ALL_COMPUTED_STYLES_CALLBACK,
-            callbackId,
-            JSON.stringify(res),
-          ])
+          publish([ChannelEventType.GET_COMPUTED_STYLES_CALLBACK, callbackId, JSON.stringify(res)])
+        })
+        break
+      }
+      case ChannelEventType.GET_PARTIAL_COMPUTED_STYLES: {
+        const [, elementId, properties, callbackId] = arg
+        const element = nodeMap[elementId]! as Element
+        controller.getPartialComputedStyles(element, properties, (res) => {
+          publish([ChannelEventType.GET_COMPUTED_STYLES_CALLBACK, callbackId, JSON.stringify(res)])
         })
         break
       }
@@ -1265,11 +1281,15 @@ export const MessageChannelViewSide = (
         const [, elementId, pseudoType, callbackId] = arg
         const element = nodeMap[elementId]! as Element
         controller.getPseudoComputedStyles(element, pseudoType, (res) => {
-          publish([
-            ChannelEventType.GET_PSEUDO_COMPUTED_STYLES_CALLBACK,
-            callbackId,
-            JSON.stringify(res),
-          ])
+          publish([ChannelEventType.GET_COMPUTED_STYLES_CALLBACK, callbackId, JSON.stringify(res)])
+        })
+        break
+      }
+      case ChannelEventType.GET_PARTIAL_PSEUDO_COMPUTED_STYLES: {
+        const [, elementId, pseudoType, properties, callbackId] = arg
+        const element = nodeMap[elementId]! as Element
+        controller.getPartialPseudoComputedStyles(element, pseudoType, properties, (res) => {
+          publish([ChannelEventType.GET_COMPUTED_STYLES_CALLBACK, callbackId, JSON.stringify(res)])
         })
         break
       }

@@ -5,6 +5,7 @@ import {
   type ShadowSyncElement,
   ReflectTemplateEngine,
 } from '../../src/backend'
+import { getNodeId } from '../../src/message_channel'
 import {
   getViewNode,
   shadowSyncBackend,
@@ -60,53 +61,248 @@ describe('backend', () => {
     })
     expect(domHtml(elem)).toEqual('')
   })
-  test('external component', () => {
-    viewComponentSpace.setGlobalUsingComponent(
-      'wx-button',
-      viewComponentSpace.defineComponent({
-        is: 'wx-button',
-        options: {
-          externalComponent: true,
-        },
-        properties: {
-          disabled: Boolean,
-        },
-        template: tmpl('<button disabled="{{disabled}}"><slot /></button>'),
-      }) as glassEasel.GeneralComponentDefinition,
-    )
+  describe('external component', () => {
+    // jsdom does not implement layout-based hit testing;
+    // `document.elementFromPoint` is mocked to return the designated hit element.
+    let hitElement: Element | null = null
+    const elementFromPointMock = jest.fn((_left: number, _top: number) => hitElement)
 
-    const ops: any[] = []
-    const rootDef = componentSpace.defineComponent({
-      template: tmpl(`
-        <wx-button disabled="{{disabled}}" bind:tap="handleTap">{{text}}</wx-button>
-      `),
-      data: {
-        text: '123',
-        disabled: true,
-      },
-      methods: {
-        handleTap(e: glassEasel.Event<any>) {
-          ops.push(e.detail)
-        },
-      },
+    beforeAll(() => {
+      Object.defineProperty(document, 'elementFromPoint', {
+        configurable: true,
+        writable: true,
+        value: elementFromPointMock,
+      })
     })
-    const root = glassEasel.Component.createWithContext('root', rootDef, shadowSyncBackend)
-    root.destroyBackendElementOnDetach()
 
-    expect(domHtml(root)).toEqual('<wx-button><button disabled="">123</button></wx-button>')
+    afterAll(() => {
+      delete (document as { elementFromPoint?: unknown }).elementFromPoint
+    })
 
-    root.setData({ disabled: false })
-    expect(domHtml(root)).toEqual('<wx-button><button>123</button></wx-button>')
+    test('external component', () => {
+      viewComponentSpace.setGlobalUsingComponent(
+        'wx-button',
+        viewComponentSpace.defineComponent({
+          is: 'wx-button',
+          options: {
+            externalComponent: true,
+          },
+          properties: {
+            disabled: Boolean,
+          },
+          template: tmpl('<button disabled="{{disabled}}"><slot /></button>'),
+        }) as glassEasel.GeneralComponentDefinition,
+      )
 
-    root.setData({ text: '23333' })
-    expect(domHtml(root)).toEqual('<wx-button><button>23333</button></wx-button>')
+      const ops: any[] = []
+      const rootDef = componentSpace.defineComponent({
+        template: tmpl(`
+          <wx-button disabled="{{disabled}}" bind:tap="handleTap">{{text}}</wx-button>
+        `),
+        data: {
+          text: '123',
+          disabled: true,
+        },
+        methods: {
+          handleTap(e: glassEasel.Event<any>) {
+            ops.push(e.detail)
+          },
+        },
+      })
+      const root = glassEasel.Component.createWithContext('root', rootDef, shadowSyncBackend)
+      root.destroyBackendElementOnDetach()
 
-    const button = root.getShadowRoot()!.childNodes[0]!
+      expect(domHtml(root)).toEqual('<wx-button><button disabled="">123</button></wx-button>')
 
-    const viewButton = getViewNode(button) as glassEasel.GeneralComponent
-    viewButton.triggerEvent('tap', { foo: 'foo' })
-    expect(ops).toEqual([{ foo: 'foo' }])
+      root.setData({ disabled: false })
+      expect(domHtml(root)).toEqual('<wx-button><button>123</button></wx-button>')
+
+      root.setData({ text: '23333' })
+      expect(domHtml(root)).toEqual('<wx-button><button>23333</button></wx-button>')
+
+      const button = root.getShadowRoot()!.childNodes[0]!
+
+      const viewButton = getViewNode(button) as glassEasel.GeneralComponent
+      viewButton.triggerEvent('tap', { foo: 'foo' })
+      expect(ops).toEqual([{ foo: 'foo' }])
+    })
+
+    // The view side renders `<wx-button>` as a full built-in component.
+    // Its internal nodes are created by the view-side template engine directly,
+    // so they are not known to the message channel (i.e. they have no channel id).
+    // Note that it must not be an `externalComponent` in this case: the internals of
+    // an `externalComponent` are plain DOM nodes, which the backend `elementFromPoint`
+    // already resolves to the component by itself.
+    const registerViewButton = (templateSrc: string) => {
+      viewComponentSpace.setGlobalUsingComponent(
+        'wx-button',
+        viewComponentSpace.defineComponent({
+          is: 'wx-button',
+          template: tmpl(templateSrc),
+        }) as glassEasel.GeneralComponentDefinition,
+      )
+    }
+
+    const renderRoot = (templateSrc: string) => {
+      const rootDef = componentSpace.defineComponent({
+        template: tmpl(templateSrc),
+      })
+      const root = glassEasel.Component.createWithContext('root', rootDef, shadowSyncBackend)
+      root.destroyBackendElementOnDetach()
+      shadowSyncBackend.getRootNode().appendChild(root.getBackendElement() as ShadowSyncElement)
+      glassEasel.Component.pretendAttached(root)
+      return root
+    }
+
+    // collect the internal nodes of the built-in component on the view side,
+    // from outside to inside: `<button>`, `<div>`, `<span>`
+    const getInternalNodes = (button: glassEasel.Element): glassEasel.Element[] => {
+      const internalButton = (getViewNode(button) as glassEasel.GeneralComponent).getShadowRoot()!
+        .childNodes[0] as glassEasel.Element
+      const internalDiv = internalButton.childNodes[0] as glassEasel.Element
+      const internalSpan = internalDiv.childNodes[0] as glassEasel.Element
+      return [internalButton, internalDiv, internalSpan]
+    }
+
+    test('elementFromPoint on external component internals', () => {
+      viewComponentSpace.setGlobalUsingComponent(
+        'wx-button',
+        viewComponentSpace.defineComponent({
+          is: 'wx-button',
+          options: {
+            externalComponent: true,
+          },
+          template: tmpl('<button><div><span>label</span></div></button>'),
+        }) as glassEasel.GeneralComponentDefinition,
+      )
+
+      const root = renderRoot(`
+        <wx-button></wx-button>
+      `)
+      const button = root.getShadowRoot()!.childNodes[0] as glassEasel.Element
+
+      expect(domHtml(root)).toEqual(
+        '<wx-button><button><div><span>label</span></div></button><virtual></virtual></wx-button>',
+      )
+
+      // internals of an `externalComponent` are plain DOM nodes created by the view side
+      const viewButton = getViewNode(button) as glassEasel.GeneralComponent
+      const internalSpanDom = (viewButton.getBackendElement() as unknown as Element).querySelector(
+        'span',
+      )!
+
+      hitElement = internalSpanDom
+      const results: (glassEasel.Element | null)[] = []
+      shadowSyncBackend.elementFromPoint(1, 1, (elem) => {
+        results.push(elem)
+      })
+      expect(results).toEqual([button])
+    })
+
+    test('elementFromPoint on built-in component internals', () => {
+      registerViewButton('<button><div><span>label</span></div></button>')
+      const root = renderRoot(`
+        <wx-button></wx-button>
+      `)
+      const button = root.getShadowRoot()!.childNodes[0] as glassEasel.Element
+
+      const internalNodes = getInternalNodes(button)
+      // the internal nodes are created by the view side only, so they have no channel id
+      expect(internalNodes.map((node) => getNodeId(node))).toEqual([
+        undefined,
+        undefined,
+        undefined,
+      ])
+
+      internalNodes.forEach((node) => {
+        hitElement = node.getBackendElement() as unknown as Element
+        elementFromPointMock.mockClear()
+        const results: (glassEasel.Element | null)[] = []
+        shadowSyncBackend.elementFromPoint(1, 1, (elem) => {
+          results.push(elem)
+        })
+        expect(elementFromPointMock).toHaveBeenCalledWith(1, 1)
+        expect(results).toEqual([button])
+      })
+    })
+
+    test('elementFromPoint on channel-created element', () => {
+      registerViewButton('<button><div><span>label</span></div></button>')
+      const root = renderRoot(`
+        <view id="a"></view>
+        <wx-button></wx-button>
+      `)
+      const view = root.getShadowRoot()!.childNodes[0] as glassEasel.Element
+
+      hitElement = getViewNode(view).getBackendElement() as unknown as Element
+      const results: (glassEasel.Element | null)[] = []
+      shadowSyncBackend.elementFromPoint(1, 1, (elem) => {
+        results.push(elem)
+      })
+      expect(results).toEqual([view])
+    })
+
+    test('elementFromPoint on slotted content of a built-in component', () => {
+      registerViewButton('<button><div><slot /></div></button>')
+      const root = renderRoot(`
+        <wx-button><view id="inner">label</view></wx-button>
+      `)
+      const button = root.getShadowRoot()!.childNodes[0] as glassEasel.Element
+      const inner = button.childNodes[0] as glassEasel.Element
+
+      hitElement = getViewNode(inner).getBackendElement() as unknown as Element
+      const results: (glassEasel.Element | null)[] = []
+      shadowSyncBackend.elementFromPoint(1, 1, (elem) => {
+        results.push(elem)
+      })
+      expect(results).toEqual([inner])
+    })
+
+    test('getActiveElement on built-in component internals', () => {
+      registerViewButton('<button><div><span>label</span></div></button>')
+      const root = renderRoot(`
+        <wx-button></wx-button>
+      `)
+      const button = root.getShadowRoot()!.childNodes[0] as glassEasel.Element
+
+      // attach the view tree to the document so that jsdom accepts focusing
+      const viewRootDom = getViewNode(root).getBackendElement() as unknown as Element
+      const container = viewRootDom.parentNode as Element
+      document.body.appendChild(container)
+
+      const internalButton = getInternalNodes(button)[0]!
+      const internalButtonDom = internalButton.getBackendElement() as unknown as HTMLElement
+      internalButtonDom.focus()
+      expect(document.activeElement).toBe(internalButtonDom)
+
+      const results: (glassEasel.Element | null)[] = []
+      shadowSyncBackend.getActiveElement((elem) => {
+        results.push(elem)
+      })
+      expect(results).toEqual([button])
+
+      container.remove()
+    })
+
+    test('overlay inspect on built-in component internals', () => {
+      registerViewButton('<button><div><span>label</span></div></button>')
+      const root = renderRoot(`
+        <wx-button></wx-button>
+      `)
+      const button = root.getShadowRoot()!.childNodes[0] as glassEasel.Element
+      const internalSpan = getInternalNodes(button)[2]!
+
+      const ops: [string, glassEasel.Element | null][] = []
+      shadowSyncBackend.startOverlayInspect((event, elem) => {
+        ops.push([event, elem])
+      })
+      hitElement = internalSpan.getBackendElement() as unknown as Element
+      window.dispatchEvent(new window.MouseEvent('click', { clientX: 1, clientY: 1 }))
+      expect(ops).toEqual([['tap', button]])
+      shadowSyncBackend.stopOverlayInspect()
+    })
   })
+
   test('hook to sync behavior builder', async () => {
     const beh = hookBuilderToSyncData(componentSpace.define())
       .property('name', String)

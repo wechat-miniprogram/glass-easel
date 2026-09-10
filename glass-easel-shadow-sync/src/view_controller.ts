@@ -48,6 +48,26 @@ const getTmplArgs = (elem: Node): TmplArgs => {
   return (node._$wxTmplArgs = node._$wxTmplArgs || {})
 }
 
+const markSymbol = Symbol('mark')
+
+const markElement = (elem: Node) => {
+  ;(elem as any)[markSymbol] = true
+}
+
+const isElementMarked = (elem: Node) => {
+  return (elem as any)[markSymbol] === true
+}
+
+function findMarkedElementParent(elem: Element): Element | null
+function findMarkedElementParent(elem: Node): Node | null
+function findMarkedElementParent(elem: Node): Node | null {
+  let curr: Node | null = elem
+  while (curr && !isElementMarked(curr)) {
+    curr = curr.getComposedParent()
+  }
+  return curr
+}
+
 export class Fragment {
   public childNodes: Node[] = []
 
@@ -188,11 +208,15 @@ export class ViewController {
       cb(null)
       return
     }
-    _backendContext.elementFromPoint(x, y, cb)
+    _backendContext.elementFromPoint(x, y, (element) => {
+      cb(element ? findMarkedElementParent(element) : null)
+    })
   }
 
   createElement(logicalName: string, stylingName: string, ownerShadowRoot: ShadowRoot): Element {
-    return ownerShadowRoot.createNativeNodeWithInit(logicalName, stylingName, undefined)
+    const elem = ownerShadowRoot.createNativeNodeWithInit(logicalName, stylingName, undefined)
+    markElement(elem)
+    return elem
   }
 
   createElementOrComponent(
@@ -244,6 +268,8 @@ export class ViewController {
       )
       shadowRoot.applySlotUpdates()
     }
+
+    markElement(comp)
 
     return comp
   }
@@ -303,20 +329,28 @@ export class ViewController {
         ? ownerShadowRoot.createComponentByDef(tagName, compDef)
         : _glassEasel.Component.createWithContext(tagName, compDef, _backendContext)
 
+      markElement(node)
+
       return this._$pendingAssignComponentId?.(node)
     }
   }
 
   createTextNode(textContent: string, ownerShadowRoot: ShadowRoot): TextNode {
-    return ownerShadowRoot.createTextNode(textContent)
+    const elem = ownerShadowRoot.createTextNode(textContent)
+    markElement(elem)
+    return elem
   }
 
   createVirtualNode(virtualName: string, ownerShadowRoot: ShadowRoot): VirtualNode {
-    return ownerShadowRoot.createVirtualNode(virtualName)
+    const elem = ownerShadowRoot.createVirtualNode(virtualName)
+    markElement(elem)
+    return elem
   }
 
   createShadowRoot(hostNode: GeneralComponent): ShadowRoot {
-    return hostNode.shadowRoot as ShadowRoot
+    const elem = hostNode.shadowRoot as ShadowRoot
+    markElement(elem)
+    return elem
   }
 
   createFragment(): Fragment {
@@ -548,7 +582,27 @@ export class ViewController {
     element: Element,
     cb: (res: GlassEaselBackend.GetAllComputedStylesResponses) => void,
   ): void {
-    this.callSuggestedBackendCbMethod(element, 'getAllComputedStyles', [], { properties: [] }, cb)
+    this.callSuggestedBackendCbMethod(
+      element,
+      'getAllComputedStyles',
+      [] as any,
+      { properties: [] },
+      cb,
+    )
+  }
+
+  getPartialComputedStyles(
+    element: Element,
+    properties: string[],
+    cb: (res: GlassEaselBackend.GetAllComputedStylesResponses) => void,
+  ): void {
+    this.callSuggestedBackendCbMethod(
+      element,
+      'getPartialComputedStyles',
+      [properties],
+      { properties: [] },
+      cb,
+    )
   }
 
   getPseudoComputedStyles(
@@ -560,6 +614,21 @@ export class ViewController {
       element,
       'getPseudoComputedStyles',
       [pseudoType],
+      { properties: [] },
+      cb,
+    )
+  }
+
+  getPartialPseudoComputedStyles(
+    element: Element,
+    pseudoType: string,
+    properties: string[],
+    cb: (res: GlassEaselBackend.GetAllComputedStylesResponses) => void,
+  ): void {
+    this.callSuggestedBackendCbMethod(
+      element,
+      'getPartialPseudoComputedStyles',
+      [pseudoType, properties],
       { properties: [] },
       cb,
     )
@@ -590,7 +659,25 @@ export class ViewController {
     element: Element,
     cb: (res: { left: number; top: number; width: number; height: number }) => void,
   ): void {
-    element.getBoundingClientRect(cb)
+    const { _glassEasel } = this
+    const backendContext = element.getBackendContext()
+    const backendElement = element.getBackendElement()
+    const defaultRect = { left: 0, top: 0, width: 0, height: 0 }
+    if (!backendContext || !backendElement) {
+      return cb(defaultRect)
+    }
+    if (backendContext.mode === _glassEasel.BackendMode.Domlike) {
+      if (!(backendElement as domlikeBackend.Element).getBoundingClientRect) {
+        return cb(defaultRect)
+      }
+      cb((backendElement as domlikeBackend.Element).getBoundingClientRect!())
+    } else {
+      const be = backendElement as composedBackend.Element | shadowBackend.Element
+      if (!be.getBoundingClientRect) {
+        return cb(defaultRect)
+      }
+      be.getBoundingClientRect!(cb)
+    }
   }
 
   getBoxModel(
@@ -630,7 +717,28 @@ export class ViewController {
       scrollHeight: number
     }) => void,
   ): void {
-    element.getScrollOffset(cb)
+    const { _glassEasel } = this
+    const backendContext = element.getBackendContext()
+    const backendElement = element.getBackendElement()
+    const defaultOffset = { scrollLeft: 0, scrollTop: 0, scrollWidth: 0, scrollHeight: 0 }
+    if (!backendContext || !backendElement) {
+      return cb(defaultOffset)
+    }
+    if (backendContext.mode === _glassEasel.BackendMode.Domlike) {
+      const elem = backendElement as domlikeBackend.Element
+      cb({
+        scrollLeft: elem.scrollLeft || 0,
+        scrollTop: elem.scrollTop || 0,
+        scrollWidth: elem.scrollWidth || 0,
+        scrollHeight: elem.scrollHeight || 0,
+      })
+    } else {
+      const be = backendElement as composedBackend.Element | shadowBackend.Element
+      if (!be.getScrollOffset) {
+        return cb(defaultOffset)
+      }
+      be.getScrollOffset!(cb)
+    }
   }
 
   setScrollPosition(
@@ -677,7 +785,9 @@ export class ViewController {
     if (!_backendContext.startOverlayInspect) {
       return
     }
-    _backendContext.startOverlayInspect(callback)
+    _backendContext.startOverlayInspect((event, node) => {
+      callback(event, node ? findMarkedElementParent(node) : null)
+    })
   }
 
   stopOverlayInspect(): void {
@@ -712,7 +822,9 @@ export class ViewController {
     if (!_backendContext.getActiveElement) {
       return cb(null)
     }
-    _backendContext.getActiveElement(cb)
+    _backendContext.getActiveElement((node) => {
+      cb(node ? findMarkedElementParent(node) : null)
+    })
   }
 
   setListenerStats(
