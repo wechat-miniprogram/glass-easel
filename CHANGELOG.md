@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.2.0] - 2026-09-10
+
+### Changed
+- Suggested backend protocol updates. ([#305](https://github.com/wechat-miniprogram/glass-easel/pull/305))
 
 ## [1.1.0] - 2026-08-28
 
