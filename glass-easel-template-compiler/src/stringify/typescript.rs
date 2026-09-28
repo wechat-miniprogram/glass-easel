@@ -55,6 +55,9 @@ pub(crate) fn generate_tmpl_converted_expr(
             let location = &script.module_name().location;
             let scope_name = &script.module_name().name;
             w.add_scope_with_ts_keyword_escape(scope_name, &PRESERVED_VAR_NAMES);
+            if !Ident::is_valid_js_identifier(scope_name) {
+                continue;
+            }
             w.write_line(|w| {
                 let pos = location.start;
                 write_token_series(["const "], &(pos..pos), w)?;
@@ -163,6 +166,9 @@ fn write_let_vars<'s, 't, W: FmtWrite>(
         let var_name = w
             .add_scope_with_ts_keyword_escape(&attr.name.name, &PRESERVED_VAR_NAMES)
             .clone();
+        if !Ident::is_valid_js_identifier(&attr.name.name) {
+            continue;
+        }
         w.write_line(|w| {
             write_token_series(
                 ["const "],
@@ -212,6 +218,9 @@ fn write_slot_value_refs<'s, 't, W: FmtWrite>(
         let var_name = w
             .add_scope_with_ts_keyword_escape(&attr.value.name, &PRESERVED_VAR_NAMES)
             .clone();
+        if !Ident::is_valid_js_identifier(&attr.value.name) {
+            continue;
+        }
         w.write_line(|w| {
             write_token_series(
                 ["const "],
@@ -238,6 +247,11 @@ fn write_event_method<'s, 't, W: FmtWrite>(
 ) -> FmtResult {
     // IDEA impl event typing
     if let Some(value) = value.as_ref() {
+        if let Value::Static { value, .. } = value {
+            if !Ident::is_valid_js_identifier(value) {
+                return Ok(());
+            }
+        }
         w.write_line(|w| {
             let pos = name.location.start;
             write_token_series(["var ", "_event_", ":", "Function", "="], &(pos..pos), w)?;
@@ -334,6 +348,9 @@ impl ConvertedExprWriteBlock for Element {
                     let nv_change_attr = change_attributes.iter().map(|x| (&x.name, &x.value));
                     for (name, value) in nv_attr.chain(nv_change_attr) {
                         let attr_name = dash_to_camel(&name.name);
+                        if !Ident::is_valid_js_identifier(&attr_name) {
+                            continue;
+                        }
                         w.write_line(|w| match value {
                             None => {
                                 write_token_series(
@@ -520,58 +537,62 @@ impl ConvertedExprWriteBlock for Element {
                         list.1.converted_expr_write(w)?;
                         write_token_series([";"], &list.0, w)
                     })?;
-                    w.write_line(|w| {
-                        write_token_series(["const "], &item_name.0, w)?;
-                        w.write_token_state(
-                            &item_scope_name,
-                            Some(&item_name.1.name),
-                            &item_name.1.location,
-                            StringifierLineState::Normal,
-                        )?;
-                        write_token_series(
-                            [
-                                "=",
-                                "0",
-                                " as ",
-                                "unknown",
-                                " as ",
-                                "_ForItem_",
-                                "<",
-                                "typeof ",
-                                "_for_",
-                                ">",
-                                ";",
-                            ],
-                            &(item_name.0.end..item_name.0.end),
-                            w,
-                        )
-                    })?;
-                    w.write_line(|w| {
-                        write_token_series(["const "], &index_name.0, w)?;
-                        w.write_token_state(
-                            &index_scope_name,
-                            Some(&index_name.1.name),
-                            &index_name.1.location,
-                            StringifierLineState::Normal,
-                        )?;
-                        write_token_series(
-                            [
-                                "=",
-                                "0",
-                                " as ",
-                                "unknown",
-                                " as ",
-                                "_ForIndex_",
-                                "<",
-                                "typeof ",
-                                "_for_",
-                                ">",
-                                ";",
-                            ],
-                            &(item_name.0.end..item_name.0.end),
-                            w,
-                        )
-                    })?;
+                    if Ident::is_valid_js_identifier(&item_name.1.name) {
+                        w.write_line(|w| {
+                            write_token_series(["const "], &item_name.0, w)?;
+                            w.write_token_state(
+                                &item_scope_name,
+                                Some(&item_name.1.name),
+                                &item_name.1.location,
+                                StringifierLineState::Normal,
+                            )?;
+                            write_token_series(
+                                [
+                                    "=",
+                                    "0",
+                                    " as ",
+                                    "unknown",
+                                    " as ",
+                                    "_ForItem_",
+                                    "<",
+                                    "typeof ",
+                                    "_for_",
+                                    ">",
+                                    ";",
+                                ],
+                                &(item_name.0.end..item_name.0.end),
+                                w,
+                            )
+                        })?;
+                    }
+                    if Ident::is_valid_js_identifier(&index_name.1.name) {
+                        w.write_line(|w| {
+                            write_token_series(["const "], &index_name.0, w)?;
+                            w.write_token_state(
+                                &index_scope_name,
+                                Some(&index_name.1.name),
+                                &index_name.1.location,
+                                StringifierLineState::Normal,
+                            )?;
+                            write_token_series(
+                                [
+                                    "=",
+                                    "0",
+                                    " as ",
+                                    "unknown",
+                                    " as ",
+                                    "_ForIndex_",
+                                    "<",
+                                    "typeof ",
+                                    "_for_",
+                                    ">",
+                                    ";",
+                                ],
+                                &(item_name.0.end..item_name.0.end),
+                                w,
+                            )
+                        })?;
+                    }
                     if !key.1.name.is_empty() {
                         w.write_line(|w| {
                             write_token_series(
