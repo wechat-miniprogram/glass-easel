@@ -4,11 +4,18 @@ use super::{
     JsExprWriter, JsFunctionScopeWriter, JsIdent, JsTopScopeWriter, ScopeVar, ScopeVarLvaluePath,
 };
 use crate::{
-    TmplError, TmplGroup, binding_map::BindingMapCollector, escape::{camel_to_dash, gen_lit_str}, parse::{
-        Position, Template, tag::{
-            Attribute, ClassAttribute, CommonElementAttributes, Element, ElementKind, EventBinding, Ident, Node, NormalAttribute, NormalAttributePrefix, Script, StaticAttribute, StyleAttribute, Value,
+    binding_map::BindingMapCollector,
+    escape::{camel_to_dash, gen_lit_str},
+    parse::{
+        tag::{
+            Attribute, ClassAttribute, CommonElementAttributes, Element, ElementKind, EventBinding,
+            Ident, Node, NormalAttribute, NormalAttributePrefix, Script, StaticAttribute,
+            StyleAttribute, Value,
         },
-    }, proc_gen::expr::ExpressionProcGen,
+        Position, Template,
+    },
+    proc_gen::expr::ExpressionProcGen,
+    TmplError, TmplGroup,
 };
 
 impl Template {

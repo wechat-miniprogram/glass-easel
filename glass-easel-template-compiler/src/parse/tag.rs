@@ -1898,6 +1898,12 @@ impl Element {
                                         attr_name.location,
                                     );
                                 } else {
+                                    if !Ident::is_valid_js_identifier(&attr_name.name) {
+                                        ps.add_warning(
+                                            ParseErrorKind::InvalidScopeName,
+                                            attr_name.location(),
+                                        );
+                                    }
                                     if value.is_none() {
                                         ps.add_warning(
                                             ParseErrorKind::MissingAttributeValue,
@@ -4113,9 +4119,19 @@ mod test {
         case!("<div slot='a'></div>", r#"<div slot="a"/>"#);
         case!("<div slot:a></div>", r#"<div slot:a/>"#);
         case!("<div slot:a-b></div>", r#"<div slot:aB/>"#);
-        case!("<div slot:a.b></div>", r#"<div slot:a.b/>"#, ParseErrorKind::InvalidScopeName, 10..13);
+        case!(
+            "<div slot:a.b></div>",
+            r#"<div slot:a.b/>"#,
+            ParseErrorKind::InvalidScopeName,
+            10..13
+        );
         case!("<div slot:a='A'></div>", r#"<div slot:a="A"/>"#);
-        case!("<div slot:a.b='A'></div>", r#"<div slot:a.b="A"/>"#, ParseErrorKind::InvalidScopeName, 10..13);
+        case!(
+            "<div slot:a.b='A'></div>",
+            r#"<div slot:a.b="A"/>"#,
+            ParseErrorKind::InvalidScopeName,
+            10..13
+        );
         case!(
             "<div slot:a='A '></div>",
             r#"<div slot:a="A "/>"#,
