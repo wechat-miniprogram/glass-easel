@@ -4,18 +4,11 @@ use super::{
     JsExprWriter, JsFunctionScopeWriter, JsIdent, JsTopScopeWriter, ScopeVar, ScopeVarLvaluePath,
 };
 use crate::{
-    binding_map::BindingMapCollector,
-    escape::{camel_to_dash, gen_lit_str},
-    parse::{
-        tag::{
-            Attribute, ClassAttribute, CommonElementAttributes, Element, ElementKind, EventBinding,
-            Node, NormalAttribute, NormalAttributePrefix, Script, StaticAttribute, StyleAttribute,
-            Value,
+    TmplError, TmplGroup, binding_map::BindingMapCollector, escape::{camel_to_dash, gen_lit_str}, parse::{
+        Position, Template, tag::{
+            Attribute, ClassAttribute, CommonElementAttributes, Element, ElementKind, EventBinding, Ident, Node, NormalAttribute, NormalAttributePrefix, Script, StaticAttribute, StyleAttribute, Value,
         },
-        Position, Template,
-    },
-    proc_gen::expr::ExpressionProcGen,
-    TmplError, TmplGroup,
+    }, proc_gen::expr::ExpressionProcGen,
 };
 
 impl Template {
@@ -173,8 +166,10 @@ impl Template {
                                 w.expr_stmt(|w| {
                                     write!(
                                         w,
-                                        "var {}=D('{}#{}',(require,exports,module)=>{{{}}})()",
-                                        ident, &self.path, module_name.name, content
+                                        "var {}=D({},(require,exports,module)=>{{{}}})()",
+                                        ident,
+                                        gen_lit_str(&format!("{}#{}", &self.path, module_name.name)),
+                                        content,
                                     )?;
                                     Ok(())
                                 })?;
@@ -371,13 +366,22 @@ impl Node {
             writer.function_scope(|w| {
                 let mut var_slot_map: HashMap<String, (JsIdent, JsIdent)> = HashMap::new();
                 for slot_value_name in var_slot_names.iter() {
+                    let valid = Ident::is_valid_js_identifier(&slot_value_name);
                     let var_scope = w.declare_var_on_top_scope_init(|w, var_scope| {
-                        write!(w, "X(V).{}", slot_value_name)?;
+                        if valid {
+                            write!(w, "X(V).{}", slot_value_name)?;
+                        } else {
+                            write!(w, "undefined")?;
+                        }
                         Ok(var_scope)
                     })?;
                     let var_update_path_tree =
                         w.declare_var_on_top_scope_init(|w, var_update_path_tree| {
-                            write!(w, "C?!0:W.{}", slot_value_name)?;
+                            if valid {
+                                write!(w, "C?!0:W.{}", slot_value_name)?;
+                            } else {
+                                write!(w, "!1")?;
+                            }
                             Ok(var_update_path_tree)
                         })?;
                     var_slot_map.insert(slot_value_name.clone(), (var_scope, var_update_path_tree));

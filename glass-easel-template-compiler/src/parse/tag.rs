@@ -1853,7 +1853,15 @@ impl Element {
                                             name: attr_name.name.clone(),
                                             location: attr_name.location(),
                                         },
-                                        false => s,
+                                        false => {
+                                            if !Ident::is_valid_js_identifier(&attr_name.name) {
+                                                ps.add_warning(
+                                                    ParseErrorKind::InvalidScopeName,
+                                                    attr_name.location(),
+                                                );
+                                            }
+                                            s
+                                        }
                                     };
                                     if !s.is_valid_js_identifier() {
                                         ps.add_warning(
@@ -3131,7 +3139,7 @@ impl Ident {
     }
 
     fn is_js_following_char(ch: char) -> bool {
-        Self::is_start_char(ch) || ('0'..='9').contains(&ch)
+        Self::is_js_start_char(ch) || ('0'..='9').contains(&ch)
     }
 
     fn is_css_start_char(ch: char) -> bool {
@@ -3170,6 +3178,17 @@ impl Ident {
             }
         }
         true
+    }
+
+    /// Check if a `str` is a valid js identifier.
+    pub fn is_valid_js_identifier(s: &str) -> bool {
+        let mut chars = s.chars();
+        let first = chars.next();
+        match first {
+            None => false,
+            Some(ch) if !Ident::is_js_start_char(ch) => false,
+            Some(_) => chars.find(|ch| !Ident::is_js_following_char(*ch)).is_none(),
+        }
     }
 
     /// Parse colon-seperated identifiers.
@@ -3234,7 +3253,7 @@ impl TemplateStructure for StrName {
 }
 
 impl StrName {
-    pub fn to_ident(&self) -> Option<Ident> {
+    pub fn ident_name(&self) -> Option<&str> {
         let mut chars = self.name.chars();
         if !Ident::is_start_char(chars.next()?) {
             return None;
@@ -3244,8 +3263,13 @@ impl StrName {
                 return None;
             }
         }
+        Some(self.name.as_str())
+    }
+
+    pub fn to_ident(&self) -> Option<Ident> {
+        let name = self.ident_name()?;
         Some(Ident {
-            name: self.name.clone(),
+            name: name.into(),
             location: self.location(),
         })
     }
@@ -3390,13 +3414,7 @@ impl StrName {
 
     /// Check whether the name is a valid JavaScript identifier.
     pub fn is_valid_js_identifier(&self) -> bool {
-        let mut chars = self.name.chars();
-        let first = chars.next();
-        match first {
-            None => false,
-            Some(ch) if !Ident::is_js_start_char(ch) => false,
-            Some(_) => chars.find(|ch| !Ident::is_js_following_char(*ch)).is_none(),
-        }
+        Ident::is_valid_js_identifier(&self.name)
     }
 
     /// Check whether the name is a valid class name.
@@ -4095,7 +4113,9 @@ mod test {
         case!("<div slot='a'></div>", r#"<div slot="a"/>"#);
         case!("<div slot:a></div>", r#"<div slot:a/>"#);
         case!("<div slot:a-b></div>", r#"<div slot:aB/>"#);
+        case!("<div slot:a.b></div>", r#"<div slot:a.b/>"#, ParseErrorKind::InvalidScopeName, 10..13);
         case!("<div slot:a='A'></div>", r#"<div slot:a="A"/>"#);
+        case!("<div slot:a.b='A'></div>", r#"<div slot:a.b="A"/>"#, ParseErrorKind::InvalidScopeName, 10..13);
         case!(
             "<div slot:a='A '></div>",
             r#"<div slot:a="A "/>"#,
@@ -4582,6 +4602,12 @@ mod test {
             r#"<wxs module="a"/>"#,
             ParseErrorKind::DuplicatedName,
             31..32
+        );
+        case!(
+            "<wxs module='a.'></wxs>",
+            r#"<wxs module="a."/>"#,
+            ParseErrorKind::InvalidScopeName,
+            13..15
         );
         case!(
             "<wxs src='a' module='a'><div/></wxs>",
