@@ -8,6 +8,21 @@ export type IntersectionObserverMargins = {
   bottom?: number
 }
 
+/**
+ * The intersection status passed to the listener of `IntersectionObserver.observe` .
+ *
+ * Besides the backend intersection status fields, it contains `id` , `dataset`
+ * and `relativeRect` required by the mini program API.
+ */
+export type IntersectionStatus = glassEasel.backend.IntersectionStatus & {
+  /** The ID of the observed node */
+  id: string
+  /** The dataset of the observed node */
+  dataset: Record<string, any>
+  /** The layout of the relative node, a.k.a. the root bounds */
+  relativeRect: glassEasel.backend.BoundingClientRect
+}
+
 const normalizeMarginRect = (margins: IntersectionObserverMargins) => ({
   left: margins.left || 0,
   top: margins.top || 0,
@@ -20,6 +35,46 @@ const defaultMargins = {
   top: 0,
   right: 0,
   bottom: 0,
+}
+
+/**
+ * Filter out invalid thresholds and sort them in ascending order.
+ *
+ * The thresholds must be sorted for `getThresholdGreaterThan` to work.
+ */
+const processThresholds = (thresholds: number[]): number[] => {
+  if (!Array.isArray(thresholds)) return [0]
+  const valid = thresholds
+    .filter((threshold) => 0 <= threshold && threshold <= 1)
+    .sort((a, b) => a - b)
+  return valid.length > 0 ? valid : [0]
+}
+
+/**
+ * Search for the number of thresholds that are not greater than `ratio` .
+ *
+ * This is copied from the native-mode intersection observer implementation of
+ * the mini program base library, so that the behavior of the `initialRatio`
+ * option is aligned with the mini program.
+ */
+const getThresholdGreaterThan = (thresholds: readonly number[], ratio: number): number => {
+  const thresholdsLen = thresholds.length
+
+  let l = 0
+  let r = thresholdsLen
+  let m: number
+
+  while (l !== r) {
+    // eslint-disable-next-line no-bitwise
+    m = (l + r) >> 1
+    if (thresholds[m]! <= ratio) {
+      l = m + 1
+    } else {
+      r = m
+    }
+  }
+
+  return l
 }
 
 export class IntersectionObserver {
@@ -39,8 +94,11 @@ export class IntersectionObserver {
     observeAll: boolean,
   ) {
     this._$comp = comp
-    this._$thresholds = thresholds
-    this._$initialRatio = initialRatio
+    this._$thresholds = processThresholds(thresholds)
+    // `initialRatio === 0` historically stands for "not intersecting" in the mini
+    // program, so it is converted to -1 (which is not a valid ratio) as the initial
+    // state
+    this._$initialRatio = initialRatio === 0 ? -1 : initialRatio
     this._$observeAll = observeAll
   }
 
@@ -56,10 +114,7 @@ export class IntersectionObserver {
     return this
   }
 
-  observe(
-    targetSelector: string,
-    listener: (status: glassEasel.backend.IntersectionStatus) => void,
-  ) {
+  observe(targetSelector: string, listener: (status: IntersectionStatus) => void) {
     const shadowRoot = this._$comp._$.getShadowRoot()
     let targets: glassEasel.Element[]
     if (!shadowRoot) {
@@ -91,23 +146,39 @@ export class IntersectionObserver {
     const { left, top, right, bottom } = normalizeMarginRect(this._$margins)
     const margin = `${top}px ${right}px ${bottom}px ${left}px`
     targets.forEach((target) => {
-      let initial: number | null = this._$initialRatio
+      // The threshold slot the `initialRatio` falls into. The first status is
+      // suppressed if it falls into the same threshold slot as the initial ratio;
+      // afterwards the statuses are passed through as-is.
+      let initialThreshold: number | null = getThresholdGreaterThan(
+        this._$thresholds,
+        this._$initialRatio,
+      )
       const observer = target.createIntersectionObserver(
         relativeElement,
         margin,
         this._$thresholds,
         (args) => {
-          if (initial !== null) {
-            let i = 0
-            for (; i < this._$thresholds.length; i += 1) {
-              const threshold = this._$thresholds[i]!
-              if (initial === args.intersectionRatio) continue
-              if ((initial - threshold) * (args.intersectionRatio - threshold) <= 0) break
-            }
-            initial = null
-            if (i < this._$thresholds.length) return
+          const isIntersecting = args.isIntersecting ?? args.intersectionRatio > 0
+          if (initialThreshold !== null) {
+            const thresholdIndex = getThresholdGreaterThan(
+              this._$thresholds,
+              isIntersecting ? args.intersectionRatio : -1,
+            )
+            const initial = initialThreshold
+            initialThreshold = null
+            if (thresholdIndex === initial) return
           }
-          listener(args)
+          listener({
+            id: target.id,
+            dataset: target.dataset || {},
+            time: Date.now(),
+            boundingClientRect: args.boundingClientRect,
+            intersectionRatio: args.intersectionRatio,
+            intersectionRect: args.intersectionRect,
+            relativeRect: args.rootBounds!,
+            rootBounds: args.rootBounds,
+            isIntersecting,
+          })
         },
       )
       if (observer === null) {
