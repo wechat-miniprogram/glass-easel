@@ -88,8 +88,11 @@ componentSpace.define().property('invalid', {
 componentSpace
   .define()
   .property('duplicate', String)
-  // @ts-expect-error
-  .property('duplicate', String)
+  .property('duplicate', { type: Number, value: 123 })
+  .init(({ data }) => {
+    expectType<number>(data.duplicate)
+  })
+  .registerComponent()
 
 componentSpace.define().property('invalid', {
   // @ts-expect-error
@@ -499,6 +502,56 @@ componentSpace
 
     // @ts-expect-error
     expectType<any>(data.nonExists)
+  })
+  .registerComponent()
+
+/**
+ * Behavior Property Override
+ */
+const overridableBehavior = componentSpace
+  .define()
+  .property('propNum', Number)
+  .property('propFn', {
+    value: () => 'fromBehavior',
+  })
+  .property('propUntouched', {
+    type: Number,
+    value: 123,
+  })
+  .registerBehavior()
+
+// a behavior-inherited property can be re-declared, overriding the whole
+// inherited definition (the number-typed property becomes string-typed)
+componentSpace
+  .define()
+  .behavior(overridableBehavior)
+  .property('propNum', String)
+  .property('propFn', {
+    value: () => 'fromComponent',
+  })
+  .init(({ data }) => {
+    expectType<string>(data.propNum)
+    expectType<() => 'fromComponent'>(data.propFn)
+    expectType<number>(data.propUntouched)
+  })
+  .registerComponent()
+
+// properties of a later behavior override those of an earlier one
+const behaviorWithPropA = componentSpace
+  .define()
+  .property('propShared', { type: Number, value: 1 })
+  .registerBehavior()
+const behaviorWithPropB = componentSpace
+  .define()
+  .property('propShared', { type: String, value: 'b' })
+  .registerBehavior()
+
+componentSpace
+  .define()
+  .behavior(behaviorWithPropA)
+  .behavior(behaviorWithPropB)
+  .init(({ data }) => {
+    expectType<string>(data.propShared)
   })
   .registerComponent()
 
