@@ -153,7 +153,7 @@ export const helloWorld = componentSpace
 | `listener` | 将函数标记为事件监听器 |
 | `lifetime` | 注册组件生命周期回调 |
 | `pageLifetime` | 注册页面生命周期回调 |
-| `observer` | 注册数据变化监听器 |
+| `observer` | 注册 data observer，可监听 data 字段和 property |
 | `implement` | 实现一个 Trait Behavior |
 | `relation` | 声明组件间关系 |
 
@@ -255,7 +255,9 @@ export const myComponent = componentSpace
 
 ## observers 数据监听器
 
-数据监听器可以监听数据或属性字段的变化。当被监听的字段被 `setData` 设置时，监听器会被触发。
+数据监听器（data observer）可以监听普通 data 字段或 property。当匹配的路径被设置并应用更新时，监听器会在模板更新前触发，即使前后值相同。父组件传入的属性更新也可以触发它。
+
+`.observer()` 、经典 API 的 `observers` 和 `init` 中的 `observer` 注册的都是 data observer。属性配置对象中的 `observer` 则是另一种 property observer，值比较、参数和执行阶段都不同，详见 [property observer 与 data observer 的区别](../data_management/data_observer.md#property-vs-data-observer)。
 
 ```js
 export const myComponent = componentSpace
