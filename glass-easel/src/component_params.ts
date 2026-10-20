@@ -349,6 +349,25 @@ export type PropertyOption<T extends PropertyType, V> = {
 
 export type PropertyListItem<T extends PropertyType, V> = T | PropertyOption<T, V>
 
+/**
+ * Merge two property lists, where `TOverride` shadows same-named entries of `TBase`.
+ *
+ * It describes the runtime property-merging rule: a property declared by a
+ * component (or a later behavior) replaces the whole definition of the
+ * same-named property inherited from a behavior (including its type,
+ * initial value, observer, and comparer).
+ *
+ * When the two lists share no property names, this is a plain intersection,
+ * which keeps the result compatible with generic code that only knows the
+ * merged shape (e.g. assigning a specific behavior to `GeneralBehavior`).
+ */
+export type MergeProperties<TBase extends PropertyList, TOverride extends PropertyList> = Extract<
+  keyof TBase,
+  keyof TOverride
+> extends never
+  ? TBase & TOverride
+  : Merge<Omit<TBase, keyof TOverride> & TOverride>
+
 export type PropertyValues<P extends PropertyList> = {
   [key in keyof P]: PropertyValueType<P[key]>
 }

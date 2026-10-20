@@ -119,6 +119,8 @@ const myComponent = componentSpace.define()
 * **数据 (data)** —— 对象类型的数据会进行浅合并（递归一层合并子字段），非对象类型则后者覆盖前者。
 * **生命周期 (lifetime)** 、**页面生命周期 (pageLifetime)** 和**数据监听器 (observer)** —— 不会互相覆盖，而是按引入顺序依次执行。
 
+这里的“数据监听器”指 `.observer()` 、经典 API 的 `observers` 和 `init` 中注册的 data observer。property observer 是属性定义中的 `observer` 配置项：重新声明同名 property 会替换整个属性定义，包括原来的 `observer` 和 `comparer` ，即使新定义没有写这两个字段也不会保留原值；独立注册、监听该属性的 data observer 则仍会保留。两者的选择方式见 [property observer 与 data observer 的区别](../data_management/data_observer.md#property-vs-data-observer)。
+
 ```js
 const behaviorX = componentSpace.define()
   .property('val', { type: Number, value: 1 })

@@ -104,7 +104,7 @@ export class BaseBehaviorBuilder<
     BaseBehaviorBuilder<
       TPrevData,
       TData & UData,
-      TProperty & UProperty,
+      typeUtils.MergeProperties<TProperty, UProperty>,
       TMethod & UMethod,
       UChainingFilter,
       TPendingChainingFilter,
@@ -162,12 +162,15 @@ export class BaseBehaviorBuilder<
 
   property<N extends string, T extends PropertyType, V extends PropertyTypeToValueType<T>>(
     name: N,
-    def: N extends keyof (TData & TProperty) ? never : typeUtils.PropertyListItem<T, V>,
+    def: typeUtils.PropertyListItem<T, V>,
   ): ResolveBehaviorBuilder<
     BaseBehaviorBuilder<
       TPrevData,
       TData,
-      TProperty & Record<N, unknown extends V ? T : typeUtils.PropertyOption<T, V>>,
+      typeUtils.MergeProperties<
+        TProperty,
+        Record<N, unknown extends V ? T : typeUtils.PropertyOption<T, V>>
+      >,
       TMethod,
       TChainingFilter,
       TPendingChainingFilter,
@@ -418,7 +421,7 @@ export class BaseBehaviorBuilder<
       ThisType<
         Component<
           TData & TNewData,
-          TProperty & TNewProperty,
+          typeUtils.MergeProperties<TProperty, TNewProperty>,
           TMethod & TNewMethod,
           TNewComponentExport,
           TExtraThisFields
@@ -428,7 +431,7 @@ export class BaseBehaviorBuilder<
     BaseBehaviorBuilder<
       TPrevData,
       TData & TNewData,
-      TProperty & TNewProperty,
+      typeUtils.MergeProperties<TProperty, TNewProperty>,
       TMethod & TNewMethod,
       TChainingFilter,
       TPendingChainingFilter,
