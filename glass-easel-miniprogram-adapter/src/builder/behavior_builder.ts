@@ -197,7 +197,7 @@ export class BehaviorBuilder<
    */
   override property<N extends string, T extends PropertyType, V extends PropertyTypeToValueType<T>>(
     name: N,
-    def: typeUtils.PropertyListItem<T, V>,
+    def: N extends keyof TData ? never : typeUtils.PropertyListItem<T, V>,
   ): ResolveBehaviorBuilder<
     BehaviorBuilder<
       TPrevData,

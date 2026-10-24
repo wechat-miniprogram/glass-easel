@@ -94,6 +94,15 @@ componentSpace
   })
   .registerComponent()
 
+componentSpace
+  .define()
+  .data(() => ({
+    duplicate: 1,
+  }))
+  // @ts-expect-error a data field cannot also be declared as a property
+  .property('duplicate', Number)
+  .registerComponent()
+
 componentSpace.define().property('invalid', {
   // @ts-expect-error
   type: '123',

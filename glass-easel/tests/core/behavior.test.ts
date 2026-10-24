@@ -337,6 +337,62 @@ describe('chaining-form interface', () => {
     expect(child.data.propA).toBe('fromParent')
   })
 
+  test('chaining property override does not evaluate the inherited default', () => {
+    let inheritedDefaultCalls = 0
+    const beh = componentSpace
+      .define()
+      .property<'propA', typeof Number, number>('propA', {
+        type: Number,
+        default: () => {
+          inheritedDefaultCalls += 1
+          throw new Error('inherited default should not run')
+        },
+      })
+      .registerBehavior()
+    const compDef = componentSpace
+      .define()
+      .behavior(beh)
+      .definition({
+        properties: {
+          propA: {
+            type: String,
+            value: 'component',
+          },
+        },
+      })
+      .registerComponent()
+
+    const elem = glassEasel.Component.createWithContext('root', compDef, domBackend)
+    expect(elem.data.propA).toBe('component')
+    expect(inheritedDefaultCalls).toBe(0)
+  })
+
+  test('a later behavior override does not evaluate the earlier default', () => {
+    let earlierDefaultCalls = 0
+    const earlier = componentSpace
+      .define()
+      .property<'propA', typeof Number, number>('propA', {
+        type: Number,
+        default: () => {
+          earlierDefaultCalls += 1
+          throw new Error('earlier default should not run')
+        },
+      })
+      .registerBehavior()
+    const later = componentSpace
+      .define()
+      .property<'propA', typeof String, string>('propA', {
+        type: String,
+        value: 'later',
+      })
+      .registerBehavior()
+    const compDef = componentSpace.define().behavior(earlier).behavior(later).registerComponent()
+
+    const elem = glassEasel.Component.createWithContext('root', compDef, domBackend)
+    expect(elem.data.propA).toBe('later')
+    expect(earlierDefaultCalls).toBe(0)
+  })
+
   test('chaining methods', () => {
     const beh = componentSpace
       .define()
