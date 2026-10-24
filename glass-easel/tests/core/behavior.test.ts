@@ -337,6 +337,36 @@ describe('chaining-form interface', () => {
     expect(child.data.propA).toBe('fromParent')
   })
 
+  test('chaining property override does not evaluate the inherited default', () => {
+    let inheritedDefaultCalls = 0
+    const beh = componentSpace
+      .define()
+      .property<'propA', typeof Number, number>('propA', {
+        type: Number,
+        default: () => {
+          inheritedDefaultCalls += 1
+          throw new Error('inherited default should not run')
+        },
+      })
+      .registerBehavior()
+    const compDef = componentSpace
+      .define()
+      .behavior(beh)
+      .definition({
+        properties: {
+          propA: {
+            type: String,
+            value: 'component',
+          },
+        },
+      })
+      .registerComponent()
+
+    const elem = glassEasel.Component.createWithContext('root', compDef, domBackend)
+    expect(elem.data.propA).toBe('component')
+    expect(inheritedDefaultCalls).toBe(0)
+  })
+
   test('chaining methods', () => {
     const beh = componentSpace
       .define()

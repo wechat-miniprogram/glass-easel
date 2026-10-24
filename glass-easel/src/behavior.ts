@@ -409,7 +409,7 @@ export class BehaviorBuilder<
    */
   property<N extends string, T extends PropertyType, V extends PropertyTypeToValueType<T>>(
     name: N,
-    def: PropertyListItem<T, V>,
+    def: N extends keyof TData ? never : PropertyListItem<T, V>,
   ): ResolveBehaviorBuilder<
     BehaviorBuilder<
       TPrevData,
@@ -838,6 +838,8 @@ export class Behavior<
   /** @internal */
   _$data: (() => { [field: string]: any })[]
   /** @internal */
+  _$propertyDataGenerators: { name: string; func: () => { [field: string]: any } }[]
+  /** @internal */
   _$propertyMap: { [name: string]: PropertyDefinition }
   /** @internal */
   _$methodMap: { [name: string]: ComponentMethod }
@@ -898,6 +900,7 @@ export class Behavior<
     this._$externalClasses = builder._$externalClasses
     this._$staticData = undefined
     this._$data = []
+    this._$propertyDataGenerators = []
     this._$propertyMap = Object.create(null) as { [name: string]: PropertyDefinition }
     this._$methodMap = Object.create(null) as { [name: string]: ComponentMethod }
     this._$observers = []
@@ -1016,8 +1019,20 @@ export class Behavior<
         // merge properties
         Object.assign(this._$propertyMap, parent._$propertyMap)
 
-        // merge dynamic data
-        this._$data.push(...parent._$data)
+        // merge dynamic data, excluding property initializers shadowed by this behavior
+        const overriddenProperties = new Set(builder._$properties?.map(({ name }) => name))
+        const overriddenPropertyGenerators = new Set(
+          parent._$propertyDataGenerators
+            .filter(({ name }) => overriddenProperties.has(name))
+            .map(({ func }) => func),
+        )
+        parent._$data.forEach((dataGenerator) => {
+          if (overriddenPropertyGenerators.has(dataGenerator)) return
+          this._$data.push(dataGenerator)
+        })
+        this._$propertyDataGenerators.push(
+          ...parent._$propertyDataGenerators.filter(({ name }) => !overriddenProperties.has(name)),
+        )
 
         // merge observers
         const observers = parent._$observers
@@ -1222,9 +1237,18 @@ export class Behavior<
     // init properties
     const properties = builder._$properties
     if (properties !== undefined) {
-      const initValueFuncs: { name: string; func: () => any }[] = []
-      for (let i = 0; i < properties.length; i += 1) {
-        const { name, def } = properties[i]!
+      const overriddenNames = new Set<string>()
+      const effectiveProperties = properties
+        .slice()
+        .reverse()
+        .filter(({ name }) => {
+          if (overriddenNames.has(name)) return false
+          overriddenNames.add(name)
+          return true
+        })
+        .reverse()
+      for (let i = 0; i < effectiveProperties.length; i += 1) {
+        const { name, def } = effectiveProperties[i]!
         const shortHandDef = normalizePropertyTypeShortHand(def)
         let d: PropertyDefinition
         let initialValueFn: () => DataValue
@@ -1323,19 +1347,10 @@ export class Behavior<
           }
         }
         this._$propertyMap[name] = d
-        initValueFuncs.push({
-          name,
-          func: initialValueFn,
-        })
+        const propertyDataGenerator = () => ({ [name]: initialValueFn() })
+        this._$data.push(propertyDataGenerator)
+        this._$propertyDataGenerators.push({ name, func: propertyDataGenerator })
       }
-      this._$data.push(() => {
-        const ret: DataList = {}
-        for (let i = 0; i < initValueFuncs.length; i += 1) {
-          const { name, func } = initValueFuncs[i]!
-          ret[name] = func()
-        }
-        return ret
-      })
     }
 
     // init dynamic data
