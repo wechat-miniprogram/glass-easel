@@ -19,7 +19,6 @@ import {
   type GetFromObserverPathString,
   type IsNever,
   type Merge,
-  type MergeProperties,
   type MethodList,
   type NewFieldList,
   type ObserverDataPathStrings,
@@ -227,8 +226,7 @@ export class BehaviorBuilder<
     BehaviorBuilder<
       TPrevData,
       TData & UData,
-      // properties of the incoming behavior override same-named inherited ones
-      MergeProperties<TProperty, UProperty>,
+      TProperty & UProperty,
       TMethod & UMethod,
       UChainingFilter,
       TPendingChainingFilter,
@@ -403,18 +401,16 @@ export class BehaviorBuilder<
   /**
    * Add a single property
    *
-   * If the property is already declared (by a mixed-in behavior or previously
-   * in this builder), the new declaration overrides the whole old definition
-   * (including the type, initial value, observer, and comparer).
+   * The property name should be different from other properties.
    */
   property<N extends string, T extends PropertyType, V extends PropertyTypeToValueType<T>>(
     name: N,
-    def: PropertyListItem<T, V>,
+    def: N extends keyof (TData & TProperty) ? never : PropertyListItem<T, V>,
   ): ResolveBehaviorBuilder<
     BehaviorBuilder<
       TPrevData,
       TData,
-      MergeProperties<TProperty, Record<N, unknown extends V ? T : PropertyOption<T, V>>>,
+      TProperty & Record<N, unknown extends V ? T : PropertyOption<T, V>>,
       TMethod,
       TChainingFilter,
       TPendingChainingFilter,
@@ -585,9 +581,6 @@ export class BehaviorBuilder<
 
   /**
    * Apply a classic-style definition
-   *
-   * Properties in the definition override same-named properties declared before,
-   * just like the `property` method.
    */
   definition<
     TNewData extends DataList = Empty,
@@ -598,7 +591,7 @@ export class BehaviorBuilder<
       ThisType<
         ComponentInstance<
           TData & TNewData,
-          MergeProperties<TProperty, TNewProperty>,
+          TProperty & TNewProperty,
           TMethod & TNewMethod,
           TExtraThisFields
         >
@@ -607,7 +600,7 @@ export class BehaviorBuilder<
     BehaviorBuilder<
       TPrevData,
       TData & TNewData,
-      MergeProperties<TProperty, TNewProperty>,
+      TProperty & TNewProperty,
       TMethod & TNewMethod,
       TChainingFilter,
       TPendingChainingFilter,

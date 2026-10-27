@@ -120,7 +120,7 @@ export class ComponentBuilder<
     ComponentBuilder<
       TPrevData,
       TData & UData,
-      typeUtils.MergeProperties<TProperty, UProperty>,
+      TProperty & UProperty,
       TMethod & UMethod,
       UChainingFilter,
       TPendingChainingFilter,
@@ -201,20 +201,16 @@ export class ComponentBuilder<
   /**
    * Add a single property
    *
-   * If the property is already declared, the new declaration overrides the whole
-   * old definition (including the type, initial value, observer, and comparer).
+   * The property name should be different from other properties.
    */
   override property<N extends string, T extends PropertyType, V extends PropertyTypeToValueType<T>>(
     name: N,
-    def: typeUtils.PropertyListItem<T, V>,
+    def: N extends keyof (TData & TProperty) ? never : typeUtils.PropertyListItem<T, V>,
   ): ResolveBehaviorBuilder<
     ComponentBuilder<
       TPrevData,
       TData,
-      typeUtils.MergeProperties<
-        TProperty,
-        Record<N, unknown extends V ? T : typeUtils.PropertyOption<T, V>>
-      >,
+      TProperty & Record<N, unknown extends V ? T : typeUtils.PropertyOption<T, V>>,
       TMethod,
       TChainingFilter,
       TPendingChainingFilter,
@@ -297,7 +293,7 @@ export class ComponentBuilder<
       ThisType<
         Component<
           TData & TNewData,
-          typeUtils.MergeProperties<TProperty, TNewProperty>,
+          TProperty & TNewProperty,
           TMethod & TNewMethod,
           TNewComponentExport,
           TExtraThisFields
@@ -307,7 +303,7 @@ export class ComponentBuilder<
     ComponentBuilder<
       TPrevData,
       TData & TNewData,
-      typeUtils.MergeProperties<TProperty, TNewProperty>,
+      TProperty & TNewProperty,
       TMethod & TNewMethod,
       TChainingFilter,
       TPendingChainingFilter,

@@ -229,7 +229,7 @@ export const myComponent = componentSpace
 | `optionalTypes`   | `PropertyType[]`                           | 属性可接受的额外类型列表，属性值可以是 `type` 或 `optionalTypes` 中的任意一种类型                                           |
 | `value`           | 与类型对应的值                             | 属性的初始值。如果未指定，会使用该类型的默认值。如果同时指定了 `default` 和 `value` ，则 `value` 会被忽略                   |
 | `default`         | `() => V`                                  | 返回属性初始值的工厂函数。适用于初始值需要每个实例独立生成的场景。如果同时指定了 `default` 和 `value` ，则 `value` 会被忽略 |
-| `observer`        | `((newValue, oldValue) => void) \| string` | 属性监听器（property observer），与 `.observer()` 注册的数据监听器不同。可以传入函数或方法名字符串                        |
+| `observer`        | `((newValue, oldValue) => void) \| string` | 属性值变化时的监听回调。可以传入函数，也可以传入方法名字符串                                                                |
 | `comparer`        | `(newValue, oldValue) => boolean`          | 自定义属性值比较函数。返回 `true` 表示值已改变（需要更新），返回 `false` 表示值未变（跳过更新）。默认使用 `!==` 比较        |
 | `reflectIdPrefix` | `boolean`                                  | 当属性值反射到 DOM 属性时，是否自动添加组件的 id 前缀。默认为 `false`                                                       |
 
@@ -285,9 +285,9 @@ property('list', {
 })
 ```
 
-#### `observer` 监听属性变化 {#property-observer}
+#### `observer` 监听属性变化
 
-这里的 `observer` 是 property observer，属于单个属性的定义。整体设置该属性时，只有值比较判定需要更新，才会触发回调，并传入新值和旧值。可以传入函数，也可以传入方法名字符串：
+当属性值发生变化时，`observer` 回调会被触发。可以传入函数，也可以传入方法名字符串：
 
 ```js
 property('count', {
@@ -299,15 +299,11 @@ property('count', {
 })
 ```
 
-常规更新中，property observer 在本组件的模板更新后执行。整体设置属性时，默认使用类型转换后的新值与旧值做 `!==` 比较；属性 `comparer` 或组件选项 `propertyComparer` 可以自定义这一判定。直接更新属性子路径时会绕过比较，回调收到子路径的新值和 `undefined` ，详见 [对象属性与子路径更新](../data_management/data_observer.md#property-subpaths)。
-
-`.observer()` 、经典 API 的 `observers` 和 `init` 中的 `observer` 都是 data observer，也可以监听这个属性，但在模板更新前执行，不提供旧值，也不受上述比较判定过滤。初始化时序、纯数据属性和 behavior 覆盖等区别见 [property observer 与 data observer 的区别](../data_management/data_observer.md#property-vs-data-observer)。
+> ⚠️ property `observer` 和数据监听器（`observers`）的触发时机不同：property `observer` 只在 `comparer` 判定值发生变化后才触发（默认使用 `!==` 比较）；而数据监听器只要对应字段被 `setData` 设置就会触发，无论前后值是否相同。
 
 #### `comparer` 自定义属性值比较逻辑
 
 `comparer` 用于自定义属性值的比较方式。返回 `true` 表示值已改变（需要更新），返回 `false` 表示值未变（跳过更新）。默认使用 `!==` 比较。这在一些场景下可以减少更新范围提升性能：
-
-这里的“跳过更新”指跳过该属性整体替换对应的模板更新和 property observer；属性在 `this.data` 中的值仍会被设置，匹配的数据监听器也仍会执行。直接更新属性子路径不使用这个比较函数。
 
 ```js
 property('obj', {
@@ -490,15 +486,13 @@ init(({ relation, lifetime }) => {
 
 ### observer 方法 {#init-observer}
 
-`observer` 与 Chaining 方法 [`.observer()`](#observer-数据监听器) 使用相同的 data observer 机制，可以监听普通 data 字段和 property。即使监听的是属性名，它也不会变成 property observer：回调在常规模板更新前执行，参数是所监听字段的当前值，不包含旧值。
-
-`builderContext` 没有单独注册 property observer 的方法。需要在实例闭包中比较前后值时，可以参考 [在 init 中监听 property](../data_management/data_observer.md#init-property-observer)；需要 property observer 本身的语义时，应使用 [属性定义的 `observer` 配置项](#property-observer)。
+`observer` 与 Chaining 方法 [`.observer()`](#observer-数据监听器) 类似，用于在 `init` 函数中注册组件数据变化回调：
 
 ```js
 .init(({ observer, setData }) => {
   // 监听单个字段
   observer('count', (newValue) => {
-    console.log('count set to', newValue)
+    console.log('count changed to', newValue)
   })
 
   // 监听多个字段
@@ -669,9 +663,7 @@ export const myComponent = componentSpace
 .observer(paths: string | string[], func: (...args: any[]) => void)
 ```
 
-添加一个数据监听器（data observer）。它可以监听普通 data 字段或 property，匹配的路径被设置并应用更新时就会触发，即使值没有改变，或 property 的 `comparer` 返回 `false` 。父组件传入的属性更新同样可以触发它。
-
-回调在本组件的模板更新前执行，参数依次为各监听路径的当前值，不提供旧值。与属性定义中的 property observer 的完整对比见 [property observer 与 data observer 的区别](../data_management/data_observer.md#property-vs-data-observer)。
+添加一个数据监听器。数据监听器可以监听数据或属性字段的变化。当被监听的字段被 `setData` 设置时，监听器会被触发。
 
 `paths` 可以是单个字段路径字符串或字段路径数组。支持监听子字段（如 `'a.b'`）和使用通配符 `**` 监听所有子字段（如 `'a.**'`）。
 
