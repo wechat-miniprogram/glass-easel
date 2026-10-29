@@ -59,6 +59,10 @@ jobs:
         working-directory: glass-easel-shadow-sync
         run: |
           pnpm run test
+      - name: Test glass-easel-miniprogram-webpack-plugin
+        working-directory: glass-easel-miniprogram-webpack-plugin
+        run: |
+          pnpm run test
       - name: Test glass-easel-stylesheet-compiler
         working-directory: glass-easel-stylesheet-compiler
         run: |
