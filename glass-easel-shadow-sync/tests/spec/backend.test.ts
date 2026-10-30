@@ -28,6 +28,10 @@ const domHtml = (elem: glassEasel.Element): string => {
   return domElem.innerHTML
 }
 
+// messages from the view side are delivered by a microtask flush on both sides,
+// so wait for a macrotask before asserting on their effect
+const waitForChannel = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
+
 describe('backend', () => {
   test('basic backend', () => {
     const child = componentSpace.defineComponent({
@@ -133,7 +137,7 @@ describe('backend', () => {
       delete (document as { elementFromPoint?: unknown }).elementFromPoint
     })
 
-    test('external component', () => {
+    test('external component', async () => {
       viewComponentSpace.setGlobalUsingComponent(
         'wx-button',
         viewComponentSpace.defineComponent({
@@ -178,6 +182,7 @@ describe('backend', () => {
 
       const viewButton = getViewNode(button) as glassEasel.GeneralComponent
       viewButton.triggerEvent('tap', { foo: 'foo' })
+      await waitForChannel()
       expect(ops).toEqual([{ foo: 'foo' }])
     })
 
@@ -218,7 +223,7 @@ describe('backend', () => {
       return [internalButton, internalDiv, internalSpan]
     }
 
-    test('elementFromPoint on external component internals', () => {
+    test('elementFromPoint on external component internals', async () => {
       viewComponentSpace.setGlobalUsingComponent(
         'wx-button',
         viewComponentSpace.defineComponent({
@@ -250,10 +255,11 @@ describe('backend', () => {
       shadowSyncBackend.elementFromPoint(1, 1, (elem) => {
         results.push(elem)
       })
+      await waitForChannel()
       expect(results).toEqual([button])
     })
 
-    test('elementFromPoint on built-in component internals', () => {
+    test('elementFromPoint on built-in component internals', async () => {
       registerViewButton('<button><div><span>label</span></div></button>')
       const root = renderRoot(`
         <wx-button></wx-button>
@@ -268,23 +274,28 @@ describe('backend', () => {
         undefined,
       ])
 
-      internalNodes.forEach((node) => {
+      const checkInternalNode = async (node: glassEasel.Element) => {
         hitElement = node.getBackendElement() as unknown as Element
         elementFromPointMock.mockClear()
         const results: (glassEasel.Element | null)[] = []
         shadowSyncBackend.elementFromPoint(1, 1, (elem) => {
           results.push(elem)
         })
+        await waitForChannel()
         expect(elementFromPointMock).toHaveBeenCalledWith(1, 1)
         expect(results).toEqual([button])
-      })
+      }
+      await internalNodes.reduce(
+        (prev, node) => prev.then(() => checkInternalNode(node)),
+        Promise.resolve(),
+      )
     })
 
-    // An adapter may give a component its own method caller (the mini program
-    // adapter does), so the target glass-easel hands to a listener is that caller
-    // wrapper rather than the component node. It has no channel id of its own, so
-    // the view side has to map it back to the component it wraps.
-    test('event from a component with a custom method caller', () => {
+    // An adapter may give a component its own method caller (the mini program adapter
+    // does), so the target glass-easel hands to a listener is that caller wrapper
+    // rather than the component node. It has no channel id of its own: it only points
+    // to the node it wraps via `_$`, so the view side has to unwrap it.
+    test('event from a component with a custom method caller', async () => {
       viewComponentSpace.setGlobalUsingComponent(
         'wx-button',
         viewComponentSpace
@@ -319,10 +330,11 @@ describe('backend', () => {
       expect(getNodeId(viewButton.getMethodCaller())).toBe(undefined)
 
       viewButton.triggerEvent('tap', { foo: 'foo' })
+      await waitForChannel()
       expect(ops).toEqual([{ foo: 'foo' }])
     })
 
-    test('elementFromPoint on channel-created element', () => {
+    test('elementFromPoint on channel-created element', async () => {
       registerViewButton('<button><div><span>label</span></div></button>')
       const root = renderRoot(`
         <view id="a"></view>
@@ -335,10 +347,11 @@ describe('backend', () => {
       shadowSyncBackend.elementFromPoint(1, 1, (elem) => {
         results.push(elem)
       })
+      await waitForChannel()
       expect(results).toEqual([view])
     })
 
-    test('elementFromPoint on slotted content of a built-in component', () => {
+    test('elementFromPoint on slotted content of a built-in component', async () => {
       registerViewButton('<button><div><slot /></div></button>')
       const root = renderRoot(`
         <wx-button><view id="inner">label</view></wx-button>
@@ -351,10 +364,11 @@ describe('backend', () => {
       shadowSyncBackend.elementFromPoint(1, 1, (elem) => {
         results.push(elem)
       })
+      await waitForChannel()
       expect(results).toEqual([inner])
     })
 
-    test('getActiveElement on built-in component internals', () => {
+    test('getActiveElement on built-in component internals', async () => {
       registerViewButton('<button><div><span>label</span></div></button>')
       const root = renderRoot(`
         <wx-button></wx-button>
@@ -375,12 +389,13 @@ describe('backend', () => {
       shadowSyncBackend.getActiveElement((elem) => {
         results.push(elem)
       })
+      await waitForChannel()
       expect(results).toEqual([button])
 
       container.remove()
     })
 
-    test('overlay inspect on built-in component internals', () => {
+    test('overlay inspect on built-in component internals', async () => {
       registerViewButton('<button><div><span>label</span></div></button>')
       const root = renderRoot(`
         <wx-button></wx-button>
@@ -392,8 +407,11 @@ describe('backend', () => {
       shadowSyncBackend.startOverlayInspect((event, elem) => {
         ops.push([event, elem])
       })
+      // the view side installs its click listener when it receives the request
+      await waitForChannel()
       hitElement = internalSpan.getBackendElement() as unknown as Element
       window.dispatchEvent(new window.MouseEvent('click', { clientX: 1, clientY: 1 }))
+      await waitForChannel()
       expect(ops).toEqual([['tap', button]])
       shadowSyncBackend.stopOverlayInspect()
     })
@@ -469,7 +487,7 @@ describe('backend', () => {
     expect(viewRoot.data.name).toEqual('a')
     expect(viewRoot.data.value).toEqual('b')
   })
-  test('hook template engine to sync', () => {
+  test('hook template engine to sync', async () => {
     viewComponentSpace.setGlobalUsingComponent(
       'wx-textarea',
       viewComponentSpace.defineComponent({
@@ -552,9 +570,10 @@ describe('backend', () => {
 
     const viewButton = getViewNode(textarea) as glassEasel.GeneralComponent
     viewButton.triggerEvent('tap', { foo: 'foo' })
+    await waitForChannel()
     expect(ops).toEqual([{ foo: 'foo' }])
   })
-  test('sync setModelListener', () => {
+  test('sync setModelListener', async () => {
     viewComponentSpace.setGlobalUsingComponent(
       'wx-input',
       viewComponentSpace.defineComponent({
@@ -588,6 +607,7 @@ describe('backend', () => {
 
     inputOnView.setData({ value: '456' })
     expect(inputOnView.data.value).toEqual('456')
+    await waitForChannel()
     expect(root.data.value).toEqual('456')
   })
   test('external structure on lifetimes', () => {
@@ -649,7 +669,7 @@ describe('backend', () => {
     matchElementWithDom(root)
     matchElementWithDom(getViewNode(root))
   })
-  test('syncing dynamic slots', () => {
+  test('syncing dynamic slots', async () => {
     viewComponentSpace.setGlobalUsingComponent(
       'list',
       viewComponentSpace.defineComponent({
@@ -716,6 +736,7 @@ describe('backend', () => {
       displayList: [0, 1, 2],
     })
     expect(listOnView.data.displayList).toEqual([0, 1, 2])
+    await waitForChannel()
     expect(domHtml(root)).toEqual('<list><li>0</li><li>1</li><li>2</li></list>')
     matchElementWithDom(root)
     matchElementWithDom(getViewNode(root))
@@ -723,6 +744,7 @@ describe('backend', () => {
     listOnView.spliceArrayDataOnPath(['displayList'], undefined, undefined, [3, 4])
     listOnView.applyDataUpdates()
     expect(listOnView.data.displayList).toEqual([0, 1, 2, 3, 4])
+    await waitForChannel()
     expect(domHtml(root)).toEqual('<list><li>0</li><li>1</li><li>2</li><li>3</li><li>4</li></list>')
     matchElementWithDom(root)
     matchElementWithDom(getViewNode(root))
@@ -730,12 +752,13 @@ describe('backend', () => {
     listOnView.spliceArrayDataOnPath(['displayList'], 0, 2, [])
     listOnView.applyDataUpdates()
     expect(listOnView.data.displayList).toEqual([2, 3, 4])
+    await waitForChannel()
     expect(domHtml(root)).toEqual('<list><li>2</li><li>3</li><li>4</li></list>')
     matchElementWithDom(root)
     matchElementWithDom(getViewNode(root))
   })
 
-  test('wxs', () => {
+  test('wxs', async () => {
     const customHandler = jest.fn().mockReturnThis()
 
     shadowSyncBackend.onCustomMethodFromView((element, options) => {
@@ -838,6 +861,7 @@ describe('backend', () => {
     const div = elem.getShadowRoot()!.getElementById('a')!
 
     getViewNode(div).triggerEvent('customEv')
+    await waitForChannel()
     expect(customHandler).toHaveBeenCalledTimes(1)
     expect(customHandler).toHaveBeenCalledWith([true])
     expect(customHandler).toHaveReturnedWith(elem)

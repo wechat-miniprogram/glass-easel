@@ -5,8 +5,10 @@ import {
   bridgeOnView,
   createViewContext,
   domBackend,
+  schedulerOnData,
   shadowSyncBackend,
   tmpl,
+  transportBridgeOnData,
   viewComponentSpace,
 } from '../base/env'
 
@@ -28,11 +30,16 @@ const replayedDomHtml = (elem: glassEasel.Element): string => {
   )
 
   bridgeOnData.connect(newViewContext.bridgeOnView)
+  // the new view side has never seen the stream string table, and the pending
+  // batch belongs to the previous view
+  transportBridgeOnData.reset()
   shadowSyncBackend.replay(
     glassEasel,
     [elem],
     (elem) => elem.getBackendElement() as ShadowSyncElement,
   )
+  // replay is a synchronous snapshot: publish it before reading the view
+  schedulerOnData.flush()
   const innerHTML = (rootNode.firstChild! as Element).innerHTML
 
   bridgeOnData.connect(bridgeOnView)
