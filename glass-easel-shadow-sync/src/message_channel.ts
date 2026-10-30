@@ -1117,7 +1117,7 @@ export const MessageChannelViewSide = (
       case ChannelEventType.ASSOCIATE_VALUE: {
         const [, nodeId, data] = arg
         const node = nodeMap[nodeId]! as Node
-        controller.associateValue(node, JSON.parse(data))
+        controller.associateValue(node, data)
         break
       }
       case ChannelEventType.SET_ID: {

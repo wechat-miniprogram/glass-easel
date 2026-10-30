@@ -199,6 +199,10 @@ export class ShadowSyncElement implements GlassEaselBackend.Element {
   }
 
   associateValue(v: Element): void {
+    // the view side only consumes this message to decide whether the pending simple
+    // component reflects an external component definition, so associations of native
+    // nodes and virtual nodes (which carry no information) need not be sent
+    if (!v.asGeneralComponent()) return
     this.getChannel().associateValue(this._id, this._context.getAssociateValueInfo(v))
   }
 

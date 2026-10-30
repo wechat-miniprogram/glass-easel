@@ -2,12 +2,14 @@ import * as glassEasel from 'glass-easel'
 import { virtual as matchElementWithDom } from '../../../glass-easel/tests/base/match'
 import {
   hookBuilderToSyncData,
+  getNodeId as getBackendNodeId,
   type ShadowSyncElement,
   ReflectTemplateEngine,
 } from '../../src/backend'
 import { getNodeId } from '../../src/message_channel'
 import {
   getViewNode,
+  messageChannelDataSide,
   shadowSyncBackend,
   syncController,
   tmpl,
@@ -60,6 +62,33 @@ describe('backend', () => {
       text: '',
     })
     expect(domHtml(elem)).toEqual('')
+  })
+  test('associateValue is only sent for components', () => {
+    const childDef = componentSpace.defineComponent({
+      template: tmpl(`<view><text>child</text></view>`),
+    })
+    const rootDef = componentSpace.defineComponent({
+      using: { child: childDef },
+      template: tmpl(`<view><child /></view>`),
+    })
+    const spy = jest.spyOn(messageChannelDataSide, 'associateValue')
+    try {
+      const root = glassEasel.Component.createWithContext('root', rootDef, shadowSyncBackend)
+      root.destroyBackendElementOnDetach()
+      const child = (
+        (root.getShadowRoot()!.childNodes[0] as glassEasel.Element)
+          .childNodes[0] as glassEasel.Element
+      ).asGeneralComponent()!
+      expect(child).toBeTruthy()
+      // native nodes and virtual nodes carry no association information, so only
+      // the component nodes may reach the channel
+      const componentIds = new Set([getBackendNodeId(root as any), getBackendNodeId(child)])
+      const sentIds = new Set(spy.mock.calls.map(([id]) => id))
+      expect(sentIds.size).toBeGreaterThan(0)
+      expect(sentIds).toEqual(componentIds)
+    } finally {
+      spy.mockRestore()
+    }
   })
   describe('external component', () => {
     // jsdom does not implement layout-based hit testing;

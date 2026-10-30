@@ -19,6 +19,7 @@ import type {
   domlikeBackend,
   backend as shadowBackend,
 } from 'glass-easel'
+import { getNodeId } from './message_channel'
 import { EmptyTemplateEngine } from './template_engine'
 import { dashToCamelCase, initValues, updateValues } from './utils'
 
@@ -48,19 +49,23 @@ const getTmplArgs = (elem: Node): TmplArgs => {
   return (node._$wxTmplArgs = node._$wxTmplArgs || {})
 }
 
-const markSymbol = Symbol('mark')
+const camelCaseCache = new Map<string, string>()
 
-const markElement = (elem: Node) => {
-  ;(elem as any)[markSymbol] = true
+const cachedDashToCamelCase = (name: string): string => {
+  let converted = camelCaseCache.get(name)
+  if (converted === undefined) {
+    converted = dashToCamelCase(name)
+    camelCaseCache.set(name, converted)
+  }
+  return converted
 }
-
-const isElementMarked = (elem: Node) => (elem as any)[markSymbol] === true
 
 function findMarkedElementParent(elem: Element): Element | null
 function findMarkedElementParent(elem: Node): Node | null
 function findMarkedElementParent(elem: Node): Node | null {
   let curr: Node | null = elem
-  while (curr && !isElementMarked(curr)) {
+  // a node is part of the channel tree iff the channel has assigned a sync id to it
+  while (curr && getNodeId(curr) === undefined) {
     curr = curr.getComposedParent()
   }
   return curr
@@ -213,7 +218,6 @@ export class ViewController {
 
   createElement(logicalName: string, stylingName: string, ownerShadowRoot: ShadowRoot): Element {
     const elem = ownerShadowRoot.createNativeNodeWithInit(logicalName, stylingName, undefined)
-    markElement(elem)
     return elem
   }
 
@@ -266,8 +270,6 @@ export class ViewController {
       )
       shadowRoot.applySlotUpdates()
     }
-
-    markElement(comp)
 
     return comp
   }
@@ -327,27 +329,22 @@ export class ViewController {
         ? ownerShadowRoot.createComponentByDef(tagName, compDef)
         : _glassEasel.Component.createWithContext(tagName, compDef, _backendContext)
 
-      markElement(node)
-
       return this._$pendingAssignComponentId?.(node)
     }
   }
 
   createTextNode(textContent: string, ownerShadowRoot: ShadowRoot): TextNode {
     const elem = ownerShadowRoot.createTextNode(textContent)
-    markElement(elem)
     return elem
   }
 
   createVirtualNode(virtualName: string, ownerShadowRoot: ShadowRoot): VirtualNode {
     const elem = ownerShadowRoot.createVirtualNode(virtualName)
-    markElement(elem)
     return elem
   }
 
   createShadowRoot(hostNode: GeneralComponent): ShadowRoot {
     const elem = hostNode.shadowRoot as ShadowRoot
-    markElement(elem)
     return elem
   }
 
@@ -416,8 +413,12 @@ export class ViewController {
     parent.removeChildren(start.parentIndex, deleteCount)
   }
 
-  associateValue(node: Node, data: Record<string, unknown>): void {
-    this._$pendingCreateSimpleComponent?.(data.isReflect as boolean)
+  associateValue(node: Node, data: string): void {
+    // only the pending simple component creation consumes this data; every other
+    // association is a no-op, so skip parsing it
+    const pending = this._$pendingCreateSimpleComponent
+    if (!pending) return
+    pending((JSON.parse(data) as Record<string, unknown>).isReflect as boolean)
   }
 
   setId(element: Element, id: string): void {
@@ -470,7 +471,7 @@ export class ViewController {
     const { _glassEasel } = this
     const Component = _glassEasel.Component
     if (Component.isComponent(element)) {
-      const camelName = dashToCamelCase(name)
+      const camelName = cachedDashToCamelCase(name)
       const dataProxy = Component.getDataProxy(element)
       if (dataProxy.replaceProperty(camelName, value)) {
         dataProxy.applyDataUpdates(true)
@@ -488,7 +489,7 @@ export class ViewController {
     const { _glassEasel } = this
     const Component = _glassEasel.Component
     if (Component.isComponent(element)) {
-      const camelName = dashToCamelCase(name)
+      const camelName = cachedDashToCamelCase(name)
       const dataProxy = Component.getDataProxy(element)
       if (dataProxy.replaceProperty(camelName, undefined)) {
         dataProxy.applyDataUpdates(true)
