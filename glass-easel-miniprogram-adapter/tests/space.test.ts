@@ -1246,9 +1246,9 @@ describe('define', () => {
 
     const ab = env.associateBackend()
     const root = ab.createRoot('body', codeSpace, 'comp2')
-    expect(domHtml(root.getComponent())).toBe('<comp1>1</comp1>')
+    expect(domHtml(root.getComponent())).toBe('<comp1 id="c1">1</comp1>')
     root.getComponent().triggerPageLifetime('show', [])
-    expect(domHtml(root.getComponent())).toBe('<comp1>2</comp1>')
+    expect(domHtml(root.getComponent())).toBe('<comp1 id="c1">2</comp1>')
   })
 
   test('overall behavior', () => {

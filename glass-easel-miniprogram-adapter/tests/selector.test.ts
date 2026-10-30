@@ -75,7 +75,7 @@ describe('selector query', () => {
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
     expect(domHtml(root.getComponent())).toBe(
-      '<div><child>456</child><child data-a="A">789</child></div>',
+      '<div><child id="c1">456</child><child data-a="A" id="c2">789</child></div>',
     )
   })
 
@@ -166,7 +166,9 @@ describe('selector query', () => {
     const ab = env.associateBackend()
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
-    expect(domHtml(root.getComponent())).toBe('<div><child1>456</child1><child2>789</child2></div>')
+    expect(domHtml(root.getComponent())).toBe(
+      '<div id="d"><child1 id="c1">456</child1><child2 id="c2">789</child2></div>',
+    )
   })
 
   test('select single component (with custom export on behavior)', () => {
@@ -323,7 +325,7 @@ describe('selector query', () => {
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
     expect(domHtml(root.getComponent())).toBe(
-      '<div><child1>456</child1><child2>789</child2><child3>654</child3><child4>987</child4></div>',
+      '<div id="d"><child1 id="c1">456</child1><child2 id="c2">789</child2><child3 id="c3">654</child3><child4 id="c4">987</child4></div>',
     )
   })
 
@@ -391,7 +393,7 @@ describe('selector query', () => {
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
     expect(domHtml(root.getComponent())).toBe(
-      '<div><child class="c">0</child><child class="c">1</child><child-b class="c">2</child-b></div>',
+      '<div id="d"><child class="c">0</child><child class="c">1</child><child-b class="c">2</child-b></div>',
     )
   })
 
@@ -772,6 +774,37 @@ describe('media query observer', () => {
     const ab = env.associateBackend()
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
-    expect(domHtml(root.getComponent())).toBe('<div></div>')
+    expect(domHtml(root.getComponent())).toBe('<div id="a"></div>')
+  })
+})
+
+describe('id in dom', () => {
+  test('ids are written as-is on the page and prefixed inside nested components', () => {
+    const env = new MiniProgramEnv()
+    const codeSpace = env.createCodeSpace('', true)
+
+    codeSpace.addComponentStaticConfig('child/comp', {
+      component: true,
+      styleIsolation: StyleIsolation.Shared,
+    })
+    codeSpace.addCompiledTemplate('child/comp', tmpl('<div id="inner"></div>'))
+    codeSpace.componentEnv('child/comp', ({ Component }) => Component().register())
+
+    codeSpace.addComponentStaticConfig('path/to/comp', {
+      usingComponents: {
+        child: '/child/comp',
+      },
+    })
+    codeSpace.addCompiledTemplate('path/to/comp', tmpl('<div id="outer"></div><child />'))
+    codeSpace.componentEnv('path/to/comp', ({ Component }) => Component().register())
+
+    const ab = env.associateBackend()
+    const root = ab.createRoot('body', codeSpace, 'path/to/comp')
+    glassEasel.Element.pretendAttached(root.getComponent())
+    // the page is a root component, so it does not prefix its ids; an element
+    // inside a nested component gets that component's generated prefix
+    expect(domHtml(root.getComponent())).toMatch(
+      /^<div id="outer"><\/div><child><div id="[0-9a-f]{8}--inner"><\/div><\/child>$/,
+    )
   })
 })
