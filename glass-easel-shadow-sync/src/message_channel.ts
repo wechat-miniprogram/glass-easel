@@ -789,6 +789,18 @@ export const MessageChannelViewSide = (
   const nodeMap: Record<number, Node | Fragment | ShadowRoot | undefined> = []
   const eventIdGen = idGenerator()
   const eventIdMap = new WeakMap<Event<unknown>, number>()
+  /**
+   * Components that hand their listeners a separate method caller.
+   *
+   * An adapter may give a component its own method caller object, in which case
+   * glass-easel reports the event target as that caller. The caller has no
+   * channel id; creation registers it here so `getEventNodeId` can map it back
+   * to the component node.
+   */
+  const methodCallerMap = new WeakMap<any, GeneralComponent>()
+
+  const getEventNodeId = (node: Element | null): number | undefined =>
+    node ? getNodeId(methodCallerMap.get(node) ?? node) : undefined
 
   const observersMap: Record<number, { disconnect(): void } | undefined> = []
 
@@ -799,8 +811,8 @@ export const MessageChannelViewSide = (
     // ShadowedEvent is fresh created for each target
     // We should check it's prototype
     const event = Object.getPrototypeOf(shadowedEvent) as Event<unknown>
-    const targetId = getNodeId(shadowedEvent.target)
-    const currentTargetId = getNodeId(shadowedEvent.currentTarget)
+    const targetId = getEventNodeId(shadowedEvent.target)
+    const currentTargetId = getEventNodeId(shadowedEvent.currentTarget)
     const capture = shadowedEvent.isCapturePhase()
     if (typeof targetId !== 'number' || typeof currentTargetId !== 'number') return
 
@@ -995,6 +1007,10 @@ export const MessageChannelViewSide = (
           stylingName,
           ownerShadowRoot,
         ))
+        const comp = node.asGeneralComponent()
+        if (comp && comp.getMethodCaller() !== comp) {
+          methodCallerMap.set(comp.getMethodCaller(), comp)
+        }
         setNodeId(node, id)
         break
       }
@@ -1029,6 +1045,9 @@ export const MessageChannelViewSide = (
             if (shadowRoot) {
               nodeMap[shadowRootId] = shadowRoot
               setNodeId(shadowRoot, shadowRootId)
+            }
+            if (component.getMethodCaller() !== component) {
+              methodCallerMap.set(component.getMethodCaller(), component)
             }
             setNodeId(component, id)
           },

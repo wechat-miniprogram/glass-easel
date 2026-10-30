@@ -255,6 +255,48 @@ describe('backend', () => {
       })
     })
 
+    // An adapter may give a component its own method caller (the mini program
+    // adapter does), so the target glass-easel hands to a listener is that caller
+    // wrapper rather than the component node. It has no channel id of its own, so
+    // the view side has to map it back to the component it wraps.
+    test('event from a component with a custom method caller', () => {
+      viewComponentSpace.setGlobalUsingComponent(
+        'wx-button',
+        viewComponentSpace
+          .defineWithMethodCaller('wx-button')
+          .template(tmpl('<button><slot /></button>'))
+          .methodCallerInit(function (this: glassEasel.GeneralComponent) {
+            // like the mini program adapter, the caller is a separate object which
+            // only points back to the node it wraps
+            return { _$: this } as unknown as glassEasel.GeneralComponent
+          })
+          .registerComponent() as unknown as glassEasel.GeneralComponentDefinition,
+      )
+
+      const ops: any[] = []
+      const rootDef = componentSpace.defineComponent({
+        template: tmpl(`
+          <wx-button bind:tap="handleTap">label</wx-button>
+        `),
+        methods: {
+          handleTap(e: glassEasel.Event<any>) {
+            ops.push(e.detail)
+          },
+        },
+      })
+      const root = glassEasel.Component.createWithContext('root', rootDef, shadowSyncBackend)
+      root.destroyBackendElementOnDetach()
+
+      const button = root.getShadowRoot()!.childNodes[0] as glassEasel.Element
+      const viewButton = getViewNode(button) as glassEasel.GeneralComponent
+      // the target of the event is the caller wrapper, not the component node itself
+      expect(viewButton.getMethodCaller()).not.toBe(viewButton)
+      expect(getNodeId(viewButton.getMethodCaller())).toBe(undefined)
+
+      viewButton.triggerEvent('tap', { foo: 'foo' })
+      expect(ops).toEqual([{ foo: 'foo' }])
+    })
+
     test('elementFromPoint on channel-created element', () => {
       registerViewButton('<button><div><span>label</span></div></button>')
       const root = renderRoot(`
