@@ -784,6 +784,14 @@ export class ShadowSyncBackendContext implements GlassEaselBackend.Context {
     })
   }
 
+  /**
+   * Re-emit the whole backend tree so that a view side can rebuild it.
+   *
+   * This only publishes the operations; it does not touch the transport. When
+   * replaying onto a *fresh* view side the caller must reset the transport
+   * bridge first (the new side has not seen the stream string table) and flush
+   * it afterwards if the result is read synchronously. See `tests/spec/replay`.
+   */
   replay(
     glassEasel: typeof import('glass-easel'),
     roots: Node[],
@@ -985,6 +993,10 @@ export const hookBuilderToSyncData = <TBuilder extends GeneralBehaviorBuilder>(
 export const getNodeId = (node: Node) =>
   (node.getBackendElement() as unknown as ShadowSyncElement)._id
 
-export { Channel, ChannelEventType, MessageChannelDataSide } from './message_channel'
-export { ReplayHandler, replayShadowBackend } from './replay'
+export { ChannelEventType, MessageChannelDataSide } from './message_channel'
+export type { Channel } from './message_channel'
+export { MicroTaskScheduler, StreamTransportBridge } from './transport_bridge'
+export type { Scheduler, TransportBridge } from './transport_bridge'
+export { replayShadowBackend } from './replay'
+export type { ReplayHandler } from './replay'
 export { getLinearIdGenerator, getRandomIdGenerator } from './utils'
