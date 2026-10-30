@@ -1,0 +1,5 @@
+module.exports = {
+  upper: function (s) {
+    return s.toUpperCase()
+  },
+}

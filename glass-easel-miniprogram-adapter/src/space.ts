@@ -310,7 +310,11 @@ export class CodeSpace {
 
     // construct component options
     const ret: glassEasel.ComponentOptions = {
-      idPrefixGenerator: guid,
+      writeIdToDOM: true,
+      idPrefixGenerator() {
+        // the page root component does not add a prefix to its ids
+        return this.ownerShadowRoot === null ? '' : guid()
+      },
       multipleSlots: options?.multipleSlots,
       dynamicSlots: options?.dynamicSlots,
       pureDataPattern,

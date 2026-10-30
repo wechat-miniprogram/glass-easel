@@ -32,6 +32,7 @@ const VirtualModulesPlugin = require('webpack-virtual-modules')
 
 export const GlassEaselMiniprogramWxmlLoader = path.join(__dirname, 'wxml_loader.js')
 export const GlassEaselMiniprogramWxssLoader = path.join(__dirname, 'wxss_loader.js')
+export const GlassEaselMiniprogramWxsLoader = path.join(__dirname, 'wxs_loader.js')
 
 const PLUGIN_NAME = 'GlassEaselMiniprogramWebpackPlugin'
 const CACHE_ETAG = 1
@@ -214,6 +215,7 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
     }
     const resPathMap = Object.create(null) as { [compPath: string]: true }
     const wxmlContentMap = Object.create(null) as { [compPath: string]: string }
+    const wxsContentMap = Object.create(null) as { [relPath: string]: string }
     let globalStaticConfig = {} as GlobalStaticConfig
     let appEntry: 'app.js' | 'app.ts' | null = null
     const depsTmplGroup = new TmplGroup()
@@ -324,7 +326,8 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
               /* empty */
             }
             if (hasScriptFile) {
-              styleSheetManager.add(compPath, absPath)
+              // components without a wxss file have no style sheet to register
+              if (hasWxss) styleSheetManager.add(compPath, absPath)
               styleSheetManager.setStyleIsolation(
                 compPath,
                 staticConfig.styleIsolation,
@@ -340,6 +343,10 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
           const compPath = relPath.slice(0, -5)
           if (compInfoMap[compPath]) {
             compInfoMap[compPath]!.hasWxss = true
+            // the style sheet may be added after the component json (watch mode)
+            if (!styleSheetManager.map[compPath]) {
+              styleSheetManager.add(compPath, path.join(codeRoot, relPath))
+            }
           }
         }
 
@@ -358,6 +365,7 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
             delete compInfoMap[compPath]
           } else if (extName === '.wxss') {
             compInfoMap[compPath]!.hasWxss = false
+            delete styleSheetManager.map[compPath]
           }
         }
       }
@@ -424,10 +432,22 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
         (loaders, mod) => {
           const absPath = mod.resource
           const extName = path.extname(absPath)
-          if (extName === '.wxml' || extName === '.wxss') {
+          if (extName === '.wxml' || extName === '.wxss' || extName === '.wxs') {
             const relPath = path.relative(codeRoot, absPath).split(path.sep).join('/')
             const compPath = relPath.slice(0, -extName.length)
-            if (extName === '.wxss') {
+            if (extName === '.wxs') {
+              loaders.forEach((x) => {
+                if (x.loader === GlassEaselMiniprogramWxsLoader) {
+                  x.options = {
+                    addWxs(content: string) {
+                      wxsContentMap[relPath] = content
+                      // the template compiler refers to scripts without the `.wxs` suffix
+                      depsTmplGroup.addScript(relPath.slice(0, -'.wxs'.length), content)
+                    },
+                  }
+                }
+              })
+            } else if (extName === '.wxss') {
               loaders.forEach((x, i) => {
                 if (x.loader === GlassEaselMiniprogramWxssLoader) {
                   if (relPath === HOST_STYLES_MODULE) {
@@ -463,12 +483,12 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
                           else console.warn(msg)
                         })
                       }
-                      const deps = depsTmplGroup
-                        .getDirectDependencies(compPath)
-                        .concat(depsTmplGroup.getScriptDependencies(compPath))
+                      const deps = depsTmplGroup.getDirectDependencies(compPath)
+                      const scriptDeps = depsTmplGroup.getScriptDependencies(compPath)
                       return {
                         compPath,
                         deps,
+                        scriptDeps,
                         codeRoot,
                       }
                     },
@@ -497,7 +517,32 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
           }
           const absPath = module.resource
           const extName = path.extname(absPath)
-          if (extName === '.wxml') {
+          if (extName === '.wxs') {
+            if (module.loaders.some((x) => x.loader === GlassEaselMiniprogramWxsLoader)) {
+              const relPath = path.relative(codeRoot, absPath).split(path.sep).join('/')
+              // eslint-disable-next-line no-loop-func
+              tasks.push(
+                (async () => {
+                  let content = wxsContentMap[relPath]
+                  if (content) {
+                    await writeCache(compiler, relPath, content)
+                  } else {
+                    const s = await readCache<string>(compiler, relPath)
+                    if (s === undefined) {
+                      throw new Error(
+                        `Cannot find WXS compilation result for ${relPath} (webpack cache broken?)`,
+                      )
+                    }
+                    content = s
+                  }
+                  if (typeof content === 'string') {
+                    // the template compiler refers to scripts without the `.wxs` suffix
+                    tmplGroup.addScript(relPath.slice(0, -'.wxs'.length), content)
+                  }
+                })(),
+              )
+            }
+          } else if (extName === '.wxml') {
             if (module.loaders.some((x) => x.loader === GlassEaselMiniprogramWxmlLoader)) {
               // check wxml results, read cache if needed
               const relPath = path.relative(codeRoot, absPath).split(path.sep).join('/')
@@ -569,7 +614,10 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
             codeSpace.addComponentStaticConfig('${escapeJsString(compPath)}', staticConfig)
             codeSpace.addCompiledTemplate('${escapeJsString(compPath)}', {
               groupList: index.genObjectGroups,
-              content: index.genObjectGroups[require('${escapeJsString(wxmlSrcPath)}')]
+              content: index.genObjectGroups[require('${escapeJsString(wxmlSrcPath)}')],
+              // bind/catch listeners must also work on native nodes
+              // (e.g. a tag that is not registered as a component)
+              fallbackListenerOnNativeNode: true
             })
             ${addStyleSheet}
             codeSpace.globalComponentEnv(index.globalObject, '${escapeJsString(compPath)}', () => {
