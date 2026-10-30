@@ -996,7 +996,7 @@ export const getNodeId = (node: Node) =>
 export { ChannelEventType, MessageChannelDataSide } from './message_channel'
 export type { Channel } from './message_channel'
 export { MicroTaskScheduler, StreamTransportBridge } from './transport_bridge'
-export type { Scheduler, TransportBridge } from './transport_bridge'
+export type { Scheduler, StreamPayload, TransportBridge } from './transport_bridge'
 export { replayShadowBackend } from './replay'
 export type { ReplayHandler } from './replay'
 export { getLinearIdGenerator, getRandomIdGenerator } from './utils'

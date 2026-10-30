@@ -4,7 +4,7 @@
  * `MessageChannelDataSide` / `MessageChannelViewSide` (see `message_channel.ts`)
  * turn glass-easel backend calls into typed `publish(OP, ...args)` calls; this
  * module owns what actually goes on the wire. It packs the arguments of every
- * operation into one flat op stream, interns the strings in it, and hands the
+ * operation into one flat op stream, shortens the strings in it, and hands the
  * result to a plain `[ops, strings]` transport (the demo `Bridge`, the worker
  * channel, the synchronous test bridge, ...).
  *
@@ -12,8 +12,22 @@
  * encodes, `subscribeHandler` decodes. A transport never sees a
  * `ChannelEventType`, only numbers and JSON-safe values.
  */
-import { ARITY } from './channel_protocol'
-import type { ChannelEventHandlers, ChannelEventType, StringRef } from './channel_protocol'
+import {
+  ARITY,
+  type ChannelEventHandlers,
+  type ChannelEventType,
+  type StringRef,
+} from './channel_protocol'
+
+/**
+ * One payload of a stream.
+ *
+ * `ops` is the flat run of `[op, arg, ...]` slots, `strings` are the strings the
+ * payload announces, and the third slot is `1` when the payload starts a new
+ * string epoch: the receiver then replaces its whole table with `strings`
+ * instead of appending them (see `StreamTransportBridge`).
+ */
+export type StreamPayload = [ops: unknown[], strings: string[], startsEpoch?: 1]
 
 /**
  * The only thing a channel needs from the outside world.
@@ -104,19 +118,43 @@ export class MicroTaskScheduler implements Scheduler {
   }
 }
 
+/** Upper bound of the "seen once" candidate set (it is cleared when exceeded). */
+const CANDIDATE_LIMIT = 2048
+/** Upper bound of the interned table; a full table ends the epoch. */
+const MAX_INTERNED = 2048
+
 /**
  * Encodes outgoing operations into a compact stream and replays incoming ones.
  *
  * Outgoing operations (`publish`) are appended to `streamOps` as
- * `[op, arg, arg, ...]` slots and flushed as a single `[ops, newStrings]`
- * payload per scheduled flush, so one message carries a whole batch of DOM
- * operations instead of one message per operation.
+ * `[op, arg, arg, ...]` slots and flushed as a single payload per scheduled
+ * flush, so one message carries a whole batch of DOM operations instead of one
+ * message per operation.
  *
- * String arguments are interned per channel and replaced by a negative
- * reference (`-1 - id`): the first occurrence ships the string in
- * `pendingStrings`, every later occurrence ships only the reference. Negative
- * numbers can never collide with node / callback ids. The peer keeps its own
- * table (`recvStrings`) in arrival order.
+ * A string slot in the stream is one of two things: the string itself, or the
+ * negative reference `-1 - id` into the table the peer announced. The two never
+ * collide (references are numbers), so the receiver needs no policy of its own
+ * and the sender needs no round trip.
+ *
+ * A string travels inline the *first* time and earns a table slot only when it
+ * shows up a second time. Genuinely repeated strings (tag / class / attribute /
+ * event names) therefore cost a single reference from their third occurrence
+ * on, while one-shot strings — a unique `SET_ID` sid, a per-node
+ * `node-b-<id>` class, ... — never enter either table. Interning on first
+ * sight instead would keep every such string alive on both sides for the
+ * lifetime of the channel.
+ *
+ * The "seen once" candidate set is bounded (`CANDIDATE_LIMIT`): when it is
+ * exceeded it is cleared, and a repeat that falls on the other side of a clear
+ * is simply shipped inline again (and becomes a candidate again). The failure
+ * mode is a few extra bytes, never a wrong decode.
+ *
+ * The interned table is bounded as well (`maxInterned`). A full table ends the
+ * epoch at the next flush: the sender drops its table, and the payload after it
+ * carries the `startsEpoch` flag, so the receiver replaces its table with that
+ * payload's strings. Because only repeated strings ever get a slot, this is a
+ * safety valve rather than a policy — it usually never triggers — and unlike a
+ * plain periodic reset it does not re-send the strings of live nodes.
  *
  * The two directions have independent tables, and `reset` clears both.
  */
@@ -125,51 +163,79 @@ export class StreamTransportBridge<
   ReceiveType extends ChannelEventType,
 > implements TransportBridge<PublishType, ReceiveType>
 {
-  // outgoing direction: the string table grows with every distinct string sent
+  // outgoing direction: interned strings and their wire id
   private sendStringId = 0
   private sendStringMap = new Map<string, number>()
   private pendingStrings: string[] = []
+  // outgoing direction: strings seen once, candidates for interning
+  private candidates = new Set<string>()
+  // whether the next outgoing payload starts a new epoch
+  private pendingEpoch = false
   // incoming direction: strings announced by the peer, indexed by interned id
   private recvStrings: string[] = []
   // pending `[op, ...args]` slots, flushed as one payload
   private streamOps: unknown[] = []
 
+  /**
+   * `maxInterned` bounds the interned table; it is only lowered by tests that
+   * need the epoch reset to happen within a few batches.
+   */
   constructor(
-    publish: (arg: [unknown[], string[]]) => void,
-    private subscribe: (handler: (arg: [unknown[], string[]]) => void) => void,
+    publish: (arg: StreamPayload) => void,
+    private subscribe: (handler: (arg: StreamPayload) => void) => void,
     private scheduler: Scheduler,
+    private maxInterned = MAX_INTERNED,
   ) {
     scheduler.onFlush(() => {
       const ops = this.streamOps
       const str = this.pendingStrings
+      const startsEpoch = this.pendingEpoch
       // take the buffers before publishing: a synchronous transport may deliver
       // the payload (and publish more operations) before `publish` returns
       this.streamOps = []
       this.pendingStrings = []
-      publish([ops, str])
+      this.pendingEpoch = false
+      // a full table ends the epoch *after* this payload, so the payload being
+      // published still refers to the table its peer has
+      if (this.sendStringMap.size >= this.maxInterned) this.beginEpoch()
+      if (startsEpoch) publish([ops, str, 1])
+      else publish([ops, str])
     })
   }
 
   /**
-   * Intern a string and return its reference.
+   * Encode a string for the outgoing stream.
    *
-   * New strings are shipped in the header of the next payload; repeated ones
-   * cost a single negative number.
+   * Interned strings become a negative reference; a first occurrence travels
+   * inline (as the string itself) and only becomes a reference if it shows up
+   * again later.
    */
   encodeString(s: string): StringRef {
-    let id = this.sendStringMap.get(s)
-    if (id === undefined) {
-      id = this.sendStringId
+    const id = this.sendStringMap.get(s)
+    if (id !== undefined) return (-1 - id) as StringRef
+    if (this.candidates.has(s)) {
+      const newId = this.sendStringId
       this.sendStringId += 1
       this.pendingStrings.push(s)
-      this.sendStringMap.set(s, id)
+      this.sendStringMap.set(s, newId)
+      this.candidates.delete(s)
+      return (-1 - newId) as StringRef
     }
-    return (-1 - id) as StringRef
+    // not proven to repeat yet: ship it inline
+    this.candidates.add(s)
+    if (this.candidates.size > CANDIDATE_LIMIT) this.candidates.clear()
+    return s as unknown as StringRef
   }
 
-  /** Resolve a reference against the table announced by the peer. */
-  decodeString(id: StringRef): string {
-    return this.recvStrings[-1 - id]!
+  /**
+   * Resolve a slot against the table announced by the peer.
+   *
+   * A string slot is already the value (inline first occurrence); anything else
+   * is a negative reference.
+   */
+  decodeString(ref: StringRef): string {
+    if (typeof ref === 'string') return ref
+    return this.recvStrings[-1 - ref]!
   }
 
   /**
@@ -197,9 +263,12 @@ export class StreamTransportBridge<
    * `default` branch throws).
    */
   subscribeHandler(handler: SideHandlers<ReceiveType>) {
-    this.subscribe(([ops, str]) => {
-      // strings are announced in arrival order: appending keeps ids stable
-      this.recvStrings.push(...str)
+    this.subscribe(([ops, str, startsEpoch]) => {
+      // strings are announced in arrival order, which keeps ids stable; a
+      // payload that starts an epoch replaces the whole table instead, and
+      // carries every string its ops refer to
+      if (startsEpoch) this.recvStrings = str
+      else this.recvStrings.push(...str)
       let start = 0
       while (start < ops.length) {
         const op = ops[start] as ReceiveType
@@ -275,13 +344,28 @@ export class StreamTransportBridge<
    *
    * Call this before replaying onto a fresh view side: the peer has not seen
    * any of the strings this channel already sent, so the next payload must
-   * carry a table built from scratch.
+   * carry a table built from scratch (hence the epoch flag).
    */
   reset() {
     this.sendStringId = 0
     this.sendStringMap.clear()
     this.pendingStrings = []
+    this.candidates.clear()
+    this.pendingEpoch = true
     this.recvStrings = []
     this.streamOps = []
+  }
+
+  /**
+   * Close the current epoch at a flush boundary.
+   *
+   * Called after the current payload's buffers are taken, so everything encoded
+   * from here on (including re-entrant publishes from a synchronous transport)
+   * belongs to the new table and travels in the flagged payload.
+   */
+  private beginEpoch() {
+    this.sendStringId = 0
+    this.sendStringMap.clear()
+    this.pendingEpoch = true
   }
 }

@@ -912,4 +912,4 @@ export class ViewController {
 
 export { ChannelEventType, MessageChannelViewSide, getNodeId } from './message_channel'
 export { MicroTaskScheduler, StreamTransportBridge } from './transport_bridge'
-export type { Scheduler, TransportBridge } from './transport_bridge'
+export type { Scheduler, StreamPayload, TransportBridge } from './transport_bridge'
