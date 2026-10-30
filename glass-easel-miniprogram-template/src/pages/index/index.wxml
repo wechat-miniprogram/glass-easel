@@ -1,3 +1,4 @@
+<wxs module="utils" src="../../utils.wxs" />
 <view>
   <image class="logo" src="resources/logo_256.png" />
 </view>
@@ -7,3 +8,4 @@
 <view class="hello" hidden="{{ !showAgain }}" mark:a="{{ a: 1, b: 2 }}">
   Hello world again!
 </view>
+<view>{{ utils.upper('wxs') }}</view>

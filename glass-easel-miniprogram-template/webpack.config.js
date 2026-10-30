@@ -5,6 +5,7 @@ const {
   GlassEaselMiniprogramWebpackPlugin,
   GlassEaselMiniprogramWxmlLoader,
   GlassEaselMiniprogramWxssLoader,
+  GlassEaselMiniprogramWxsLoader,
 } = require('glass-easel-miniprogram-webpack-plugin')
 const MiniCssExtractPlugin = require('mini-css-extract-plugin')
 
@@ -36,6 +37,12 @@ module.exports = [
           // wxml should be explicit handled with a loader
           test: /\.wxml$/,
           use: GlassEaselMiniprogramWxmlLoader,
+          exclude: /node_modules/,
+        },
+        {
+          // wxs should be explicit handled with a loader as well
+          test: /\.wxs$/,
+          use: GlassEaselMiniprogramWxsLoader,
           exclude: /node_modules/,
         },
         {
