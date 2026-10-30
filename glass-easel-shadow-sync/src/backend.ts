@@ -199,6 +199,10 @@ export class ShadowSyncElement implements GlassEaselBackend.Element {
   }
 
   associateValue(v: Element): void {
+    // the view side only consumes this message to decide whether the pending simple
+    // component reflects an external component definition, so associations of native
+    // nodes and virtual nodes (which carry no information) need not be sent
+    if (!v.asGeneralComponent()) return
     this.getChannel().associateValue(this._id, this._context.getAssociateValueInfo(v))
   }
 
@@ -646,7 +650,8 @@ export class ShadowSyncBackendContext implements GlassEaselBackend.Context {
   }
 
   _checkStyleScope(styleScope: number | null | undefined) {
-    if (styleScope !== null && styleScope !== undefined && !this._$styleScopeMap[styleScope]) {
+    // the prefix of a style scope may be an empty string, so check for the key
+    if (styleScope !== null && styleScope !== undefined && !(styleScope in this._$styleScopeMap)) {
       const stylePrefix = this.styleScopeManager.queryName(styleScope)
       this._$styleScopeMap[styleScope] = stylePrefix
       this.channel.registerStyleScope(styleScope, stylePrefix)
@@ -779,6 +784,14 @@ export class ShadowSyncBackendContext implements GlassEaselBackend.Context {
     })
   }
 
+  /**
+   * Re-emit the whole backend tree so that a view side can rebuild it.
+   *
+   * This only publishes the operations; it does not touch the transport. When
+   * replaying onto a *fresh* view side the caller must reset the transport
+   * bridge first (the new side has not seen the stream string table) and flush
+   * it afterwards if the result is read synchronously. See `tests/spec/replay`.
+   */
   replay(
     glassEasel: typeof import('glass-easel'),
     roots: Node[],
@@ -980,6 +993,10 @@ export const hookBuilderToSyncData = <TBuilder extends GeneralBehaviorBuilder>(
 export const getNodeId = (node: Node) =>
   (node.getBackendElement() as unknown as ShadowSyncElement)._id
 
-export { Channel, ChannelEventType, MessageChannelDataSide } from './message_channel'
-export { ReplayHandler, replayShadowBackend } from './replay'
+export { ChannelEventType, MessageChannelDataSide } from './message_channel'
+export type { Channel } from './message_channel'
+export { MicroTaskScheduler, StreamTransportBridge } from './transport_bridge'
+export type { Scheduler, StreamPayload, TransportBridge } from './transport_bridge'
+export { replayShadowBackend } from './replay'
+export type { ReplayHandler } from './replay'
 export { getLinearIdGenerator, getRandomIdGenerator } from './utils'
