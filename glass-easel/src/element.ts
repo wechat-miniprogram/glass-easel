@@ -197,7 +197,7 @@ export class Element implements NodeCast {
     this._$marks = null
     this._$attached = false
     this.classList = null
-    this._$styleSegments = [] as string[]
+    this._$styleSegments = ['']
     this.parentNode = null
     this.parentIndex = -1
     this.childNodes = []
