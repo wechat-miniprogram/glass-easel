@@ -9,3 +9,4 @@
   Hello world again!
 </view>
 <view>{{ utils.upper('wxs') }}</view>
+<plain>plain component</plain>
