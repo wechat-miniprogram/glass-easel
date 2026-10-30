@@ -1,4 +1,4 @@
-import { ChannelEventType } from '../../src/channel_protocol'
+import { ARITY, ChannelEventType } from '../../src/channel_protocol'
 import type { StringRef } from '../../src/channel_protocol'
 import { StreamTransportBridge } from '../../src/transport_bridge'
 import type { Scheduler, StreamPayload } from '../../src/transport_bridge'
@@ -322,5 +322,69 @@ describe('StreamTransportBridge string table', () => {
       id: 0,
       value: 'x',
     })
+  })
+})
+
+describe('StreamTransportBridge stream', () => {
+  test('a flush packs every pending operation into one payload', () => {
+    const pair = makePair()
+    pair.a.publish(ChannelEventType.ADD_CLASS, 1, pair.a.encodeString('a'))
+    pair.a.publish(ChannelEventType.SET_ID, 2, pair.a.encodeString('b'))
+    pair.a.publish(ChannelEventType.REMOVE_CLASS, 1, pair.a.encodeString('a'))
+    expect(pair.payloads).toHaveLength(0)
+    pair.flush()
+    expect(pair.payloads).toHaveLength(1)
+    expect(pair.sentAToB).toEqual([
+      { kind: 'addClass', id: 1, value: 'a' },
+      { kind: 'setId', id: 2, value: 'b' },
+      { kind: 'other', op: ChannelEventType.REMOVE_CLASS, args: [1, expect.any(Number)] },
+    ])
+  })
+
+  test('every operation decodes with its declared arity', () => {
+    const schedA = new ManualScheduler()
+    const schedB = new ManualScheduler()
+    let deliver: ((payload: StreamPayload) => void) | null = null
+    const received: unknown[][] = []
+    const a = new StreamTransportBridge<ChannelEventType, ChannelEventType>(
+      (payload) => deliver?.(JSON.parse(JSON.stringify(payload)) as StreamPayload),
+      () => {
+        /* the other direction is not used */
+      },
+      schedA,
+    )
+    const b = new StreamTransportBridge<ChannelEventType, ChannelEventType>(
+      () => {
+        /* the other direction is not used */
+      },
+      (handler) => {
+        deliver = handler
+      },
+      schedB,
+    )
+    b.subscribeHandler(
+      new Proxy(
+        {},
+        {
+          get: (_target, prop) => {
+            if (typeof prop !== 'string') return undefined
+            const op = Number(prop)
+            return (...args: unknown[]) => received.push([op, ...args])
+          },
+        },
+      ) as never,
+    )
+
+    // one operation of every opcode, with exactly as many arguments as `ARITY`
+    // declares; a wrong dispatch offset shows up as a missing / extra argument
+    const operations: [number, string[]][] = Object.entries(ARITY).map(([op, arity]) => [
+      Number(op),
+      Array.from({ length: arity }, (_, i) => `arg-${i}`),
+    ])
+    operations.forEach(([op, args]) => (a.publish as (...a: unknown[]) => void)(op, ...args))
+    schedA.flush()
+
+    const expected: unknown[][] = operations.map(([op, args]) => [op, ...args])
+    expect(received).toEqual(expected)
   })
 })
