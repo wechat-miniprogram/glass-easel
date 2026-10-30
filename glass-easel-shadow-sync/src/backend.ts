@@ -650,7 +650,8 @@ export class ShadowSyncBackendContext implements GlassEaselBackend.Context {
   }
 
   _checkStyleScope(styleScope: number | null | undefined) {
-    if (styleScope !== null && styleScope !== undefined && !this._$styleScopeMap[styleScope]) {
+    // the prefix of a style scope may be an empty string, so check for the key
+    if (styleScope !== null && styleScope !== undefined && !(styleScope in this._$styleScopeMap)) {
       const stylePrefix = this.styleScopeManager.queryName(styleScope)
       this._$styleScopeMap[styleScope] = stylePrefix
       this.channel.registerStyleScope(styleScope, stylePrefix)

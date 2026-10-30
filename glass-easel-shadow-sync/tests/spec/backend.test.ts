@@ -8,6 +8,7 @@ import {
 } from '../../src/backend'
 import { getNodeId } from '../../src/message_channel'
 import {
+  dataComponentSpace,
   getViewNode,
   messageChannelDataSide,
   shadowSyncBackend,
@@ -86,6 +87,30 @@ describe('backend', () => {
       const sentIds = new Set(spy.mock.calls.map(([id]) => id))
       expect(sentIds.size).toBeGreaterThan(0)
       expect(sentIds).toEqual(componentIds)
+    } finally {
+      spy.mockRestore()
+    }
+  })
+  test('register a style scope only once even if its prefix is empty', () => {
+    const scope = dataComponentSpace.styleScopeManager.register('')
+    const spy = jest.spyOn(messageChannelDataSide, 'registerStyleScope')
+    try {
+      shadowSyncBackend._checkStyleScope(scope)
+      shadowSyncBackend._checkStyleScope(scope)
+      shadowSyncBackend._checkStyleScope(scope)
+      expect(spy).toHaveBeenCalledTimes(1)
+      expect(spy).toHaveBeenCalledWith(scope, '')
+    } finally {
+      spy.mockRestore()
+    }
+  })
+  test('the global style scope is already known and never sent', () => {
+    // scope 0 is pre-seeded with the empty prefix, and the view side maps it to
+    // the global scope by default, so it needs no registration message
+    const spy = jest.spyOn(messageChannelDataSide, 'registerStyleScope')
+    try {
+      shadowSyncBackend._checkStyleScope(0)
+      expect(spy).not.toHaveBeenCalled()
     } finally {
       spy.mockRestore()
     }
