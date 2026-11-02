@@ -75,7 +75,7 @@ describe('selector query', () => {
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
     expect(domHtml(root.getComponent())).toBe(
-      '<div><child>456</child><child data-a="A">789</child></div>',
+      '<div><child id="c1">456</child><child data-a="A" id="c2">789</child></div>',
     )
   })
 
@@ -166,7 +166,9 @@ describe('selector query', () => {
     const ab = env.associateBackend()
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
-    expect(domHtml(root.getComponent())).toBe('<div><child1>456</child1><child2>789</child2></div>')
+    expect(domHtml(root.getComponent())).toBe(
+      '<div id="d"><child1 id="c1">456</child1><child2 id="c2">789</child2></div>',
+    )
   })
 
   test('select single component (with custom export on behavior)', () => {
@@ -323,7 +325,7 @@ describe('selector query', () => {
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
     expect(domHtml(root.getComponent())).toBe(
-      '<div><child1>456</child1><child2>789</child2><child3>654</child3><child4>987</child4></div>',
+      '<div id="d"><child1 id="c1">456</child1><child2 id="c2">789</child2><child3 id="c3">654</child3><child4 id="c4">987</child4></div>',
     )
   })
 
@@ -391,7 +393,7 @@ describe('selector query', () => {
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
     expect(domHtml(root.getComponent())).toBe(
-      '<div><child class="c">0</child><child class="c">1</child><child-b class="c">2</child-b></div>',
+      '<div id="d"><child class="c">0</child><child class="c">1</child><child-b class="c">2</child-b></div>',
     )
   })
 
@@ -772,6 +774,6 @@ describe('media query observer', () => {
     const ab = env.associateBackend()
     const root = ab.createRoot('body', codeSpace, 'path/to/comp')
     glassEasel.Element.pretendAttached(root.getComponent())
-    expect(domHtml(root.getComponent())).toBe('<div></div>')
+    expect(domHtml(root.getComponent())).toBe('<div id="a"></div>')
   })
 })
