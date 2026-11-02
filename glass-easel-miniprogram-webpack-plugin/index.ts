@@ -326,7 +326,8 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
               /* empty */
             }
             if (hasScriptFile) {
-              styleSheetManager.add(compPath, absPath)
+              // components without a wxss file have no style sheet to register
+              if (hasWxss) styleSheetManager.add(compPath, absPath)
               styleSheetManager.setStyleIsolation(
                 compPath,
                 staticConfig.styleIsolation,
@@ -342,6 +343,10 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
           const compPath = relPath.slice(0, -5)
           if (compInfoMap[compPath]) {
             compInfoMap[compPath]!.hasWxss = true
+            // the style sheet may be added after the component json (watch mode)
+            if (!styleSheetManager.map[compPath]) {
+              styleSheetManager.add(compPath, path.join(codeRoot, relPath))
+            }
           }
         }
 
@@ -360,6 +365,7 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
             delete compInfoMap[compPath]
           } else if (extName === '.wxss') {
             compInfoMap[compPath]!.hasWxss = false
+            delete styleSheetManager.map[compPath]
           }
         }
       }
