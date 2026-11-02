@@ -614,7 +614,10 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
             codeSpace.addComponentStaticConfig('${escapeJsString(compPath)}', staticConfig)
             codeSpace.addCompiledTemplate('${escapeJsString(compPath)}', {
               groupList: index.genObjectGroups,
-              content: index.genObjectGroups[require('${escapeJsString(wxmlSrcPath)}')]
+              content: index.genObjectGroups[require('${escapeJsString(wxmlSrcPath)}')],
+              // bind/catch listeners must also work on native nodes
+              // (e.g. a tag that is not registered as a component)
+              fallbackListenerOnNativeNode: true
             })
             ${addStyleSheet}
             codeSpace.globalComponentEnv(index.globalObject, '${escapeJsString(compPath)}', () => {
