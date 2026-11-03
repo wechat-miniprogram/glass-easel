@@ -18,7 +18,8 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc -p .",
-    "lint": "eslint src/**/*.ts"
+    "lint": "eslint src/**/*.ts",
+    "test": "jest -c jest.config.js"
   },
   "peerDependencies": {
     "glass-easel": "workspace:*",
