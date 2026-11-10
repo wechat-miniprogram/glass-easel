@@ -1087,15 +1087,17 @@ impl Element {
                     AttrPrefixKind::Normal => match &mut element {
                         ElementKind::Normal { attributes, .. } => {
                             if let AttrPrefixParseResult::Value(value) = attr_value {
-                                if attributes
-                                    .iter()
-                                    .find(|x| x.name.name_eq(&attr_name))
-                                    .is_some()
+                                // the last duplicated attribute wins (the same as the official compiler)
+                                if let Some(existing) =
+                                    attributes.iter_mut().find(|x| x.name.name_eq(&attr_name))
                                 {
                                     ps.add_warning(
                                         ParseErrorKind::DuplicatedAttribute,
-                                        attr_name.location,
+                                        attr_name.location.clone(),
                                     );
+                                    existing.name = attr_name;
+                                    existing.value = value;
+                                    existing.prefix = NormalAttributePrefix::None;
                                 } else {
                                     let attr = NormalAttribute {
                                         name: attr_name,
@@ -1110,15 +1112,16 @@ impl Element {
                             values: attributes, ..
                         } => {
                             if let AttrPrefixParseResult::Value(value) = attr_value {
-                                if attributes
-                                    .iter()
-                                    .find(|x| x.name.name_eq(&attr_name))
-                                    .is_some()
+                                // the last duplicated attribute wins (the same as the official compiler)
+                                if let Some(existing) =
+                                    attributes.iter_mut().find(|x| x.name.name_eq(&attr_name))
                                 {
                                     ps.add_warning(
                                         ParseErrorKind::DuplicatedAttribute,
-                                        attr_name.location,
+                                        attr_name.location.clone(),
                                     );
+                                    existing.name = attr_name;
+                                    existing.value = value;
                                 } else {
                                     let attr = Attribute {
                                         name: attr_name,
@@ -1446,15 +1449,18 @@ impl Element {
                     AttrPrefixKind::Model(prefix_location) => match &mut element {
                         ElementKind::Normal { attributes, .. } => {
                             if let AttrPrefixParseResult::Value(value) = attr_value {
-                                if attributes
-                                    .iter()
-                                    .find(|x| x.name.name_eq(&attr_name))
-                                    .is_some()
+                                // the last duplicated attribute wins (the same as the official compiler)
+                                if let Some(existing) =
+                                    attributes.iter_mut().find(|x| x.name.name_eq(&attr_name))
                                 {
                                     ps.add_warning(
                                         ParseErrorKind::DuplicatedAttribute,
-                                        attr_name.location,
+                                        attr_name.location.clone(),
                                     );
+                                    existing.name = attr_name;
+                                    existing.value = value;
+                                    existing.prefix =
+                                        NormalAttributePrefix::Model(prefix_location);
                                 } else {
                                     let attr = NormalAttribute {
                                         name: attr_name,
@@ -4021,7 +4027,8 @@ mod test {
         );
         case!(
             "<div a='1' a='2'></div>",
-            r#"<div a="1"/>"#,
+            // the last duplicated attribute wins, which is the same as the official compiler
+            r#"<div a="2"/>"#,
             ParseErrorKind::DuplicatedAttribute,
             11..12
         );
