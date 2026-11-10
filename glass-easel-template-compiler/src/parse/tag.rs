@@ -6,7 +6,7 @@ use crate::escape::dash_to_camel;
 
 use super::{
     binding_map::{BindingMapCollector, BindingMapKeys},
-    expr::Expression,
+    expr::{Expression, ScopeChain},
     ParseErrorKind, ParseState, Position, TemplateStructure,
 };
 
@@ -66,8 +66,19 @@ pub struct TagLocation {
 
 struct ScopeAnalyzeState {
     scopes: Vec<(CompactString, Range<Position>)>,
+    /// The number of the leading script module scopes in `scopes` .
+    script_scopes: usize,
     inside_dynamic_tree: usize,
     binding_map_collector: BindingMapCollector,
+}
+
+impl ScopeAnalyzeState {
+    fn scope_chain(&self) -> ScopeChain<'_> {
+        ScopeChain {
+            scopes: &self.scopes,
+            script_scopes: self.script_scopes,
+        }
+    }
 }
 
 impl Template {
@@ -102,6 +113,7 @@ impl Template {
                         (name.name.clone(), name.location())
                     })
                     .collect(),
+                script_scopes: globals.scripts.len(),
                 inside_dynamic_tree: 1,
                 binding_map_collector: BindingMapCollector::new(),
             };
@@ -118,6 +130,7 @@ impl Template {
                     (name.name.clone(), name.location())
                 })
                 .collect(),
+            script_scopes: globals.scripts.len(),
             inside_dynamic_tree: 0,
             binding_map_collector: BindingMapCollector::new(),
         };
@@ -3722,7 +3735,9 @@ impl Value {
     fn validate_scopes(&self, ps: &mut ParseState, sas: &ScopeAnalyzeState, limit: usize) -> bool {
         match self {
             Self::Static { .. } => true,
-            Self::Dynamic { expression, .. } => expression.validate_scopes(ps, &sas.scopes, limit),
+            Self::Dynamic { expression, .. } => {
+                expression.validate_scopes(ps, &sas.scope_chain(), limit)
+            }
         }
     }
 
@@ -3738,7 +3753,7 @@ impl Value {
                 binding_map_keys,
                 ..
             } => {
-                expression.convert_scopes(&sas.scopes);
+                expression.convert_scopes(&sas.scope_chain());
                 if sas.inside_dynamic_tree > 0 || disable_binding_map {
                     expression.disable_binding_map_keys(&mut sas.binding_map_collector);
                 } else {

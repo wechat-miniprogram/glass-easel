@@ -24,6 +24,7 @@ pub enum Expression {
     /// - In an expression, its usable scopes are the scopes introduced by all its ancestors, where closer parents has larger indices.
     /// - For any `wx:for` parent, `item` has a smaller index than `index`.
     /// - The script module scopes are file-global so they always occupies the smallest indices.
+    /// - A script module scope takes precedence over a local scope with the same name (which is the same as the official miniprogram template compiler), so the leading script module scopes are searched first.
     ScopeRef {
         location: Range<Position>,
         index: usize,
@@ -263,6 +264,39 @@ pub enum ArrayFieldKind {
         value: Expression,
     },
     EmptySlot,
+}
+
+/// The scopes usable in an expression, in the order they are introduced.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct ScopeChain<'a> {
+    /// All usable scopes. The leading `script_scopes` items are the file-global
+    /// script module scopes, the rest are introduced by the ancestor nodes.
+    pub scopes: &'a [(CompactString, Range<Position>)],
+    /// The number of the file-global script module scopes.
+    pub script_scopes: usize,
+}
+
+impl<'a> ScopeChain<'a> {
+    /// Find the scope index of the name.
+    ///
+    /// The script module scopes (a.k.a. `<wxs module="..." />` ) are file-global, so they
+    /// take precedence over the local scopes with the same name, which is the same as the
+    /// official miniprogram template compiler. The local scopes are searched from the
+    /// nearest one.
+    fn find(&self, name: &CompactString) -> Option<usize> {
+        let script_scopes = self.script_scopes.min(self.scopes.len());
+        if let Some(index) = self.scopes[..script_scopes]
+            .iter()
+            .position(|x| x.0 == *name)
+        {
+            return Some(index);
+        }
+        self.scopes
+            .iter()
+            .enumerate()
+            .rev()
+            .find_map(|(i, x)| (i >= script_scopes && x.0 == *name).then_some(i))
+    }
 }
 
 impl TemplateStructure for Expression {
@@ -1297,15 +1331,11 @@ impl Expression {
     pub(super) fn validate_scopes(
         &self,
         ps: &mut ParseState,
-        scopes: &[(CompactString, Range<Position>)],
+        scopes: &ScopeChain,
         limit: usize,
     ) -> bool {
         let index = if let Self::DataField { name, location } = self {
-            scopes
-                .iter()
-                .enumerate()
-                .rev()
-                .find_map(|(i, x)| (x.0 == name).then_some((i, location.clone())))
+            scopes.find(name).map(|i| (i, location.clone()))
         } else {
             None
         };
@@ -1324,13 +1354,9 @@ impl Expression {
         true
     }
 
-    pub(super) fn convert_scopes(&mut self, scopes: &[(CompactString, Range<Position>)]) {
+    pub(super) fn convert_scopes(&mut self, scopes: &ScopeChain) {
         let index = if let Self::DataField { name, location } = self {
-            scopes
-                .iter()
-                .enumerate()
-                .rev()
-                .find_map(|(i, x)| (x.0 == name).then_some((i, location.clone())))
+            scopes.find(name).map(|i| (i, location.clone()))
         } else {
             None
         };
