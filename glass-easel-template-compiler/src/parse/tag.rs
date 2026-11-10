@@ -13,6 +13,40 @@ use super::{
 pub const DEFAULT_FOR_ITEM_SCOPE_NAME: &'static str = "item";
 pub const DEFAULT_FOR_INDEX_SCOPE_NAME: &'static str = "index";
 
+/// The boolean attributes of the built-in components.
+///
+/// An attribute without value (e.g. `<view hidden />` ) is compiled into `true` , but any static
+/// value (e.g. `hidden="false"` ) is a non-empty string and therefore always truthy, which is
+/// almost always a mistake. A data binding is the only way to pass `false` . (see issue #243)
+const BOOLEAN_ATTRIBUTES: [&'static str; 14] = [
+    "hidden",
+    "checked",
+    "disabled",
+    "selected",
+    "focus",
+    "autofocus",
+    "loop",
+    "autoplay",
+    "circular",
+    "indicator-dots",
+    "scroll-x",
+    "scroll-y",
+    "enhanced",
+    "bounces",
+];
+
+fn is_boolean_attribute(name: &str) -> bool {
+    BOOLEAN_ATTRIBUTES.iter().any(|x| *x == name)
+}
+
+/// Whether the value is a static (non-binding) value with a non-empty content.
+fn is_static_non_empty_value(value: &Option<Value>) -> bool {
+    match value {
+        Some(x @ Value::Static { .. }) => !x.is_empty(),
+        _ => false,
+    }
+}
+
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct Template {
@@ -1087,6 +1121,14 @@ impl Element {
                     AttrPrefixKind::Normal => match &mut element {
                         ElementKind::Normal { attributes, .. } => {
                             if let AttrPrefixParseResult::Value(value) = attr_value {
+                                if is_static_non_empty_value(&value)
+                                    && is_boolean_attribute(attr_name.name.as_str())
+                                {
+                                    ps.add_warning(
+                                        ParseErrorKind::BooleanAttributeWithStaticValue,
+                                        attr_name.location.clone(),
+                                    );
+                                }
                                 if attributes
                                     .iter()
                                     .find(|x| x.name.name_eq(&attr_name))
@@ -1110,6 +1152,14 @@ impl Element {
                             values: attributes, ..
                         } => {
                             if let AttrPrefixParseResult::Value(value) = attr_value {
+                                if is_static_non_empty_value(&value)
+                                    && is_boolean_attribute(attr_name.name.as_str())
+                                {
+                                    ps.add_warning(
+                                        ParseErrorKind::BooleanAttributeWithStaticValue,
+                                        attr_name.location.clone(),
+                                    );
+                                }
                                 if attributes
                                     .iter()
                                     .find(|x| x.name.name_eq(&attr_name))
@@ -1446,6 +1496,12 @@ impl Element {
                     AttrPrefixKind::Model(prefix_location) => match &mut element {
                         ElementKind::Normal { attributes, .. } => {
                             if let AttrPrefixParseResult::Value(value) = attr_value {
+                                if is_static_non_empty_value(&value) {
+                                    ps.add_warning(
+                                        ParseErrorKind::ExpectsDataBinding,
+                                        attr_name.location.clone(),
+                                    );
+                                }
                                 if attributes
                                     .iter()
                                     .find(|x| x.name.name_eq(&attr_name))
@@ -1607,6 +1663,12 @@ impl Element {
                     AttrPrefixKind::Class(prefix_location) => match &mut element {
                         ElementKind::Normal { .. } => {
                             if let AttrPrefixParseResult::Value(value) = attr_value {
+                                if is_static_non_empty_value(&value) {
+                                    ps.add_warning(
+                                        ParseErrorKind::ExpectsDataBinding,
+                                        attr_name.location.clone(),
+                                    );
+                                }
                                 if class_attrs
                                     .iter()
                                     .find(|(_, x, _)| x.name_eq(&attr_name))

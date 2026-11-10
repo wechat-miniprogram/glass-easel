@@ -521,6 +521,8 @@ pub enum ParseErrorKind {
     InvalidInlineStyleString,
     DuplicatedStylePropertyNames,
     IncompatibleWithStyleColonAttributes,
+    ExpectsDataBinding,
+    BooleanAttributeWithStaticValue,
 }
 
 impl ParseErrorKind {
@@ -574,6 +576,12 @@ impl ParseErrorKind {
             Self::IncompatibleWithStyleColonAttributes => {
                 "style data bindings are incompatible with `style:` attributes"
             }
+            Self::ExpectsDataBinding => {
+                "this attribute expects a data binding, since a static value is ignored"
+            }
+            Self::BooleanAttributeWithStaticValue => {
+                "this boolean attribute expects a data binding, since a non-empty static value is always truthy"
+            }
         }
     }
 
@@ -619,6 +627,8 @@ impl ParseErrorKind {
             Self::InvalidInlineStyleString => ParseErrorLevel::Error,
             Self::DuplicatedStylePropertyNames => ParseErrorLevel::Error,
             Self::IncompatibleWithStyleColonAttributes => ParseErrorLevel::Error,
+            Self::ExpectsDataBinding => ParseErrorLevel::Warn,
+            Self::BooleanAttributeWithStaticValue => ParseErrorLevel::Warn,
         }
     }
 }
