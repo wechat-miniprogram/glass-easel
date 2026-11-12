@@ -45,5 +45,8 @@ module.exports = function (src, prevMap, meta) {
       map = ssSourceMap
       callback(null, ss, map, meta)
     }
+  } else {
+    sst.free()
+    callback(null, ss, undefined, meta)
   }
 }
