@@ -119,6 +119,10 @@ impl PathSliceList {
         true
     }
 
+    fn is_condition_expr(&self) -> bool {
+        matches!(self.0.first(), Some(PathSlice::Condition(..)))
+    }
+
     fn to_lvalue_path_arr<W: Write>(
         &self,
         w: &mut JsExprWriter<W>,
@@ -195,18 +199,39 @@ impl PathSliceList {
                 write!(w, r#":"#)?;
                 false_br.write_lvalue_path(w, scopes, model)?;
             } else {
+                let write_lvalue_path_with_concat =
+                    |w: &mut JsExprWriter<W>,
+                     pas: &PathAnalysisState,
+                     br: &dyn Fn(&mut JsExprWriter<W>) -> Result<(), TmplError>|
+                     -> Result<(), TmplError> {
+                        let psl = match pas {
+                            PathAnalysisState::InPath(psl)
+                                if psl.is_legal_lvalue_path(scopes, model) =>
+                            {
+                                psl
+                            }
+                            _ => {
+                                pas.write_lvalue_path(w, scopes, model)?;
+                                return Ok(());
+                            }
+                        };
+                        let need_paren = psl.is_condition_expr();
+                        if need_paren {
+                            write!(w, "(")?;
+                        }
+                        pas.write_lvalue_path(w, scopes, model)?;
+                        if need_paren {
+                            write!(w, ")")?;
+                        }
+                        write!(w, ".concat(")?;
+                        br(w)?;
+                        write!(w, ")")?;
+                        Ok(())
+                    };
                 write!(w, r#"{}?"#, cond)?;
-                if true_br.write_lvalue_path(w, scopes, model)?.is_some() {
-                    write!(w, r#".concat("#)?;
-                    br(w)?;
-                    write!(w, r#")"#)?;
-                }
+                write_lvalue_path_with_concat(w, true_br, &br)?;
                 write!(w, r#":"#)?;
-                if false_br.write_lvalue_path(w, scopes, model)?.is_some() {
-                    write!(w, r#".concat("#)?;
-                    br(w)?;
-                    write!(w, r#")"#)?;
-                }
+                write_lvalue_path_with_concat(w, false_br, &br)?;
             }
         } else {
             br(w)?;

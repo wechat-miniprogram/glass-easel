@@ -136,6 +136,99 @@ describe('model value binding', () => {
     expect(elem.data.b).toBe(78)
   })
 
+  test('model value binding on nested conditional expression', () => {
+    const subComp = glassEasel.registerElement({
+      template: tmpl(`
+        <div id="a" data-a="{{ propA }}">
+          <slot />
+        </div>
+      `),
+      properties: {
+        propA: Number,
+      },
+    })
+    const def = glassEasel.registerElement({
+      using: {
+        comp: subComp.general(),
+      },
+      template: tmpl(`
+        <comp id="comp" model:prop-a="{{ (cond1 ? (cond2 ? subA : subB) : subC).f }}" />
+      `),
+      data: {
+        cond1: false,
+        cond2: false,
+        subA: { f: 21 },
+        subB: { f: 43 },
+        subC: { f: 65 },
+      },
+    })
+    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const comp = elem.getShadowRoot()!.getElementById('comp')! as glassEasel.GeneralComponent
+    expect(comp.getShadowRoot()!.getElementById('a')!.dataset.a).toBe(65)
+
+    comp.setData({ propA: 99 })
+    expect(elem.data.subC).toStrictEqual({ f: 99 })
+    expect(elem.data.subA).toStrictEqual({ f: 21 })
+    expect(elem.data.subB).toStrictEqual({ f: 43 })
+
+    elem.setData({ cond1: true })
+    expect(comp.getShadowRoot()!.getElementById('a')!.dataset.a).toBe(43)
+    comp.setData({ propA: 44 })
+    expect(elem.data.subB).toStrictEqual({ f: 44 })
+    expect(elem.data.subA).toStrictEqual({ f: 21 })
+
+    elem.setData({ cond2: true })
+    expect(comp.getShadowRoot()!.getElementById('a')!.dataset.a).toBe(21)
+    comp.setData({ propA: 22 })
+    expect(elem.data.subA).toStrictEqual({ f: 22 })
+    expect(elem.data.subB).toStrictEqual({ f: 44 })
+    expect(elem.data.subC).toStrictEqual({ f: 99 })
+  })
+
+  test('model value binding on partially legal conditional expression', () => {
+    const subComp = glassEasel.registerElement({
+      template: tmpl(`
+        <div id="a" data-a="{{ propA }}">
+          <slot />
+        </div>
+      `),
+      properties: {
+        propA: Number,
+      },
+    })
+    const def = glassEasel.registerElement({
+      using: {
+        comp: subComp.general(),
+      },
+      template: tmpl(`
+        <comp id="trueLegal" model:prop-a="{{ (cond ? subA : { f: 7 }).f }}" />
+        <comp id="falseLegal" model:prop-a="{{ (cond ? { f: 7 } : subA).f }}" />
+      `),
+      data: {
+        cond: true,
+        subA: { f: 21 },
+      },
+    })
+    const elem = glassEasel.Component.createWithContext('root', def, domBackend)
+    const trueLegal = elem
+      .getShadowRoot()!
+      .getElementById('trueLegal')! as glassEasel.GeneralComponent
+    const falseLegal = elem
+      .getShadowRoot()!
+      .getElementById('falseLegal')! as glassEasel.GeneralComponent
+    expect(trueLegal.getShadowRoot()!.getElementById('a')!.dataset.a).toBe(21)
+    expect(falseLegal.getShadowRoot()!.getElementById('a')!.dataset.a).toBe(7)
+
+    trueLegal.setData({ propA: 22 })
+    expect(elem.data.subA).toStrictEqual({ f: 22 })
+
+    elem.setData({ cond: false })
+    expect(trueLegal.getShadowRoot()!.getElementById('a')!.dataset.a).toBe(7)
+    expect(falseLegal.getShadowRoot()!.getElementById('a')!.dataset.a).toBe(22)
+    falseLegal.setData({ propA: 23 })
+    expect(elem.data.subA).toStrictEqual({ f: 23 })
+  })
+
   test('model value binding for items', () => {
     const subComp = glassEasel.registerElement({
       template: tmpl('{{propB}}:{{propA}}'),
