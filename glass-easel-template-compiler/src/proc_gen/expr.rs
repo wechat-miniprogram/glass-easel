@@ -1052,7 +1052,7 @@ impl Expression {
                 x.to_proc_gen_rec_and_end_path(
                     w,
                     scopes,
-                    ExpressionLevel::BitOr,
+                    ExpressionLevel::BitXor,
                     path_calc,
                     value,
                 )?;
