@@ -59,16 +59,19 @@ jobs:
             echo "OK: $toml = $ACTUAL"
           done
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 24
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Install
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: |
+            - recursive: true
+              args: [--frozen-lockfile, --strict-peer-dependencies]
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable

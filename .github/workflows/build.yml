@@ -10,7 +10,7 @@ jobs:
   build-and-test:
     strategy:
       matrix:
-        node-version: [lts/*, latest]
+        node-version: [24, latest]
         os: ['windows-latest', 'ubuntu-latest']
       fail-fast: false
     name: Build and Test
@@ -18,18 +18,14 @@ jobs:
     steps:
       - name: Checkout master
         uses: actions/checkout@v3
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: latest
       - name: Setup node ${{ matrix.node-version }}
         uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
       - name: Install
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 10
           run_install: |
             - recursive: true
               args: [--frozen-lockfile, --strict-peer-dependencies]

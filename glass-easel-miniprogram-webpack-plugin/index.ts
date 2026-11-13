@@ -2,7 +2,7 @@
 
 import { promises as fs } from 'node:fs'
 import * as path from 'node:path'
-import { NormalModule, type Compiler, type WebpackPluginInstance } from 'webpack'
+import type { Compiler, NormalModule, WebpackPluginInstance } from 'webpack'
 import chalk from 'chalk'
 import chokidar from 'chokidar'
 import { TmplGroup } from 'glass-easel-template-compiler'
@@ -425,9 +425,10 @@ export class GlassEaselMiniprogramWebpackPlugin implements WebpackPluginInstance
     })
 
     // collect virtual files
+    const { NormalModule: NormalModuleOfCompiler } = compiler.webpack
     compiler.hooks.compilation.tap(PLUGIN_NAME, (compilation) => {
       // add loaders
-      NormalModule.getCompilationHooks(compilation).beforeLoaders.tap(
+      NormalModuleOfCompiler.getCompilationHooks(compilation).beforeLoaders.tap(
         PLUGIN_NAME,
         (loaders, mod) => {
           const absPath = mod.resource
