@@ -180,6 +180,50 @@ const testCases = (testBackend: glassEasel.GeneralBackendContext) => {
     expect(eventOrder).toStrictEqual([1])
   })
 
+  test('dynamic event binding in binding map update', () => {
+    const calls: string[] = []
+    const template = tmpl(
+      `
+        <wxs module="w">module.exports = {
+          handlerA(e) { e.detail.push('A') },
+          handlerB(e) { e.detail.push('B') },
+        }</wxs>
+        <div id="a" catch:tap="{{ w[handlerName] }}" />
+      `,
+      { updateMode: 'bindingMap' },
+      {
+        C: (elem, evName, listener, final, mutated, capture, generalLvaluePath) => {
+          expect(evName).toBe('tap')
+          expect(final).toBe(true)
+          expect(mutated).toBe(false)
+          expect(capture).toBe(false)
+          expect(generalLvaluePath).toStrictEqual([
+            glassEasel.template.GeneralLvaluePathPrefix.InlineScript,
+            '',
+            'w',
+            expect.any(String),
+          ])
+          return (event) =>
+            listener.call(elem.ownerShadowRoot?.getHostNode().getMethodCaller(), event)
+        },
+      },
+    )
+    const def = glassEasel.registerElement({
+      template,
+      data: {
+        handlerName: 'handlerA',
+      },
+    })
+    const elem = glassEasel.Component.createWithContext('root', def.general(), testBackend)
+    const div = elem.getShadowRoot()!.getElementById('a')!
+    div.triggerEvent('tap', calls)
+    expect(calls).toStrictEqual(['A'])
+    calls.length = 0
+    elem.setData({ handlerName: 'handlerB' })
+    div.triggerEvent('tap', calls)
+    expect(calls).toStrictEqual(['B'])
+  })
+
   test('bubble cross shadow', () => {
     const ops: string[] = []
 
