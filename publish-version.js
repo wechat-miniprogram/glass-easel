@@ -10,13 +10,67 @@ const writeFileAndGitAdd = (p, content) => {
   }
 }
 
+const readLineSync = () => {
+  const buffer = Buffer.alloc(1)
+  let line = ''
+  while (fs.readSync(0, buffer, 0, 1, null) === 1) {
+    const ch = buffer.toString('utf8')
+    if (ch === '\n') break
+    line += ch
+  }
+  return line.trim().toLowerCase()
+}
+
+// check git branch
+const branchRes = childProcess.spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+  encoding: 'utf8',
+})
+if (branchRes.status !== 0) {
+  throw new Error('failed to get current git branch')
+}
+const currentBranch = branchRes.stdout.trim()
+if (currentBranch !== 'master') {
+  throw new Error(`current git branch is "${currentBranch}" instead of "master"`)
+}
+
 // check arguments
-const version = process.argv[2]
-if (!version) {
+const versionArg = process.argv[2]
+if (!versionArg) {
   throw new Error('version not given in argv')
 }
-if (!/[0-9]+\.[0-9]+\.[0-9]+/.test(version)) {
+
+const currentVersion = JSON.parse(
+  fs.readFileSync('glass-easel/package.json', { encoding: 'utf8' }),
+).version
+
+const bumpVersion = (base, part) => {
+  const segments = base.split('.').map((s) => parseInt(s, 10))
+  const index = { major: 0, minor: 1, patch: 2 }[part]
+  segments[index] += 1
+  for (let i = index + 1; i < segments.length; i += 1) {
+    segments[i] = 0
+  }
+  return segments.join('.')
+}
+
+let version = versionArg
+if (['major', 'minor', 'patch'].includes(versionArg)) {
+  version = bumpVersion(currentVersion, versionArg)
+} else if (!/^[0-9]+\.[0-9]+\.[0-9]+$/.test(versionArg)) {
   throw new Error('version illegal')
+}
+
+// confirm publishing
+console.info(
+  `This script will update all package versions from "${currentVersion}" to "${version}", ` +
+    `then commit the changes and tag them as "v${version}". ` +
+    `It will also run cargo check, formatting, lint, build and tests before pushing the commit and the tag to origin. ` +
+    `The remote CI workflow publishes the packages once the tag is pushed.`,
+)
+console.info(`Publish version "${version}"? Type "y" or "yes" to confirm.`)
+const answer = readLineSync()
+if (answer !== 'y' && answer !== 'yes') {
+  throw new Error('publishing cancelled')
 }
 
 // avoid rust warnings
