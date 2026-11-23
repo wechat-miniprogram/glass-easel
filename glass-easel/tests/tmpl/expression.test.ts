@@ -1,3 +1,4 @@
+/* eslint-disable no-bitwise */
 import { domBackend, tmpl } from '../base/env'
 import * as glassEasel from '../../src'
 
