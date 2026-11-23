@@ -217,6 +217,91 @@ describe('binding expression', () => {
     expect(n5.dataset.a).toEqual(15)
   })
 
+  test('bit logic operator precedence', () => {
+    const def = glassEasel.registerElement({
+      template: tmpl(`
+        <div id="n1" data-a="{{ a & b | c }}"></div>
+        <div id="n2" data-a="{{ a | b & c }}"></div>
+        <div id="n3" data-a="{{ a ^ b | c }}"></div>
+        <div id="n4" data-a="{{ a | b ^ c }}"></div>
+        <div id="n5" data-a="{{ a & b ^ c }}"></div>
+        <div id="n6" data-a="{{ a ^ b & c }}"></div>
+        <div id="n7" data-a="{{ a ^ b & c | d }}"></div>
+        <div id="n8" data-a="{{ a & b ^ c | d }}"></div>
+        <div id="n9" data-a="{{ a | b ^ c & d }}"></div>
+        <div id="n10" data-a="{{ (a & b) | c }}"></div>
+        <div id="n11" data-a="{{ a | (b & c) }}"></div>
+        <div id="n12" data-a="{{ (a ^ b) | c }}"></div>
+        <div id="n13" data-a="{{ a | (b ^ c) }}"></div>
+        <div id="n14" data-a="{{ (a & b) ^ c }}"></div>
+        <div id="n15" data-a="{{ a ^ (b & c) }}"></div>
+        <div id="n16" data-a="{{ (a ^ b) & c }}"></div>
+        <div id="n17" data-a="{{ a & (b | c) }}"></div>
+        <div id="n18" data-a="{{ (a | b) ^ c }}"></div>
+        <div id="n19" data-a="{{ a ^ (b | c) }}"></div>
+        <div id="n20" data-a="{{ (a | b) ^ (c | d) }}"></div>
+      `),
+      data: {
+        a: 12,
+        b: 10,
+        c: 3,
+        d: 6,
+      },
+    })
+    const elem = glassEasel.Component.createWithContext('root', def.general(), domBackend)
+    const dataOf = (id: string) => elem.getShadowRoot()!.getElementById(id)!.dataset.a
+    const checkAll = (expected: { [key: string]: number }) => {
+      Object.keys(expected).forEach((id) => {
+        expect(dataOf(id)).toEqual(expected[id])
+      })
+    }
+    checkAll({
+      n1: (12 & 10) | 3,
+      n2: 12 | (10 & 3),
+      n3: (12 ^ 10) | 3,
+      n4: 12 | (10 ^ 3),
+      n5: (12 & 10) ^ 3,
+      n6: 12 ^ (10 & 3),
+      n7: (12 ^ (10 & 3)) | 6,
+      n8: ((12 & 10) ^ 3) | 6,
+      n9: 12 | ((10 ^ 3) & 6),
+      n10: (12 & 10) | 3,
+      n11: 12 | (10 & 3),
+      n12: (12 ^ 10) | 3,
+      n13: 12 | (10 ^ 3),
+      n14: (12 & 10) ^ 3,
+      n15: 12 ^ (10 & 3),
+      n16: (12 ^ 10) & 3,
+      n17: 12 & (10 | 3),
+      n18: (12 | 10) ^ 3,
+      n19: 12 ^ (10 | 3),
+      n20: (12 | 10) ^ (3 | 6),
+    })
+    elem.setData({ a: 3, b: 6, c: 5, d: 12 })
+    checkAll({
+      n1: (3 & 6) | 5,
+      n2: 3 | (6 & 5),
+      n3: (3 ^ 6) | 5,
+      n4: 3 | (6 ^ 5),
+      n5: (3 & 6) ^ 5,
+      n6: 3 ^ (6 & 5),
+      n7: (3 ^ (6 & 5)) | 12,
+      n8: ((3 & 6) ^ 5) | 12,
+      n9: 3 | ((6 ^ 5) & 12),
+      n10: (3 & 6) | 5,
+      n11: 3 | (6 & 5),
+      n12: (3 ^ 6) | 5,
+      n13: 3 | (6 ^ 5),
+      n14: (3 & 6) ^ 5,
+      n15: 3 ^ (6 & 5),
+      n16: (3 ^ 6) & 5,
+      n17: 3 & (6 | 5),
+      n18: (3 | 6) ^ 5,
+      n19: 3 ^ (6 | 5),
+      n20: (3 | 6) ^ (5 | 12),
+    })
+  })
+
   test('conditional operator', () => {
     const def = glassEasel.registerElement({
       template: tmpl(`
