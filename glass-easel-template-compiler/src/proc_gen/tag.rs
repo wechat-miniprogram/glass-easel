@@ -1799,7 +1799,7 @@ impl EventBinding {
                                 p.value_expr(w)?;
                                 write!(
                                     w,
-                                    ",{},{},{},!0)",
+                                    ",{},{},{},!0",
                                     if self.is_catch { "!0" } else { "!1" },
                                     if self.is_mut { "!0" } else { "!1" },
                                     if self.is_capture { "!0" } else { "!1" },
@@ -1808,6 +1808,7 @@ impl EventBinding {
                                     write!(w, ",")?;
                                     p.lvalue_path(w, scopes, Some(false))?;
                                 }
+                                write!(w, ")")?;
                                 Ok(())
                             })
                         })?;
